@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --background: #030712; /* gray-950 */
+  --foreground: #f9fafb; /* gray-50 */
+}
+
+/* Base styles are applied via layout.tsx body classes, but we keep this for consistency */
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl shadow-xl;
+  }
+  
+  .glass-panel {
+    @apply bg-gray-900/50 border border-gray-800 backdrop-blur-lg rounded-2xl;
+  }
+  
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-500;
+  }
+}
