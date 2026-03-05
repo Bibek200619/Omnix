@@ -1,42 +1,29 @@
 "use client";
 
-import { BrainCircuit } from "lucide-react";
-import { useRouter } from "next/navigation";
-
-const links = [
-  { label: "Chat", href: "/chat" },
-  { label: "History", href: "/history" },
-  { label: "Settings", href: "/settings" },
-  { label: "Terms", href: "/settings/terms" }
-];
+import Link from "next/link";
+import { Sparkles } from "lucide-react";
 
 export function Footer() {
-  const router = useRouter();
-
   return (
-    <footer className="border-t border-white/10 bg-[#0d0d0b] px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-        <button type="button" onClick={() => router.push("/")} className="flex items-center gap-3 text-left">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-teal-300 text-stone-950">
-            <BrainCircuit className="h-5 w-5" aria-hidden="true" />
+    <footer className="border-t border-white/10 bg-canvas px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <Link href="/" className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200">
+            <Sparkles className="h-5 w-5" />
           </span>
-          <span>
-            <span className="block text-sm font-semibold text-white">Omnix AI</span>
-            <span className="block text-xs text-stone-500">AI SaaS frontend</span>
-          </span>
-        </button>
-        <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-stone-400" aria-label="Footer">
-          {links.map((link) => (
-            <button
-              key={link.href}
-              type="button"
-              onClick={() => router.push(link.href)}
-              className="transition hover:text-white"
-            >
-              {link.label}
-            </button>
-          ))}
-        </nav>
+          <span className="font-semibold text-white">Omnix AI</span>
+        </Link>
+        <div className="flex flex-wrap gap-4 text-sm text-slate-400">
+          <Link href="/login" className="hover:text-white">
+            Login
+          </Link>
+          <Link href="/register" className="hover:text-white">
+            Register
+          </Link>
+          <Link href="/settings/terms" className="hover:text-white">
+            Terms
+          </Link>
+        </div>
       </div>
     </footer>
   );

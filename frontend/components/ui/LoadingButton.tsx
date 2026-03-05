@@ -1,24 +1,26 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
-import { Button, type ButtonProps } from "@/components/ui/Button";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { Button } from "@/components/ui/Button";
 
-type LoadingButtonProps = ButtonProps & {
-  loading?: boolean;
+type LoadingButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  isLoading?: boolean;
   loadingText?: string;
+  leftIcon?: ReactNode;
+  rightIcon?: ReactNode;
+  variant?: "primary" | "secondary" | "ghost" | "danger";
+  size?: "sm" | "md" | "lg" | "icon";
 };
 
 export function LoadingButton({
-  children,
-  loading = false,
+  isLoading = false,
   loadingText = "Working",
-  disabled,
+  children,
   ...props
 }: LoadingButtonProps) {
   return (
-    <Button disabled={disabled || loading} {...props}>
-      {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-      {loading ? loadingText : children}
+    <Button isLoading={isLoading} {...props}>
+      {isLoading ? loadingText : children}
     </Button>
   );
 }
