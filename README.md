@@ -1,508 +1,294 @@
-# AI Backend (Supabase + FastAPI + LLM)
+# 🚀 Omnix AI Backend (RAG-Enabled System)
 
-A production-ready backend for an AI application that supports authentication, chat conversations, file handling, logging, caching, and is designed to integrate with an LLM (e.g., vLLM) and a vector store (FAISS) for RAG.
+A production-oriented **AI backend system** built with FastAPI and Supabase, designed for scalable chat, document processing, and Retrieval-Augmented Generation (RAG).
 
-This README is written so another AI (or developer) can quickly understand the system without extra explanation.
+This README is structured for both **developers and AI tools** to quickly understand and extend the system.
 
 ---
 
-## 🧠 System Overview
+# 🧠 System Overview
 
-This backend follows a clean layered architecture:
+This backend implements a modular AI architecture:
 
-```
-Frontend (React)
+```text
+Frontend (Next.js - planned)
         ↓
-FastAPI (API + Logic)
+FastAPI (API + Business Logic)
         ↓
-LLM Server (vLLM / local model)
+RAG Pipeline (Retrieval Engine)
         ↓
 Supabase (Auth + Database)
         ↓
-FAISS (Vector Search - future)
+FAISS (Vector Search - temporary)
+        ↓
+LLM (optional / Dev Mode fallback)
 ```
 
 ---
 
-## 🎯 Purpose
+# 🎯 Purpose
 
-* Build a scalable AI backend
-* Avoid token limits of external APIs by using local models
-* Maintain full control over data
-* Support chat, memory, files, and future RAG
-
----
-
-## ⚙️ Tech Stack
-
-* FastAPI (backend API)
-* Supabase (auth + PostgreSQL)
-* PyJWT (JWT verification)
-* vLLM / OpenAI-compatible server (LLM)
-* FAISS (planned vector search)
-* Uvicorn (ASGI server)
+* Build a **scalable AI backend**
+* Enable **document-based Q&A (RAG)**
+* Maintain **full data control (no external APIs required)**
+* Support chat, files, caching, and future AI features
 
 ---
 
-## 📁 Project Structure
+# ⚙️ Tech Stack
 
-```
-backend/
-├── app/
-│   ├── main.py                # Entry point
-│   ├── core/
-│   │   ├── config.py          # Environment config
-│   │   └── security.py        # JWT verification
-│   ├── db/
-│   │   └── supabase.py        # DB connection
-│   ├── schemas/
-│   │   └── chat.py            # Request/response models
-│   ├── services/
-│   │   ├── chat_service.py    # LLM interaction
-│   │   └── supabase_service.py# DB helpers
-│   └── routers/
-│       ├── health.py
-│       ├── conversations.py
-│       ├── messages.py
-│       ├── files.py
-│       └── cache.py
-├── requirements.txt
-└── .env
+* FastAPI (Backend API)
+* Supabase (Auth + PostgreSQL)
+* FAISS (Vector Search - temporary)
+* sentence-transformers (Embeddings)
+* PyJWT (Authentication)
+* Uvicorn (ASGI Server)
+
+---
+
+# 🧩 Core Architecture
+
+## 🔹 RAG Flow
+
+```text
+User Query
+   ↓
+Embedding (sentence-transformers)
+   ↓
+FAISS Search (vector similarity)
+   ↓
+Top Chunk IDs
+   ↓
+Supabase Fetch (source of truth)
+   ↓
+Context Builder
+   ↓
+ChatService (Dev Mode / LLM-ready)
 ```
 
 ---
 
-## 🔐 Authentication Flow
+# ✅ Current Features
 
-1. User logs in via Supabase
-2. Supabase returns JWT access token
-3. Frontend sends token in header:
+## 🔹 Chat System
 
-   ```
-   Authorization: Bearer <token>
-   ```
-4. FastAPI verifies token using JWKS
-5. Extracts `user_id = token['sub']`
-6. All queries are filtered by user_id
+* Conversation-based messaging
+* Message persistence
+* Safe message lifecycle handling
 
----
+## 🔹 RAG System
 
-## 🗄️ Database Schema
+* Chunking (500 tokens, overlap)
+* Embedding generation
+* Vector search (FAISS)
+* DB-backed chunk retrieval (no in-memory dict)
 
-### Tables
+## 🔹 Multi-User Isolation
 
-* profiles
-* conversations
-* messages
-* files
-* documents
-* embeddings
-* api_logs
-* cache
+* Strict user-level filtering
+* No cross-user data leakage
 
-### Relationships
+## 🔹 Dev Mode (LLM-Free)
 
-```
-User
- ├── Profile
- ├── Conversations
- │     └── Messages
- ├── Files
- │     └── Documents
- │            └── Embeddings
- ├── API Logs
- └── Cache
-```
+* No dependency on external LLM
+* Returns best matching chunk
+* Clean, deduplicated responses
+
+## 🔹 Backend Stability
+
+* Async-safe operations
+* Structured logging
+* Error handling with fallbacks
 
 ---
 
-## 🔐 Security (RLS)
+# ⚠️ Current Limitations
 
-* Row Level Security enabled on all tables
-* Users can only access their own data
-* Backend uses service role key (bypasses RLS)
-* Frontend uses anon key (RLS enforced)
+* FAISS is **in-memory** (rebuilt on startup)
+* No real LLM integration yet (Dev Mode only)
+* Split storage:
+
+  * FAISS → embeddings
+  * Supabase → text data
+* No frontend yet (planned)
 
 ---
 
-## 💬 Chat Flow
+# 🗄️ Database Schema (Supabase)
 
-```
+### Core Tables
+
+* `profiles` → user data
+* `conversations` → chat sessions
+* `messages` → chat messages
+* `files` → uploaded files
+* `documents` → chunked text
+* `embeddings` → vector mapping
+* `cache` → response caching
+* `api_logs` → request logs
+
+---
+
+# 🔐 Authentication
+
+* Supabase JWT-based authentication
+* Backend verifies token via JWKS
+* Extracts `user_id` from token
+* All queries filtered by `user_id`
+
+---
+
+# 💬 Chat Flow
+
+```text
 User sends message
     ↓
-FastAPI validates JWT
+JWT validation
     ↓
 Message stored in DB
     ↓
-Context built from past messages
+RAG retrieval (chunks)
     ↓
-Sent to LLM
+Context built
     ↓
-Response generated
+Dev Mode response (or LLM)
     ↓
-Response stored
-    ↓
-Returned to user
+Response stored + returned
 ```
 
 ---
 
-## 🧠 LLM Integration
+# 📁 Project Structure
 
-Uses OpenAI-compatible API:
-
-Endpoint:
-
-```
-POST /v1/chat/completions
-```
-
-Payload:
-
-```
-{
-  "model": "local-model",
-  "messages": [...]
-}
+```text
+backend/
+├── app/
+│   ├── rag/
+│   │   ├── ingestion.py
+│   │   ├── chunking.py
+│   │   ├── embedding.py
+│   │   ├── vector_store.py
+│   │   ├── retrieval.py
+│   │   └── context_builder.py
+│   │
+│   ├── services/
+│   │   ├── chat_service.py
+│   │   ├── supabase_service.py
+│   │   └── llm_service.py
+│   │
+│   ├── core/
+│   │   ├── config.py
+│   │   └── security.py
+│   │
+│   ├── routers/
+│   │   ├── conversations.py
+│   │   ├── messages.py
+│   │   ├── files.py
+│   │   └── cache.py
+│
+└── main.py
 ```
 
 ---
 
-## 📡 API Endpoints
+# 📡 API Endpoints
 
-### Health
+### Chat
 
-* GET /health
+* `POST /chat`
 
 ### Conversations
 
-* POST /conversations
-* GET /conversations
-* GET /conversations/{id}
+* `POST /conversations`
+* `GET /conversations`
 
 ### Messages
 
-* POST /chat
-* GET /conversations/{id}/messages
+* `GET /conversations/{id}/messages`
 
 ### Files
 
-* POST /files
-* GET /files
+* `POST /files`
+* `GET /files`
 
-### Cache
+### System
 
-* POST /cache
-* GET /cache/{key}
-
----
-
-## 🧪 Example Request
-
-```
-curl -X POST http://localhost:8000/chat \
--H "Authorization: Bearer TOKEN" \
--H "Content-Type: application/json" \
--d '{"message": "Hello AI"}'
-```
+* `GET /health`
 
 ---
 
-## 📦 Setup
+# 🔧 Setup
 
-### Install
+## Install
 
-```
+```bash
 pip install -r requirements.txt
 ```
 
-### Run
+## Run
 
-```
+```bash
 uvicorn app.main:app --reload
 ```
 
 ---
 
-## ⚠️ Important Notes
+# ⚠️ Security Notes
 
-* Never expose service role key
+* Never expose `SERVICE_ROLE_KEY`
 * Always verify JWT in backend
-* Assistant messages should only be created by backend
-* Keep model separate from API logic
+* Use RLS in Supabase for frontend access
+* Backend uses service role with strict filtering
 
 ---
 
-## 🚀 Future Enhancements
+# 🚀 Roadmap
 
-* FAISS integration (vector search)
-* RAG pipeline
-* Multi-agent system
-* Streaming responses
-* Rate limiting
+## 🔹 Short-Term
 
----
+* Frontend UI (Next.js)
+* Improve retrieval quality (threshold tuning)
+* Add logging/metrics
 
-## 🧠 Design Philosophy
+## 🔹 Mid-Term
 
-* Modular architecture
-* Clear separation of concerns
-* Scalable from prototype → production
-* Backend acts as "AI operating system"
+* LLM integration (local via Ollama or API)
+* Conversation memory enhancement
+* File upload → RAG ingestion
 
----
+## 🔹 Long-Term
 
-## 📌 Summary
-
-This backend is:
-
-* Secure (JWT + RLS)
-* Scalable (modular design)
-* AI-ready (LLM + future RAG)
-* Clean (structured SDLC approach)
-
-# 🚀 AI Backend System (RAG-Enabled)
-
-## 📌 Overview
-
-This project is a **local-first AI backend system** designed to run large language models (LLMs) with **no token limitations**, full control, and scalable architecture.
-
-It includes:
-- FastAPI backend
-- Supabase (auth + database)
-- FAISS (vector storage)
-- RAG (Retrieval-Augmented Generation)
-- Modular AI pipeline
+* Replace FAISS with pgvector (Supabase)
+* Background workers (Celery/queue)
+* Multi-instance scaling
 
 ---
 
-## 🧠 System Goals
+# 🧠 Design Philosophy
 
-- Run AI models locally / on cloud (AWS/GCP)
-- Remove token restrictions from APIs
-- Build scalable AI infrastructure
-- Enable document-based Q&A (RAG)
-- Maintain full control over data and logic
+* Build working systems first, optimize later
+* Separate concerns:
 
----
-
-## 🏗️ Architecture
-
-Frontend
-↓
-FastAPI Backend
-↓
-Core Services
-Auth (Supabase JWT)
-Chat Service
-RAG Engine
-↓
-Storage Layer
-Supabase (Postgres)
-FAISS (Vector DB)
-
-↓
-LLM (Local / vLLM / API)
-
+  * Vector search (FAISS)
+  * Data storage (Supabase)
+* Avoid over-engineering early
+* Design for future scalability
 
 ---
 
-## 🔐 Authentication
+# 📌 Status
 
-- Managed via Supabase
-- JWT-based authentication
-- All routes (except health/docs) are protected
-- User isolation enforced at application level
-
----
-
-## 🗄️ Database Schema (Supabase)
-
-### Core Tables
-
-- `profiles` → user data  
-- `conversations` → chat sessions  
-- `messages` → chat messages  
-- `files` → uploaded files  
-- `documents` → chunked text  
-- `embeddings` → vector mapping  
-- `cache` → response caching  
-- `api_logs` → request logs  
+🟢 Backend: Stable (MVP ready)
+🟡 RAG: Functional (improving)
+🟡 Frontend: In progress
+🔵 LLM: Planned
 
 ---
 
-## ⚙️ Backend Features
+# 🎯 Next Step
 
-### ✅ Chat System
-- Conversation-based chat
-- Message history
-- Failure-safe message handling
-- Rate-limited
+* Build frontend UI
+* Connect chat endpoint
+* Add real LLM integration
 
 ---
-
-### ✅ Security
-- Strong JWT validation
-- No raw DB error leaks
-- User data isolation
-- Controlled model access
-
----
-
-### ✅ Performance
-- Pagination implemented
-- Input/output limits enforced
-- Reduced DB roundtrips
-- Bounded LLM calls
-
----
-
-### ✅ Stability
-- Non-blocking logging
-- Background tasks
-- Concurrency control
-- Timeout handling
-
----
-
-## 🧠 RAG System (In Progress)
-
-### Design
-
-
-Upload File
-↓
-Background Processing
-↓
-Chunking (500 tokens, 50 overlap)
-↓
-Embedding Generation
-↓
-FAISS Storage
-↓
-Query → Retrieval → Context → LLM
-
-
----
-
-### Components
-
-- `ingestion.py` → file processing
-- `chunking.py` → text splitting
-- `embedding.py` → embeddings
-- `vector_store.py` → FAISS
-- `retrieval.py` → search engine
-
----
-
-### Key Decisions
-
-- Global FAISS index
-- Background ingestion
-- Selective RAG (not always-on)
-- User-level data isolation
-
----
-
-## 📡 API Endpoints (Core)
-
-### Auth
-- `/auth/login`
-- `/auth/signup`
-
-### Chat
-- `/chat`
-- `/conversations`
-- `/messages`
-
-### Files
-- `/files/upload`
-- `/files/list`
-
-### System
-- `/health`
-
----
-
-## 🔧 Environment Variables
-
-```env
-SUPABASE_URL=...
-SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
-
-SUPABASE_JWKS_URL=...
-
-MODEL_URL=http://localhost:8000/v1/chat/completions
-
-SECRET_KEY=...
-⚠️ Security Notes
-NEVER expose SERVICE_ROLE_KEY
-.env must be in .gitignore
-Rotate keys if leaked
-All access controlled via JWT
-🧪 Testing Strategy
-Postman / curl for API testing
-UI (planned) for real-world validation
-Stress testing via multiple requests
-Failure simulation (LLM down, DB slow)
-🚀 Current Status
-✅ Completed
-Backend architecture
-Security hardening
-Performance optimization
-Chat system
-Supabase integration
-🔄 In Progress
-RAG ingestion
-FAISS integration
-⏳ Planned
-UI
-Deployment (AWS/GCP)
-Advanced RAG (reranking, hybrid search)
-🧠 Development Philosophy
-System-first design (not feature-first)
-Security before scaling
-Controlled complexity
-Modular architecture
-AI-assisted development workflow
-👨‍💻 Workflow
-
-This project uses:
-
-Codex / Cursor → code generation
-Claude / Gemini → reasoning/debugging
-ChatGPT → system architecture guidance
-📌 Future Enhancements
-Hybrid search (keyword + vector)
-Re-ranking models
-Distributed vector storage
-Real-time streaming responses
-Multi-model orchestration
-📄 License
-
-Internal / Personal Project
-
-🤝 Contribution
-
-Currently single-developer system
-Designed for extensibility and future collaboration
-
-
----
-
-# 🧠 Why this README is good
-
-- Structured for humans **and AI tools**
-- Reduces repeated explanation
-- Matches your actual architecture
-- Scales with your project
-
----
-
-# 🎯 Next step
-
-Save this as:
-
-```bash
-README.md

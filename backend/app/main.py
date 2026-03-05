@@ -12,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 
 from .core.security import auth_context_middleware
 from .db.supabase import get_supabase
+from .rag.startup import initialize_vector_store, shutdown_vector_store
 from .routers import cache, conversations, files, health, messages
 
 app = FastAPI(title="Omnix Backend API", version="1.0.0")
@@ -57,6 +58,29 @@ def _fire_and_forget_log(log_payload: dict[str, Any]) -> None:
     task = asyncio.create_task(_write_api_log(log_payload))
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize FAISS vector store on application startup."""
+    logger.info("Starting Omnix Backend API...")
+    try:
+        await initialize_vector_store()
+        logger.info("Vector store initialized successfully.")
+    except Exception as exc:
+        logger.exception("Failed to initialize vector store on startup.")
+        raise
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Persist FAISS vector store on application shutdown."""
+    logger.info("Shutting down Omnix Backend API...")
+    try:
+        await shutdown_vector_store()
+        logger.info("Vector store persisted successfully.")
+    except Exception as exc:
+        logger.exception("Failed to persist vector store on shutdown.")
 
 
 app.middleware("http")(auth_context_middleware)
