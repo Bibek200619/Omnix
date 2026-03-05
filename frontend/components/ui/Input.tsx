@@ -1,37 +1,44 @@
 "use client";
 
-import * as React from "react";
+import { forwardRef } from "react";
+import type { InputHTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
+type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
-  error?: string;
+  hint?: string;
+  icon?: ReactNode;
 };
 
-export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, id, ...props }, ref) => {
-    const generatedId = React.useId();
-    const inputId = id ?? generatedId;
-
+export const Input = forwardRef<HTMLInputElement, InputProps>(
+  ({ className, label, hint, icon, id, ...props }, ref) => {
     return (
-      <label className="block" htmlFor={inputId}>
+      <label className="block space-y-2" htmlFor={id}>
         {label ? (
-          <span className="mb-2 block text-sm font-medium text-stone-200">{label}</span>
+          <span className="text-sm font-medium text-slate-200">{label}</span>
         ) : null}
-        <input
-          ref={ref}
-          id={inputId}
-          className={cn(
-            "h-12 w-full rounded-md border border-white/10 bg-white/[0.06] px-3.5 text-sm text-stone-50 outline-none transition placeholder:text-stone-500 focus:border-teal-200/65 focus:bg-white/[0.09] focus:ring-4 focus:ring-teal-200/10",
-            error && "border-rose-300/50 focus:border-rose-200 focus:ring-rose-300/10",
-            className
-          )}
-          {...props}
-        />
-        {error ? <span className="mt-2 block text-sm text-rose-200">{error}</span> : null}
+        <span className="relative block">
+          {icon ? (
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+              {icon}
+            </span>
+          ) : null}
+          <input
+            ref={ref}
+            id={id}
+            className={cn(
+              "h-11 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-white outline-none transition",
+              "placeholder:text-slate-500 focus:border-cyan-300/70 focus:bg-white/[0.07] focus:ring-2 focus:ring-cyan-300/15",
+              icon && "pl-10",
+              className,
+            )}
+            {...props}
+          />
+        </span>
+        {hint ? <span className="text-xs text-slate-500">{hint}</span> : null}
       </label>
     );
-  }
+  },
 );
 
 Input.displayName = "Input";

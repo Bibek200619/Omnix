@@ -1,46 +1,44 @@
 "use client";
 
-import * as React from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { OTPInput } from "@/components/ui/OTPInput";
+import { ShieldCheck } from "lucide-react";
 import { LoadingButton } from "@/components/ui/LoadingButton";
-import { Button } from "@/components/ui/Button";
+import { OTPInput } from "@/components/ui/OTPInput";
 
 export function VerifyForm() {
   const router = useRouter();
-  const [code, setCode] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
+  const [otp, setOtp] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (code.length !== 6) {
-      return;
-    }
-
+    if (otp.length !== 6) return;
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 450));
-    router.push("/chat");
-  };
+
+    window.setTimeout(() => {
+      setLoading(false);
+      router.push("/chat");
+    }, 500);
+  }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div>
-        <label className="mb-3 block text-sm font-medium text-stone-200">Verification code</label>
-        <OTPInput value={code} onChange={setCode} disabled={loading} />
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-slate-200">
+          Verification code
+        </label>
+        <OTPInput value={otp} onChange={setOtp} disabled={loading} />
       </div>
       <LoadingButton
         type="submit"
-        fullWidth
-        loading={loading}
-        loadingText="Verifying"
-        disabled={code.length !== 6}
+        className="w-full"
+        isLoading={loading}
+        disabled={otp.length !== 6}
+        leftIcon={<ShieldCheck className="h-4 w-4" />}
       >
         Verify
       </LoadingButton>
-      <Button type="button" variant="ghost" fullWidth onClick={() => setCode("")} disabled={!code || loading}>
-        Clear code
-      </Button>
     </form>
   );
 }

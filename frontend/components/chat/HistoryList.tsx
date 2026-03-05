@@ -1,68 +1,97 @@
 "use client";
 
-import * as React from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquareText, Trash2 } from "lucide-react";
+import { Clock, MessageSquareText, Search } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { chatHistory, type ChatPreview } from "@/lib/mock-data";
+import { Input } from "@/components/ui/Input";
+import { mockChats } from "@/lib/mock-data";
 
 export function HistoryList() {
   const router = useRouter();
-  const [chats, setChats] = React.useState<ChatPreview[]>(chatHistory);
+  const [query, setQuery] = useState("");
 
-  if (chats.length === 0) {
-    return (
-      <section className="flex min-h-[28rem] flex-col items-center justify-center rounded-lg border border-dashed border-white/15 bg-white/[0.035] px-6 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-md bg-teal-300 text-stone-950">
-          <MessageSquareText className="h-6 w-6" aria-hidden="true" />
-        </div>
-        <h2 className="mt-5 text-xl font-semibold text-white">No chat history yet</h2>
-        <p className="mt-2 max-w-md text-sm leading-6 text-stone-400">
-          Start a new chat and your conversations will appear here once the backend history endpoint is connected.
-        </p>
-        <Button className="mt-6" onClick={() => router.push("/chat")}>
-          Start a chat
-        </Button>
-      </section>
+  const chats = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return mockChats;
+    return mockChats.filter((chat) =>
+      `${chat.title} ${chat.excerpt}`.toLowerCase().includes(normalized),
     );
-  }
+  }, [query]);
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-white">Recent chats</h2>
-          <p className="mt-1 text-sm text-stone-400">Open any conversation to continue from chat.</p>
-        </div>
-        <Button variant="secondary" onClick={() => setChats([])}>
-          <Trash2 className="h-4 w-4" aria-hidden="true" />
-          Clear
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search chat history"
+          aria-label="Search chat history"
+          icon={<Search className="h-4 w-4" />}
+          className="sm:w-80"
+        />
+        <Button type="button" onClick={() => router.push("/chat")}>
+          New chat
         </Button>
       </div>
 
-      <div className="grid gap-3">
-        {chats.map((chat) => (
-          <button
-            key={chat.id}
+      {chats.length > 0 ? (
+        <div className="grid gap-3">
+          {chats.map((chat) => (
+            <button
+              key={chat.id}
+              type="button"
+              onClick={() => router.push(`/chat?conversation=${chat.id}`)}
+              className="group rounded-lg border border-white/10 bg-white/[0.04] p-4 text-left transition hover:border-cyan-300/30 hover:bg-white/[0.07]"
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <MessageSquareText className="h-4 w-4 text-cyan-200" />
+                    <h2 className="truncate text-base font-semibold text-white">
+                      {chat.title}
+                    </h2>
+                  </div>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+                    {chat.excerpt}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2 text-xs text-slate-500">
+                  <Clock className="h-3.5 w-3.5" />
+                  {chat.updatedAt}
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
+                <span className="text-xs text-slate-500">
+                  {chat.messageCount} messages
+                </span>
+                <span className="text-sm font-medium text-cyan-200 opacity-0 transition group-hover:opacity-100">
+                  Open chat
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="flex min-h-[360px] flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200">
+            <MessageSquareText className="h-5 w-5" />
+          </div>
+          <h2 className="mt-4 text-lg font-semibold text-white">
+            No chats found
+          </h2>
+          <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
+            Try a different search or start a new conversation.
+          </p>
+          <Button
             type="button"
-            onClick={() => router.push(`/chat?conversation=${chat.id}`)}
-            className="group rounded-lg border border-white/10 bg-white/[0.045] p-4 text-left transition hover:border-teal-200/35 hover:bg-white/[0.075]"
+            className="mt-5"
+            onClick={() => router.push("/chat")}
           >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <h3 className="truncate text-base font-semibold text-white group-hover:text-teal-100">
-                  {chat.title}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-stone-400">{chat.summary}</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-3 text-xs text-stone-500 sm:flex-col sm:items-end sm:gap-1">
-                <span>{chat.updatedAt}</span>
-                <span>{chat.messageCount} messages</span>
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
+            Start chat
+          </Button>
+        </div>
+      )}
     </section>
   );
 }

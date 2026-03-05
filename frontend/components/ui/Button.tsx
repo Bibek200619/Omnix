@@ -1,61 +1,76 @@
 "use client";
 
-import * as React from "react";
+import { forwardRef } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type ButtonSize = "sm" | "md" | "lg" | "icon";
 
-export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
-  fullWidth?: boolean;
+  isLoading?: boolean;
+  leftIcon?: ReactNode;
+  rightIcon?: ReactNode;
 };
 
 const variants: Record<ButtonVariant, string> = {
   primary:
-    "bg-teal-300 text-stone-950 shadow-[0_14px_32px_rgba(45,212,191,0.18)] hover:bg-teal-200",
+    "border-cyan-300/40 bg-cyan-300 text-slate-950 shadow-glow hover:bg-cyan-200",
   secondary:
-    "border border-white/12 bg-white/[0.07] text-stone-100 hover:border-white/20 hover:bg-white/[0.11]",
-  ghost: "text-stone-300 hover:bg-white/[0.07] hover:text-white",
+    "border-white/10 bg-white/[0.06] text-white hover:border-white/20 hover:bg-white/[0.1]",
+  ghost:
+    "border-transparent bg-transparent text-slate-300 hover:bg-white/[0.06] hover:text-white",
   danger:
-    "border border-rose-300/25 bg-rose-400/12 text-rose-100 hover:bg-rose-400/18"
+    "border-rose-400/30 bg-rose-400/12 text-rose-100 hover:bg-rose-400/18",
 };
 
 const sizes: Record<ButtonSize, string> = {
-  sm: "h-9 gap-2 rounded-md px-3 text-sm",
-  md: "h-11 gap-2 rounded-md px-4 text-sm",
-  lg: "h-12 gap-2 rounded-md px-5 text-base",
-  icon: "h-10 w-10 rounded-md p-0"
+  sm: "h-9 gap-2 px-3 text-sm",
+  md: "h-10 gap-2 px-4 text-sm",
+  lg: "h-12 gap-2.5 px-5 text-base",
+  icon: "h-10 w-10 p-0",
 };
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   (
     {
       className,
       variant = "primary",
       size = "md",
-      fullWidth = false,
-      type = "button",
+      isLoading = false,
+      disabled,
+      leftIcon,
+      rightIcon,
+      children,
       ...props
     },
-    ref
+    ref,
   ) => {
+    const isDisabled = disabled || isLoading;
+
     return (
       <button
         ref={ref}
-        type={type}
         className={cn(
-          "inline-flex items-center justify-center whitespace-nowrap font-medium transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-200 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-55",
+          "inline-flex shrink-0 items-center justify-center rounded-lg border font-medium transition duration-200",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+          "disabled:cursor-not-allowed disabled:opacity-55",
           variants[variant],
           sizes[size],
-          fullWidth && "w-full",
-          className
+          className,
         )}
+        disabled={isDisabled}
         {...props}
-      />
+      >
+        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : leftIcon}
+        {children}
+        {!isLoading ? rightIcon : null}
+      </button>
     );
-  }
+  },
 );
 
 Button.displayName = "Button";

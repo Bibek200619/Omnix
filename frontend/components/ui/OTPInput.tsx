@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import { useRef } from "react";
 import { cn } from "@/lib/utils";
 
 type OTPInputProps = {
@@ -10,43 +10,34 @@ type OTPInputProps = {
   disabled?: boolean;
 };
 
-export function OTPInput({ value, onChange, length = 6, disabled = false }: OTPInputProps) {
-  const refs = React.useRef<Array<HTMLInputElement | null>>([]);
+export function OTPInput({
+  value,
+  onChange,
+  length = 6,
+  disabled = false,
+}: OTPInputProps) {
+  const refs = useRef<Array<HTMLInputElement | null>>([]);
   const digits = Array.from({ length }, (_, index) => value[index] ?? "");
 
-  const setDigit = (index: number, digit: string) => {
+  function updateDigit(index: number, nextValue: string) {
+    const digit = nextValue.replace(/\D/g, "").slice(-1);
     const next = digits.slice();
-    next[index] = digit.replace(/\D/g, "").slice(-1);
+    next[index] = digit;
     onChange(next.join("").slice(0, length));
 
     if (digit && index < length - 1) {
       refs.current[index + 1]?.focus();
     }
-  };
+  }
 
-  const handlePaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
-    event.preventDefault();
-    const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, length);
+  function handlePaste(text: string) {
+    const pasted = text.replace(/\D/g, "").slice(0, length);
     onChange(pasted);
     refs.current[Math.min(pasted.length, length - 1)]?.focus();
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>, index: number) => {
-    if (event.key === "Backspace" && !digits[index] && index > 0) {
-      refs.current[index - 1]?.focus();
-    }
-
-    if (event.key === "ArrowLeft" && index > 0) {
-      refs.current[index - 1]?.focus();
-    }
-
-    if (event.key === "ArrowRight" && index < length - 1) {
-      refs.current[index + 1]?.focus();
-    }
-  };
+  }
 
   return (
-    <div className="flex items-center gap-2 sm:gap-3" role="group" aria-label="Verification code">
+    <div className="grid grid-cols-6 gap-2" aria-label="One-time password">
       {digits.map((digit, index) => (
         <input
           key={index}
@@ -54,19 +45,24 @@ export function OTPInput({ value, onChange, length = 6, disabled = false }: OTPI
             refs.current[index] = node;
           }}
           value={digit}
+          disabled={disabled}
           inputMode="numeric"
           autoComplete={index === 0 ? "one-time-code" : "off"}
-          pattern="[0-9]*"
-          disabled={disabled}
           maxLength={1}
-          onChange={(event) => setDigit(index, event.target.value)}
-          onKeyDown={(event) => handleKeyDown(event, index)}
-          onPaste={handlePaste}
+          onPaste={(event) => {
+            event.preventDefault();
+            handlePaste(event.clipboardData.getData("text"));
+          }}
+          onChange={(event) => updateDigit(index, event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Backspace" && !digits[index] && index > 0) {
+              refs.current[index - 1]?.focus();
+            }
+          }}
           className={cn(
-            "h-12 w-10 rounded-md border border-white/10 bg-white/[0.06] text-center text-lg font-semibold text-stone-50 outline-none transition focus:border-teal-200/65 focus:bg-white/[0.09] focus:ring-4 focus:ring-teal-200/10 disabled:opacity-55 sm:h-14 sm:w-12",
-            digit && "border-teal-200/40 bg-teal-200/10"
+            "aspect-square min-h-12 rounded-lg border border-white/10 bg-white/[0.04] text-center text-lg font-semibold text-white outline-none transition",
+            "focus:border-cyan-300/70 focus:bg-white/[0.07] focus:ring-2 focus:ring-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-60",
           )}
-          aria-label={`Digit ${index + 1}`}
         />
       ))}
     </div>

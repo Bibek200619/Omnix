@@ -1,51 +1,59 @@
 "use client";
 
-import * as React from "react";
 import Link from "next/link";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Lock, Mail, UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { LoadingButton } from "@/components/ui/LoadingButton";
 
 export function RegisterForm() {
   const router = useRouter();
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 450));
-    router.push("/verify");
-  };
+
+    window.setTimeout(() => {
+      setLoading(false);
+      router.push("/verify");
+    }, 500);
+  }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <Input
+        id="email"
         label="Email"
         type="email"
-        value={email}
-        onChange={(event) => setEmail(event.target.value)}
-        placeholder="you@company.com"
         autoComplete="email"
+        placeholder="you@company.com"
         required
+        icon={<Mail className="h-4 w-4" />}
       />
       <Input
+        id="password"
         label="Password"
         type="password"
-        value={password}
-        onChange={(event) => setPassword(event.target.value)}
-        placeholder="Create a strong password"
         autoComplete="new-password"
-        minLength={8}
+        placeholder="Create a secure password"
         required
+        minLength={8}
+        icon={<Lock className="h-4 w-4" />}
+        hint="Use at least 8 characters."
       />
-      <LoadingButton type="submit" fullWidth loading={loading} loadingText="Creating account">
+      <LoadingButton
+        type="submit"
+        className="w-full"
+        isLoading={loading}
+        leftIcon={<UserPlus className="h-4 w-4" />}
+      >
         Register
       </LoadingButton>
-      <p className="text-center text-sm text-stone-400">
+      <p className="text-center text-sm text-slate-400">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-teal-200 hover:text-teal-100">
+        <Link href="/login" className="font-medium text-cyan-200 hover:text-cyan-100">
           Login
         </Link>
       </p>
