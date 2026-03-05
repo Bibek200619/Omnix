@@ -3,6 +3,7 @@ import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { MessageList } from "@/components/chat/MessageList";
 import { ChatInput } from "@/components/chat/ChatInput";
+import { sendMessage } from "@/lib/api";
 
 interface Message {
   id: string;
@@ -14,7 +15,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
 
-  const handleSend = (content: string) => {
+  const handleSend = async (content: string) => {
     // Add user message
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -25,16 +26,25 @@ export default function ChatPage() {
     setMessages(prev => [...prev, userMsg]);
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      const data = await sendMessage(content);
+      
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "ai",
-        content: "This is a simulated response. The UI is now fully interactive, using `next/navigation` and Framer Motion micro-interactions."
+        content: data.response || "No response received."
       };
       setMessages(prev => [...prev, aiMsg]);
+    } catch (error: any) {
+      const errorMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "ai",
+        content: "⚠️ Error: Could not connect to the backend server. Please make sure the FastAPI server is running."
+      };
+      setMessages(prev => [...prev, errorMsg]);
+    } finally {
       setIsTyping(false);
-    }, 2000); // 2 seconds typing simulation
+    }
   };
 
   return (
@@ -46,3 +56,4 @@ export default function ChatPage() {
     </AppLayout>
   );
 }
+
