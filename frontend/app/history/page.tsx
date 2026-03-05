@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { PageTransition } from "@/components/layout/PageTransition";
 import { MessageSquare, MoreHorizontal, Calendar, Search } from "lucide-react";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 const MOCK_HISTORY = [
   { id: 1, title: "Data Analysis Request", date: "Today", messages: 12 },
@@ -13,6 +14,8 @@ const MOCK_HISTORY = [
 ];
 
 export default function HistoryPage() {
+  const router = useRouter();
+
   return (
     <AppLayout>
       <PageTransition>
@@ -43,10 +46,12 @@ export default function HistoryPage() {
                 {MOCK_HISTORY.map((chat, idx) => (
                   <motion.button
                     key={chat.id}
+                    onClick={() => router.push(`/chat?id=${chat.id}`)}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.05 }}
-                    className="group w-full flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all text-left"
+                    whileTap={{ scale: 0.98 }}
+                    className="group w-full flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all text-left cursor-pointer"
                   >
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center shrink-0 group-hover:bg-purple-500/20 transition-colors">
