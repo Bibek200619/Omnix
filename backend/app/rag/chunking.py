@@ -42,9 +42,9 @@ def split_text_into_chunks(text: str) -> list[str]:
     """
     Splits raw text into smaller, semantic chunks for embedding generation.
     
-    Targets ~500 tokens (approx 2000 characters) per chunk with an
-    overlap of ~50 tokens (approx 200 characters). 
+    Targets 500-800 characters per chunk with an overlap of 50-100 characters.
     Prioritizes splitting on sentence boundaries to maintain semantic continuity.
+    Strict upper bound of 800 characters is enforced.
     
     Args:
         text (str): The raw text string to chunk.
@@ -70,11 +70,13 @@ def split_text_into_chunks(text: str) -> list[str]:
     current_chunk: list[str] = []
     current_length = 0
     last_overlap_text = ""
+    
+    soft_chunk_limit = 600  # Leave room for potential <200 char final merge without exceeding 800
 
     for sentence in processed_sentences:
         sentence_len = len(sentence)
 
-        if current_length + sentence_len > TARGET_CHUNK_CHARS and current_chunk:
+        if current_length + sentence_len > soft_chunk_limit and current_chunk:
             # Finalize the current chunk
             chunk_text = " ".join(current_chunk).strip()
             if chunk_text:
@@ -109,7 +111,11 @@ def split_text_into_chunks(text: str) -> list[str]:
                     new_part = chunk_text[len(last_overlap_text):].strip()
                 
                 if new_part:
-                    chunks[-1] += " " + new_part
+                    # Strict upper bound check
+                    if len(chunks[-1]) + 1 + len(new_part) <= TARGET_CHUNK_CHARS:
+                        chunks[-1] += " " + new_part
+                    else:
+                        chunks.append(chunk_text)
             else:
                 chunks.append(chunk_text)
 
