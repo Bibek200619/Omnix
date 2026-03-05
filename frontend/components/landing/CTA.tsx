@@ -1,8 +1,11 @@
 "use client";
 import { motion } from "framer-motion";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
 
 export function CTA() {
+  const router = useRouter();
+
   return (
     <section className="py-24 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-purple-900/10" />
@@ -19,9 +22,13 @@ export function CTA() {
           <div className="relative z-10">
             <h2 className="text-4xl md:text-6xl font-bold mb-6">Start using AI without limits</h2>
             <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto">Join thousands of users building the next generation of intelligent applications today.</p>
-            <Link href="/auth/register" className="inline-block px-10 py-4 rounded-full bg-white text-black font-semibold hover:bg-gray-200 transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)]">
+            <Button 
+              variant="primary" 
+              size="lg"
+              onClick={() => router.push("/auth/register")}
+            >
               Create an Account
-            </Link>
+            </Button>
           </div>
         </motion.div>
       </div>
