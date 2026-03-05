@@ -12,6 +12,7 @@ interface Message {
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
 
   const handleSend = (content: string) => {
     // Add user message
@@ -22,22 +23,24 @@ export default function ChatPage() {
     };
     
     setMessages(prev => [...prev, userMsg]);
+    setIsTyping(true);
 
     // Simulate AI response
     setTimeout(() => {
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "ai",
-        content: "This is a simulated response. In the future, this will connect to the FastAPI backend and use RAG to answer based on your documents."
+        content: "This is a simulated response. The UI is now fully interactive, using `next/navigation` and Framer Motion micro-interactions."
       };
       setMessages(prev => [...prev, aiMsg]);
-    }, 1000);
+      setIsTyping(false);
+    }, 2000); // 2 seconds typing simulation
   };
 
   return (
     <ChatLayout>
-      <MessageList messages={messages} />
-      <ChatInput onSend={handleSend} />
+      <MessageList messages={messages} isTyping={isTyping} />
+      <ChatInput onSend={handleSend} disabled={isTyping} />
     </ChatLayout>
   );
 }

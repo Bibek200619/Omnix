@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { User, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface MessageBubbleProps {
   role: "user" | "ai";
@@ -10,7 +11,12 @@ export function MessageBubble({ role, content }: MessageBubbleProps) {
   const isUser = role === "user";
 
   return (
-    <div className={cn("flex gap-4 w-full max-w-4xl mx-auto py-6", isUser ? "flex-row-reverse" : "flex-row")}>
+    <motion.div 
+      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className={cn("flex gap-4 w-full max-w-4xl mx-auto py-6", isUser ? "flex-row-reverse" : "flex-row")}
+    >
       <div className={cn(
         "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 shadow-lg",
         isUser ? "bg-gradient-to-br from-purple-500 to-purple-700" : "bg-gradient-to-br from-blue-500 to-blue-700"
@@ -19,7 +25,7 @@ export function MessageBubble({ role, content }: MessageBubbleProps) {
       </div>
       
       <div className={cn(
-        "flex flex-col max-w-[80%] md:max-w-[70%]",
+        "flex flex-col max-w-[85%] md:max-w-[75%]",
         isUser ? "items-end" : "items-start"
       )}>
         <div className="text-xs text-gray-500 mb-1.5 font-medium px-1 uppercase tracking-wider">
@@ -34,6 +40,6 @@ export function MessageBubble({ role, content }: MessageBubbleProps) {
           {content}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

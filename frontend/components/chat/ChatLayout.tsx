@@ -1,3 +1,4 @@
+"use client";
 import { ReactNode } from "react";
 import { MessageSquare, Settings, Plus, LogOut, Menu } from "lucide-react";
 import Link from "next/link";
@@ -14,7 +15,10 @@ export function ChatLayout({ children }: { children: ReactNode }) {
         </div>
         
         <div className="p-4">
-          <button className="w-full flex items-center gap-2 bg-white/5 hover:bg-white/10 transition-colors border border-white/10 rounded-xl px-4 py-3 text-sm font-medium text-gray-200">
+          <button 
+            onClick={() => console.log("[Sidebar] New Conversation clicked")}
+            className="w-full flex items-center gap-2 bg-white/5 hover:bg-white/10 transition-colors border border-white/10 rounded-xl px-4 py-3 text-sm font-medium text-gray-200"
+          >
             <Plus className="w-5 h-5" /> New Conversation
           </button>
         </div>
@@ -22,7 +26,11 @@ export function ChatLayout({ children }: { children: ReactNode }) {
         <div className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
           <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4 px-2">Recent</div>
           {[1, 2, 3].map((i) => (
-            <button key={i} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 text-left text-sm text-gray-300 transition-colors truncate">
+            <button 
+              key={i} 
+              onClick={() => console.log(`[Sidebar] Selected Conversation ${i}`)}
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 text-left text-sm text-gray-300 transition-colors truncate"
+            >
               <MessageSquare className="w-4 h-4 shrink-0 text-gray-400" />
               <span className="truncate">Data analysis discussion {i}</span>
             </button>
@@ -30,7 +38,10 @@ export function ChatLayout({ children }: { children: ReactNode }) {
         </div>
 
         <div className="p-4 border-t border-white/5 space-y-1">
-          <button className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 text-sm text-gray-300 transition-colors font-medium">
+          <button 
+            onClick={() => console.log("[Sidebar] Settings clicked")}
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 text-sm text-gray-300 transition-colors font-medium"
+          >
             <Settings className="w-4 h-4" /> Settings
           </button>
           <Link href="/auth/login" className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-red-500/10 hover:text-red-400 text-sm text-gray-300 transition-colors font-medium">

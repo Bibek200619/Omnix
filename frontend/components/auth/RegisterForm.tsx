@@ -1,18 +1,32 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
 export function RegisterForm() {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError("");
+    console.log("[RegisterForm] Submitting new account details...");
+    
     // Simulate API call
     setTimeout(() => {
-      setLoading(false);
-      window.location.href = "/chat";
+      if (Math.random() < 0.1) {
+        setLoading(false);
+        setError("Account creation failed. Email might already be in use.");
+        console.error("[RegisterForm] Registration failed");
+      } else {
+        setLoading(false);
+        console.log("[RegisterForm] Registration successful. Redirecting to /chat...");
+        router.push("/chat");
+      }
     }, 1500);
   };
 
@@ -26,42 +40,46 @@ export function RegisterForm() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Full Name</label>
-          <input 
+          <Input 
             type="text" 
             required
-            className="w-full bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
             placeholder="John Doe"
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Email Address</label>
-          <input 
+          <Input 
             type="email" 
             required
-            className="w-full bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
             placeholder="you@example.com"
           />
         </div>
         
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
-          <input 
+          <Input 
             type="password" 
             required
-            className="w-full bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
             placeholder="••••••••"
           />
         </div>
 
-        <button 
+        <Button 
           type="submit" 
-          disabled={loading}
-          className="w-full bg-gradient-to-r from-purple-600 to-blue-500 text-white font-semibold rounded-xl px-4 py-3 hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+          variant="secondary" 
+          className="w-full mt-2" 
+          isLoading={loading}
         >
-          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sign Up"}
-        </button>
+          Sign Up
+        </Button>
       </form>
+
+      {error && (
+        <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center">
+          {error}
+        </div>
+      )}
 
       <div className="mt-6 text-center text-gray-400 text-sm">
         Already have an account?{" "}
