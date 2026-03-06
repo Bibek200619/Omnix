@@ -41,8 +41,8 @@ class KeywordRetriever:
                 logger.info("No files found for user/conversation.")
                 return []
                 
-            # 2. Fetch all document chunks for these files
-            docs_resp = supabase.table("documents").select("id,content,file_id").in_("file_id", file_ids).eq("user_id", user_id).execute()
+            # 2. Fetch all document chunks for these files (include created_at to compute chunk index)
+            docs_resp = supabase.table("documents").select("id,content,file_id,created_at").in_("file_id", file_ids).eq("user_id", user_id).execute()
             docs = getattr(docs_resp, "data", []) or []
             
             if not docs:
@@ -90,6 +90,7 @@ class KeywordRetriever:
                         "file_id": doc.get("file_id"),
                         "file_name": files_map.get(doc.get("file_id"), "Unknown File"),
                         "chunk_id": doc.get("id"),
+                        "created_at": doc.get("created_at"),
                         "score": score
                     })
                     
@@ -97,6 +98,17 @@ class KeywordRetriever:
             scored_chunks.sort(key=lambda x: x["score"], reverse=True)
             
             # 6. Return top K
+            # Compute chunk_index per file by ordering by created_at
+            file_chunks: dict[str, list[dict[str, Any]]] = {}
+            for c in scored_chunks:
+                fid = c.get("file_id") or ""
+                file_chunks.setdefault(fid, []).append(c)
+
+            for fid, clist in file_chunks.items():
+                clist.sort(key=lambda x: x.get("created_at") or "")
+                for idx, c in enumerate(clist):
+                    c["chunk_index"] = idx
+
             top_chunks = scored_chunks[:top_k]
             logger.info("Keyword retrieval found %d chunks. Returning top %d.", len(scored_chunks), len(top_chunks))
             return top_chunks

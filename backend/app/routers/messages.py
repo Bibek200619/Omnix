@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime, timezone
 import logging
 import time
-from typing import Any
+from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import StreamingResponse, Request
 
 from ..db.supabase import get_supabase
 from starlette.concurrency import run_in_threadpool
 from ..core.security import get_current_user
 from ..schemas.chat import ChatRequest, ChatResponse, MessageRead
 from ..services.chat_service import ModelServiceError, call_llm
+from ..services.chat_service import call_llm_stream
 from ..services.supabase_service import SupabaseServiceError, insert_many, insert_one, select_all, select_one, update_one
 from .conversations import build_conversation_title, hydrate_conversation_history
 
@@ -222,12 +225,22 @@ async def chat(
             chunk_texts = [c["content"] for c in chunks]
             prompt_message = context_builder.build_context(message_text, chunk_texts)
             
+            # Build rich source metadata for UI consumption
             for c in chunks:
-                sources.append({
-                    "id": c.get("chunk_id"),
-                    "title": c.get("file_name", "Unknown File"),
-                    "excerpt": f"[Score: {c.get('score', 0):.1f}] " + c.get("content", "")[:100] + "..."
-                })
+                    try:
+                        score_val = float(c.get("score", 0.0))
+                    except Exception:
+                        score_val = 0.0
+                    preview = (c.get("content") or "")[:200]
+                    sources.append({
+                        "id": c.get("chunk_id"),
+                        "title": c.get("file_name", "Unknown File"),
+                        "excerpt": f"[Score: {score_val:.2f}] " + preview[:100] + ("..." if len(preview) > 100 else ""),
+                        "score": score_val,
+                        "chunk_index": c.get("chunk_index"),
+                        "file_id": c.get("file_id"),
+                        "chunk_preview": preview,
+                    })
             
     except Exception as e:
         logger.exception("Failed to retrieve chunks for context: %s", e)
@@ -300,3 +313,148 @@ async def chat(
         user_message=user_message,
         assistant_message=completed_assistant_message,
     )
+
+
+@router.post("/chat/stream")
+async def chat_stream(request: Request, payload: ChatRequest, current_user: dict[str, Any] = Depends(get_current_user)):
+    """Stream assistant responses as server-sent events (SSE).
+
+    Emits JSON payloads with the following envelope in `data`:
+      { type: 'init'|'status'|'token'|'done'|'error', ... }
+    """
+    user_id = _user_id_from_claims(current_user)
+    _check_rate_limit(user_id)
+
+    message_text = payload.message.strip()
+    if not message_text:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message cannot be empty.")
+
+    # Create conversation / messages (same as non-stream endpoint)
+    try:
+        if payload.conversation_id:
+            conversation_id = payload.conversation_id
+            conversation_task = _require_conversation_owner(conversation_id, user_id)
+            recent_messages_task = select_all(
+                "messages",
+                MESSAGE_CONTEXT_COLUMNS,
+                filters={"conversation_id": conversation_id, "user_id": user_id},
+                order_by="created_at",
+                desc=True,
+                limit=RECENT_CONTEXT_LIMIT,
+            )
+            conversation, recent_messages = await asyncio.gather(conversation_task, recent_messages_task)
+        else:
+            conversation_payload = {
+                "user_id": user_id,
+                "title": payload.title or build_conversation_title(message_text),
+                "is_archived": False,
+                "last_message_at": _utc_now_iso(),
+                "updated_at": _utc_now_iso(),
+            }
+            conversation = await insert_one("conversations", conversation_payload)
+            conversation_id = str(conversation["id"])
+            recent_messages = []
+
+        messages_to_insert = [
+            {
+                "conversation_id": conversation_id,
+                "user_id": user_id,
+                "role": "user",
+                "content": message_text,
+                "status": "completed",
+                "created_at": _utc_now_iso(),
+            },
+            {
+                "conversation_id": conversation_id,
+                "user_id": user_id,
+                "role": "assistant",
+                "content": "",
+                "status": "pending",
+                "created_at": _utc_now_iso(),
+            },
+        ]
+
+        inserted_messages = await insert_many("messages", messages_to_insert)
+        user_message = inserted_messages[0]
+        assistant_message = inserted_messages[1]
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    # Retrieval for context (keyword retriever)
+    prompt_message = message_text
+    sources: list[dict[str, Any]] = []
+    chunks = []
+    try:
+        from ..rag.keyword_retrieval import KeywordRetriever
+        from ..rag.context_builder import ContextBuilder
+
+        retriever = KeywordRetriever()
+        context_builder = ContextBuilder()
+        chunks = await retriever.retrieve(message_text, user_id=user_id, conversation_id=conversation_id, top_k=5)
+        if chunks:
+            chunk_texts = [c["content"] for c in chunks]
+            prompt_message = context_builder.build_context(message_text, chunk_texts)
+            for c in chunks:
+                sources.append({
+                    "id": c.get("chunk_id"),
+                    "title": c.get("file_name", "Unknown File"),
+                    "excerpt": (c.get("content") or "")[:120],
+                    "score": c.get("score", 0.0),
+                    "chunk_index": c.get("chunk_index"),
+                })
+    except Exception as exc:
+        logger.exception("Failed to retrieve chunks for streaming context: %s", exc)
+
+    async def event_generator() -> AsyncIterator[str]:
+        # Initial event with metadata
+        init_payload = {
+            "type": "init",
+            "conversation_id": conversation_id,
+            "user_message_id": str(user_message.get("id")),
+            "assistant_message_id": str(assistant_message.get("id")),
+            "sources": sources,
+        }
+        yield f"data: {json.dumps(init_payload)}\n\n"
+
+        # Notify retrieval status
+        yield f"data: {json.dumps({"type": "status", "status": "retrieved", "count": len(sources)})}\n\n"
+
+        # Stream tokens from the LLM
+        try:
+            async for token in call_llm_stream(prompt_message, context=_build_context(recent_messages), temperature=payload.temperature):
+                # Check client disconnect
+                if await request.is_disconnected():
+                    logger.info("Client disconnected during streaming.")
+                    break
+                payload_chunk = {"type": "token", "text": token}
+                yield f"data: {json.dumps(payload_chunk)}\n\n"
+
+        except ModelServiceError as exc:
+            err = {"type": "error", "detail": str(exc)}
+            yield f"data: {json.dumps(err)}\n\n"
+            # mark assistant message failed
+            try:
+                await update_one(
+                    "messages",
+                    {"id": assistant_message["id"], "user_id": user_id},
+                    {"status": "failed"},
+                )
+            except Exception:
+                logger.exception("Failed to mark streaming assistant message as failed.")
+            return
+
+        # Finalize: update assistant message content and mark as completed
+        try:
+            # Fetch the final assembled content from the database could be optional; here we update with placeholder
+            await update_one(
+                "messages",
+                {"id": assistant_message["id"], "user_id": user_id},
+                {"status": "completed"},
+            )
+        except Exception:
+            logger.exception("Failed to mark streaming assistant message as completed.")
+
+        done_payload = {"type": "done", "conversation_id": conversation_id}
+        yield f"data: {json.dumps(done_payload)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

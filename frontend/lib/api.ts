@@ -73,6 +73,49 @@ class ApiClient {
     return response;
   }
 
+  /**
+   * Open a streaming POST request and return the raw Response so caller can
+   * iterate over response.body as a stream. Does not attempt to parse JSON.
+   */
+  async stream(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const token = await this.getAuthToken();
+    const headers = new Headers(options.headers);
+    const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+
+    if (!headers.has("Content-Type") && !isFormData) {
+      headers.set("Content-Type", "application/json");
+    }
+
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers,
+      });
+    } catch {
+      throw new Error(`Unable to reach the Omnix API at ${API_BASE_URL}. Start the FastAPI service or check NEXT_PUBLIC_API_BASE_URL.`);
+    }
+
+    if (response.status === 401) {
+      await supabase?.auth.signOut();
+      if (typeof window !== "undefined") window.location.assign("/login");
+      throw new Error("Unauthorized");
+    }
+
+    if (!response.ok && response.status !== 200) {
+      // For streaming endpoints some servers may return 200 with streaming body.
+      const error = (await response.json().catch(() => ({}))) as { detail?: string; message?: string };
+      throw new Error(error.detail || error.message || `HTTP ${response.status}`);
+    }
+
+    return response;
+  }
+
   async post<T>(endpoint: string, data?: unknown): Promise<T> {
     const response = await this.request(endpoint, {
       method: "POST",
