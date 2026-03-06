@@ -11,7 +11,7 @@ export function Footer() {
           <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200">
             <Sparkles className="h-5 w-5" />
           </span>
-          <span className="font-semibold text-white">Omnix AI</span>
+          <span className="font-semibold text-white">Omnix</span>
         </Link>
         <div className="flex flex-wrap gap-4 text-sm text-slate-400">
           <Link href="/login" className="hover:text-white">

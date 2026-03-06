@@ -8,15 +8,19 @@ export function CTA() {
   const router = useRouter();
 
   return (
-    <section className="bg-[#07090d] px-4 py-20 sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-8 rounded-lg border border-white/10 bg-white/[0.04] p-6 sm:p-8 lg:flex-row lg:items-center">
+    <section className="border-t border-white/10 bg-[#07090d] px-4 py-20 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-8 lg:flex-row lg:items-center">
         <div className="max-w-2xl">
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-200/70">
-            Ready for handoff
+            Start with Omnix
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">
-            Start with a complete UI, then connect real auth and chat APIs.
+            Bring a secure AI workspace to your team with less friction.
           </h2>
+          <p className="mt-4 text-sm leading-6 text-slate-400">
+            Sign in to continue an existing workspace, or create a new account
+            when Supabase registration is enabled.
+          </p>
         </div>
         <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
           <Button
@@ -26,7 +30,7 @@ export function CTA() {
             rightIcon={<ArrowRight className="h-4 w-4" />}
             onClick={() => router.push("/login")}
           >
-            Get Started
+            Sign in
           </Button>
           <Button
             type="button"
@@ -36,7 +40,7 @@ export function CTA() {
             leftIcon={<UserPlus className="h-4 w-4" />}
             onClick={() => router.push("/register")}
           >
-            Register
+            Create account
           </Button>
         </div>
       </div>

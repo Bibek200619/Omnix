@@ -1,0 +1,195 @@
+"use client";
+
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import type { ConversationSummary } from "@/components/chat/types";
+import { apiClient } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+
+type ConversationHistoryContextType = {
+  conversations: ConversationSummary[];
+  loading: boolean;
+  error: string | null;
+  activeConversationId: string | null;
+  refreshConversations: () => Promise<void>;
+  setActiveConversation: (conversationId: string | null) => void;
+  upsertConversation: (conversation: ConversationSummary) => void;
+  renameConversation: (conversationId: string, title: string) => Promise<void>;
+  archiveConversation: (conversationId: string) => Promise<void>;
+};
+
+const ConversationHistoryContext =
+  createContext<ConversationHistoryContextType | undefined>(undefined);
+
+function sortConversations(items: ConversationSummary[]) {
+  return [...items].sort((a, b) => {
+    const aTime = a.latest_message_at ?? a.last_message_at ?? a.updated_at ?? a.created_at ?? "";
+    const bTime = b.latest_message_at ?? b.last_message_at ?? b.updated_at ?? b.created_at ?? "";
+    const aMs = new Date(aTime).getTime();
+    const bMs = new Date(bTime).getTime();
+    return (Number.isNaN(bMs) ? 0 : bMs) - (Number.isNaN(aMs) ? 0 : aMs);
+  });
+}
+
+export function ConversationHistoryProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const { user } = useAuth();
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(
+    null,
+  );
+
+  const setActiveConversation = useCallback((conversationId: string | null) => {
+    setActiveConversationId(conversationId);
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (conversationId) {
+      window.localStorage.setItem("omnix.activeConversationId", conversationId);
+      return;
+    }
+
+    window.localStorage.removeItem("omnix.activeConversationId");
+  }, []);
+
+  const refreshConversations = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await apiClient.get<ConversationSummary[]>("/conversations");
+      setConversations(sortConversations(data));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load conversations");
+      setConversations([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const upsertConversation = useCallback((conversation: ConversationSummary) => {
+    setConversations((current) => {
+      const next = current.filter((item) => item.id !== conversation.id);
+      return sortConversations([conversation, ...next]);
+    });
+  }, []);
+
+  const mergeConversation = useCallback((conversation: ConversationSummary) => {
+    setConversations((current) =>
+      sortConversations(
+        current.map((item) =>
+          item.id === conversation.id ? { ...item, ...conversation } : item,
+        ),
+      ),
+    );
+  }, []);
+
+  const renameConversation = useCallback(
+    async (conversationId: string, title: string) => {
+      const normalizedTitle = title.trim();
+      if (!normalizedTitle) {
+        throw new Error("Conversation title cannot be empty.");
+      }
+
+      const updated = await apiClient.patch<ConversationSummary>(
+        `/conversations/${conversationId}`,
+        { title: normalizedTitle },
+      );
+      mergeConversation(updated);
+    },
+    [mergeConversation],
+  );
+
+  const archiveConversation = useCallback(
+    async (conversationId: string) => {
+      await apiClient.patch<ConversationSummary>(
+        `/conversations/${conversationId}`,
+        { is_archived: true },
+      );
+      setConversations((current) =>
+        current.filter((item) => item.id !== conversationId),
+      );
+
+      if (activeConversationId === conversationId) {
+        setActiveConversation(null);
+      }
+    },
+    [activeConversationId, setActiveConversation],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    setActiveConversationId(
+      window.localStorage.getItem("omnix.activeConversationId"),
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setConversations([]);
+      setLoading(false);
+      setError(null);
+      setActiveConversation(null);
+      return;
+    }
+
+    refreshConversations();
+  }, [refreshConversations, setActiveConversation, user]);
+
+  const value = useMemo(
+    () => ({
+      conversations,
+      loading,
+      error,
+      activeConversationId,
+      archiveConversation,
+      refreshConversations,
+      renameConversation,
+      setActiveConversation,
+      upsertConversation,
+    }),
+    [
+      activeConversationId,
+      archiveConversation,
+      conversations,
+      error,
+      loading,
+      refreshConversations,
+      renameConversation,
+      setActiveConversation,
+      upsertConversation,
+    ],
+  );
+
+  return (
+    <ConversationHistoryContext.Provider value={value}>
+      {children}
+    </ConversationHistoryContext.Provider>
+  );
+}
+
+export function useConversationHistory() {
+  const context = useContext(ConversationHistoryContext);
+  if (!context) {
+    throw new Error(
+      "useConversationHistory must be used within ConversationHistoryProvider",
+    );
+  }
+  return context;
+}

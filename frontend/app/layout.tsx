@@ -3,8 +3,9 @@ import "../styles/globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
-  title: "Omnix AI",
-  description: "A clean AI SaaS frontend for RAG chat, history, and account settings.",
+  title: "Omnix",
+  description:
+    "A premium AI workspace for secure chat, searchable history, and account-managed knowledge workflows.",
 };
 
 export default function RootLayout({
@@ -13,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body>
         <AuthProvider>{children}</AuthProvider>
       </body>

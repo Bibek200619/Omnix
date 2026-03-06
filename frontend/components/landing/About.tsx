@@ -6,18 +6,18 @@ import { Database, LockKeyhole, Workflow } from "lucide-react";
 const points = [
   {
     icon: Database,
-    label: "FastAPI RAG backend",
-    copy: "The interface is shaped around conversation IDs, messages, and future source metadata.",
+    label: "Knowledge retrieval",
+    copy: "Conversation IDs, messages, and source metadata have a clear path into the FastAPI backend.",
   },
   {
     icon: LockKeyhole,
-    label: "Supabase identity",
-    copy: "Login, registration, session refresh, and logout all use the Supabase browser client.",
+    label: "Identity first",
+    copy: "Every protected screen depends on the active Supabase session before workspace data is requested.",
   },
   {
     icon: Workflow,
-    label: "Composable frontend",
-    copy: "Pages stay small while UI, layout, auth, landing, and chat components live in clear folders.",
+    label: "Composable UI",
+    copy: "Small pages and reusable components make future billing, teams, files, and admin views straightforward.",
   },
 ];
 
@@ -30,13 +30,13 @@ export function About() {
             About
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            Built as the frontend layer Omnix was missing
+            Built for teams that need answers they can trust
           </h2>
           <p className="mt-5 text-base leading-8 text-slate-400">
-            Omnix already has a modular backend with chat, conversations,
-            messages, Supabase, and a RAG pipeline. This UI gives it the
-            product surface: clear routes, dependable interactions, and dark
-            SaaS styling that can grow with real API calls.
+            Omnix gives operators, support teams, and builders a secure place to
+            ask questions against private knowledge. The experience stays calm,
+            fast, and legible so the AI can be useful in daily workflows rather
+            than becoming another noisy tool.
           </p>
         </div>
         <div className="grid gap-4">

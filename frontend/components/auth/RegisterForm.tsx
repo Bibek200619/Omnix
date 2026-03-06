@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, UserPlus } from "lucide-react";
+import { Lock, Mail, UserRound, UserPlus } from "lucide-react";
+import { Alert } from "@/components/ui/Alert";
 import { Input } from "@/components/ui/Input";
 import { LoadingButton } from "@/components/ui/LoadingButton";
 import { useAuth } from "@/lib/auth-context";
@@ -11,16 +12,22 @@ import { supabase } from "@/lib/supabase";
 
 export function RegisterForm() {
   const router = useRouter();
-  const { refreshSession } = useAuth();
+  const { authError, isConfigured, refreshSession } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!supabase) {
+      setError(authError ?? "Authentication is not configured.");
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
     const formData = new FormData(event.currentTarget);
+    const name = String(formData.get("name") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
 
@@ -28,6 +35,11 @@ export function RegisterForm() {
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: name || undefined,
+          },
+        },
       });
 
       if (signUpError) {
@@ -39,10 +51,14 @@ export function RegisterForm() {
       if (data.session) {
         await refreshSession();
         router.replace("/chat");
+        router.refresh();
         return;
       }
 
-      router.replace("/login");
+      setError(
+        "Supabase did not return a session after registration. For development, disable email confirmation and OTP in Supabase Auth settings so password sign-up signs in immediately.",
+      );
+      setLoading(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
       setLoading(false);
@@ -51,11 +67,26 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {!isConfigured ? (
+        <Alert variant="warning" title="Authentication is not configured">
+          {authError}
+        </Alert>
+      ) : null}
       {error && (
-        <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-200">
+        <Alert variant="error" title="Unable to create account">
           {error}
-        </div>
+        </Alert>
       )}
+      <Input
+        id="name"
+        name="name"
+        label="Name"
+        type="text"
+        autoComplete="name"
+        placeholder="Alex Morgan"
+        icon={<UserRound className="h-4 w-4" />}
+        disabled={loading || !isConfigured}
+      />
       <Input
         id="email"
         name="email"
@@ -65,7 +96,7 @@ export function RegisterForm() {
         placeholder="you@company.com"
         required
         icon={<Mail className="h-4 w-4" />}
-        disabled={loading}
+        disabled={loading || !isConfigured}
       />
       <Input
         id="password"
@@ -78,15 +109,17 @@ export function RegisterForm() {
         minLength={8}
         icon={<Lock className="h-4 w-4" />}
         hint="Use at least 8 characters."
-        disabled={loading}
+        disabled={loading || !isConfigured}
       />
       <LoadingButton
         type="submit"
         className="w-full"
         isLoading={loading}
+        loadingText="Creating account"
+        disabled={!isConfigured}
         leftIcon={<UserPlus className="h-4 w-4" />}
       >
-        Register
+        Create account
       </LoadingButton>
       <p className="text-center text-sm text-slate-400">
         Already have an account?{" "}

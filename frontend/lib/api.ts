@@ -7,6 +7,10 @@ export type ApiStatus = "idle" | "loading" | "success" | "error";
 
 class ApiClient {
   private async getAuthToken(): Promise<string | null> {
+    if (!supabase) {
+      return null;
+    }
+
     const {
       data: { session },
       error,
@@ -20,10 +24,7 @@ class ApiClient {
     return session?.access_token ?? null;
   }
 
-  async request(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<Response> {
+  async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const url = `${API_BASE_URL}${endpoint}`;
     const token = await this.getAuthToken();
     const headers = new Headers(options.headers);
@@ -38,13 +39,21 @@ class ApiClient {
       headers.set("Authorization", `Bearer ${token}`);
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+    let response: Response;
+
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers,
+      });
+    } catch {
+      throw new Error(
+        `Unable to reach the Omnix API at ${API_BASE_URL}. Start the FastAPI service or check NEXT_PUBLIC_API_BASE_URL.`,
+      );
+    }
 
     if (response.status === 401) {
-      await supabase.auth.signOut();
+      await supabase?.auth.signOut();
 
       if (typeof window !== "undefined") {
         window.location.assign("/login");
@@ -54,8 +63,11 @@ class ApiClient {
     }
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({})) as { detail?: string };
-      throw new Error(error.detail || `HTTP ${response.status}`);
+      const error = (await response.json().catch(() => ({}))) as {
+        detail?: string;
+        message?: string;
+      };
+      throw new Error(error.detail || error.message || `HTTP ${response.status}`);
     }
 
     return response;
@@ -64,6 +76,14 @@ class ApiClient {
   async post<T>(endpoint: string, data?: unknown): Promise<T> {
     const response = await this.request(endpoint, {
       method: "POST",
+      body: JSON.stringify(data || {}),
+    });
+    return response.json() as Promise<T>;
+  }
+
+  async patch<T>(endpoint: string, data?: unknown): Promise<T> {
+    const response = await this.request(endpoint, {
+      method: "PATCH",
       body: JSON.stringify(data || {}),
     });
     return response.json() as Promise<T>;

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from fastapi.middleware.cors import CORSMiddleware
 
 import asyncio
 import logging
@@ -14,6 +15,9 @@ from .core.security import auth_context_middleware
 from .db.supabase import get_supabase
 from .rag.startup import initialize_vector_store, shutdown_vector_store
 from .routers import cache, conversations, files, health, messages
+from .routers import upload
+
+
 
 app = FastAPI(title="Omnix Backend API", version="1.0.0")
 logger = logging.getLogger(__name__)
@@ -113,9 +117,17 @@ async def api_logging_middleware(request: Request, call_next) -> Response:
         except Exception:
             logger.exception("Failed to dispatch API log.")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(health.router)
 app.include_router(conversations.router)
 app.include_router(messages.router)
 app.include_router(files.router)
+app.include_router(upload.router)
 app.include_router(cache.router)

@@ -6,17 +6,23 @@ import { useRouter } from "next/navigation";
 import { Lock, Mail } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { LoadingButton } from "@/components/ui/LoadingButton";
+import { Alert } from "@/components/ui/Alert";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 
 export function LoginForm() {
   const router = useRouter();
-  const { refreshSession } = useAuth();
+  const { authError, isConfigured, refreshSession } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!supabase) {
+      setError(authError ?? "Authentication is not configured.");
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
@@ -29,7 +35,10 @@ export function LoginForm() {
         await supabase.auth.signInWithPassword({ email, password });
 
       if (signInError) {
-        setError(signInError.message || "Login failed. Please check your credentials.");
+        setError(
+          signInError.message ||
+            "Sign in failed. Check your email and password, then try again.",
+        );
         setLoading(false);
         return;
       }
@@ -42,6 +51,7 @@ export function LoginForm() {
 
       await refreshSession();
       router.replace("/chat");
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
       setLoading(false);
@@ -50,10 +60,15 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {!isConfigured ? (
+        <Alert variant="warning" title="Authentication is not configured">
+          {authError}
+        </Alert>
+      ) : null}
       {error && (
-        <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-200">
+        <Alert variant="error" title="Unable to sign in">
           {error}
-        </div>
+        </Alert>
       )}
       <Input
         id="email"
@@ -64,7 +79,7 @@ export function LoginForm() {
         placeholder="you@company.com"
         required
         icon={<Mail className="h-4 w-4" />}
-        disabled={loading}
+        disabled={loading || !isConfigured}
       />
       <Input
         id="password"
@@ -76,10 +91,16 @@ export function LoginForm() {
         required
         minLength={8}
         icon={<Lock className="h-4 w-4" />}
-        disabled={loading}
+        disabled={loading || !isConfigured}
       />
-      <LoadingButton type="submit" className="w-full" isLoading={loading}>
-        Login
+      <LoadingButton
+        type="submit"
+        className="w-full"
+        isLoading={loading}
+        loadingText="Signing in"
+        disabled={!isConfigured}
+      >
+        Sign in
       </LoadingButton>
       <p className="text-center text-sm text-slate-400">
         New to Omnix?{" "}

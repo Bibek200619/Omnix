@@ -3,4 +3,51 @@ export type Message = {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
+  // status now supports streaming to reflect progressive reveal
+  status?: "sending" | "streaming" | "sent" | "failed";
+  error?: string;
+  // UI helpers
+  isStreaming?: boolean;
+  // optional sources attached to assistant responses
+  sources?: Array<{
+    id?: string;
+    title?: string;
+    url?: string;
+    excerpt?: string;
+  }>;
+};
+
+export type ApiMessage = {
+  id?: string;
+  conversation_id?: string;
+  user_id?: string;
+  role?: "user" | "assistant" | "system";
+  content?: string;
+  status?: "pending" | "completed" | "failed";
+  created_at?: string;
+  timestamp?: string;
+};
+
+export type ConversationSummary = {
+  id: string;
+  user_id?: string;
+  title?: string | null;
+  preview?: string | null;
+  latest_message_role?: string | null;
+  latest_message_at?: string | null;
+  is_archived?: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  last_message_at?: string | null;
+};
+
+export type ChatApiResponse = {
+  conversation_id: string;
+  user_message_id: string;
+  assistant_message_id: string;
+  response: string;
+  sources?: Array<Record<string, unknown>>;
+  conversation?: ConversationSummary | null;
+  user_message?: ApiMessage | null;
+  assistant_message?: ApiMessage | null;
 };

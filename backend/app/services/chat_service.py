@@ -64,6 +64,32 @@ def _extract_assistant_content(content: Any) -> str:
     raise ModelServiceError("Model response did not include assistant content.")
 
 
+def _build_dev_mode_response(
+    message: str,
+    context: list[dict[str, str]] | None,
+) -> str:
+    normalized_message = " ".join(message.strip().split())
+    if len(normalized_message) > 240:
+        normalized_message = f"{normalized_message[:237]}..."
+
+    context_count = len(context or [])
+    context_note = (
+        f"\n\nI also received {context_count} prior context message"
+        f"{'' if context_count == 1 else 's'} for this conversation."
+        if context_count
+        else ""
+    )
+
+    return (
+        "Omnix backend is connected successfully.\n\n"
+        f"I received your message: \"{normalized_message}\"\n\n"
+        "Development mode is enabled, so no external AI provider was called. "
+        "Authentication, conversation persistence, message storage, and response "
+        "delivery are ready for frontend testing."
+        f"{context_note}"
+    )
+
+
 def _call_llm_sync(
     message: str,
     context: list[dict[str, str]] | None,
@@ -128,6 +154,12 @@ async def call_llm(
     context: list[dict[str, Any]] | None = None,
     temperature: float = 0.2,
 ) -> str:
+    normalized_context = _normalize_context(context)
+    settings = get_settings()
+    if settings.DEV_MODE:
+        logger.info("DEV_MODE enabled; returning mock assistant response.")
+        return _build_dev_mode_response(message, normalized_context)
+
     sem = _get_llm_semaphore()
     if sem.locked():
         raise ModelServiceError(
@@ -137,7 +169,13 @@ async def call_llm(
 
     async with sem:
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(_LLM_EXECUTOR, _call_llm_sync, message, context, temperature)
+        return await loop.run_in_executor(
+            _LLM_EXECUTOR,
+            _call_llm_sync,
+            message,
+            normalized_context,
+            temperature,
+        )
 
 
 class ChatService:
