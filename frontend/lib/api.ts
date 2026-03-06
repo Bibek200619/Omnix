@@ -1,22 +1,23 @@
+import { supabase } from "@/lib/supabase";
+
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export type ApiStatus = "idle" | "loading" | "success" | "error";
 
 class ApiClient {
-  private getAuthToken(): string | null {
-    if (typeof window !== "undefined") {
-      try {
-        const supabaseAuth = localStorage.getItem("sb-qsaaipuaxcreiljnwcgs-auth-token");
-        if (supabaseAuth) {
-          const parsed = JSON.parse(supabaseAuth) as { access_token?: string };
-          return parsed?.access_token ?? null;
-        }
-      } catch {
-        return null;
-      }
+  private async getAuthToken(): Promise<string | null> {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
+    if (error) {
+      console.error("Unable to read Supabase session", error);
+      return null;
     }
-    return null;
+
+    return session?.access_token ?? null;
   }
 
   async request(
@@ -24,18 +25,17 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<Response> {
     const url = `${API_BASE_URL}${endpoint}`;
-    const token = this.getAuthToken();
+    const token = await this.getAuthToken();
+    const headers = new Headers(options.headers);
+    const isFormData =
+      typeof FormData !== "undefined" && options.body instanceof FormData;
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-
-    if (options.headers && typeof options.headers === "object" && !Array.isArray(options.headers)) {
-      Object.assign(headers, options.headers);
+    if (!headers.has("Content-Type") && !isFormData) {
+      headers.set("Content-Type", "application/json");
     }
 
     if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+      headers.set("Authorization", `Bearer ${token}`);
     }
 
     const response = await fetch(url, {
@@ -44,11 +44,12 @@ class ApiClient {
     });
 
     if (response.status === 401) {
-      // Unauthorized - redirect to login
+      await supabase.auth.signOut();
+
       if (typeof window !== "undefined") {
-        localStorage.removeItem("sb-qsaaipuaxcreiljnwcgs-auth-token");
-        window.location.href = "/login";
+        window.location.assign("/login");
       }
+
       throw new Error("Unauthorized");
     }
 

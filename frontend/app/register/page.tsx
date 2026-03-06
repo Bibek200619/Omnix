@@ -5,7 +5,7 @@ export default function RegisterPage() {
   return (
     <AuthCard
       title="Create your account"
-      description="Register now. Supabase auth can be wired into this flow without changing the screen structure."
+      description="Register with Supabase and continue into your Omnix workspace."
     >
       <RegisterForm />
     </AuthCard>
