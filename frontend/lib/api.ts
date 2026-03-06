@@ -39,6 +39,16 @@ class ApiClient {
       headers.set("Authorization", `Bearer ${token}`);
     }
 
+    // Workspace awareness: include active workspace id from localStorage if present
+    try {
+      if (typeof window !== "undefined") {
+        const activeWorkspace = window.localStorage.getItem("omnix.activeWorkspaceId");
+        if (activeWorkspace) headers.set("X-Omnix-Workspace", activeWorkspace);
+      }
+    } catch {
+      // Ignore localStorage failures
+    }
+
     let response: Response;
 
     try {

@@ -15,7 +15,7 @@ from .core.security import auth_context_middleware
 from .db.supabase import get_supabase
 from .rag.startup import initialize_vector_store, shutdown_vector_store
 from .routers import cache, conversations, files, health, messages
-from .routers import upload
+from .routers import upload, workspaces
 
 
 
@@ -131,3 +131,4 @@ app.include_router(messages.router)
 app.include_router(files.router)
 app.include_router(upload.router)
 app.include_router(cache.router)
+app.include_router(workspaces.router)

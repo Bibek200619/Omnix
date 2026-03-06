@@ -8,7 +8,8 @@ import time
 from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi import StreamingResponse, Request
+from fastapi import Request
+from starlette.responses import StreamingResponse
 
 from ..db.supabase import get_supabase
 from starlette.concurrency import run_in_threadpool
