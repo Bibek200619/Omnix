@@ -9,3 +9,9 @@ PyJWT[crypto]
 # Document extraction dependencies
 pypdf
 python-docx
+
+# Embeddings and ML
+sentence-transformers
+
+# Optional OpenAI provider
+openai

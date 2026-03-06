@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
 import { Input } from "@/components/ui/Input";
 import { useConversationHistory } from "@/lib/conversation-history-context";
+import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -32,6 +33,86 @@ const navItems = [
   { href: "/history", label: "History", icon: History },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+function WorkspaceSelector() {
+  const { workspaces, loading, activeWorkspaceId, setActiveWorkspace, createWorkspace } = useWorkspace();
+  const [open, setOpen] = useState(false);
+
+  const active = workspaces.find((w) => w.id === activeWorkspaceId) || null;
+
+  async function handleCreate() {
+    if (typeof window === "undefined") return;
+    const name = window.prompt("Create a workspace", "My Workspace");
+    if (!name || !name.trim()) return;
+    try {
+      const created = await createWorkspace({ name: name.trim() });
+      setActiveWorkspace(created.id);
+      setOpen(false);
+    } catch (err) {
+      console.error("Failed to create workspace", err);
+      // small UX: brief alert
+      alert("Unable to create workspace. Try again.");
+    }
+  }
+
+  return (
+    <div className="relative mt-1">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 rounded-lg bg-white/[0.02] px-3 py-2 text-left transition hover:bg-white/[0.04]"
+        aria-expanded={open}
+      >
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 flex-shrink-0 rounded-md bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center text-white text-sm font-semibold">
+            {active ? active.name.charAt(0).toUpperCase() : "M"}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-medium text-white">{active ? active.name : "My Workspace"}</div>
+            <div className="truncate text-xs text-slate-500">Workspace · Shared knowledge</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <svg className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M6 9l6 6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+      </button>
+
+      {open ? (
+        <div className="absolute left-0 top-full mt-2 w-[260px] rounded-lg border border-white/8 bg-[#071017]/95 p-2 shadow-lg z-50">
+          <div className="max-h-56 overflow-auto">
+            {loading ? (
+              <div className="p-2 text-xs text-slate-500">Loading workspaces…</div>
+            ) : workspaces.length === 0 ? (
+              <div className="p-2 text-sm text-slate-400">No workspaces yet</div>
+            ) : (
+              workspaces.map((ws) => (
+                <button
+                  key={ws.id}
+                  onClick={() => {
+                    setActiveWorkspace(ws.id);
+                    setOpen(false);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-white/[0.02]"
+                >
+                  <div className="h-8 w-8 flex-shrink-0 rounded-sm bg-slate-800 flex items-center justify-center text-sm font-medium text-white">{ws.name.charAt(0).toUpperCase()}</div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm text-white">{ws.name}</div>
+                    <div className="truncate text-xs text-slate-500">{ws.description || ""}</div>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+          <div className="mt-2 border-t border-white/6 pt-2">
+            <button onClick={handleCreate} className="w-full rounded-md bg-cyan-600 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-500">Create workspace</button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 type SidebarProps = {
   isOpen: boolean;
@@ -131,23 +212,24 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         )}
       >
         <div className="flex h-16 items-center justify-between border-b border-white/10 px-5">
-          <Link
-            href="/chat"
-            onClick={onClose}
-            className="flex items-center gap-3"
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200">
-              <Sparkles className="h-5 w-5" />
-            </span>
-            <span>
-              <span className="block text-sm font-semibold text-white">
-                Omnix
+          <div className="flex items-center gap-3">
+            <Link
+              href="/chat"
+              onClick={onClose}
+              className="flex items-center gap-3"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200">
+                <Sparkles className="h-5 w-5" />
               </span>
-              <span className="block text-xs text-slate-500">
-                AI workspace
-              </span>
-            </span>
-          </Link>
+            </Link>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="block text-sm font-semibold text-white">Omnix</span>
+                <span className="text-xs text-slate-500">AI workspace</span>
+              </div>
+              <WorkspaceSelector />
+            </div>
+          </div>
           <Button
             type="button"
             variant="ghost"

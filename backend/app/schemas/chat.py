@@ -73,6 +73,7 @@ class ChatResponse(BaseModel):
 
 class FileCreate(BaseModel):
     conversation_id: str | None = None
+    workspace_id: str | None = None
     file_name: str = Field(..., min_length=1, max_length=512)
     file_type: str | None = Field(default=None, max_length=255)
     size_bytes: int | None = Field(default=None, ge=0)
@@ -85,6 +86,7 @@ class FileRead(BaseModel):
 
     id: str
     user_id: str
+    workspace_id: str | None = None
     conversation_id: str | None = None
     file_name: str
     file_type: str | None = None
@@ -92,6 +94,22 @@ class FileRead(BaseModel):
     storage_path: str | None = None
     metadata: dict[str, Any] | None = None
     created_at: datetime | None = None
+
+
+class WorkspaceCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    description: str | None = None
+
+
+class WorkspaceRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    name: str
+    description: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class CacheCreate(BaseModel):
