@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Database, FileSearch, ShieldCheck } from "lucide-react";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageList } from "@/components/chat/MessageList";
 import type { Message } from "@/components/chat/types";
-import { mockChats, starterMessages } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 function nowLabel() {
   return new Intl.DateTimeFormat("en", {
@@ -17,21 +18,41 @@ function nowLabel() {
 
 export function ChatInterface() {
   const params = useSearchParams();
+  const { session } = useAuth();
   const conversationId = params.get("conversation");
-  const activeChat = useMemo(
-    () => mockChats.find((chat) => chat.id === conversationId),
-    [conversationId],
-  );
-  const [messages, setMessages] = useState<Message[]>(
-    activeChat?.messages ?? starterMessages,
-  );
+  
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "welcome",
+      role: "assistant",
+      content: "Welcome to Omnix. Ask me anything about your documents.",
+      timestamp: nowLabel(),
+    },
+  ]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentConversation, setCurrentConversation] = useState<string | null>(conversationId);
 
+  // Load conversation if specified
   useEffect(() => {
-    setMessages(activeChat?.messages ?? starterMessages);
-  }, [activeChat]);
+    if (conversationId) {
+      loadConversation(conversationId);
+    }
+  }, [conversationId]);
 
-  function handleSend(content: string) {
+  async function loadConversation(convId: string) {
+    try {
+      const messages = await apiClient.get<Message[]>(
+        `/messages/conversations/${convId}/messages`
+      );
+      setMessages(messages);
+      setCurrentConversation(convId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load conversation");
+    }
+  }
+
+  async function handleSend(content: string) {
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: "user",
@@ -41,18 +62,37 @@ export function ChatInterface() {
 
     setMessages((current) => [...current, userMessage]);
     setLoading(true);
+    setError(null);
 
-    window.setTimeout(() => {
-      const response: Message = {
-        id: crypto.randomUUID(),
+    try {
+      const response = await apiClient.post<{
+        conversation_id: string;
+        user_message_id: string;
+        assistant_message_id: string;
+        response: string;
+      }>("/messages/chat", {
+        message: content,
+        conversation_id: currentConversation || undefined,
+        title: !currentConversation ? "New conversation" : undefined,
+      });
+
+      setCurrentConversation(response.conversation_id);
+
+      const assistantMessage: Message = {
+        id: response.assistant_message_id,
         role: "assistant",
+        content: response.response,
         timestamp: nowLabel(),
-        content:
-          "I would send this to the FastAPI RAG endpoint next. For now, the frontend keeps the interaction local so the UX is ready before backend wiring.",
       };
-      setMessages((current) => [...current, response]);
+
+      setMessages((current) => [...current, assistantMessage]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send message");
+      // Remove the user message on error
+      setMessages((current) => current.slice(0, -1));
+    } finally {
       setLoading(false);
-    }, 700);
+    }
   }
 
   return (
@@ -68,13 +108,13 @@ export function ChatInterface() {
           {
             icon: ShieldCheck,
             label: "Auth state",
-            value: "Supabase handoff",
+            value: session ? "Authenticated" : "Not authenticated",
             color: "text-emerald-200",
           },
           {
             icon: FileSearch,
             label: "Context",
-            value: activeChat ? activeChat.title : "New conversation",
+            value: currentConversation ? "Active conversation" : "New conversation",
             color: "text-amber-200",
           },
         ].map((item) => {
@@ -99,6 +139,11 @@ export function ChatInterface() {
           );
         })}
       </div>
+      {error && (
+        <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-200">
+          {error}
+        </div>
+      )}
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         <MessageList messages={messages} loading={loading} />
         <ChatInput onSend={handleSend} loading={loading} />
