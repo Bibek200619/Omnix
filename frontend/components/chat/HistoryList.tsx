@@ -1,23 +1,67 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, MessageSquareText, Search } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { mockChats } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api";
+
+interface Conversation {
+  id: string;
+  title?: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export function HistoryList() {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
+  async function loadConversations() {
+    try {
+      setLoading(true);
+      const data = await apiClient.get<Conversation[]>("/conversations");
+      setConversations(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load conversations");
+      setConversations([]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const chats = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return mockChats;
-    return mockChats.filter((chat) =>
-      `${chat.title} ${chat.excerpt}`.toLowerCase().includes(normalized),
+    if (!normalized) return conversations;
+    return conversations.filter((chat) =>
+      (chat.title || "").toLowerCase().includes(normalized),
     );
-  }, [query]);
+  }, [query, conversations]);
+
+  function formatDate(dateString?: string) {
+    if (!dateString) return "Recently";
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  }
 
   return (
     <section className="space-y-5">
@@ -29,13 +73,25 @@ export function HistoryList() {
           aria-label="Search chat history"
           icon={<Search className="h-4 w-4" />}
           className="sm:w-80"
+          disabled={loading}
         />
-        <Button type="button" onClick={() => router.push("/chat")}>
+        <Button type="button" onClick={() => router.push("/chat")} disabled={loading}>
           New chat
         </Button>
       </div>
 
-      {chats.length > 0 ? (
+      {error && (
+        <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-200">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex min-h-[360px] flex-col items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-300 border-t-transparent" />
+          <p className="mt-4 text-sm text-slate-400">Loading conversations...</p>
+        </div>
+      ) : chats.length > 0 ? (
         <div className="grid gap-3">
           {chats.map((chat) => (
             <button
@@ -49,22 +105,16 @@ export function HistoryList() {
                   <div className="flex items-center gap-2">
                     <MessageSquareText className="h-4 w-4 text-cyan-200" />
                     <h2 className="truncate text-base font-semibold text-white">
-                      {chat.title}
+                      {chat.title || "Untitled conversation"}
                     </h2>
                   </div>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-                    {chat.excerpt}
-                  </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 text-xs text-slate-500">
                   <Clock className="h-3.5 w-3.5" />
-                  {chat.updatedAt}
+                  {formatDate(chat.updated_at || chat.created_at)}
                 </div>
               </div>
-              <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
-                <span className="text-xs text-slate-500">
-                  {chat.messageCount} messages
-                </span>
+              <div className="mt-4 border-t border-white/10 pt-3">
                 <span className="text-sm font-medium text-cyan-200 opacity-0 transition group-hover:opacity-100">
                   Open chat
                 </span>
