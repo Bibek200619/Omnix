@@ -8,6 +8,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from ..db.supabase import get_supabase
+from starlette.concurrency import run_in_threadpool
 from ..core.security import get_current_user
 from ..schemas.chat import ChatRequest, ChatResponse, MessageRead
 from ..services.chat_service import ModelServiceError, call_llm
@@ -203,9 +205,37 @@ async def chat(
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
+    # --- KEYWORD RETRIEVAL INTEGRATION ---
+    prompt_message = message_text
+    sources = []
+    try:
+        from ..rag.keyword_retrieval import KeywordRetriever
+        from ..rag.context_builder import ContextBuilder
+        
+        retriever = KeywordRetriever()
+        context_builder = ContextBuilder()
+        
+        # Use conversation_id if available to scope keyword retrieval
+        chunks = await retriever.retrieve(message_text, user_id=user_id, conversation_id=conversation_id, top_k=5)
+        
+        if chunks:
+            chunk_texts = [c["content"] for c in chunks]
+            prompt_message = context_builder.build_context(message_text, chunk_texts)
+            
+            for c in chunks:
+                sources.append({
+                    "id": c.get("chunk_id"),
+                    "title": c.get("file_name", "Unknown File"),
+                    "excerpt": f"[Score: {c.get('score', 0):.1f}] " + c.get("content", "")[:100] + "..."
+                })
+            
+    except Exception as e:
+        logger.exception("Failed to retrieve chunks for context: %s", e)
+    # ---------------------------------------
+
     try:
         assistant_response = await call_llm(
-            message_text,
+            prompt_message,
             context=_build_context(recent_messages),
             temperature=payload.temperature,
         )
@@ -265,7 +295,7 @@ async def chat(
         user_message_id=str(user_message["id"]),
         assistant_message_id=str(completed_assistant_message["id"]),
         response=assistant_response,
-        sources=[],
+        sources=sources,
         conversation=hydrated_conversation,
         user_message=user_message,
         assistant_message=completed_assistant_message,

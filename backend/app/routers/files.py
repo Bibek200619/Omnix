@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import logging
+import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-import os
+from fastapi.responses import FileResponse
 
 from ..core.security import get_current_user
+from ..db.supabase import get_supabase
 from ..schemas.chat import FileCreate, FileRead
 from ..services.supabase_service import SupabaseServiceError, insert_one, select_all, select_one
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/files", tags=["files"])
 FILE_COLUMNS = "id,user_id,conversation_id,file_name,file_type,size_bytes,storage_path,metadata,created_at"
@@ -66,15 +71,20 @@ async def create_file_metadata(
 async def get_files(
     limit: int = Query(default=DEFAULT_FILE_LIMIT, ge=1, le=MAX_FILE_LIMIT),
     offset: int = Query(default=0, ge=0),
+    conversation_id: str | None = Query(default=None),
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     user_id = _user_id_from_claims(current_user)
+
+    filters = {"user_id": user_id}
+    if conversation_id is not None:
+        filters["conversation_id"] = conversation_id
 
     try:
         return await select_all(
             "files",
             FILE_COLUMNS,
-            filters={"user_id": user_id},
+            filters=filters,
             order_by="created_at",
             desc=True,
             limit=limit,
@@ -82,6 +92,29 @@ async def get_files(
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
+
+
+@router.get("/{file_id}/download")
+async def download_file(
+    file_id: str, current_user: dict[str, Any] = Depends(get_current_user)
+) -> FileResponse:
+    user_id = _user_id_from_claims(current_user)
+
+    try:
+        file_row = await select_one("files", FILE_COLUMNS, {"id": file_id, "user_id": user_id})
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    if file_row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    storage_path = file_row.get("storage_path")
+    if not storage_path or not os.path.exists(storage_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File content not found on server")
+
+    filename = file_row.get("file_name") or "download"
+    file_type = file_row.get("file_type") or "application/octet-stream"
+    return FileResponse(path=storage_path, filename=filename, media_type=file_type)
 
 
 @router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -103,7 +136,7 @@ async def delete_file(
     try:
         # Direct low-level delete to support removal; keep guard on user_id
         supabase = get_supabase()
-        resp = supabase.table("files").delete().eq("id", file_id).eq("user_id", user_id).execute()
+        supabase.table("files").delete().eq("id", file_id).eq("user_id", user_id).execute()
         # remove local storage if present
         storage_path = file_row.get("storage_path")
         if storage_path:

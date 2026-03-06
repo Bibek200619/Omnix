@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, Check, Copy, RotateCcw, User } from "lucide-react";
-import { motion } from "framer-motion";
+import { Bot, Check, Copy, RotateCcw, User, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "@/components/chat/types";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { Button } from "@/components/ui/Button";
@@ -16,8 +16,8 @@ type MessageBubbleProps = {
 
 export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
-  const [sourcesOpen, setSourcesOpen] = useState(false);
   const [gaveFeedback, setGaveFeedback] = useState<null | "up" | "down">(null);
+  const [expandedSource, setExpandedSource] = useState<string | null>(null);
 
   const isUser = message.role === "user";
   const Icon = isUser ? User : Bot;
@@ -37,13 +37,8 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
     onRegenerate(message.id);
   }
 
-  function toggleSources() {
-    setSourcesOpen((s) => !s);
-  }
-
   function giveFeedback(type: "up" | "down") {
     setGaveFeedback(type);
-    // ideally send to analytics/feedback endpoint; currently only UI
   }
 
   return (
@@ -82,6 +77,73 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
           <MarkdownRenderer content={message.content} compact />
         )}
 
+        {/* Citations block */}
+        {!isUser && message.sources && message.sources.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <p className="text-xs font-medium text-slate-400 mb-3 flex items-center gap-2">
+              <FileText className="w-3.5 h-3.5" />
+              Retrieved Sources
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {message.sources.map((s: Record<string, string>, i: number) => {
+                const sourceId = s.id || String(i);
+                const isExpanded = expandedSource === sourceId;
+                
+                // Extract score if it exists in the excerpt like [Score: 4.5]
+                let scoreText = "";
+                let cleanExcerpt = s.excerpt || "";
+                const scoreMatch = cleanExcerpt.match(/\[Score:\s*([0-9.]+)\]/);
+                if (scoreMatch) {
+                  scoreText = scoreMatch[1];
+                  cleanExcerpt = cleanExcerpt.replace(scoreMatch[0], "").trim();
+                }
+
+                return (
+                  <div key={sourceId} className="flex flex-col rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden transition-colors hover:bg-white/[0.04]">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedSource(isExpanded ? null : sourceId)}
+                      className="flex items-center justify-between p-2.5 text-left focus:outline-none"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-3.5 h-3.5 shrink-0 text-cyan-400/70" />
+                        <span className="truncate text-xs font-medium text-slate-200">
+                          {s.title || 'Unknown Source'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {scoreText && (
+                          <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 text-[10px] font-medium border border-cyan-500/20">
+                            {scoreText}
+                          </span>
+                        )}
+                        {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+                      </div>
+                    </button>
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2, ease: "easeOut" }}
+                          className="px-3 pb-3"
+                        >
+                          <div className="pt-2 mt-1 border-t border-white/5">
+                            <p className="text-[11px] leading-relaxed text-slate-400 italic">
+                              "{cleanExcerpt}"
+                            </p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="mt-2 flex items-center justify-between gap-2">
           <p
             className={cn(
@@ -97,7 +159,6 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
           </p>
 
           <div className="flex items-center gap-1">
-            {/* toolbar: copy always, regenerate + feedback for assistant */}
             {!sending && message.content ? (
               <button
                 type="button"
@@ -150,18 +211,6 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
                 >
                   <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2v18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </button>
-
-                {message.sources && message.sources.length ? (
-                  <button
-                    type="button"
-                    onClick={toggleSources}
-                    title="Sources"
-                    aria-label="Sources"
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-white/[0.06]"
-                  >
-                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 12h18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </button>
-                ) : null}
               </>
             ) : null}
 
@@ -179,33 +228,6 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
             ) : null}
           </div>
         </div>
-
-        {message.sources && message.sources.length ? (
-          <div className={cn("mt-3 transition-all", sourcesOpen ? "max-h-96" : "max-h-0 overflow-hidden")}>
-            <div className="rounded-md border border-white/6 bg-white/[0.02] p-3 text-xs text-slate-400">
-              <p className="mb-2 text-[11px] font-medium text-slate-300">Sources</p>
-              <div className="space-y-2">
-                {message.sources.map((s, i) => (
-                  <a
-                    key={s.id ?? i}
-                    href={(s as any).url || "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block rounded-sm p-2 hover:bg-white/[0.03]"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-xs font-medium text-white truncate">{(s as any).title ?? (s as any).url ?? 'Source'}</p>
-                      <span className="text-[11px] text-slate-400">{(s as any).id ?? ''}</span>
-                    </div>
-                    {(s as any).excerpt ? (
-                      <p className="mt-1 text-[12px] text-slate-400 line-clamp-2">{(s as any).excerpt}</p>
-                    ) : null}
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : null}
       </div>
     </motion.div>
   );
