@@ -5,3 +5,7 @@ pydantic-settings
 python-multipart
 requests
 PyJWT[crypto]
+
+# Document extraction dependencies
+pypdf
+python-docx

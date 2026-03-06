@@ -7,8 +7,19 @@ import { Button } from "@/components/ui/Button";
 
 const UploadDropzone = dynamic(() => import("@/components/upload/UploadDropzone").then((m) => m.UploadDropzone), { ssr: false });
 
+
+interface FileData {
+  id: string;
+  file_name?: string;
+  filename?: string;
+  file_type?: string;
+  content_type?: string;
+  size_bytes?: number;
+  storage_path?: string;
+}
+
 export default function FilesPage() {
-  const [files, setFiles] = useState<any[]>([]);
+  const [files, setFiles] = useState<FileData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,7 +27,7 @@ export default function FilesPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiClient.get<any[]>("/files");
+      const data = await apiClient.get<FileData[]>("/files");
       setFiles(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -33,6 +44,24 @@ export default function FilesPage() {
     try {
       await apiClient.request(`/files/${id}`, { method: "DELETE" });
       setFiles((s) => s.filter((f) => f.id !== id));
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleDownload(id: string, filename: string) {
+    try {
+      const response = await apiClient.request(`/files/${id}/download`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : String(err));
@@ -65,7 +94,7 @@ export default function FilesPage() {
                   <p className="mt-1 text-xs text-slate-400">{f.file_type ?? f.content_type} • {f.size_bytes} bytes</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <a href={f.storage_path} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-white">Download</a>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
                   <Button type="button" size="sm" variant="ghost" onClick={() => handleDelete(f.id)}>Delete</Button>
                 </div>
               </div>

@@ -64,6 +64,9 @@ def _extract_text_from_bytes(filename: str, file_type: str | None, data: bytes) 
                     logger.exception("Failed to extract page text from PDF page.")
             text = "\n\n".join(pages)
             return text
+        except ImportError as exc:
+            logger.exception("Missing pypdf dependency: %s", exc)
+            raise
         except Exception as exc:
             logger.exception("PDF extraction failed: %s", exc)
             raise
@@ -76,6 +79,9 @@ def _extract_text_from_bytes(filename: str, file_type: str | None, data: bytes) 
             doc = docx.Document(io.BytesIO(data))
             paragraphs = [p.text for p in doc.paragraphs if p.text]
             return "\n\n".join(paragraphs)
+        except ImportError as exc:
+            logger.exception("Missing python-docx dependency: %s", exc)
+            raise
         except Exception as exc:
             logger.exception("DOCX extraction failed: %s", exc)
             raise
@@ -129,17 +135,24 @@ async def upload_file(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to store file")
 
     # Extract text
+    extracted = ""
+    normalized = ""
     try:
         extracted = _extract_text_from_bytes(filename, file_type, contents) or ""
         normalized = "\n\n".join([line.strip() for line in extracted.splitlines() if line.strip()])
-    except Exception as exc:
-        logger.exception("Text extraction failed for file '%s': %s", filename, exc)
+    except ImportError as exc:
+        logger.exception("Missing dependency for text extraction: %s", exc)
         # best-effort cleanup: remove stored file
         try:
             os.remove(storage_path)
         except Exception:
             pass
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to extract text from file")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Server missing text extraction dependency")
+    except Exception as exc:
+        logger.exception("Text extraction failed for file '%s': %s", filename, exc)
+        # Do not fail the upload, just store the file without extracted text
+        # This prevents valid files from returning a 400 Bad Request
+        pass
 
     # Persist file metadata to files table
     payload = {
@@ -157,23 +170,16 @@ async def upload_file(
         logger.exception("Failed to insert file metadata: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to register file")
 
-    # Split into chunks and insert into documents table for future ingestion
+    # Split into chunks, generate embeddings, and insert into documents and vector store
     try:
-        chunks = split_text_into_chunks(normalized)
-        if chunks:
-            db_payloads = []
-            for chunk_text in chunks:
-                db_payloads.append({
-                    "id": uuid.uuid4().hex,
-                    "user_id": user_id,
-                    "content": chunk_text,
-                    "file_id": file_row.get("id"),
-                    "created_at": _utc_now_iso(),
-                })
-            # Insert many
-            await insert_many("documents", db_payloads)
+        from ..rag.startup import get_vector_store
+        from ..rag.ingestion import RAGIngestionPipeline
+        
+        vector_store = get_vector_store()
+        pipeline = RAGIngestionPipeline(vector_store)
+        await pipeline.ingest_text(normalized, user_id, document_id=file_row.get("id"))
     except Exception:
-        logger.exception("Failed to split/insert document chunks. Continuing without chunks.")
+        logger.exception("Failed to run ingestion pipeline. Continuing without chunks.")
 
     # Return the stored file record
     return file_row

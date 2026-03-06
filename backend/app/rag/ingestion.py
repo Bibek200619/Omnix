@@ -78,12 +78,15 @@ class RAGIngestionPipeline:
         for i, chunk_text in enumerate(chunks):
             chunk_id = str(uuid.uuid4())
             chunk_ids.append(chunk_id)
-            db_payloads.append({
+            payload = {
                 "id": chunk_id,
                 "user_id": user_id,
                 "content": chunk_text,
                 "created_at": timestamp
-            })
+            }
+            if document_id:
+                payload["file_id"] = document_id
+            db_payloads.append(payload)
 
         # 3. Generate Embeddings (Batch) - using async wrapper to prevent event loop blocking
         try:

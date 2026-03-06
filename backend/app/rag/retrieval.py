@@ -32,7 +32,7 @@ class RAGRetriever:
         
         self.vector_store = vector_store
 
-    async def retrieve(self, query: str, user_id: str, top_k: int = 5, distance_threshold: float | None = None) -> list[str]:
+    async def retrieve(self, query: str, user_id: str, top_k: int = 5, distance_threshold: float | None = None) -> list[dict[str, Any]]:
         """
         Retrieves the most relevant text chunks for a given query securely from the database.
 
@@ -63,7 +63,7 @@ class RAGRetriever:
             query_embedding = get_embedding(query)
         except Exception as exc:
             logger.exception("Failed to generate query embedding.")
-            raise RuntimeError("Retrieval failed at the embedding stage.") from exc
+            query_embedding = []
 
         if not query_embedding:
             logger.warning("Embedding generation returned an empty vector.")
@@ -74,7 +74,7 @@ class RAGRetriever:
             search_results = self.vector_store.search(query_embedding, user_id=user_id, top_k=top_k)
         except Exception as exc:
             logger.exception("Failed to search vector store.")
-            raise RuntimeError("Retrieval failed at the vector search stage.") from exc
+            search_results = []
 
         if not search_results:
             logger.info("No matching chunks found in the vector store.")
@@ -103,23 +103,66 @@ class RAGRetriever:
             logger.info("Fetching %d chunk texts from Supabase for user.", len(chunk_ids))
             db_chunks = await select_all(
                 table="documents",
-                columns="id,content",
+                columns="id,content,file_id",
                 filters={"id": chunk_ids, "user_id": user_id},
             )
+            file_ids = list(set([row["file_id"] for row in db_chunks if row.get("file_id")]))
+            files_map = {}
+            if file_ids:
+                files_resp = await select_all("files", "id,file_name", filters={"id": file_ids, "user_id": user_id})
+                files_map = {f["id"]: f.get("file_name", "Unknown File") for f in files_resp}
         except SupabaseServiceError as exc:
             logger.exception("Failed to fetch chunks from Supabase.")
             raise RuntimeError("Retrieval failed at the database stage.") from exc
 
         # Create a fast lookup dictionary to maintain FAISS ranking order
-        chunk_map = {row["id"]: row["content"] for row in db_chunks}
+        chunk_map = {row["id"]: row for row in db_chunks}
 
-        relevant_chunks: list[str] = []
+        relevant_chunks: list[dict[str, Any]] = []
         for chunk_id in chunk_ids:
-            chunk_text = chunk_map.get(chunk_id)
-            if chunk_text and chunk_text.strip():
-                relevant_chunks.append(chunk_text.strip())
+            chunk_row = chunk_map.get(chunk_id)
+            if chunk_row and chunk_row.get("content") and chunk_row["content"].strip():
+                relevant_chunks.append({
+                    "content": chunk_row["content"].strip(),
+                    "file_id": chunk_row.get("file_id"),
+                    "file_name": files_map.get(chunk_row.get("file_id"), "Unknown File"),
+                    "chunk_id": chunk_id
+                })
             else:
-                logger.warning("Chunk ID '%s' found in FAISS but missing/unauthorized in database.", chunk_id)
+                logger.warning("Chunk ID '%s' found in vector store but missing/unauthorized in database.", chunk_id)
+
+
+        # --- KEYWORD FALLBACK ---
+        if not relevant_chunks:
+            logger.info("Falling back to keyword search.")
+            try:
+                # Basic keyword search using ilike
+                keyword = query.split()[0] if query else ""
+                if keyword:
+                    from ..db.supabase import get_supabase
+                    supabase = get_supabase()
+                    fallback_resp = supabase.table("documents").select("id,content,file_id").eq("user_id", user_id).ilike("content", f"%{keyword}%").limit(top_k).execute()
+                    fallback_chunks = getattr(fallback_resp, "data", None) or []
+                    
+                    if fallback_chunks:
+                        file_ids = list(set([row["file_id"] for row in fallback_chunks if row.get("file_id")]))
+                        files_map = {}
+                        if file_ids:
+                            files_resp = await select_all("files", "id,file_name", filters={"id": file_ids, "user_id": user_id})
+                            files_map = {f["id"]: f.get("file_name", "Unknown File") for f in files_resp}
+                            
+                        for chunk_row in fallback_chunks:
+                            if chunk_row.get("content") and chunk_row["content"].strip():
+                                relevant_chunks.append({
+                                    "content": chunk_row["content"].strip(),
+                                    "file_id": chunk_row.get("file_id"),
+                                    "file_name": files_map.get(chunk_row.get("file_id"), "Unknown File"),
+                                    "chunk_id": chunk_row.get("id")
+                                })
+            except Exception as exc:
+                logger.exception("Keyword fallback failed.")
+        # ------------------------
 
         logger.info("Successfully retrieved %d chunks.", len(relevant_chunks))
         return relevant_chunks
+
