@@ -1,69 +1,123 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  ReactNode,
+} from "react";
 import { Session, User, AuthError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
 interface AuthContextType {
   session: Session | null;
   user: User | null;
+  accessToken: string | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
-  signOut: () => Promise<void>;
+  refreshSession: () => Promise<{
+    session: Session | null;
+    error: AuthError | null;
+  }>;
+  signOut: () => Promise<{ error: AuthError | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function logAccessToken(session: Session | null) {
+  if (session?.access_token) {
+    console.debug("Supabase session.access_token", session.access_token);
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+  const applySession = useCallback((nextSession: Session | null) => {
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
+    logAccessToken(nextSession);
+  }, []);
 
-    // Listen for auth changes
+  const refreshSession = useCallback(async () => {
+    const {
+      data: { session: nextSession },
+      error,
+    } = await supabase.auth.getSession();
+
+    if (error) {
+      console.error("Unable to load Supabase session", error);
+      applySession(null);
+      return { session: null, error };
+    }
+
+    applySession(nextSession);
+    return { session: nextSession, error: null };
+  }, [applySession]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadInitialSession() {
+      const {
+        data: { session: nextSession },
+        error,
+      } = await supabase.auth.getSession();
+
+      if (!isMounted) return;
+
+      if (error) {
+        console.error("Unable to load Supabase session", error);
+        applySession(null);
+      } else {
+        applySession(nextSession);
+      }
+
+      setLoading(false);
+    }
+
+    loadInitialSession();
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      applySession(session);
+      setLoading(false);
     });
 
-    return () => subscription?.unsubscribe();
-  }, []);
+    return () => {
+      isMounted = false;
+      subscription?.unsubscribe();
+    };
+  }, [applySession]);
 
-  const signIn = async (
-    email: string,
-    password: string
-  ): Promise<{ error: AuthError | null }> => {
-    const result = await supabase.auth.signInWithPassword({ email, password });
-    return { error: result.error };
-  };
+  const signOut = useCallback(async () => {
+    const { error } = await supabase.auth.signOut();
 
-  const signUp = async (
-    email: string,
-    password: string
-  ): Promise<{ error: AuthError | null }> => {
-    const result = await supabase.auth.signUp({ email, password });
-    return { error: result.error };
-  };
+    if (!error) {
+      applySession(null);
+    }
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
+    return { error };
+  }, [applySession]);
 
-  return (
-    <AuthContext.Provider value={{ session, user, loading, signIn, signUp, signOut }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      session,
+      user,
+      accessToken: session?.access_token ?? null,
+      loading,
+      refreshSession,
+      signOut,
+    }),
+    [loading, refreshSession, session, signOut, user],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

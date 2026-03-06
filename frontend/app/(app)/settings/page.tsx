@@ -6,16 +6,37 @@ import { useRouter } from "next/navigation";
 import { Bell, FileText, LogOut, Save, ShieldCheck, User } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { useAuth } from "@/lib/auth-context";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { signOut, user } = useAuth();
   const [saved, setSaved] = useState(false);
   const [emailUpdates, setEmailUpdates] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
+  const displayName =
+    (user?.user_metadata?.name as string | undefined) ??
+    (user?.user_metadata?.full_name as string | undefined) ??
+    "";
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1800);
+  }
+
+  async function handleSignOut() {
+    setSigningOut(true);
+
+    const { error } = await signOut();
+
+    if (error) {
+      console.error("Unable to sign out", error);
+      setSigningOut(false);
+      return;
+    }
+
+    router.replace("/login");
   }
 
   return (
@@ -40,14 +61,14 @@ export default function SettingsPage() {
           <Input
             id="name"
             label="Display name"
-            defaultValue="Bibek"
+            defaultValue={displayName}
             placeholder="Your name"
           />
           <Input
             id="email"
             label="Email"
             type="email"
-            defaultValue="you@company.com"
+            defaultValue={user?.email ?? ""}
             placeholder="you@company.com"
           />
         </div>
@@ -86,9 +107,10 @@ export default function SettingsPage() {
             type="button"
             variant="ghost"
             leftIcon={<LogOut className="h-4 w-4" />}
-            onClick={() => router.push("/login")}
+            isLoading={signingOut}
+            onClick={handleSignOut}
           >
-            Sign out
+            {signingOut ? "Signing out" : "Sign out"}
           </Button>
         </div>
       </form>
@@ -100,17 +122,9 @@ export default function SettingsPage() {
             <h2 className="font-semibold text-white">Security</h2>
           </div>
           <p className="mt-3 text-sm leading-6 text-slate-400">
-            Session, password, and OTP controls can connect here once Supabase
-            client calls are added.
+            Your active Supabase session is used for protected routes and API
+            authorization.
           </p>
-          <Button
-            type="button"
-            variant="secondary"
-            className="mt-4"
-            onClick={() => router.push("/verify")}
-          >
-            Verify again
-          </Button>
         </div>
 
         <Link

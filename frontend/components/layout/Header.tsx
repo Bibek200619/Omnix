@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Menu, MessageSquarePlus, LogOut } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { useAuth } from "@/lib/auth-context";
 
 const routeTitles = [
   { match: "/chat", title: "Chat", eyebrow: "RAG workspace" },
@@ -18,9 +20,25 @@ type HeaderProps = {
 export function Header({ onMenuClick }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { signOut } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
   const active =
     routeTitles.find((route) => pathname.startsWith(route.match)) ??
     routeTitles[0];
+
+  async function handleSignOut() {
+    setSigningOut(true);
+
+    const { error } = await signOut();
+
+    if (error) {
+      console.error("Unable to sign out", error);
+      setSigningOut(false);
+      return;
+    }
+
+    router.replace("/login");
+  }
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-canvas/90 backdrop-blur-xl">
@@ -60,9 +78,10 @@ export function Header({ onMenuClick }: HeaderProps) {
             type="button"
             variant="ghost"
             leftIcon={<LogOut className="h-4 w-4" />}
-            onClick={() => router.push("/login")}
+            isLoading={signingOut}
+            onClick={handleSignOut}
           >
-            Sign out
+            {signingOut ? "Signing out" : "Sign out"}
           </Button>
         </div>
       </div>

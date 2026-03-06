@@ -12,7 +12,7 @@ const points = [
   {
     icon: LockKeyhole,
     label: "Supabase identity",
-    copy: "Auth screens are intentionally thin so Supabase calls can replace mock redirects cleanly.",
+    copy: "Login, registration, session refresh, and logout all use the Supabase browser client.",
   },
   {
     icon: Workflow,

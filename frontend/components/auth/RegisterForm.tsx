@@ -7,10 +7,11 @@ import { Lock, Mail, UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { LoadingButton } from "@/components/ui/LoadingButton";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/lib/supabase";
 
 export function RegisterForm() {
   const router = useRouter();
-  const { signUp } = useAuth();
+  const { refreshSession } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,12 +20,15 @@ export function RegisterForm() {
     setError(null);
     setLoading(true);
 
-    const form = event.currentTarget;
-    const email = (form.querySelector("#email") as HTMLInputElement).value;
-    const password = (form.querySelector("#password") as HTMLInputElement).value;
+    const formData = new FormData(event.currentTarget);
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
 
     try {
-      const { error: signUpError } = await signUp(email, password);
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
 
       if (signUpError) {
         setError(signUpError.message || "Registration failed. Please try again.");
@@ -32,9 +36,13 @@ export function RegisterForm() {
         return;
       }
 
-      // Store email for verification page
-      localStorage.setItem("pendingVerificationEmail", email);
-      router.push("/verify");
+      if (data.session) {
+        await refreshSession();
+        router.replace("/chat");
+        return;
+      }
+
+      router.replace("/login");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
       setLoading(false);
@@ -50,6 +58,7 @@ export function RegisterForm() {
       )}
       <Input
         id="email"
+        name="email"
         label="Email"
         type="email"
         autoComplete="email"
@@ -60,6 +69,7 @@ export function RegisterForm() {
       />
       <Input
         id="password"
+        name="password"
         label="Password"
         type="password"
         autoComplete="new-password"

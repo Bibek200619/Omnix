@@ -7,10 +7,11 @@ import { Lock, Mail } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { LoadingButton } from "@/components/ui/LoadingButton";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/lib/supabase";
 
 export function LoginForm() {
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { refreshSession } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,12 +20,13 @@ export function LoginForm() {
     setError(null);
     setLoading(true);
 
-    const form = event.currentTarget;
-    const email = (form.querySelector("#email") as HTMLInputElement).value;
-    const password = (form.querySelector("#password") as HTMLInputElement).value;
+    const formData = new FormData(event.currentTarget);
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
 
     try {
-      const { error: signInError } = await signIn(email, password);
+      const { data, error: signInError } =
+        await supabase.auth.signInWithPassword({ email, password });
 
       if (signInError) {
         setError(signInError.message || "Login failed. Please check your credentials.");
@@ -32,7 +34,14 @@ export function LoginForm() {
         return;
       }
 
-      router.push("/chat");
+      if (!data.session) {
+        setError("Login succeeded but Supabase did not return a session.");
+        setLoading(false);
+        return;
+      }
+
+      await refreshSession();
+      router.replace("/chat");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
       setLoading(false);
@@ -48,6 +57,7 @@ export function LoginForm() {
       )}
       <Input
         id="email"
+        name="email"
         label="Email"
         type="email"
         autoComplete="email"
@@ -58,6 +68,7 @@ export function LoginForm() {
       />
       <Input
         id="password"
+        name="password"
         label="Password"
         type="password"
         autoComplete="current-password"
