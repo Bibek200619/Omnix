@@ -134,25 +134,21 @@ async def upload_file(
         logger.exception("Failed to persist uploaded file to disk: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to store file")
 
-    # Extract text
+    # Extract text (best-effort). Do not fail the upload on extraction errors.
     extracted = ""
     normalized = ""
+    extraction_error: str | None = None
     try:
         extracted = _extract_text_from_bytes(filename, file_type, contents) or ""
         normalized = "\n\n".join([line.strip() for line in extracted.splitlines() if line.strip()])
     except ImportError as exc:
         logger.exception("Missing dependency for text extraction: %s", exc)
-        # best-effort cleanup: remove stored file
-        try:
-            os.remove(storage_path)
-        except Exception:
-            pass
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Server missing text extraction dependency")
+        extraction_error = f"Missing dependency: {exc}"
+        normalized = ""
     except Exception as exc:
         logger.exception("Text extraction failed for file '%s': %s", filename, exc)
-        # Do not fail the upload, just store the file without extracted text
-        # This prevents valid files from returning a 400 Bad Request
-        pass
+        extraction_error = str(exc)
+        normalized = ""
 
     # Persist file metadata to files table
     payload = {
@@ -160,7 +156,7 @@ async def upload_file(
         "file_type": file_type or None,
         "size_bytes": size,
         "storage_path": storage_path,
-        "metadata": {"extracted_text_preview": normalized[:2000]},
+        "metadata": {"extracted_text_preview": normalized[:2000], "extraction_error": extraction_error},
         "conversation_id": conversation_id,
     }
 

@@ -101,9 +101,10 @@ class RAGRetriever:
         # Securely fetch all corresponding chunks from the database in a single batch query
         try:
             logger.info("Fetching %d chunk texts from Supabase for user.", len(chunk_ids))
+            # include created_at to allow chunk ordering/indexing per file
             db_chunks = await select_all(
                 table="documents",
-                columns="id,content,file_id",
+                columns="id,content,file_id,created_at",
                 filters={"id": chunk_ids, "user_id": user_id},
             )
             file_ids = list(set([row["file_id"] for row in db_chunks if row.get("file_id")]))
@@ -118,15 +119,28 @@ class RAGRetriever:
         # Create a fast lookup dictionary to maintain FAISS ranking order
         chunk_map = {row["id"]: row for row in db_chunks}
 
+        # Map distances from FAISS search_results for score reporting
+        distances_map: dict[str, float] = {cid: dist for cid, dist in search_results}
+
         relevant_chunks: list[dict[str, Any]] = []
         for chunk_id in chunk_ids:
             chunk_row = chunk_map.get(chunk_id)
             if chunk_row and chunk_row.get("content") and chunk_row["content"].strip():
+                dist = distances_map.get(chunk_id, 0.0)
+                # Convert distance -> similarity score (higher is better). Use simple transform.
+                try:
+                    score = float(1.0 / (1.0 + float(dist)))
+                except Exception:
+                    score = 0.0
+
                 relevant_chunks.append({
                     "content": chunk_row["content"].strip(),
                     "file_id": chunk_row.get("file_id"),
                     "file_name": files_map.get(chunk_row.get("file_id"), "Unknown File"),
-                    "chunk_id": chunk_id
+                    "chunk_id": chunk_id,
+                    "distance": float(dist),
+                    "score": score,
+                    "created_at": chunk_row.get("created_at"),
                 })
             else:
                 logger.warning("Chunk ID '%s' found in vector store but missing/unauthorized in database.", chunk_id)
@@ -162,6 +176,21 @@ class RAGRetriever:
             except Exception as exc:
                 logger.exception("Keyword fallback failed.")
         # ------------------------
+
+        # Compute chunk_index per file by ordering by created_at
+        file_chunks: dict[str, list[dict[str, Any]]] = {}
+        for c in relevant_chunks:
+            fid = c.get("file_id") or ""
+            file_chunks.setdefault(fid, []).append(c)
+
+        for fid, clist in file_chunks.items():
+            clist.sort(key=lambda x: x.get("created_at") or "")
+            for idx, c in enumerate(clist):
+                c["chunk_index"] = idx
+
+        # Add preview field
+        for c in relevant_chunks:
+            c["preview"] = (c.get("content") or "")[:200]
 
         logger.info("Successfully retrieved %d chunks.", len(relevant_chunks))
         return relevant_chunks

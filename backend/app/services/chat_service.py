@@ -178,6 +178,69 @@ async def call_llm(
         )
 
 
+async def call_llm_stream(
+    message: str,
+    context: list[dict[str, Any]] | None = None,
+    temperature: float = 0.2,
+) -> "async_generator[str, None]":
+    """
+    Async generator that yields incremental text chunks from the LLM.
+
+    In DEV_MODE this simulates realistic streaming by yielding small token chunks
+    with short delays. In production mode (when DEV_MODE is False) this will
+    fall back to calling the synchronous LLM and yielding the full response in
+    small slices to preserve streaming-compatible behavior.
+    """
+    normalized_context = _normalize_context(context)
+    settings = get_settings()
+
+    # DEV mode: simulate streaming
+    if settings.DEV_MODE:
+        logger.info("Streaming mock response in DEV_MODE.")
+        full = _build_dev_mode_response(message, normalized_context)
+        # Tokenize simply on words/punctuation for streaming effect
+        import re
+
+        tokens = re.split(r"(\s+|[^\s\w]+|\w+)", full)
+        tokens = [t for t in tokens if t]
+        for token in tokens:
+            yield token
+            # realistic variable delay
+            await asyncio.sleep(0.02 + (len(token) / 80))
+        return
+
+    # Production: call model sync in executor then stream slices
+    sem = _get_llm_semaphore()
+    if sem.locked():
+        raise ModelServiceError(
+            "System is currently at capacity. Please try again later.",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    async with sem:
+        loop = asyncio.get_running_loop()
+        try:
+            full = await loop.run_in_executor(
+                _LLM_EXECUTOR,
+                _call_llm_sync,
+                message,
+                normalized_context,
+                temperature,
+            )
+        except Exception:
+            # bubble up as ModelServiceError
+            raise
+
+        # yield in small chunks to avoid blocking frontends
+        import re
+
+        tokens = re.split(r"(\s+|[^\s\w]+|\w+)", full)
+        tokens = [t for t in tokens if t]
+        for token in tokens:
+            yield token
+            await asyncio.sleep(0.01)
+
+
 class ChatService:
     """
     Connects the RAG retrieval pipeline with the LLM API.

@@ -79,11 +79,11 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
 
         {/* Citations block */}
         {!isUser && message.sources && message.sources.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-white/10">
-            <p className="text-xs font-medium text-slate-400 mb-3 flex items-center gap-2">
-              <FileText className="w-3.5 h-3.5" />
-              Retrieved Sources
-            </p>
+            <div className="mt-4 pt-4 border-t border-white/10">
+             <p className="text-xs font-medium text-slate-400 mb-3 flex items-center gap-2">
+               <FileText className="w-3.5 h-3.5" />
+               Retrieved Sources ({message.sources.length})
+             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {message.sources.map((s: Record<string, string>, i: number) => {
                 const sourceId = s.id || String(i);
@@ -105,12 +105,15 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
                       onClick={() => setExpandedSource(isExpanded ? null : sourceId)}
                       className="flex items-center justify-between p-2.5 text-left focus:outline-none"
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <FileText className="w-3.5 h-3.5 shrink-0 text-cyan-400/70" />
-                        <span className="truncate text-xs font-medium text-slate-200">
-                          {s.title || 'Unknown Source'}
-                        </span>
-                      </div>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText className="w-3.5 h-3.5 shrink-0 text-cyan-400/70" />
+                          <span className="truncate text-xs font-medium text-slate-200">{s.title || 'Unknown Source'}</span>
+                          {typeof s.chunk_index === 'number' && (
+                            <span className="ml-2 px-1.5 py-0.5 rounded bg-white/[0.02] text-slate-300 text-[10px] border border-white/6">
+                              #{s.chunk_index}
+                            </span>
+                          )}
+                        </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {scoreText && (
                           <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 text-[10px] font-medium border border-cyan-500/20">
