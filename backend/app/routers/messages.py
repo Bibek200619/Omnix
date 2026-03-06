@@ -12,6 +12,7 @@ from ..core.security import get_current_user
 from ..schemas.chat import ChatRequest, ChatResponse, MessageRead
 from ..services.chat_service import ModelServiceError, call_llm
 from ..services.supabase_service import SupabaseServiceError, insert_many, insert_one, select_all, select_one, update_one
+from .conversations import build_conversation_title, hydrate_conversation_history
 
 router = APIRouter(tags=["messages"])
 logger = logging.getLogger(__name__)
@@ -165,7 +166,13 @@ async def chat(
             )
             conversation, recent_messages = await asyncio.gather(conversation_task, recent_messages_task)
         else:
-            conversation_payload = {"user_id": user_id, **({"title": payload.title} if payload.title else {})}
+            conversation_payload = {
+                "user_id": user_id,
+                "title": payload.title or build_conversation_title(message_text),
+                "is_archived": False,
+                "last_message_at": user_message_timestamp,
+                "updated_at": user_message_timestamp,
+            }
             conversation = await insert_one("conversations", conversation_payload)
             conversation_id = str(conversation["id"])
             recent_messages = []
@@ -177,6 +184,7 @@ async def chat(
                 "role": "user",
                 "content": message_text,
                 "status": "completed",
+                "created_at": user_message_timestamp,
             },
             {
                 "conversation_id": conversation_id,
@@ -184,6 +192,7 @@ async def chat(
                 "role": "assistant",
                 "content": "",
                 "status": "pending",
+                "created_at": _utc_now_iso(),
             }
         ]
         
@@ -201,11 +210,19 @@ async def chat(
             temperature=payload.temperature,
         )
     except ModelServiceError as exc:
+        failed_at = _utc_now_iso()
         try:
-            await update_one(
-                "messages",
-                {"id": assistant_message["id"], "user_id": user_id},
-                {"status": "failed"},
+            await asyncio.gather(
+                update_one(
+                    "messages",
+                    {"id": assistant_message["id"], "user_id": user_id},
+                    {"status": "failed"},
+                ),
+                update_one(
+                    "conversations",
+                    {"id": conversation_id, "user_id": user_id},
+                    {"last_message_at": failed_at, "updated_at": failed_at},
+                ),
             )
         except SupabaseServiceError:
             logger.exception(
@@ -234,12 +251,22 @@ async def chat(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Internal server error",
             )
+        conversation["last_message_at"] = timestamp
+        conversation["updated_at"] = timestamp
     except SupabaseServiceError as exc:
         raise _database_error() from exc
+
+    hydrated_conversation = (
+        await hydrate_conversation_history([conversation], user_id)
+    )[0]
 
     return ChatResponse(
         conversation_id=conversation_id,
         user_message_id=str(user_message["id"]),
         assistant_message_id=str(completed_assistant_message["id"]),
         response=assistant_response,
+        sources=[],
+        conversation=hydrated_conversation,
+        user_message=user_message,
+        assistant_message=completed_assistant_message,
     )

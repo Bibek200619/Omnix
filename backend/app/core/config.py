@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: str
     SUPABASE_SERVICE_ROLE_KEY: str
     SUPABASE_JWKS_URL: str | None = None
-    MODEL_URL: str = "http://localhost:8000/v1/chat/completions"
+    DEV_MODE: bool = True
+    MODEL_URL: str = "http://localhost:8001/v1/chat/completions"
     SIMILARITY_THRESHOLD: float = 1.5
     FAISS_INDEX_PATH: str = "./data/faiss_index.index"
     FAISS_MAP_PATH: str = "./data/faiss_map.json"

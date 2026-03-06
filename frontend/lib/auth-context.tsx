@@ -10,13 +10,15 @@ import {
   ReactNode,
 } from "react";
 import { Session, User, AuthError } from "@supabase/supabase-js";
-import { supabase } from "./supabase";
+import { isSupabaseConfigured, supabase, supabaseConfigError } from "./supabase";
 
 interface AuthContextType {
   session: Session | null;
   user: User | null;
   accessToken: string | null;
   loading: boolean;
+  isConfigured: boolean;
+  authError: string | null;
   refreshSession: () => Promise<{
     session: Session | null;
     error: AuthError | null;
@@ -26,24 +28,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function logAccessToken(session: Session | null) {
-  if (session?.access_token) {
-    console.debug("Supabase session.access_token", session.access_token);
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isSupabaseConfigured);
 
   const applySession = useCallback((nextSession: Session | null) => {
     setSession(nextSession);
     setUser(nextSession?.user ?? null);
-    logAccessToken(nextSession);
   }, []);
 
   const refreshSession = useCallback(async () => {
+    if (!supabase) {
+      applySession(null);
+      return { session: null, error: null };
+    }
+
     const {
       data: { session: nextSession },
       error,
@@ -60,9 +60,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [applySession]);
 
   useEffect(() => {
+    if (!supabase) {
+      applySession(null);
+      setLoading(false);
+      return;
+    }
+
     let isMounted = true;
 
     async function loadInitialSession() {
+      if (!supabase) return;
+
       const {
         data: { session: nextSession },
         error,
@@ -96,6 +104,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [applySession]);
 
   const signOut = useCallback(async () => {
+    if (!supabase) {
+      applySession(null);
+      return { error: null };
+    }
+
     const { error } = await supabase.auth.signOut();
 
     if (!error) {
@@ -111,6 +124,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       accessToken: session?.access_token ?? null,
       loading,
+      isConfigured: isSupabaseConfigured,
+      authError: supabaseConfigError,
       refreshSession,
       signOut,
     }),

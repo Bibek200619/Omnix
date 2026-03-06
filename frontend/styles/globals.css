@@ -18,7 +18,9 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  background: #050608;
+  background:
+    radial-gradient(circle at top left, rgba(34, 211, 238, 0.08), transparent 30rem),
+    linear-gradient(180deg, #07080b 0%, #050608 46%, #040509 100%);
   color: #f8fafc;
   font-family: var(--font-geist-sans);
   text-rendering: optimizeLegibility;
@@ -55,4 +57,40 @@ textarea {
 .scrollbar-thin::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.35);
   border-radius: 999px;
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.08),
+    transparent
+  );
+  animation: shimmer 1.8s infinite;
+  content: "";
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

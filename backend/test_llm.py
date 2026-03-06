@@ -7,7 +7,8 @@ from concurrent.futures import ThreadPoolExecutor
 os.environ["SUPABASE_URL"] = "http://localhost:8001"
 os.environ["SUPABASE_ANON_KEY"] = "anon"
 os.environ["SUPABASE_SERVICE_ROLE_KEY"] = "service"
-os.environ["MODEL_URL"] = "http://127.0.0.1:8000/v1/chat/completions"
+os.environ["DEV_MODE"] = "false"
+os.environ["MODEL_URL"] = "http://127.0.0.1:8001/v1/chat/completions"
 
 from app.services.chat_service import call_llm, ModelServiceError
 
