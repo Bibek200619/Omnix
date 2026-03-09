@@ -37,30 +37,43 @@ const navItems = [
 function WorkspaceSelector() {
   const { workspaces, loading, activeWorkspaceId, setActiveWorkspace, createWorkspace } = useWorkspace();
   const [open, setOpen] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const active = workspaces.find((w) => w.id === activeWorkspaceId) || null;
 
   async function handleCreate() {
-    if (typeof window === "undefined") return;
-    const name = window.prompt("Create a workspace", "My Workspace");
-    if (!name || !name.trim()) return;
+    if (!newWorkspaceName.trim()) return;
     try {
-      const created = await createWorkspace({ name: name.trim() });
+      setCreatingWorkspace(true);
+      setCreateError(null);
+      const created = await createWorkspace({ name: newWorkspaceName.trim() });
       setActiveWorkspace(created.id);
+      setNewWorkspaceName("");
+      setShowCreateForm(false);
       setOpen(false);
     } catch (err) {
       console.error("Failed to create workspace", err);
-      // small UX: brief alert
-      alert("Unable to create workspace. Try again.");
+      setCreateError(err instanceof Error ? err.message : "Unable to create workspace");
+    } finally {
+      setCreatingWorkspace(false);
     }
   }
 
+  function handleCancel() {
+    setShowCreateForm(false);
+    setNewWorkspaceName("");
+    setCreateError(null);
+  }
+
   return (
-    <div className="relative mt-1">
+    <div className="relative mt-3">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 rounded-lg bg-white/[0.02] px-3 py-2 text-left transition hover:bg-white/[0.04]"
+        className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/8 bg-white/[0.04] px-4 py-3 text-left transition hover:bg-white/[0.08]"
         aria-expanded={open}
       >
         <div className="flex items-center gap-3">
@@ -69,47 +82,133 @@ function WorkspaceSelector() {
           </div>
           <div className="min-w-0">
             <div className="truncate text-sm font-medium text-white">{active ? active.name : "My Workspace"}</div>
-            <div className="truncate text-xs text-slate-500">Workspace · Shared knowledge</div>
+            <div className="truncate text-xs text-slate-400">Active workspace</div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <svg className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M6 9l6 6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
+        <svg className={`h-4 w-4 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M6 9l6 6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
 
-      {open ? (
-        <div className="absolute left-0 top-full mt-2 w-[260px] rounded-lg border border-white/8 bg-[#071017]/95 p-2 shadow-lg z-50">
-          <div className="max-h-56 overflow-auto">
-            {loading ? (
-              <div className="p-2 text-xs text-slate-500">Loading workspaces…</div>
-            ) : workspaces.length === 0 ? (
-              <div className="p-2 text-sm text-slate-400">No workspaces yet</div>
-            ) : (
-              workspaces.map((ws) => (
-                <button
-                  key={ws.id}
-                  onClick={() => {
-                    setActiveWorkspace(ws.id);
-                    setOpen(false);
-                  }}
-                  className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-white/[0.02]"
-                >
-                  <div className="h-8 w-8 flex-shrink-0 rounded-sm bg-slate-800 flex items-center justify-center text-sm font-medium text-white">{ws.name.charAt(0).toUpperCase()}</div>
-                  <div className="min-w-0">
-                    <div className="truncate text-sm text-white">{ws.name}</div>
-                    <div className="truncate text-xs text-slate-500">{ws.description || ""}</div>
-                  </div>
-                </button>
-              ))
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="absolute left-0 top-full mt-2 w-full rounded-lg border border-white/8 bg-[#071017]/95 shadow-lg z-50 backdrop-blur-sm"
+          >
+            <div className="max-h-56 overflow-y-auto">
+              {loading ? (
+                <div className="px-3 py-3 text-xs text-slate-500">Loading workspaces…</div>
+              ) : workspaces.length === 0 ? (
+                <div className="px-3 py-3 text-sm text-slate-400">No workspaces yet</div>
+              ) : (
+                <AnimatePresence mode="popLayout">
+                  {workspaces.map((ws, index) => (
+                    <motion.button
+                      key={ws.id}
+                      layout
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.12, delay: index * 0.02 }}
+                      onClick={() => {
+                        setActiveWorkspace(ws.id);
+                        setOpen(false);
+                      }}
+                      className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-white/[0.08] transition"
+                    >
+                      <div className="h-8 w-8 flex-shrink-0 rounded-md bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-sm font-medium text-white">{ws.name.charAt(0).toUpperCase()}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-white">{ws.name}</div>
+                        {ws.description && <div className="truncate text-xs text-slate-500">{ws.description}</div>}
+                      </div>
+                      {ws.id === activeWorkspaceId && (
+                        <Check className="h-4 w-4 shrink-0 text-cyan-300" />
+                      )}
+                    </motion.button>
+                  ))}
+                </AnimatePresence>
+              )}
+            </div>
+
+            {createError && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="border-t border-white/6 px-3 py-2"
+              >
+                <div className="rounded-md border border-rose-400/25 bg-rose-400/10 p-2 text-xs text-rose-100">
+                  {createError}
+                </div>
+              </motion.div>
             )}
-          </div>
-          <div className="mt-2 border-t border-white/6 pt-2">
-            <button onClick={handleCreate} className="w-full rounded-md bg-cyan-600 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-500">Create workspace</button>
-          </div>
-        </div>
-      ) : null}
+
+            <div className="border-t border-white/6 p-3">
+              {showCreateForm ? (
+                <motion.form
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.16 }}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleCreate();
+                  }}
+                  className="space-y-2"
+                >
+                  <Input
+                    value={newWorkspaceName}
+                    onChange={(e) => {
+                      setNewWorkspaceName(e.target.value);
+                      setCreateError(null);
+                    }}
+                    placeholder="Workspace name"
+                    autoFocus
+                    disabled={creatingWorkspace}
+                    className="h-9"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="submit"
+                      disabled={!newWorkspaceName.trim() || creatingWorkspace}
+                      className="flex-1"
+                    >
+                      {creatingWorkspace ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
+                          Creating
+                        </>
+                      ) : (
+                        "Create"
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={handleCancel}
+                      disabled={creatingWorkspace}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </motion.form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateForm(true)}
+                  className="w-full rounded-md bg-cyan-600 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-500 transition"
+                >
+                  Create workspace
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -211,39 +310,39 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           isOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-white/10 px-5">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/chat"
-              onClick={onClose}
-              className="flex items-center gap-3"
-            >
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200">
-                <Sparkles className="h-5 w-5" />
-              </span>
-            </Link>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="block text-sm font-semibold text-white">Omnix</span>
-                <span className="text-xs text-slate-500">AI workspace</span>
-              </div>
-              <WorkspaceSelector />
+        <div className="flex h-auto items-start justify-between border-b border-white/10 px-5 py-4 lg:py-5">
+          <div className="flex w-full flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <Link
+                href="/chat"
+                onClick={onClose}
+                className="flex items-center gap-2"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200">
+                  <Sparkles className="h-5 w-5" />
+                </span>
+                <div>
+                  <span className="block text-sm font-semibold text-white leading-tight">Omnix</span>
+                  <span className="text-xs text-slate-500 leading-tight">AI workspace</span>
+                </div>
+              </Link>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="lg:hidden"
+                aria-label="Close navigation"
+                title="Close navigation"
+                onClick={onClose}
+              >
+                <X className="h-5 w-5" />
+              </Button>
             </div>
+            <WorkspaceSelector />
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="lg:hidden"
-            aria-label="Close navigation"
-            title="Close navigation"
-            onClick={onClose}
-          >
-            <X className="h-5 w-5" />
-          </Button>
         </div>
 
-        <nav className="space-y-1 px-3 py-4">
+        <nav className="space-y-1 border-b border-white/10 px-3 py-4">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -268,9 +367,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           })}
         </nav>
 
-        <section className="flex min-h-0 flex-1 flex-col border-t border-white/10 px-3 py-4">
+        <section className="flex min-h-0 flex-1 flex-col px-3 py-4">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
               Recent chats
             </p>
             <Button
@@ -482,14 +581,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           )}
         </section>
 
-        <div className="border-t border-white/10 p-4">
-          <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4">
+        <div className="border-t border-white/10 px-4 py-5">
+          <div className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3">
             <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-300" />
-              <p className="text-sm font-medium text-white">Persistent history</p>
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <p className="text-xs font-semibold text-white">Synced</p>
             </div>
-            <p className="mt-1 text-xs leading-5 text-slate-400">
-              Conversations are loaded from the authenticated API session.
+            <p className="mt-2 text-xs leading-5 text-slate-400">
+              Your conversations are always available across devices.
             </p>
           </div>
         </div>
