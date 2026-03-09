@@ -185,21 +185,12 @@ async def upload_file(
         logger.exception("Failed to insert file metadata: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to register file")
 
-    # Split into chunks, generate embeddings, and insert into documents and vector store
+    # Enqueue ingestion job to process the file asynchronously
     try:
-        from ..rag.startup import get_vector_store
-        from ..rag.ingestion import RAGIngestionPipeline
-        
-        vector_store = get_vector_store()
-        pipeline = RAGIngestionPipeline(vector_store)
-        await pipeline.ingest_text(
-            normalized,
-            user_id,
-            document_id=file_row.get("id"),
-            workspace_id=workspace_id,
-        )
+        from ..jobs.queue import enqueue_job
+        await enqueue_job({"type": "ingest_file", "file_id": str(file_row.get("id")), "user_id": user_id, "workspace_id": workspace_id})
     except Exception:
-        logger.exception("Failed to run ingestion pipeline. Continuing without chunks.")
+        logger.exception("Failed to enqueue ingestion job; continuing without background processing.")
 
-    # Return the stored file record
+    # Return the stored file record immediately; ingestion will occur in background
     return file_row

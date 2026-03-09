@@ -21,6 +21,7 @@ AUTH_EXEMPT_PATHS = {
     "/health",
     "/docs",
     "/docs/oauth2-redirect",
+    "/integrations/google_drive/callback",
     "/openapi.json",
     "/redoc",
 }
