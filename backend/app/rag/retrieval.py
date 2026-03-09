@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from ..core.config import get_settings
-from ..services.supabase_service import SupabaseServiceError, select_all
+from ..services.supabase_service import SupabaseServiceError, select_all, select_all_trusted
 from .embedding import get_embedding
 from .vector_store_base import VectorStore
 
@@ -114,23 +114,34 @@ class RAGRetriever:
 
         try:
             logger.info("Fetching %d chunk texts from Supabase for user.", len(chunk_ids))
-            db_filters: dict[str, Any] = {"id": chunk_ids, "user_id": user_id}
             if workspace_id:
-                db_filters["workspace_id"] = workspace_id
-
-            db_chunks = await select_all(
-                table="documents",
-                columns="id,content,file_id,created_at,workspace_id",
-                filters=db_filters,
-            )
+                db_chunks = await select_all_trusted(
+                    table="documents",
+                    columns="id,content,file_id,created_at,workspace_id",
+                    filters={"id": chunk_ids, "workspace_id": workspace_id},
+                )
+            else:
+                db_chunks = await select_all(
+                    table="documents",
+                    columns="id,content,file_id,created_at,workspace_id",
+                    filters={"id": chunk_ids, "user_id": user_id},
+                )
 
             file_ids = list(set([row["file_id"] for row in db_chunks if row.get("file_id")]))
             files_map = {}
             if file_ids:
-                file_filters: dict[str, Any] = {"id": file_ids, "user_id": user_id}
                 if workspace_id:
-                    file_filters["workspace_id"] = workspace_id
-                files_resp = await select_all("files", "id,file_name", filters=file_filters)
+                    files_resp = await select_all_trusted(
+                        "files",
+                        "id,file_name",
+                        filters={"id": file_ids, "workspace_id": workspace_id},
+                    )
+                else:
+                    files_resp = await select_all(
+                        "files",
+                        "id,file_name",
+                        filters={"id": file_ids, "user_id": user_id},
+                    )
                 files_map = {f["id"]: f.get("file_name", "Unknown File") for f in files_resp}
         except SupabaseServiceError as exc:
             logger.exception("Failed to fetch chunks from Supabase.")
@@ -168,9 +179,11 @@ class RAGRetriever:
                 if keyword:
                     from ..db.supabase import get_supabase
                     supabase = get_supabase()
-                    fallback_query = supabase.table("documents").select("id,content,file_id").eq("user_id", user_id).ilike("content", f"%{keyword}%").limit(top_k)
+                    fallback_query = supabase.table("documents").select("id,content,file_id").ilike("content", f"%{keyword}%").limit(top_k)
                     if workspace_id:
                         fallback_query = fallback_query.eq("workspace_id", workspace_id)
+                    else:
+                        fallback_query = fallback_query.eq("user_id", user_id)
                     fallback_resp = fallback_query.execute()
                     fallback_chunks = getattr(fallback_resp, "data", None) or []
 
@@ -178,10 +191,18 @@ class RAGRetriever:
                         file_ids = list(set([row["file_id"] for row in fallback_chunks if row.get("file_id")]))
                         files_map = {}
                         if file_ids:
-                            file_filters = {"id": file_ids, "user_id": user_id}
                             if workspace_id:
-                                file_filters["workspace_id"] = workspace_id
-                            files_resp = await select_all("files", "id,file_name", filters=file_filters)
+                                files_resp = await select_all_trusted(
+                                    "files",
+                                    "id,file_name",
+                                    filters={"id": file_ids, "workspace_id": workspace_id},
+                                )
+                            else:
+                                files_resp = await select_all(
+                                    "files",
+                                    "id,file_name",
+                                    filters={"id": file_ids, "user_id": user_id},
+                                )
                             files_map = {f["id"]: f.get("file_name", "Unknown File") for f in files_resp}
 
                         for chunk_row in fallback_chunks:
@@ -210,4 +231,3 @@ class RAGRetriever:
 
         logger.info("Successfully retrieved %d chunks.", len(relevant_chunks))
         return relevant_chunks
-

@@ -26,56 +26,7 @@ export function UploadDropzone({ conversationId, onUploadSuccess }: UploadDropzo
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const onFiles = useCallback((files: FileList | null) => {
-    if (!files) return;
-    const arr = Array.from(files).map((file) => ({
-      id: crypto.randomUUID(),
-      file,
-      progress: 0,
-      status: "idle" as const,
-      preview: file.type === "application/pdf" || file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
-    }));
-    setItems((s) => [...arr, ...s]);
-    arr.forEach((it) => upload(it));
-  }, []);
-
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragActive(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragActive(false);
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isDragActive) {
-      setIsDragActive(true);
-    }
-  }, [isDragActive]);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragActive(false);
-    onFiles(e.dataTransfer.files);
-  }, [onFiles]);
-
-  const handleChoose = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    onFiles(e.target.files);
-    e.currentTarget.value = "";
-  }, [onFiles]);
-
-  const triggerFilePicker = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
-  async function upload(item: UploadItem) {
+  const upload = useCallback(async (item: UploadItem) => {
     setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "uploading" } : it));
 
     const fd = new FormData();
@@ -118,12 +69,70 @@ export function UploadDropzone({ conversationId, onUploadSuccess }: UploadDropzo
           xhr.setRequestHeader("Authorization", "Bearer " + token);
         }
       }
+
+      if (typeof window !== "undefined") {
+        const activeWorkspace = window.localStorage.getItem("omnix.activeWorkspaceId");
+        if (activeWorkspace) {
+          xhr.setRequestHeader("X-Omnix-Workspace", activeWorkspace);
+        }
+      }
     } catch (err) {
       console.error("Failed to attach auth token to upload request", err);
     }
 
     xhr.send(fd);
-  }
+  }, [conversationId, onUploadSuccess]);
+
+  const onFiles = useCallback((files: FileList | null) => {
+    if (!files) return;
+    const arr = Array.from(files).map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+      progress: 0,
+      status: "idle" as const,
+      preview: file.type === "application/pdf" || file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+    }));
+    setItems((s) => [...arr, ...s]);
+    arr.forEach((it) => {
+      void upload(it);
+    });
+  }, [upload]);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragActive) {
+      setIsDragActive(true);
+    }
+  }, [isDragActive]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+    onFiles(e.dataTransfer.files);
+  }, [onFiles]);
+
+  const handleChoose = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onFiles(e.target.files);
+    e.currentTarget.value = "";
+  }, [onFiles]);
+
+  const triggerFilePicker = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
 
   return (
     <div className="w-full">

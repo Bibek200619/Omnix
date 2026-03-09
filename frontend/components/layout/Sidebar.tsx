@@ -7,9 +7,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
   Check,
+  ChevronDown,
   Clock,
   Edit3,
   FileText,
+  Globe2,
   History,
   Loader2,
   MessageSquare,
@@ -18,6 +20,8 @@ import {
   Settings,
   Sparkles,
   Trash2,
+  UserPlus,
+  Users,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -26,6 +30,8 @@ import { Input } from "@/components/ui/Input";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
+import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
+import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModal";
 
 const navItems = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
@@ -35,14 +41,27 @@ const navItems = [
 ];
 
 function WorkspaceSelector() {
-  const { workspaces, loading, activeWorkspaceId, setActiveWorkspace, createWorkspace } = useWorkspace();
+  const {
+    workspaces,
+    loading,
+    activeWorkspaceId,
+    activeWorkspace,
+    activeMembers,
+    setActiveWorkspace,
+    createWorkspace,
+    inviteToActiveWorkspace,
+  } = useWorkspace();
   const [open, setOpen] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
-  const active = workspaces.find((w) => w.id === activeWorkspaceId) || null;
+  const active = activeWorkspace || workspaces.find((w) => w.id === activeWorkspaceId) || null;
+  const memberPreview = activeMembers.length > 0 ? activeMembers : active?.members_preview ?? [];
 
   async function handleCreate() {
     if (!newWorkspaceName.trim()) return;
@@ -68,6 +87,20 @@ function WorkspaceSelector() {
     setCreateError(null);
   }
 
+  async function handleInvite(email: string) {
+    try {
+      setInviting(true);
+      setInviteError(null);
+      await inviteToActiveWorkspace(email);
+      setInviteOpen(false);
+      setOpen(false);
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "Unable to invite teammate");
+    } finally {
+      setInviting(false);
+    }
+  }
+
   return (
     <div className="relative mt-3">
       <button
@@ -76,18 +109,40 @@ function WorkspaceSelector() {
         className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/8 bg-white/[0.04] px-4 py-3 text-left transition hover:bg-white/[0.08]"
         aria-expanded={open}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="h-8 w-8 flex-shrink-0 rounded-md bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center text-white text-sm font-semibold">
             {active ? active.name.charAt(0).toUpperCase() : "M"}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium text-white">{active ? active.name : "My Workspace"}</div>
-            <div className="truncate text-xs text-slate-400">Active workspace</div>
+            <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+              <span>{active?.current_user_role === "owner" ? "Owner" : "Member"}</span>
+              {active ? (
+                <>
+                  <span className="h-1 w-1 rounded-full bg-white/20" />
+                  <span>{active.member_count} {active.member_count === 1 ? "member" : "members"}</span>
+                </>
+              ) : null}
+            </div>
+            {active ? (
+              <div className="mt-2 flex items-center gap-2">
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium",
+                    active.is_shared
+                      ? "border-cyan-300/20 bg-cyan-300/10 text-cyan-100"
+                      : "border-white/10 bg-white/[0.04] text-slate-300",
+                  )}
+                >
+                  {active.is_shared ? <Users className="h-3 w-3" /> : <Globe2 className="h-3 w-3" />}
+                  {active.is_shared ? "Shared" : "Solo"}
+                </span>
+                <WorkspaceMemberStack members={memberPreview} totalCount={active.member_count} />
+              </div>
+            ) : null}
           </div>
         </div>
-        <svg className={`h-4 w-4 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path d="M6 9l6 6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform duration-200", open && "rotate-180")} />
       </button>
 
       <AnimatePresence>
@@ -122,8 +177,14 @@ function WorkspaceSelector() {
                       <div className="h-8 w-8 flex-shrink-0 rounded-md bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-sm font-medium text-white">{ws.name.charAt(0).toUpperCase()}</div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-white">{ws.name}</div>
-                        {ws.description && <div className="truncate text-xs text-slate-500">{ws.description}</div>}
+                        <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                          <span>{ws.member_count} {ws.member_count === 1 ? "member" : "members"}</span>
+                          <span className="h-1 w-1 rounded-full bg-white/15" />
+                          <span>{ws.current_user_role === "owner" ? "Owner" : "Member"}</span>
+                        </div>
+                        {ws.description && <div className="mt-1 truncate text-xs text-slate-500">{ws.description}</div>}
                       </div>
+                      <WorkspaceMemberStack members={ws.members_preview} totalCount={ws.member_count} />
                       {ws.id === activeWorkspaceId && (
                         <Check className="h-4 w-4 shrink-0 text-cyan-300" />
                       )}
@@ -147,68 +208,95 @@ function WorkspaceSelector() {
             )}
 
             <div className="border-t border-white/6 p-3">
-              {showCreateForm ? (
-                <motion.form
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.16 }}
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleCreate();
-                  }}
-                  className="space-y-2"
-                >
-                  <Input
-                    value={newWorkspaceName}
-                    onChange={(e) => {
-                      setNewWorkspaceName(e.target.value);
-                      setCreateError(null);
+              <div className="space-y-2">
+                {active?.current_user_role === "owner" ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    leftIcon={<UserPlus className="h-4 w-4" />}
+                    onClick={() => {
+                      setInviteError(null);
+                      setInviteOpen(true);
                     }}
-                    placeholder="Workspace name"
-                    autoFocus
-                    disabled={creatingWorkspace}
-                    className="h-9"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      type="submit"
-                      disabled={!newWorkspaceName.trim() || creatingWorkspace}
-                      className="flex-1"
-                    >
-                      {creatingWorkspace ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
-                          Creating
-                        </>
-                      ) : (
-                        "Create"
-                      )}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={handleCancel}
+                  >
+                    Invite teammate
+                  </Button>
+                ) : null}
+
+                {showCreateForm ? (
+                  <motion.form
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.16 }}
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleCreate();
+                    }}
+                    className="space-y-2"
+                  >
+                    <Input
+                      value={newWorkspaceName}
+                      onChange={(e) => {
+                        setNewWorkspaceName(e.target.value);
+                        setCreateError(null);
+                      }}
+                      placeholder="Workspace name"
+                      autoFocus
                       disabled={creatingWorkspace}
-                      className="flex-1"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </motion.form>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowCreateForm(true)}
-                  className="w-full rounded-md bg-cyan-600 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-500 transition"
-                >
-                  Create workspace
-                </button>
-              )}
+                      className="h-9"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        type="submit"
+                        disabled={!newWorkspaceName.trim() || creatingWorkspace}
+                        className="flex-1"
+                      >
+                        {creatingWorkspace ? (
+                          <>
+                            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                            Creating
+                          </>
+                        ) : (
+                          "Create"
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={handleCancel}
+                        disabled={creatingWorkspace}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </motion.form>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateForm(true)}
+                    className="w-full rounded-md bg-cyan-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-cyan-500"
+                  >
+                    Create workspace
+                  </button>
+                )}
+              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+      {active ? (
+        <WorkspaceInviteModal
+          open={inviteOpen}
+          workspaceName={active.name}
+          loading={inviting}
+          error={inviteError}
+          onClose={() => setInviteOpen(false)}
+          onSubmit={handleInvite}
+        />
+      ) : null}
     </div>
   );
 }

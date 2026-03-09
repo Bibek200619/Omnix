@@ -46,6 +46,15 @@ def _insert_one_sync(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
     return data[0]
 
 
+def _insert_one_trusted_sync(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
+    response = get_supabase().table(table).insert(dict(payload)).execute()
+    data = getattr(response, "data", None) or []
+    if not data:
+        logger.error("Trusted insert into '%s' returned no rows.", table)
+        raise SupabaseServiceError(INTERNAL_DB_ERROR)
+    return data[0]
+
+
 def _insert_many_sync(table: str, payloads: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
     # WARNING: get_supabase() uses the SERVICE ROLE KEY. 
     # This bypasses RLS completely. Enforcing user_id mapping prevents privilege escalation.
@@ -58,6 +67,15 @@ def _insert_many_sync(table: str, payloads: list[Mapping[str, Any]]) -> list[dic
     data = getattr(response, "data", None) or []
     if not data:
         logger.error("Batch insert into '%s' returned no rows.", table)
+        raise SupabaseServiceError(INTERNAL_DB_ERROR)
+    return data
+
+
+def _insert_many_trusted_sync(table: str, payloads: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    response = get_supabase().table(table).insert([dict(p) for p in payloads]).execute()
+    data = getattr(response, "data", None) or []
+    if not data:
+        logger.error("Trusted batch insert into '%s' returned no rows.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
     return data
 
@@ -106,6 +124,29 @@ def _select_all_sync(
     return list(getattr(response, "data", None) or [])
 
 
+def _select_all_trusted_sync(
+    table: str,
+    columns: str,
+    filters: Mapping[str, Any] | None = None,
+    order_by: str | None = None,
+    desc: bool = False,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> list[dict[str, Any]]:
+    query = get_supabase().table(table).select(columns)
+    query = _apply_filters(query, filters)
+
+    if order_by:
+        query = query.order(order_by, desc=desc)
+    if limit is not None:
+        query = query.limit(limit)
+    if offset is not None:
+        query = query.offset(offset)
+
+    response = query.execute()
+    return list(getattr(response, "data", None) or [])
+
+
 def _select_one_sync(
     table: str,
     columns: str,
@@ -117,6 +158,17 @@ def _select_one_sync(
         logger.error("Rejected read on table '%s' missing user_id filter.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
+    query = get_supabase().table(table).select(columns)
+    query = _apply_filters(query, filters)
+    response = query.limit(1).maybe_single().execute()
+    return getattr(response, "data", None)
+
+
+def _select_one_trusted_sync(
+    table: str,
+    columns: str,
+    filters: Mapping[str, Any],
+) -> dict[str, Any] | None:
     query = get_supabase().table(table).select(columns)
     query = _apply_filters(query, filters)
     response = query.limit(1).maybe_single().execute()
@@ -147,6 +199,34 @@ def _update_one_sync(
     return data[0]
 
 
+def _update_one_trusted_sync(
+    table: str,
+    filters: Mapping[str, Any],
+    payload: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if not payload:
+        logger.error("Trusted update for '%s' requires at least one field.", table)
+        raise SupabaseServiceError(INTERNAL_DB_ERROR)
+
+    query = get_supabase().table(table).update(dict(payload))
+    query = _apply_filters(query, filters)
+    response = query.execute()
+    data = getattr(response, "data", None) or []
+    if not data:
+        return None
+    return data[0]
+
+
+def _delete_many_trusted_sync(
+    table: str,
+    filters: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    query = get_supabase().table(table).delete()
+    query = _apply_filters(query, filters)
+    response = query.execute()
+    return list(getattr(response, "data", None) or [])
+
+
 async def insert_one(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
     try:
         return await run_in_threadpool(_insert_one_sync, table, payload)
@@ -157,6 +237,16 @@ async def insert_one(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
         raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
 
 
+async def insert_one_trusted(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
+    try:
+        return await run_in_threadpool(_insert_one_trusted_sync, table, payload)
+    except SupabaseServiceError:
+        raise
+    except Exception as exc:
+        logger.exception("Failed trusted insert into '%s'.", table)
+        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+
+
 async def insert_many(table: str, payloads: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
     try:
         return await run_in_threadpool(_insert_many_sync, table, payloads)
@@ -164,6 +254,16 @@ async def insert_many(table: str, payloads: list[Mapping[str, Any]]) -> list[dic
         raise
     except Exception as exc:
         logger.exception("Failed to batch insert into '%s'.", table)
+        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+
+
+async def insert_many_trusted(table: str, payloads: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    try:
+        return await run_in_threadpool(_insert_many_trusted_sync, table, payloads)
+    except SupabaseServiceError:
+        raise
+    except Exception as exc:
+        logger.exception("Failed trusted batch insert into '%s'.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
 
 
@@ -194,6 +294,33 @@ async def select_all(
         raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
 
 
+async def select_all_trusted(
+    table: str,
+    columns: str,
+    filters: Mapping[str, Any] | None = None,
+    order_by: str | None = None,
+    desc: bool = False,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> list[dict[str, Any]]:
+    try:
+        return await run_in_threadpool(
+            _select_all_trusted_sync,
+            table,
+            columns,
+            filters,
+            order_by,
+            desc,
+            limit,
+            offset,
+        )
+    except SupabaseServiceError:
+        raise
+    except Exception as exc:
+        logger.exception("Failed trusted query on '%s'.", table)
+        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+
+
 async def select_one(
     table: str,
     columns: str,
@@ -205,6 +332,20 @@ async def select_one(
         raise
     except Exception as exc:
         logger.exception("Failed to query '%s'.", table)
+        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+
+
+async def select_one_trusted(
+    table: str,
+    columns: str,
+    filters: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    try:
+        return await run_in_threadpool(_select_one_trusted_sync, table, columns, filters)
+    except SupabaseServiceError:
+        raise
+    except Exception as exc:
+        logger.exception("Failed trusted query on '%s'.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
 
 
@@ -222,6 +363,20 @@ async def update_one(
         raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
 
 
+async def update_one_trusted(
+    table: str,
+    filters: Mapping[str, Any],
+    payload: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    try:
+        return await run_in_threadpool(_update_one_trusted_sync, table, filters, payload)
+    except SupabaseServiceError:
+        raise
+    except Exception as exc:
+        logger.exception("Failed trusted update on '%s'.", table)
+        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+
+
 async def upsert_one(table: str, payload: Mapping[str, Any], on_conflict: str) -> dict[str, Any]:
     try:
         return await run_in_threadpool(_upsert_one_sync, table, payload, on_conflict)
@@ -229,4 +384,17 @@ async def upsert_one(table: str, payload: Mapping[str, Any], on_conflict: str) -
         raise
     except Exception as exc:
         logger.exception("Failed to upsert into '%s'.", table)
+        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+
+
+async def delete_many_trusted(
+    table: str,
+    filters: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    try:
+        return await run_in_threadpool(_delete_many_trusted_sync, table, filters)
+    except SupabaseServiceError:
+        raise
+    except Exception as exc:
+        logger.exception("Failed trusted delete on '%s'.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc

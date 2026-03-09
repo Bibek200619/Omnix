@@ -36,6 +36,7 @@ export type ConversationSummary = {
   latest_message_role?: string | null;
   latest_message_at?: string | null;
   is_archived?: boolean | null;
+  workspace_id?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   last_message_at?: string | null;

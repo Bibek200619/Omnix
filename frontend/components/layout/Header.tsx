@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Menu, MessageSquarePlus, LogOut } from "lucide-react";
+import { AlertCircle, LogOut, Menu, MessageSquarePlus, Users } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth-context";
+import { useWorkspace } from "@/lib/workspace-context";
+import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 
 const routeTitles = [
   { match: "/chat", title: "Chat", eyebrow: "AI workspace" },
+  { match: "/files", title: "Files", eyebrow: "Workspace knowledge" },
   { match: "/history", title: "History", eyebrow: "Previous conversations" },
   { match: "/settings/terms", title: "Terms", eyebrow: "Product policies" },
   { match: "/settings", title: "Settings", eyebrow: "Account controls" },
@@ -21,11 +24,13 @@ export function Header({ onMenuClick }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { signOut } = useAuth();
+  const { activeWorkspace, activeMembers, pendingInvites } = useWorkspace();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const active =
     routeTitles.find((route) => pathname.startsWith(route.match)) ??
     routeTitles[0];
+  const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -61,7 +66,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           </Button>
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200/70">
-              {active.eyebrow}
+              {activeWorkspace ? activeWorkspace.name : active.eyebrow}
             </p>
             <h1 className="truncate text-lg font-semibold text-white sm:text-xl">
               {active.title}
@@ -69,6 +74,25 @@ export function Header({ onMenuClick }: HeaderProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {activeWorkspace ? (
+            <div className="hidden items-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-300 lg:flex">
+              <div className="flex items-center gap-2 text-slate-400">
+                <Users className="h-4 w-4 text-cyan-200" />
+                <span>{activeWorkspace.member_count}</span>
+              </div>
+              <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} />
+            </div>
+          ) : null}
+          {pendingInvites.length > 0 ? (
+            <Button
+              type="button"
+              variant="secondary"
+              className="hidden md:inline-flex"
+              onClick={() => router.push("/settings")}
+            >
+              Invites {pendingInvites.length}
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="secondary"

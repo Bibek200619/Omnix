@@ -6,6 +6,17 @@ export const API_BASE_URL =
 export type ApiStatus = "idle" | "loading" | "success" | "error";
 
 class ApiClient {
+  private applyWorkspaceHeader(headers: Headers) {
+    try {
+      if (typeof window !== "undefined") {
+        const activeWorkspace = window.localStorage.getItem("omnix.activeWorkspaceId");
+        if (activeWorkspace) headers.set("X-Omnix-Workspace", activeWorkspace);
+      }
+    } catch {
+      // Ignore localStorage failures
+    }
+  }
+
   private async getAuthToken(): Promise<string | null> {
     if (!supabase) {
       return null;
@@ -39,15 +50,7 @@ class ApiClient {
       headers.set("Authorization", `Bearer ${token}`);
     }
 
-    // Workspace awareness: include active workspace id from localStorage if present
-    try {
-      if (typeof window !== "undefined") {
-        const activeWorkspace = window.localStorage.getItem("omnix.activeWorkspaceId");
-        if (activeWorkspace) headers.set("X-Omnix-Workspace", activeWorkspace);
-      }
-    } catch {
-      // Ignore localStorage failures
-    }
+    this.applyWorkspaceHeader(headers);
 
     let response: Response;
 
@@ -100,6 +103,7 @@ class ApiClient {
     if (token) {
       headers.set("Authorization", `Bearer ${token}`);
     }
+    this.applyWorkspaceHeader(headers);
 
     let response: Response;
     try {
@@ -147,6 +151,12 @@ class ApiClient {
       method: "GET",
     });
     return response.json() as Promise<T>;
+  }
+
+  async delete(endpoint: string): Promise<void> {
+    await this.request(endpoint, {
+      method: "DELETE",
+    });
   }
 }
 

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from ..core.security import get_current_user
 from ..schemas.chat import (
@@ -12,19 +11,29 @@ from ..schemas.chat import (
     ConversationRead,
     ConversationUpdate,
 )
-from ..services.supabase_service import SupabaseServiceError, insert_one, select_all, select_one, update_one
+from ..services.supabase_service import (
+    SupabaseServiceError,
+    insert_one,
+    select_all,
+    select_all_trusted,
+    select_one_trusted,
+    update_one,
+    update_one_trusted,
+)
+from ..services.workspace_service import (
+    can_manage_workspace_resource,
+    require_active_workspace_access,
+    require_workspace_access,
+    utc_now_iso,
+)
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
-CONVERSATION_COLUMNS = "id,user_id,title,is_archived,created_at,updated_at,last_message_at"
+CONVERSATION_COLUMNS = "id,user_id,workspace_id,title,is_archived,created_at,updated_at,last_message_at"
 MESSAGE_PREVIEW_COLUMNS = "id,conversation_id,user_id,role,content,status,created_at"
 DEFAULT_CONVERSATION_LIMIT = 50
 MAX_CONVERSATION_LIMIT = 100
 MAX_HISTORY_MESSAGE_LOOKBACK = 1000
 PREVIEW_LENGTH = 140
-
-
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _user_id_from_claims(current_user: dict[str, Any]) -> str:
@@ -35,6 +44,13 @@ def _database_error() -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Internal server error",
+    )
+
+
+def _conversation_not_found() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Conversation not found.",
     )
 
 
@@ -97,37 +113,79 @@ def _merge_latest_message_previews(
 async def hydrate_conversation_history(
     conversations: list[dict[str, Any]],
     user_id: str,
+    workspace_id: str | None = None,
 ) -> list[dict[str, Any]]:
     conversation_ids = [str(item["id"]) for item in conversations if item.get("id")]
     if not conversation_ids:
         return _merge_latest_message_previews(conversations, [])
 
     try:
-        messages = await select_all(
-            "messages",
-            MESSAGE_PREVIEW_COLUMNS,
-            filters={"conversation_id": conversation_ids, "user_id": user_id},
-            order_by="created_at",
-            desc=True,
-            limit=MAX_HISTORY_MESSAGE_LOOKBACK,
-        )
+        if workspace_id:
+            messages = await select_all_trusted(
+                "messages",
+                MESSAGE_PREVIEW_COLUMNS,
+                filters={"conversation_id": conversation_ids},
+                order_by="created_at",
+                desc=True,
+                limit=MAX_HISTORY_MESSAGE_LOOKBACK,
+            )
+        else:
+            messages = await select_all(
+                "messages",
+                MESSAGE_PREVIEW_COLUMNS,
+                filters={"conversation_id": conversation_ids, "user_id": user_id},
+                order_by="created_at",
+                desc=True,
+                limit=MAX_HISTORY_MESSAGE_LOOKBACK,
+            )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
     return _merge_latest_message_previews(conversations, messages)
 
 
+async def require_conversation_access(
+    conversation_id: str,
+    user_id: str,
+) -> tuple[dict[str, Any], Any | None]:
+    try:
+        conversation = await select_one_trusted(
+            "conversations",
+            CONVERSATION_COLUMNS,
+            {"id": conversation_id},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    if conversation is None:
+        raise _conversation_not_found()
+
+    workspace_id = conversation.get("workspace_id")
+    if workspace_id:
+        access = await require_workspace_access(str(workspace_id), user_id)
+        return conversation, access
+
+    if str(conversation.get("user_id") or "") != user_id:
+        raise _conversation_not_found()
+
+    return conversation, None
+
+
 @router.post("", response_model=ConversationRead, status_code=status.HTTP_201_CREATED)
 async def create_conversation(
     conversation: ConversationCreate,
+    request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
+    workspace_access = await require_active_workspace_access(request, user_id)
     payload = {
         "user_id": user_id,
         "is_archived": False,
         **conversation.model_dump(exclude_none=True),
     }
+    if workspace_access is not None:
+        payload["workspace_id"] = workspace_access.workspace_id
 
     try:
         return await insert_one("conversations", payload)
@@ -137,23 +195,36 @@ async def create_conversation(
 
 @router.get("", response_model=list[ConversationHistoryRead])
 async def get_conversations(
+    request: Request,
     limit: int = Query(default=DEFAULT_CONVERSATION_LIMIT, ge=1, le=MAX_CONVERSATION_LIMIT),
     offset: int = Query(default=0, ge=0),
     include_archived: bool = Query(default=False),
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     user_id = _user_id_from_claims(current_user)
+    workspace_access = await require_active_workspace_access(request, user_id)
 
     try:
-        conversations = await select_all(
-            "conversations",
-            CONVERSATION_COLUMNS,
-            filters={"user_id": user_id},
-            order_by="last_message_at",
-            desc=True,
-            limit=limit,
-            offset=offset,
-        )
+        if workspace_access is not None:
+            conversations = await select_all_trusted(
+                "conversations",
+                CONVERSATION_COLUMNS,
+                filters={"workspace_id": workspace_access.workspace_id},
+                order_by="last_message_at",
+                desc=True,
+                limit=limit,
+                offset=offset,
+            )
+        else:
+            conversations = await select_all(
+                "conversations",
+                CONVERSATION_COLUMNS,
+                filters={"user_id": user_id},
+                order_by="last_message_at",
+                desc=True,
+                limit=limit,
+                offset=offset,
+            )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
@@ -164,7 +235,11 @@ async def get_conversations(
             if conversation.get("is_archived") is not True
         ]
 
-    return await hydrate_conversation_history(conversations, user_id)
+    return await hydrate_conversation_history(
+        conversations,
+        user_id,
+        workspace_access.workspace_id if workspace_access is not None else None,
+    )
 
 
 @router.get("/{conversation_id}", response_model=ConversationRead)
@@ -173,21 +248,7 @@ async def get_conversation(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
-
-    try:
-        conversation = await select_one(
-            "conversations",
-            CONVERSATION_COLUMNS,
-            {"id": conversation_id, "user_id": user_id},
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-
-    if conversation is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Conversation not found.",
-        )
+    conversation, _ = await require_conversation_access(conversation_id, user_id)
     return conversation
 
 
@@ -198,6 +259,7 @@ async def update_conversation(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
+    existing_conversation, workspace_access = await require_conversation_access(conversation_id, user_id)
     payload = conversation.model_dump(exclude_none=True)
 
     if not payload:
@@ -206,20 +268,34 @@ async def update_conversation(
             detail="No updatable fields were provided.",
         )
 
-    payload["updated_at"] = _utc_now_iso()
+    if workspace_access is not None and not can_manage_workspace_resource(
+        str(existing_conversation.get("user_id") or ""),
+        workspace_access,
+        user_id,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the creator or workspace owner can update this conversation.",
+        )
+
+    payload["updated_at"] = utc_now_iso()
 
     try:
-        updated_conversation = await update_one(
-            "conversations",
-            {"id": conversation_id, "user_id": user_id},
-            payload,
-        )
+        if workspace_access is not None:
+            updated_conversation = await update_one_trusted(
+                "conversations",
+                {"id": conversation_id},
+                payload,
+            )
+        else:
+            updated_conversation = await update_one(
+                "conversations",
+                {"id": conversation_id, "user_id": user_id},
+                payload,
+            )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
     if updated_conversation is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Conversation not found.",
-        )
+        raise _conversation_not_found()
     return updated_conversation
