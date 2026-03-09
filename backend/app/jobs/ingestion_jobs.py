@@ -63,7 +63,22 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
 
         # Run ingestion pipeline (chunks, embeddings, DB insert)
         try:
-            vector_store = get_vector_store()
+            try:
+                vector_store = get_vector_store()
+            except RuntimeError as e:
+                logger.error("Vector store not initialized in ingestion worker: %s", e)
+                raise RuntimeError("Vector store unavailable in worker runtime. Ensure worker startup initialized retrieval infrastructure.") from e
+
+            # validate embedding provider early (gives actionable error if misconfigured)
+            try:
+                from ..embeddings.provider import get_default_provider  # local import to avoid cycles
+
+                provider = get_default_provider()
+                logger.debug("Embedding provider available in ingestion job: %s", provider.__class__.__name__)
+            except Exception as e:
+                logger.error("Embedding provider not available: %s", e)
+                raise RuntimeError("Embeddings provider misconfigured or missing API key in worker runtime.") from e
+
             pipeline = RAGIngestionPipeline(vector_store)
             num, chunk_ids = await pipeline.ingest_text(normalized, user_id, document_id=file_id, workspace_id=workspace_id)
             logger.info("Ingestion produced %d chunks for file %s", num, file_id)
