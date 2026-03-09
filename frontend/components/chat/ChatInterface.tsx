@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Database, FileSearch, ShieldCheck, WifiOff } from "lucide-react";
+import { Database, FileSearch, ShieldCheck, Users, WifiOff } from "lucide-react";
 import dynamic from "next/dynamic";
 const UploadDropzone = dynamic(() => import("@/components/upload/UploadDropzone").then((m) => m.UploadDropzone), { ssr: false });
 import { FileText } from "lucide-react";
@@ -10,8 +10,6 @@ import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageList } from "@/components/chat/MessageList";
 import type {
   ApiMessage,
-  ChatApiResponse,
-  ConversationSummary,
   Message,
 } from "@/components/chat/types";
 import { Alert } from "@/components/ui/Alert";
@@ -19,6 +17,8 @@ import { Button } from "@/components/ui/Button";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
+import { useWorkspace } from "@/lib/workspace-context";
+import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 
 function formatTime(value?: string) {
   const date = value ? new Date(value) : new Date();
@@ -49,27 +49,6 @@ function normalizeMessage(message: ApiMessage, index: number): Message {
   };
 }
 
-function optimisticConversation(
-  conversationId: string,
-  content: string,
-): ConversationSummary {
-  const compact = content.replace(/\s+/g, " ").trim();
-  const title = compact.length > 72 ? `${compact.slice(0, 69)}...` : compact;
-  const timestamp = new Date().toISOString();
-
-  return {
-    id: conversationId,
-    title: title || "New conversation",
-    preview: compact,
-    latest_message_role: "user",
-    latest_message_at: timestamp,
-    last_message_at: timestamp,
-    updated_at: timestamp,
-    created_at: timestamp,
-  };
-}
-
-
 interface FileData {
   id: string;
   file_name?: string;
@@ -80,14 +59,25 @@ interface FileData {
   storage_path?: string;
 }
 
+type StreamEvent = {
+  type: "init" | "status" | "token" | "error" | "done";
+  conversation_id?: string;
+  user_message_id?: string;
+  assistant_message_id?: string;
+  sources?: Message["sources"];
+  status?: string;
+  text?: string;
+  detail?: string;
+};
+
 export function ChatInterface() {
   const params = useSearchParams();
   const router = useRouter();
   const { session } = useAuth();
+  const { activeWorkspace, activeMembers, activeWorkspaceId } = useWorkspace();
   const {
     refreshConversations,
     setActiveConversation,
-    upsertConversation,
   } = useConversationHistory();
   const conversationId = params.get("conversation");
 
@@ -95,12 +85,16 @@ export function ChatInterface() {
   const [responding, setResponding] = useState(false);
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [error, setError] = useState<string | null>(null);
-    const [currentConversation, setCurrentConversation] = useState<string | null>(
+  const [currentConversation, setCurrentConversation] = useState<string | null>(
     conversationId,
+  );
+  const [currentConversationWorkspaceId, setCurrentConversationWorkspaceId] = useState<string | null>(
+    activeWorkspaceId,
   );
 
   const [chatFiles, setChatFiles] = useState<FileData[]>([]);
   const [showUpload, setShowUpload] = useState(false);
+  const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
 
   useEffect(() => {
     if (currentConversation) {
@@ -121,6 +115,7 @@ export function ChatInterface() {
         );
         setMessages(data.map(normalizeMessage));
         setCurrentConversation(convId);
+        setCurrentConversationWorkspaceId(activeWorkspaceId);
         setActiveConversation(convId);
       } catch (err) {
         const message =
@@ -138,7 +133,7 @@ export function ChatInterface() {
         setLoadingConversation(false);
       }
     },
-    [refreshConversations, router, setActiveConversation],
+    [activeWorkspaceId, refreshConversations, router, setActiveConversation],
   );
 
   useEffect(() => {
@@ -148,33 +143,53 @@ export function ChatInterface() {
     }
 
     setCurrentConversation(null);
+    setCurrentConversationWorkspaceId(activeWorkspaceId);
     setActiveConversation(null);
     setMessages([]);
     setError(null);
-  }, [conversationId, loadConversation, setActiveConversation]);
+  }, [activeWorkspaceId, conversationId, loadConversation, setActiveConversation]);
+
+  useEffect(() => {
+    if (!currentConversation) {
+      return;
+    }
+
+    if (currentConversationWorkspaceId !== activeWorkspaceId) {
+      setCurrentConversation(null);
+      setCurrentConversationWorkspaceId(activeWorkspaceId);
+      setChatFiles([]);
+      setMessages([]);
+      setActiveConversation(null);
+      router.replace("/chat", { scroll: false });
+    }
+  }, [activeWorkspaceId, currentConversation, currentConversationWorkspaceId, router, setActiveConversation]);
 
   const statusItems = useMemo(
     () => [
       {
-        icon: Database,
-        label: "Retrieval",
-        value: currentConversation ? "Context attached" : "Ready",
+        icon: FileSearch,
+        label: "Workspace",
+        value: activeWorkspace?.name ?? "Loading workspace",
         color: "text-cyan-200",
       },
       {
-        icon: ShieldCheck,
-        label: "Session",
-        value: session?.user?.email ?? "Authenticated",
+        icon: Database,
+        label: "Memory",
+        value: activeWorkspace?.is_shared
+          ? `Shared with ${activeWorkspace.member_count} members`
+          : "Private to this workspace",
         color: "text-emerald-200",
       },
       {
-        icon: FileSearch,
-        label: "Workspace",
-        value: currentConversation ? "Saved thread" : "Draft thread",
+        icon: ShieldCheck,
+        label: "Access",
+        value: activeWorkspace?.current_user_role === "owner"
+          ? "Owner controls"
+          : session?.user?.email ?? "Collaborator",
         color: "text-amber-200",
       },
     ],
-    [currentConversation, session?.user?.email],
+    [activeWorkspace, session?.user?.email],
   );
 
   const sendMessage = useCallback(
@@ -226,7 +241,7 @@ export function ChatInterface() {
             if (!line.startsWith("data:")) continue;
             const payload = line.replace(/^data:\s?/, "");
             try {
-              const obj = JSON.parse(payload);
+              const obj = JSON.parse(payload) as StreamEvent;
               handleStreamEvent(obj);
             } catch (e) {
               console.error("Failed to parse stream payload", payload, e);
@@ -238,12 +253,13 @@ export function ChatInterface() {
         let assistantId: string | null = null;
         let persistedUserMessageId: string | null = null;
 
-        const handleStreamEvent = (obj: any) => {
+        const handleStreamEvent = (obj: StreamEvent) => {
           const t = obj.type;
           if (t === "init") {
             // persist conversation & user message ids
             if (obj.conversation_id) {
               setCurrentConversation(obj.conversation_id);
+              setCurrentConversationWorkspaceId(activeWorkspaceId);
               setActiveConversation(obj.conversation_id);
             }
             persistedUserMessageId = obj.user_message_id ?? null;
@@ -310,6 +326,7 @@ export function ChatInterface() {
             if (!conversationId && obj.conversation_id) {
               router.replace(`/chat?conversation=${obj.conversation_id}`, { scroll: false });
             }
+            void refreshConversations();
           }
         };
 
@@ -318,7 +335,7 @@ export function ChatInterface() {
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-          let parts = buffer.split(/\n\n/);
+          const parts = buffer.split(/\n\n/);
           buffer = parts.pop() || "";
           for (const part of parts) processEvent(part);
         }
@@ -343,11 +360,11 @@ export function ChatInterface() {
     [
       conversationId,
       currentConversation,
+      activeWorkspaceId,
       refreshConversations,
       responding,
       router,
       setActiveConversation,
-      upsertConversation,
     ],
   );
 
@@ -393,6 +410,28 @@ export function ChatInterface() {
           );
         })}
       </div>
+      {activeWorkspace ? (
+        <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-medium text-white">
+              <Users className="h-4 w-4 text-cyan-200" />
+              Collaborative AI context
+            </div>
+            <p className="mt-1 text-sm leading-6 text-slate-400">
+              {activeWorkspace.is_shared
+                ? `Retrieval and conversation history are shared across ${activeWorkspace.name}.`
+                : `This workspace keeps knowledge isolated to you until you invite teammates.`}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} size="md" />
+            <div className="text-right text-xs text-slate-400">
+              <div>{activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "contributor" : "contributors"}</div>
+              <div>{activeWorkspace.current_user_role === "owner" ? "Owner" : "Member"}</div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {error ? (
         <Alert
           variant="error"
@@ -418,7 +457,9 @@ export function ChatInterface() {
         <div className="w-full mx-auto mb-2">
             {chatFiles.length > 0 && (
               <div className="mb-3">
-                <p className="text-xs font-medium text-slate-400 mb-2">Using retrieved sources:</p>
+                <p className="mb-2 text-xs font-medium text-slate-400">
+                  {activeWorkspace?.is_shared ? "Workspace sources in this thread:" : "Retrieved sources in this thread:"}
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {chatFiles.map(f => (
                     <div key={f.id as string} className="flex items-center gap-2 bg-white/[0.04] border border-white/10 rounded-md px-3 py-1.5 text-xs text-slate-200">
@@ -441,7 +482,7 @@ export function ChatInterface() {
             )}
             <div className="flex justify-end mb-2">
               <Button variant="ghost" size="sm" onClick={() => setShowUpload(!showUpload)} className="text-xs text-slate-400">
-                {showUpload ? "Hide Upload" : "Attach Document"}
+                {showUpload ? "Hide upload" : activeWorkspace?.is_shared ? "Attach to workspace" : "Attach document"}
               </Button>
             </div>
         </div>
