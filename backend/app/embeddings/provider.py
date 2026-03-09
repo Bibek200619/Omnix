@@ -29,9 +29,22 @@ def get_default_provider() -> EmbeddingProvider:
 
         return OpenAIEmbeddingProvider()
     elif provider in ("local", "sentence-transformers", "sbert"):
-        from .local_provider import LocalEmbeddingProvider
+        try:
+            from .local_provider import LocalEmbeddingProvider
 
-        return LocalEmbeddingProvider()
+            return LocalEmbeddingProvider()
+        except Exception as exc:
+            # If local provider can't be loaded (missing deps), fall back gracefully
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.exception("Failed to initialize LocalEmbeddingProvider, falling back to OpenAI: %s", exc)
+            try:
+                from .openai_provider import OpenAIEmbeddingProvider
+
+                return OpenAIEmbeddingProvider()
+            except Exception:
+                raise
     else:
         # Fallback: try local first, then openai
         try:
