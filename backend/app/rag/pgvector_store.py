@@ -13,7 +13,7 @@ class PgVectorStore(VectorStore):
     pgvector-based implementation of VectorStore using Supabase.
     """
 
-    def add_embeddings(self, embeddings: list[list[float]], ids: list[str], user_ids: list[str]) -> None:
+    def add_embeddings(self, embeddings: list[list[float]], ids: list[str], user_ids: list[str], workspace_ids: list[str] | None = None) -> None:
         if not embeddings or not ids or not user_ids:
             return
 
@@ -22,12 +22,20 @@ class PgVectorStore(VectorStore):
 
         supabase = get_supabase()
         
-        for emb, doc_id, user_id in zip(embeddings, ids, user_ids):
+        # Iterate and update each document's embedding. Workspace filtering is optional.
+        for idx, (emb, doc_id, user_id) in enumerate(zip(embeddings, ids, user_ids)):
             try:
-                supabase.table("documents").update({"embedding": emb}).eq("id", doc_id).eq("user_id", user_id).execute()
+                query = supabase.table("documents").update({"embedding": emb}).eq("id", doc_id).eq("user_id", user_id)
+                # If workspace_ids provided, ensure the document belongs to the workspace
+                if workspace_ids:
+                    workspace_id = workspace_ids[idx]
+                    if workspace_id:
+                        query = query.eq("workspace_id", workspace_id)
+                query.execute()
             except Exception as exc:
                 logger.exception("Failed to update document %s with embedding.", doc_id)
-                pass
+                # non-fatal: continue with remaining
+                continue
 
     def search(self, query_embedding: list[float], user_id: str, top_k: int = 5) -> list[tuple[str, float]]:
         if not query_embedding:

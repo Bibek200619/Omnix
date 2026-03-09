@@ -50,7 +50,8 @@ class RAGRetriever:
 
         logger.info("Generating embedding for query.")
         try:
-            query_embedding = get_embedding(query)
+            # get_embedding is async now
+            query_embedding = await get_embedding(query)
         except Exception as exc:
             logger.exception("Failed to generate query embedding.")
             query_embedding = []

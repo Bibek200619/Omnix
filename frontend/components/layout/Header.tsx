@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
+import { ActionsMenu } from "@/components/actions/ActionsMenu";
 
 const routeTitles = [
   { match: "/chat", title: "Chat", eyebrow: "AI workspace" },
@@ -93,6 +94,7 @@ export function Header({ onMenuClick }: HeaderProps) {
               Invites {pendingInvites.length}
             </Button>
           ) : null}
+          <ActionsMenu className="hidden sm:inline-flex" />
           <Button
             type="button"
             variant="secondary"

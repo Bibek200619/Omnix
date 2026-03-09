@@ -280,65 +280,57 @@ class ChatService:
             logger.warning("Empty query provided to ChatService.")
             return "Please provide a valid query."
 
-        # Step 1: Retrieve relevant chunks
+        # Step 1: Assemble unified context using ContextEngine
         try:
-            logger.info("Retrieving context for query.")
-            chunks = await self.retriever.retrieve(query, user_id)
-        except Exception as exc:
-            logger.exception("Context retrieval failed.")
-            chunks = []
+            from ..context.context_engine import ContextEngine
 
-        # Step 2: Build the context prompt (kept for debugging)
-        try:
-            logger.info("Building LLM prompt with %d chunks.", len(chunks))
-            context_prompt = self.context_builder.build_context(query, chunks)
+            engine = ContextEngine(self.retriever.vector_store, max_chunks=self.context_builder.max_chunks)
+            assembled = await engine.assemble(query, user_id, None)
+            context_prompt = assembled.get("prompt")
+            logger.info("Built unified context with %d chunks.", len(assembled.get("chunks") or []))
         except Exception as exc:
             logger.exception("Context building failed.")
             return f"Error building context: {exc}"
 
-        # Step 3: Debug (important)
-        print("\n=== DEBUG CONTEXT ===\n")
-        print(context_prompt)
-        print("\n=====================\n")
+        # Step 2: DEV MODE LOGIC (Bypass LLM)
+        if get_settings().DEV_MODE:
+            # in dev mode, reuse existing simplified behavior: pick sentences from provided chunks
+            import re
+            chunks_src = assembled.get("chunks") or []
+            if not chunks_src:
+                return "No relevant information found."
 
-        # Step 4: DEV MODE LOGIC (Bypass LLM)
-        if not chunks:
-            return "No relevant information found."
-            
-        import re
-        seen_sentences = set()
-        unique_sentences = []
-        
-        # Process chunks until we have 1-3 meaningful sentences
-        for chunk in chunks:
-            if len(unique_sentences) >= 3:
-                break
-                
-            chunk = chunk.strip()
-            if not chunk:
-                continue
-                
-            # Basic sentence deduplication for cleaner output
-            sentences = [s.strip() for s in re.split(r"(?<=[.?!])\s+", chunk) if len(s.strip()) > 10]
-            
-            for s in sentences:
-                # Normalize for comparison to catch near-duplicates
-                s_lower = re.sub(r'[^a-z0-9]', '', s.lower())
-                if not s_lower:
-                    continue
-                    
-                if s_lower not in seen_sentences:
-                    seen_sentences.add(s_lower)
-                    # Ensure it ends with punctuation
-                    if not re.search(r'[.?!]$', s):
-                        s += "."
-                    unique_sentences.append(s)
-                
+            seen_sentences = set()
+            unique_sentences = []
+            for chunk in chunks_src:
                 if len(unique_sentences) >= 3:
                     break
+                chunk = chunk.strip()
+                if not chunk:
+                    continue
+                sentences = [s.strip() for s in re.split(r"(?<=[.?!])\s+", chunk) if len(s.strip()) > 10]
+                for s in sentences:
+                    s_lower = re.sub(r'[^a-z0-9]', '', s.lower())
+                    if not s_lower:
+                        continue
+                    if s_lower not in seen_sentences:
+                        seen_sentences.add(s_lower)
+                        if not re.search(r'[.?!]$', s):
+                            s += "."
+                        unique_sentences.append(s)
+                    if len(unique_sentences) >= 3:
+                        break
 
-        if not unique_sentences:
-            return "No relevant information found."
+            if not unique_sentences:
+                return "No relevant information found."
+            answer = " ".join(unique_sentences)
+            return f"Based on available data:\n\n{answer}"
 
-        answer = " ".join(unique_sentences)
-        return f"Based on available data:\n\n{answer}"
+        # Step 3: Call the LLM with assembled context
+        try:
+            logger.info("Calling LLM with assembled context.")
+            final = await call_llm(context_prompt, context=None, temperature=0.2)
+            return final
+        except Exception:
+            logger.exception("LLM call failed.")
+            raise

@@ -107,7 +107,11 @@ async def get_pending_workspace_invites(
     user_email = user_email_from_claims(current_user)
     if user_email is None:
         return []
-    return await list_pending_invites_for_email(user_email)
+    try:
+        return await list_pending_invites_for_email(user_email)
+    except Exception as exc:
+        logger.exception("Failed to fetch pending invites; returning empty list instead of 500.")
+        return []
 
 
 @router.post("/invites/{invite_id}/accept", response_model=WorkspaceRead)
@@ -248,7 +252,11 @@ async def list_workspaces(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     user_id = _user_id_from_claims(current_user)
-    return await list_user_workspaces(user_id)
+    try:
+        return await list_user_workspaces(user_id)
+    except Exception:
+        logger.exception("Failed to list user workspaces; returning empty list instead of 500.")
+        return []
 
 
 @router.get("/{workspace_id}", response_model=WorkspaceRead)
