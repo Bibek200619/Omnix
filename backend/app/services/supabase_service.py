@@ -110,6 +110,7 @@ def _select_all_sync(
         logger.error("Rejected read on table '%s' missing user_id filter.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
+    # Build base query
     query = get_supabase().table(table).select(columns)
     query = _apply_filters(query, filters)
 
@@ -120,8 +121,51 @@ def _select_all_sync(
     if offset is not None:
         query = query.offset(offset)
 
-    response = query.execute()
-    return list(getattr(response, "data", None) or [])
+    try:
+        response = query.execute()
+        return list(getattr(response, "data", None) or [])
+    except Exception as exc:
+        msg = str(exc)
+        # Detect missing column errors and retry with that column removed from selection
+        if "does not exist" in msg and isinstance(columns, str):
+            import re
+
+            m = re.search(r"column\s+([^\s]+)\s+does not exist", msg)
+            if m:
+                missing = m.group(1)
+                # handle qualified name like table.column
+                missing_col = missing.split(".")[-1]
+                # Split columns by comma if present, otherwise treat as single entry
+                cols_raw = [c.strip() for c in columns.split(",")] if "," in columns else [columns.strip()]
+                cols = [c for c in cols_raw if c and c != missing_col and c != f"{table}.{missing_col}"]
+                if cols:
+                    new_columns = ",".join(cols)
+                    logger.warning("Retrying select on %s without missing column '%s'", table, missing_col)
+                    query = get_supabase().table(table).select(new_columns)
+                    query = _apply_filters(query, filters)
+                    if order_by:
+                        query = query.order(order_by, desc=desc)
+                    if limit is not None:
+                        query = query.limit(limit)
+                    if offset is not None:
+                        query = query.offset(offset)
+                    response = query.execute()
+                    return list(getattr(response, "data", None) or [])
+                else:
+                    # No usable columns left after removing missing column; try selecting all
+                    logger.warning("No columns left after removing missing column '%s' on %s; retrying select *", missing_col, table)
+                    query = get_supabase().table(table).select("*")
+                    query = _apply_filters(query, filters)
+                    if order_by:
+                        query = query.order(order_by, desc=desc)
+                    if limit is not None:
+                        query = query.limit(limit)
+                    if offset is not None:
+                        query = query.offset(offset)
+                    response = query.execute()
+                    return list(getattr(response, "data", None) or [])
+        # If we couldn't handle it, re-raise
+        raise
 
 
 def _select_all_trusted_sync(
@@ -143,8 +187,46 @@ def _select_all_trusted_sync(
     if offset is not None:
         query = query.offset(offset)
 
-    response = query.execute()
-    return list(getattr(response, "data", None) or [])
+    try:
+        response = query.execute()
+        return list(getattr(response, "data", None) or [])
+    except Exception as exc:
+        msg = str(exc)
+        if "does not exist" in msg and isinstance(columns, str):
+            import re
+
+            m = re.search(r"column\s+([^\s]+)\s+does not exist", msg)
+            if m:
+                missing = m.group(1)
+                missing_col = missing.split(".")[-1]
+                cols_raw = [c.strip() for c in columns.split(",")] if "," in columns else [columns.strip()]
+                cols = [c for c in cols_raw if c and c != missing_col and c != f"{table}.{missing_col}"]
+                if cols:
+                    new_columns = ",".join(cols)
+                    logger.warning("Retrying trusted select on %s without missing column '%s'", table, missing_col)
+                    query = get_supabase().table(table).select(new_columns)
+                    query = _apply_filters(query, filters)
+                    if order_by:
+                        query = query.order(order_by, desc=desc)
+                    if limit is not None:
+                        query = query.limit(limit)
+                    if offset is not None:
+                        query = query.offset(offset)
+                    response = query.execute()
+                    return list(getattr(response, "data", None) or [])
+                else:
+                    logger.warning("No columns left after removing missing column '%s' on %s; retrying select *", missing_col, table)
+                    query = get_supabase().table(table).select("*")
+                    query = _apply_filters(query, filters)
+                    if order_by:
+                        query = query.order(order_by, desc=desc)
+                    if limit is not None:
+                        query = query.limit(limit)
+                    if offset is not None:
+                        query = query.offset(offset)
+                    response = query.execute()
+                    return list(getattr(response, "data", None) or [])
+        raise
 
 
 def _select_one_sync(
@@ -160,8 +242,34 @@ def _select_one_sync(
 
     query = get_supabase().table(table).select(columns)
     query = _apply_filters(query, filters)
-    response = query.limit(1).maybe_single().execute()
-    return getattr(response, "data", None)
+    try:
+        response = query.limit(1).maybe_single().execute()
+        return getattr(response, "data", None)
+    except Exception as exc:
+        msg = str(exc)
+        if "does not exist" in msg and isinstance(columns, str):
+            import re
+
+            m = re.search(r"column\s+([^\s]+)\s+does not exist", msg)
+            if m:
+                missing = m.group(1)
+                missing_col = missing.split(".")[-1]
+                cols_raw = [c.strip() for c in columns.split(",")] if "," in columns else [columns.strip()]
+                cols = [c for c in cols_raw if c and c != missing_col and c != f"{table}.{missing_col}"]
+                if cols:
+                    new_columns = ",".join(cols)
+                    logger.warning("Retrying select on %s without missing column '%s'", table, missing_col)
+                    query = get_supabase().table(table).select(new_columns)
+                    query = _apply_filters(query, filters)
+                    response = query.limit(1).maybe_single().execute()
+                    return getattr(response, "data", None)
+                else:
+                    logger.warning("No columns left after removing missing column '%s' on %s; retrying select *", missing_col, table)
+                    query = get_supabase().table(table).select("*")
+                    query = _apply_filters(query, filters)
+                    response = query.limit(1).maybe_single().execute()
+                    return getattr(response, "data", None)
+        raise
 
 
 def _select_one_trusted_sync(
@@ -171,8 +279,27 @@ def _select_one_trusted_sync(
 ) -> dict[str, Any] | None:
     query = get_supabase().table(table).select(columns)
     query = _apply_filters(query, filters)
-    response = query.limit(1).maybe_single().execute()
-    return getattr(response, "data", None)
+    try:
+        response = query.limit(1).maybe_single().execute()
+        return getattr(response, "data", None)
+    except Exception as exc:
+        msg = str(exc)
+        if "does not exist" in msg and isinstance(columns, str) and "," in columns:
+            import re
+
+            m = re.search(r"column\s+([^\s]+)\s+does not exist", msg)
+            if m:
+                missing = m.group(1)
+                missing_col = missing.split(".")[-1]
+                cols = [c.strip() for c in columns.split(",") if c.strip() and c.strip() != missing_col and c.strip() != f"{table}.{missing_col}"]
+                if cols:
+                    new_columns = ",".join(cols)
+                    logger.warning("Retrying trusted select on %s without missing column '%s'", table, missing_col)
+                    query = get_supabase().table(table).select(new_columns)
+                    query = _apply_filters(query, filters)
+                    response = query.limit(1).maybe_single().execute()
+                    return getattr(response, "data", None)
+        raise
 
 
 def _update_one_sync(
@@ -317,6 +444,10 @@ async def select_all_trusted(
     except SupabaseServiceError:
         raise
     except Exception as exc:
+        msg = str(exc)
+        if "does not exist" in msg:
+            logger.warning("Trusted query on '%s' failed due to missing column: %s. Returning empty list.", table, msg)
+            return []
         logger.exception("Failed trusted query on '%s'.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
 
@@ -345,6 +476,12 @@ async def select_one_trusted(
     except SupabaseServiceError:
         raise
     except Exception as exc:
+        # Make missing-column errors non-fatal for trusted reads so transient schema drift
+        # doesn't cause 500s. Higher-level callers should handle None results.
+        msg = str(exc)
+        if "does not exist" in msg:
+            logger.warning("Trusted query on '%s' failed due to missing column: %s. Returning None.", table, msg)
+            return None
         logger.exception("Failed trusted query on '%s'.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
 
