@@ -26,7 +26,15 @@ class LocalEmbeddingProvider(EmbeddingProvider):
 
     def _load_model_sync(self):
         # synchronous model load; executed in a thread
-        from sentence_transformers import SentenceTransformer
+        try:
+            from sentence_transformers import SentenceTransformer
+        except Exception as exc:
+            # Raise a clearer error so callers can surface actionable instructions
+            logger.exception("sentence-transformers import failed: %s", exc)
+            raise RuntimeError(
+                "Missing dependency: sentence-transformers is not installed. "
+                "Install with: pip install -r backend/requirements.txt"
+            ) from exc
 
         logger.info("Loading local sentence-transformers model '%s'", self.model_name)
         model = SentenceTransformer(self.model_name)
