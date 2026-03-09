@@ -96,6 +96,28 @@ class RAGIngestionPipeline:
             )
             raise RuntimeError("Pipeline inconsistency: chunk count does not match embedding count.")
 
+        # Validate embedding dimensionality and warn if it differs from expected env / provider
+        try:
+            first_dim = len(embeddings[0]) if embeddings and embeddings[0] else 0
+            import os
+
+            expected_dim = os.environ.get("EMBEDDING_DIM")
+            if expected_dim is not None:
+                try:
+                    expected_dim = int(expected_dim)
+                except Exception:
+                    expected_dim = None
+            if expected_dim and first_dim and expected_dim != first_dim:
+                logger.warning(
+                    "Embedding dimension mismatch: expected %s (EMBEDDING_DIM) but got %s. Consider migrating DB vector size or setting EMBEDDING_DIM accordingly.",
+                    expected_dim,
+                    first_dim,
+                )
+            else:
+                logger.debug("Embeddings generated with dimension %s.", first_dim)
+        except Exception:
+            logger.exception("Failed to validate embedding dimensions")
+
         try:
             logger.info("Attaching embeddings to payloads and inserting %d chunks into Supabase.", num_chunks)
             for i, emb in enumerate(embeddings):
