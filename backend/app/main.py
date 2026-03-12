@@ -66,7 +66,7 @@ def _fire_and_forget_log(log_payload: dict[str, Any]) -> None:
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize FAISS vector store on application startup."""
+    """Initialize application startup."""
     logger.info("Starting Omnix Backend API...")
     try:
         await initialize_vector_store()
@@ -78,13 +78,13 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Persist FAISS vector store on application shutdown."""
+    """Application shutdown."""
     logger.info("Shutting down Omnix Backend API...")
     try:
         await shutdown_vector_store()
-        logger.info("Vector store persisted successfully.")
+        logger.info("Vector store shutdown successfully.")
     except Exception as exc:
-        logger.exception("Failed to persist vector store on shutdown.")
+        logger.exception("Failed to run vector store shutdown.")
 
 
 app.middleware("http")(auth_context_middleware)

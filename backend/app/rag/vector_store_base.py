@@ -58,17 +58,3 @@ class VectorStore(ABC):
             list[tuple[str, float]]: List of (id, distance) tuples sorted by distance.
         """
         pass
-
-    @abstractmethod
-    def save_local(self, index_path: str, map_path: str) -> None:
-        """
-        Persist the vector store to disk for later recovery.
-        """
-        pass
-
-    @abstractmethod
-    def load_local(self, index_path: str, map_path: str) -> None:
-        """
-        Load a previously persisted vector store from disk.
-        """
-        pass

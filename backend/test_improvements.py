@@ -1,3 +1,4 @@
+import pytest
 """
 Test script to verify the three improvements:
 1. Configurable similarity threshold with logging
@@ -29,6 +30,7 @@ from app.rag.retrieval import RAGRetriever
 from app.rag.startup import initialize_vector_store, shutdown_vector_store, get_vector_store
 
 
+@pytest.mark.asyncio
 async def test_improvements():
     """Test all three improvements"""
     print("\n" + "="*70)
