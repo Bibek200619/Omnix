@@ -1,3 +1,4 @@
+import pytest
 import asyncio
 import logging
 import os
@@ -13,7 +14,7 @@ logger = logging.getLogger("test_rag_db")
 # os.environ["SUPABASE_URL"] = "..."
 # os.environ["SUPABASE_SERVICE_ROLE_KEY"] = "..."
 
-from app.rag.vector_store import FAISSStore
+from app.rag.pgvector_store import PgVectorStore
 from app.rag.ingestion import RAGIngestionPipeline
 from app.rag.retrieval import RAGRetriever
 from app.rag.context_builder import ContextBuilder
@@ -21,6 +22,7 @@ from app.services.chat_service import ChatService
 from app.db.supabase import get_supabase
 
 
+@pytest.mark.asyncio
 async def run_integration_tests():
     print("\n==================================================")
     print(" RAG SYSTEM INTEGRATION TESTS (SUPABASE BACKED)")
@@ -31,7 +33,7 @@ async def run_integration_tests():
     # ---------------------------------------------------------
     print("--- 1. Initialization ---")
     try:
-        vector_store = FAISSStore()
+        vector_store = PgVectorStore()
         ingestion_pipeline = RAGIngestionPipeline(vector_store)
         retriever = RAGRetriever(vector_store)
         context_builder = ContextBuilder(max_chunks=3)
@@ -120,7 +122,7 @@ async def run_integration_tests():
                  pprint(stolen_chunks)
             else:
                  print("✅ Isolation successful. User A did NOT retrieve User B's quantum data.")
-                 print("(Instead, User A got their own closest chunk because FAISS FlatL2 has no distance threshold):")
+                 print("(Instead, User A got their own closest chunk):")
                  pprint(stolen_chunks)
     except Exception as e:
         print(f"❌ Isolation test crashed: {e}")
@@ -130,9 +132,7 @@ async def run_integration_tests():
     # ---------------------------------------------------------
     print("\n--- 5. Restart Simulation ---")
     try:
-        # Simulate a server restart by instantiating a fresh retriever that shares
-        # the same FAISS index (assuming FAISS was saved/loaded from disk in a real app)
-        # We prove the database mapping works without any in-memory dicts.
+        # Simulate a server restart by instantiating a fresh retriever.
         new_retriever = RAGRetriever(vector_store)
         
         restarted_chunks = await new_retriever.retrieve(query_a, user_id=user_a_id, top_k=1)
