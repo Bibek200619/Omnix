@@ -4,6 +4,7 @@ import logging
 from typing import Any, List
 
 from .queue import enqueue_job
+from ..embeddings.dimensions import get_expected_embedding_dimension, validate_embedding_dimension
 from ..services.supabase_service import select_one_trusted, update_one_trusted, select_all_trusted
 from ..rag.startup import get_vector_store
 from ..rag.embedding import get_embeddings_async
@@ -13,6 +14,15 @@ logger = logging.getLogger(__name__)
 
 async def handle_reembed_batch(job_row: dict[str, Any]) -> dict[str, Any]:
     payload = job_row.get("payload") or {}
+    if isinstance(payload, str):
+        try:
+            import json
+
+            payload = json.loads(payload)
+        except Exception:
+            logger.exception("Invalid reembed_batch payload JSON")
+            return {"status": "failed", "error": "invalid payload"}
+
     document_ids: List[str] = payload.get("document_ids") or []
     if isinstance(document_ids, str):
         try:
@@ -27,6 +37,8 @@ async def handle_reembed_batch(job_row: dict[str, Any]) -> dict[str, Any]:
         return {"status": "completed", "processed": 0}
 
     processed = 0
+    skipped = 0
+    expected_dim = get_expected_embedding_dimension()
     try:
         vector_store = get_vector_store()
     except Exception as exc:
@@ -49,6 +61,7 @@ async def handle_reembed_batch(job_row: dict[str, Any]) -> dict[str, Any]:
                 logger.warning("No embedding produced for document %s", doc_id)
                 continue
             emb = embeddings[0]
+            validate_embedding_dimension(emb, expected_dim=expected_dim, label=f"document {doc_id} embedding")
 
             # Update document in DB
             await update_one_trusted("documents", {"id": doc_id}, {"embedding": emb})
@@ -64,9 +77,10 @@ async def handle_reembed_batch(job_row: dict[str, Any]) -> dict[str, Any]:
             processed += 1
         except Exception:
             logger.exception("Failed to re-embed document %s", doc_id)
+            skipped += 1
 
-    logger.info("Re-embedded %d documents in batch", processed)
-    return {"status": "completed", "processed": processed}
+    logger.info("Re-embedded %d documents in batch; skipped=%d", processed, skipped)
+    return {"status": "completed", "processed": processed, "skipped": skipped, "expected_dimension": expected_dim}
 
 
 async def enqueue_reembed_all(batch_size: int = 50) -> dict[str, Any]:
@@ -79,18 +93,35 @@ async def enqueue_reembed_all(batch_size: int = 50) -> dict[str, Any]:
     # Read all document ids in a trusted way
     offset = 0
     while True:
-        rows = await select_all_trusted("documents", "id", order_by=None, limit=batch_size)
+        rows = await select_all_trusted(
+            "documents",
+            "id",
+            order_by="created_at",
+            limit=batch_size,
+            offset=offset,
+        )
         if not rows:
             break
         ids = [r["id"] for r in rows if r.get("id")]
         if not ids:
             break
         # enqueue job
-        payload = {"type": "reembed_batch", "document_ids": ids}
+        payload = {"type": "reembed_batch", "document_ids": ids, "expected_dimension": get_expected_embedding_dimension()}
         await enqueue_job(payload)
         created += 1
         offset += batch_size
         # stop if fewer than batch_size returned
         if len(rows) < batch_size:
             break
-    return {"jobs_created": created}
+    logger.info("Queued %d re-embedding batch job(s).", created)
+    return {"jobs_created": created, "batch_size": batch_size}
+
+
+if __name__ == "__main__":
+    import asyncio
+    import os
+
+    logging.basicConfig(level=logging.INFO)
+    size = int(os.environ.get("REEMBED_BATCH_SIZE", "50"))
+    summary = asyncio.run(enqueue_reembed_all(batch_size=size))
+    print(summary)

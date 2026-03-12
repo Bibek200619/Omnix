@@ -6,6 +6,7 @@ import os
 
 import numpy as np
 
+from ..embeddings.dimensions import get_expected_embedding_dimension, validate_embedding_dimension
 from .vector_store_base import VectorStore
 
 logger = logging.getLogger(__name__)
@@ -16,7 +17,7 @@ except ImportError:
     faiss = None
     logger.warning("faiss is not installed. Vector store will not function.")
 
-EMBEDDING_DIMENSION = 384
+EMBEDDING_DIMENSION = get_expected_embedding_dimension()
 
 
 class FAISSStore(VectorStore):
@@ -59,9 +60,10 @@ class FAISSStore(VectorStore):
         except Exception as exc:
             raise ValueError("Failed to convert embeddings to a numpy array.") from exc
 
-        if np_embeddings.shape[1] != EMBEDDING_DIMENSION:
+        actual_dim = np_embeddings.shape[1] if np_embeddings.ndim == 2 else 0
+        if actual_dim != EMBEDDING_DIMENSION:
             raise ValueError(
-                f"Expected embedding dimension {EMBEDDING_DIMENSION}, but got {np_embeddings.shape[1]}."
+                f"Expected embedding dimension {EMBEDDING_DIMENSION}, but got {actual_dim}."
             )
 
         try:
@@ -87,6 +89,7 @@ class FAISSStore(VectorStore):
             return []
 
         try:
+            validate_embedding_dimension(query_embedding, expected_dim=EMBEDDING_DIMENSION, label="query embedding")
             np_query = np.array([query_embedding], dtype=np.float32)
         except Exception as exc:
             raise ValueError("Failed to convert query embedding to a numpy array.") from exc

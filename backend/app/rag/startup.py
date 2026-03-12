@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import logging
-import os
-from pathlib import Path
 
-from ..core.config import get_settings
 from .pgvector_store import PgVectorStore
 from .vector_store_base import VectorStore
 
@@ -33,9 +30,8 @@ def get_vector_store() -> VectorStore:
 
 async def initialize_vector_store() -> VectorStore:
     """
-    Initializes the vector store on application startup.
-    Currently uses FAISS, but can be swapped for pgvector or other implementations.
-    Loads from persisted files if they exist, otherwise initializes empty.
+    Initializes the vector store on application or worker startup.
+    PgVectorStore is the default persisted vector backend.
     
     Returns:
         VectorStore: The initialized vector store instance.
@@ -44,38 +40,18 @@ async def initialize_vector_store() -> VectorStore:
     
     logger.info("Initializing vector store...")
     
-    settings = get_settings()
-    index_path = settings.FAISS_INDEX_PATH
-    map_path = settings.FAISS_MAP_PATH
-    
-    # Create data directory if it doesn't exist
-    data_dir = Path(index_path).parent
-    data_dir.mkdir(parents=True, exist_ok=True)
-    logger.debug("Ensured data directory exists: %s", data_dir)
-    
-    # Initialize new FAISS store
+    # Initialize pgvector-backed store. This does not depend on FastAPI state and
+    # is safe to call from workers.
     store: VectorStore = PgVectorStore()
-    logger.debug("Created new FAISSStore instance.")
-    
-    # Try to load from disk if files exist
-    if os.path.exists(index_path) and os.path.exists(map_path):
-        try:
-            logger.info("Found persisted vector index. Loading from %s and %s", index_path, map_path)
-            store.load_local(index_path, map_path)
-            logger.info("Successfully loaded vector index.")
-        except Exception as exc:
-            logger.warning("Failed to load persisted vector index: %s. Starting with empty store.", exc)
-    else:
-        logger.info("No persisted vector index found. Starting with empty store.")
-    
+    logger.info("Created PgVectorStore instance.")
+
     _vector_store_instance = store
     return store
 
 
 async def shutdown_vector_store() -> None:
     """
-    Gracefully shuts down the vector store on application shutdown.
-    Persists the current state to disk.
+    Gracefully shuts down the vector store on application or worker shutdown.
     """
     global _vector_store_instance
     
@@ -83,15 +59,10 @@ async def shutdown_vector_store() -> None:
         logger.debug("Vector store not initialized, skipping shutdown.")
         return
     
-    settings = get_settings()
-    index_path = settings.FAISS_INDEX_PATH
-    map_path = settings.FAISS_MAP_PATH
-    
     try:
-        logger.info("Persisting FAISS index to %s and %s", index_path, map_path)
-        _vector_store_instance.save_local(index_path, map_path)
-        logger.info("Successfully persisted FAISS index with %d vectors.", _vector_store_instance.index.ntotal)
+        _vector_store_instance.save_local("", "")
+        logger.info("Vector store shutdown hook completed for %s.", _vector_store_instance.__class__.__name__)
     except Exception as exc:
-        logger.exception("Failed to persist FAISS index on shutdown: %s", exc)
+        logger.exception("Failed to run vector store shutdown hook: %s", exc)
     
     _vector_store_instance = None
