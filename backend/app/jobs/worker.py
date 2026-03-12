@@ -11,7 +11,7 @@ from .ingestion_jobs import handle_ingest_file
 from .automation_jobs import handle_run_automation
 from ..services.supabase_service import update_one_trusted, select_one_trusted
 from ..rag.startup import initialize_vector_store, shutdown_vector_store
-from ..embeddings.provider import get_default_provider
+from ..embeddings.provider import warm_up_default_provider
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +62,10 @@ async def _worker_loop(shutdown_event: asyncio.Event):
         logger.exception("Worker startup failed to initialize vector store: %s", exc)
         return
 
-    # Initialize embeddings provider early to validate config and open clients
+    # Initialize embeddings provider early to validate local dependencies/model cache.
     try:
-        provider = get_default_provider()
-        logger.info("Embedding provider instantiated: %s", provider.__class__.__name__)
+        provider = await warm_up_default_provider()
+        logger.info("Embedding provider initialized in worker: %s", provider.__class__.__name__)
     except Exception as exc:
         logger.exception("Worker startup failed to initialize embeddings provider: %s", exc)
         return
@@ -127,5 +127,4 @@ def run_worker():
 
 if __name__ == "__main__":
     run_worker()
-
 

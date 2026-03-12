@@ -4,14 +4,20 @@ supabase
 pydantic-settings
 python-multipart
 requests
+httpx
 PyJWT[crypto]
+redis
 
 # Document extraction dependencies
 pypdf
 python-docx
 
 # Embeddings and ML
+numpy
+torch
+transformers
+huggingface-hub
 sentence-transformers
 
-# Optional OpenAI provider
+# Optional OpenAI provider (only used when EMBEDDING_PROVIDER=openai)
 openai

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import logging
+import os
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 
 class EmbeddingProvider(ABC):
@@ -15,43 +19,47 @@ class EmbeddingProvider(ABC):
     async def embed_texts(self, texts: List[str]) -> List[List[float]]:
         raise NotImplementedError
 
+    async def warmup(self) -> None:
+        """Optional provider startup hook."""
+        return None
 
-def get_default_provider() -> EmbeddingProvider:
-    """Factory to return default provider based on env var EMBEDDING_PROVIDER.
 
-    Defaults to a local sentence-transformers provider for self-hosted deployments.
+def _normalize_provider_name(provider_name: str | None) -> str:
+    return (provider_name or os.environ.get("EMBEDDING_PROVIDER", "local")).strip().lower()
+
+
+def get_provider(provider_name: str | None = None) -> EmbeddingProvider:
+    """Create an embedding provider.
+
+    Local sentence-transformers embeddings are the default. OpenAI remains
+    available only when explicitly selected with EMBEDDING_PROVIDER=openai.
     """
-    import os
+    provider = _normalize_provider_name(provider_name)
 
-    provider = os.environ.get("EMBEDDING_PROVIDER", "local").lower()
+    if provider in ("local", "sentence-transformers", "sbert"):
+        from .local_provider import LocalEmbeddingProvider
+
+        logger.info("Selected embedding provider: local (%s).", LocalEmbeddingProvider.__name__)
+        return LocalEmbeddingProvider()
+
     if provider == "openai":
         from .openai_provider import OpenAIEmbeddingProvider
 
+        logger.info("Selected embedding provider: openai.")
         return OpenAIEmbeddingProvider()
-    elif provider in ("local", "sentence-transformers", "sbert"):
-        try:
-            from .local_provider import LocalEmbeddingProvider
 
-            return LocalEmbeddingProvider()
-        except Exception as exc:
-            # If local provider can't be loaded (missing deps), fall back gracefully
-            import logging
+    raise ValueError(
+        f"Unknown EMBEDDING_PROVIDER={provider!r}. "
+        "Supported providers: local, sentence-transformers, sbert, openai."
+    )
 
-            logger = logging.getLogger(__name__)
-            logger.exception("Failed to initialize LocalEmbeddingProvider, falling back to OpenAI: %s", exc)
-            try:
-                from .openai_provider import OpenAIEmbeddingProvider
 
-                return OpenAIEmbeddingProvider()
-            except Exception:
-                raise
-    else:
-        # Fallback: try local first, then openai
-        try:
-            from .local_provider import LocalEmbeddingProvider
+def get_default_provider() -> EmbeddingProvider:
+    return get_provider()
 
-            return LocalEmbeddingProvider()
-        except Exception:
-            from .openai_provider import OpenAIEmbeddingProvider
 
-            return OpenAIEmbeddingProvider()
+async def warm_up_default_provider() -> EmbeddingProvider:
+    provider = get_default_provider()
+    await provider.warmup()
+    logger.info("Embedding provider warmup completed: %s.", provider.__class__.__name__)
+    return provider
