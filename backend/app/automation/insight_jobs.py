@@ -1,6 +1,6 @@
 from typing import Any
 from ..insights import workspace_summary, action_item_detector, topic_detection, conflict_detector
-from ..context.context_engine import ContextEngine
+from ..context.engine import ContextEngine
 
 
 async def run_insight_refresh(workspace_id: str, user_id: str | None = None) -> dict[str, Any]:

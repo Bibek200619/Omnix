@@ -282,7 +282,7 @@ class ChatService:
 
         # Step 1: Assemble unified context using ContextEngine
         try:
-            from ..context.context_engine import ContextEngine
+            from ..context.engine import ContextEngine
 
             engine = ContextEngine(self.retriever.vector_store, max_chunks=self.context_builder.max_chunks)
             assembled = await engine.assemble(query, user_id, None)
