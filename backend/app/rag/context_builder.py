@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from ..retrieval.context_builder import ContextBuilder as HybridContextBuilder
+from ..retrieval.scoring import RetrievalResult
+
+
 class ContextBuilder:
     """
-    Prepares the retrieved context and user query into a clean, structured 
-    prompt for the LLM.
+    Backward-compatible wrapper around the hybrid retrieval context builder.
     """
 
     def __init__(self, max_chunks: int = 5) -> None:
@@ -15,10 +18,11 @@ class ContextBuilder:
                               Defaults to 5.
         """
         self.max_chunks = max_chunks
+        self._builder = HybridContextBuilder(max_chunks=max_chunks)
 
     def build_context(self, query: str, chunks: list[str]) -> str:
         """
-        Combines the retrieved text chunks and the user query into a formatted prompt.
+        Combines retrieved text chunks and the user query into a cited prompt.
 
         Args:
             query (str): The user's question or prompt.
@@ -27,33 +31,20 @@ class ContextBuilder:
         Returns:
             str: A formatted prompt string containing the instructions, context, and question.
         """
-        clean_query = query.strip() if query else ""
-
-        # Clean chunks, remove duplicates, and preserve order
-        seen = set()
-        clean_chunks: list[str] = []
-        for chunk in chunks:
-            text = chunk.strip()
-            if text and text not in seen:
-                seen.add(text)
-                clean_chunks.append(text)
-                
-            if len(clean_chunks) >= self.max_chunks:
-                break
-
-        # If no context is available, just return a simple prompt or handle gracefully
-        if not clean_chunks:
-            context_block = "No relevant context found."
-        else:
-            context_block = "\n\n".join(clean_chunks)
-
-        prompt = (
-            "You are an AI assistant. Answer the question based ONLY on the context below.\n\n"
-            "Context:\n"
-            f"{context_block}\n\n"
-            "Question:\n"
-            f"{clean_query}\n\n"
-            "Answer:\n"
+        results = [
+            RetrievalResult(
+                chunk_id=f"legacy-{index}",
+                content=chunk,
+                file_name="Retrieved Context",
+                score=max(0.0, 1.0 - (index * 0.01)),
+                sources={"legacy"},
+            )
+            for index, chunk in enumerate(chunks)
+            if chunk and chunk.strip()
+        ]
+        built_context = self._builder.build(
+            query,
+            results,
+            workspace_id=None,
         )
-        
-        return prompt
+        return built_context.prompt

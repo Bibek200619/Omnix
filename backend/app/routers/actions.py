@@ -4,11 +4,8 @@ from fastapi import APIRouter, Request, HTTPException, status
 from pydantic import BaseModel
 from typing import Any
 
-from ..rag.retrieval import RAGRetriever
-from ..rag.context_builder import ContextBuilder
 from ..rag.startup import get_vector_store
 
-from ..services.chat_service import call_llm
 from ..context.context_engine import ContextEngine
 
 from ..actions import summarize as summarize_action
@@ -36,8 +33,6 @@ async def run_action(request: Request, body: ActionRequest) -> Any:
 
     # Build unified context engine
     vector_store = get_vector_store()
-    from ..context.context_engine import ContextEngine
-
     engine = ContextEngine(vector_store, max_chunks=8)
 
     action = body.action.lower().strip()

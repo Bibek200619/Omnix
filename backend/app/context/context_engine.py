@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict, List, Tuple
-from functools import lru_cache
 from time import time
 
-from ..rag.retrieval import RAGRetriever
-from ..rag.context_builder import ContextBuilder
 from ..rag.startup import get_vector_store
+from ..retrieval.context_builder import ContextBuilder, ContextSupplement
+from ..retrieval.hybrid_search import HybridSearchEngine
 from ..services import workspace_service
 from ..services import supabase_service
-from ..services import chat_service
 
 logger = logging.getLogger(__name__)
 
@@ -43,15 +41,14 @@ class ContextEngine:
 
     def __init__(self, vector_store=None, max_chunks: int = 6, cache_ttl: int = 30):
         self.vector_store = vector_store or get_vector_store()
-        self.retriever = RAGRetriever(self.vector_store)
+        self.retrieval_engine = HybridSearchEngine(self.vector_store)
         self.max_chunks = max_chunks
         self.cache = SimpleTTLCache(ttl=cache_ttl)
-        # small convenience builder for prompt formatting
         self.context_builder = ContextBuilder(max_chunks=max_chunks)
 
     async def retrieve_chunks(self, query: str, user_id: str, workspace_id: str | None = None, top_k: int = 8):
-        # use retriever directly
-        return await self.retriever.retrieve(query, user_id, workspace_id, top_k=top_k)
+        response = await self.retrieval_engine.search(query, user_id=user_id, workspace_id=workspace_id, top_k=top_k)
+        return [result.to_dict() for result in response.results]
 
     async def workspace_summary(self, user_id: str, workspace_id: str | None = None) -> str:
         cache_key = f"ws_summary:{workspace_id}:{user_id}"
@@ -159,41 +156,62 @@ class ContextEngine:
         # 3) top artifacts
         artifacts = await self.top_artifacts(user_id, workspace_id, limit=4)
 
-        # 4) retrieval chunks for query
-        retrieved = await self.retrieve_chunks(query, user_id, workspace_id, top_k=self.max_chunks * 2)
+        # 4) hybrid retrieval chunks for query
+        retrieval_response = await self.retrieval_engine.search(
+            query,
+            user_id=user_id,
+            workspace_id=workspace_id,
+            top_k=self.max_chunks * 2,
+        )
 
-        # prioritize: artifacts (recent), retrieved by score, convs, ws summary
-        chunks_texts: List[str] = []
-        sources: List[dict[str, Any]] = []
+        supplements: list[ContextSupplement] = [
+            ContextSupplement(
+                content=ws,
+                title="Workspace Summary",
+                source_type="workspace_summary",
+                source_id=workspace_id,
+                workspace_id=workspace_id,
+                score=0.05,
+            )
+        ]
 
-        # include artifact content first
         for art in artifacts:
             content = art.get("content")
             if content:
-                chunks_texts.append(content)
-                sources.append({"type": "artifact", "id": art.get("id"), "title": art.get("title")})
-                if len(chunks_texts) >= self.max_chunks:
-                    break
+                supplements.append(
+                    ContextSupplement(
+                        content=content,
+                        title=art.get("title") or "Artifact",
+                        source_type="artifact",
+                        source_id=str(art.get("id")) if art.get("id") else None,
+                        workspace_id=workspace_id,
+                        score=0.35,
+                        metadata=art.get("metadata") or {},
+                    )
+                )
 
-        # then top retrieved unique chunks
-        for r in retrieved:
-            if len(chunks_texts) >= self.max_chunks:
-                break
-            content = r.get("content")
-            if not content:
-                continue
-            if content in chunks_texts:
-                continue
-            chunks_texts.append(content)
-            sources.append({"type": "retrieval", "chunk_id": r.get("chunk_id"), "file_name": r.get("file_name")})
-
-        # if still under limit, add convs
         for c in convs:
-            if len(chunks_texts) >= self.max_chunks:
-                break
-            chunks_texts.append(str(c))
-            sources.append({"type": "conversation_snippet"})
+            supplements.append(
+                ContextSupplement(
+                    content=str(c),
+                    title="Recent Conversation",
+                    source_type="conversation_snippet",
+                    workspace_id=workspace_id,
+                    score=0.1,
+                )
+            )
 
-        prompt = self.context_builder.build_context(query, chunks_texts)
+        built_context = self.context_builder.build(
+            query,
+            retrieval_response.results,
+            workspace_id=workspace_id,
+            supplemental_contexts=supplements,
+        )
 
-        return {"prompt": prompt, "sources": sources, "chunks": chunks_texts}
+        return {
+            "prompt": built_context.prompt,
+            "sources": built_context.sources,
+            "chunks": [chunk.get("content", "") for chunk in built_context.chunks],
+            "retrieval": retrieval_response.to_dict(),
+            "diagnostics": built_context.diagnostics,
+        }
