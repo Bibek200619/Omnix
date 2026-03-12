@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     DEV_MODE: bool = True
     MODEL_URL: str = "http://localhost:8001/v1/chat/completions"
     SIMILARITY_THRESHOLD: float = 1.5
+    HYBRID_TOP_K: int = 8
+    HYBRID_POOL_SIZE: int = 16
+    HYBRID_SEMANTIC_WEIGHT: float = 0.7
+    HYBRID_KEYWORD_WEIGHT: float = 0.3
+    HYBRID_DYNAMIC_WEIGHTING: bool = True
+    HYBRID_CONTEXT_TOKEN_BUDGET: int = 2600
+    HYBRID_MAX_CHUNK_TOKENS: int = 650
     FAISS_INDEX_PATH: str = "./data/faiss_index.index"
     FAISS_MAP_PATH: str = "./data/faiss_map.json"
 
