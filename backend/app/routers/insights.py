@@ -7,7 +7,7 @@ from typing import Any
 from ..core.security import get_current_user
 from ..services.workspace_service import require_workspace_access
 from ..services.supabase_service import insert_one, SupabaseServiceError
-from ..context.context_engine import ContextEngine
+from ..context.engine import ContextEngine
 from ..insights import (
     workspace_summary,
     topic_detection,
