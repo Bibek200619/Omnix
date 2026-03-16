@@ -26,8 +26,6 @@ class Settings(BaseSettings):
     HYBRID_DYNAMIC_WEIGHTING: bool = True
     HYBRID_CONTEXT_TOKEN_BUDGET: int = 2600
     HYBRID_MAX_CHUNK_TOKENS: int = 650
-    FAISS_INDEX_PATH: str = "./data/faiss_index.index"
-    FAISS_MAP_PATH: str = "./data/faiss_map.json"
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
