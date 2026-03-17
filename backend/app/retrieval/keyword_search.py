@@ -8,7 +8,7 @@ from typing import Any
 
 from starlette.concurrency import run_in_threadpool
 
-from ..db.supabase import get_supabase
+from ..db.supabase_client import get_supabase
 from .scoring import RetrievalResult
 
 logger = logging.getLogger(__name__)

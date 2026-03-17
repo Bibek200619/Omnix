@@ -6,7 +6,7 @@ import sys
 from typing import Any
 
 from .queue import get_redis
-from ..db.supabase import get_supabase
+from ..db.supabase_client import get_supabase
 from ..embeddings.dimensions import get_expected_embedding_dimension
 from ..embeddings.local_provider import LocalEmbeddingProvider
 from ..rag.startup import initialize_vector_store, shutdown_vector_store
