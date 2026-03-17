@@ -13,9 +13,6 @@ except ModuleNotFoundError as exc:
 else:
     _redis_import_error = None
 
-from ..settings import get_settings
-from ..services.supabase_service import insert_one_trusted
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_REDIS_URL = "redis://localhost:6379/0"
@@ -27,6 +24,8 @@ _redis_client: Any | None = None
 
 def _configured_redis_url() -> str:
     try:
+        from ..settings import get_settings
+
         return get_settings().REDIS_URL
     except Exception:
         logger.warning("Unable to load configured REDIS_URL; falling back to %s", REDIS_URL)
@@ -65,6 +64,8 @@ async def enqueue_job(payload: Dict[str, Any], queue: str | None = None) -> str:
         "attempts": 0,
     }
     try:
+        from ..services.supabase_service import insert_one_trusted
+
         # Persist job record to DB (trusted insert)
         await insert_one_trusted("jobs", record)
     except Exception:
