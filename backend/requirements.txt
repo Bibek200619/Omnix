@@ -1,7 +1,8 @@
 fastapi
 uvicorn[standard]
 supabase
-pydantic-settings
+pydantic>=2.10,<3
+pydantic-settings>=2.6,<3
 python-multipart
 requests
 httpx
