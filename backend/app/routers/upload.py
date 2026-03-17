@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from ..core.security import get_current_user
 from ..rag.chunking import split_text_into_chunks
 from ..services.supabase_service import SupabaseServiceError, insert_many, insert_one
-from ..db.supabase import get_supabase
+from ..db.supabase_client import get_supabase
 from ..services.workspace_service import active_workspace_id_from_request, require_workspace_access
 from .conversations import require_conversation_access
 

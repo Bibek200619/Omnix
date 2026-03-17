@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any, List
 
-from ..db.supabase import get_supabase
+from ..db.supabase_client import get_supabase
 from .dimensions import get_expected_embedding_dimension, validate_embedding_dimension
 from .provider import get_default_provider
 

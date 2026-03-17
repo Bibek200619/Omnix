@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - omnix-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--proxy-headers"]
+    env_file:
+      - .env.production
+    expose:
+      - "8000"
+    networks:
+      - omnix-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    command: ["python", "-m", "app.automation.scheduler"]
+    env_file:
+      - .env.production
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - omnix-network
+
+networks:
+  omnix-network:
+    driver: bridge

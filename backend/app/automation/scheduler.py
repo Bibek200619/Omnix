@@ -28,12 +28,17 @@ class AutomationScheduler:
     async def start(self) -> None:
         """Start the scheduler: load scheduled automations from DB and schedule them."""
         logger.info("Starting AutomationScheduler...")
+        automations = []
         try:
-            # load automations (trusted reader)
-            automations = await select_all_trusted("automations", "id,workspace_id,name,job_type,schedule,interval_seconds,enabled,user_id")
+            automations = await select_all_trusted(
+                "automations",
+                "id,workspace_id,name,job_type,schedule,interval_seconds,enabled,user_id",
+            )
         except Exception as exc:
-            logger.exception("Failed to load automations: %s", exc)
-            automations = []
+            logger.warning(
+                "AutomationScheduler skipped DB-backed automations: %s",
+                exc,
+            )
 
         for a in automations:
             if a.get("enabled"):

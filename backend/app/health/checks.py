@@ -2,7 +2,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import Dict, Any
-from ..db.supabase import get_supabase
+from ..db.supabase_client import get_supabase
 from ..rag.startup import get_vector_store
 
 logger = logging.getLogger(__name__)

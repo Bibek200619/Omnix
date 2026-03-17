@@ -5,9 +5,10 @@ from typing import Optional
 from pydantic import Field, AliasChoices
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Resolve `.env` from `backend/`
-ROOT_DIR = Path(__file__).resolve().parents[3]
-ENV_FILES = [ROOT_DIR / ".env", ROOT_DIR / ".env.local"]
+# Resolve backend config from `backend/`, not the repository root. The root
+# `.env.local` belongs to the Next.js app and only contains public browser keys.
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+ENV_FILES = [BACKEND_DIR / ".env", BACKEND_DIR / ".env.local"]
 
 class BaseAppSettings(BaseSettings):
     ENV: str = "dev"
