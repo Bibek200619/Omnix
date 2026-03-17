@@ -6,7 +6,7 @@ python-multipart
 requests
 httpx
 PyJWT[crypto]
-redis
+redis>=5.0.0
 
 # Document extraction dependencies
 pypdf
