@@ -4,6 +4,10 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/frontend/.next" />
       <excludeFolder url="file://$MODULE_DIR$/frontend/node_modules" />
+      <excludeFolder url="file://$MODULE_DIR$/backend/venv/bin" />
+      <excludeFolder url="file://$MODULE_DIR$/backend/venv/include" />
+      <excludeFolder url="file://$MODULE_DIR$/backend/venv/lib" />
+      <excludeFolder url="file://$MODULE_DIR$/backend/venv/share" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.13" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
