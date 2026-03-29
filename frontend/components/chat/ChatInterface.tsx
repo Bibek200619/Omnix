@@ -3,17 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Database, FileSearch, ShieldCheck, Users, WifiOff } from "lucide-react";
-import dynamic from "next/dynamic";
-const UploadDropzone = dynamic(() => import("@/components/upload/UploadDropzone").then((m) => m.UploadDropzone), { ssr: false });
-import { FileText } from "lucide-react";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageList } from "@/components/chat/MessageList";
 import type {
   ApiMessage,
   Message,
+  MessageAttachment,
 } from "@/components/chat/types";
 import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
@@ -44,19 +41,52 @@ function normalizeMessage(message: ApiMessage, index: number): Message {
     role,
     content,
     timestamp: formatTime(message.timestamp ?? message.created_at),
+    createdAt: message.timestamp ?? message.created_at,
     status: failed ? "failed" : pending ? "sending" : "sent",
     error: failed ? "Not completed" : undefined,
   };
 }
 
-interface FileData {
-  id: string;
-  file_name?: string;
-  filename?: string;
-  file_type?: string;
-  content_type?: string;
-  size_bytes?: number;
-  storage_path?: string;
+function timestampMs(value?: string) {
+  if (!value) return Number.NaN;
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? Number.NaN : ms;
+}
+
+function attachFilesToMessages(messages: Message[], files: MessageAttachment[]) {
+  if (!files.length) return messages;
+
+  const userMessages = messages.filter((message) => message.role === "user");
+  if (!userMessages.length) return messages;
+
+  const attachmentsByMessageId = new Map<string, MessageAttachment[]>();
+  const sortedFiles = [...files].sort(
+    (a, b) => (timestampMs(a.created_at) || 0) - (timestampMs(b.created_at) || 0),
+  );
+
+  for (const file of sortedFiles) {
+    const fileTime = timestampMs(file.created_at);
+    const target =
+      userMessages.find((message) => {
+        const messageTime = timestampMs(message.createdAt);
+        return !Number.isNaN(fileTime) && !Number.isNaN(messageTime) && messageTime >= fileTime - 30_000;
+      }) ?? userMessages[userMessages.length - 1];
+
+    const existing = attachmentsByMessageId.get(target.id) ?? [];
+    if (!existing.some((item) => item.id === file.id)) {
+      attachmentsByMessageId.set(target.id, [...existing, file]);
+    }
+  }
+
+  return messages.map((message) => {
+    const attachments = attachmentsByMessageId.get(message.id);
+    if (!attachments?.length) return message;
+
+    return {
+      ...message,
+      attachments: [...(message.attachments ?? []), ...attachments],
+    };
+  });
 }
 
 type StreamEvent = {
@@ -91,18 +121,8 @@ export function ChatInterface() {
   const [currentConversationWorkspaceId, setCurrentConversationWorkspaceId] = useState<string | null>(
     activeWorkspaceId,
   );
-
-  const [chatFiles, setChatFiles] = useState<FileData[]>([]);
-  const [showUpload, setShowUpload] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
-
-  useEffect(() => {
-    if (currentConversation) {
-      apiClient.get<FileData[]>("/files?conversation_id=" + currentConversation).then(setChatFiles).catch(console.error);
-    } else {
-      setChatFiles([]);
-    }
-  }, [currentConversation]);
 
 
   const loadConversation = useCallback(
@@ -110,10 +130,16 @@ export function ChatInterface() {
       try {
         setLoadingConversation(true);
         setError(null);
-        const data = await apiClient.get<ApiMessage[]>(
-          `/conversations/${convId}/messages`,
-        );
-        setMessages(data.map(normalizeMessage));
+        const [data, files] = await Promise.all([
+          apiClient.get<ApiMessage[]>(`/conversations/${convId}/messages`),
+          apiClient
+            .get<MessageAttachment[]>("/files?conversation_id=" + convId)
+            .catch((err) => {
+              console.error("Failed to load conversation files", err);
+              return [];
+            }),
+        ]);
+        setMessages(attachFilesToMessages(data.map(normalizeMessage), files));
         setCurrentConversation(convId);
         setCurrentConversationWorkspaceId(activeWorkspaceId);
         setActiveConversation(convId);
@@ -146,6 +172,7 @@ export function ChatInterface() {
     setCurrentConversationWorkspaceId(activeWorkspaceId);
     setActiveConversation(null);
     setMessages([]);
+    setPendingAttachments([]);
     setError(null);
   }, [activeWorkspaceId, conversationId, loadConversation, setActiveConversation]);
 
@@ -157,12 +184,26 @@ export function ChatInterface() {
     if (currentConversationWorkspaceId !== activeWorkspaceId) {
       setCurrentConversation(null);
       setCurrentConversationWorkspaceId(activeWorkspaceId);
-      setChatFiles([]);
+      setPendingAttachments([]);
       setMessages([]);
       setActiveConversation(null);
       router.replace("/chat", { scroll: false });
     }
   }, [activeWorkspaceId, currentConversation, currentConversationWorkspaceId, router, setActiveConversation]);
+
+  useEffect(() => {
+    function handleConversationCleared(event: Event) {
+      const detail = (event as CustomEvent<{ conversationId?: string }>).detail;
+      if (!detail?.conversationId || detail.conversationId !== currentConversation) {
+        return;
+      }
+      setMessages([]);
+      setPendingAttachments([]);
+    }
+
+    window.addEventListener("omnix:conversation-cleared", handleConversationCleared);
+    return () => window.removeEventListener("omnix:conversation-cleared", handleConversationCleared);
+  }, [currentConversation]);
 
   const statusItems = useMemo(
     () => [
@@ -193,16 +234,24 @@ export function ChatInterface() {
   );
 
   const sendMessage = useCallback(
-    async (content: string, retryMessageId?: string) => {
+    async (
+      content: string,
+      retryMessageId?: string,
+      attachmentsOverride?: MessageAttachment[],
+    ) => {
       if (responding) return;
 
       const messageId = retryMessageId ?? crypto.randomUUID();
+      const attachments = attachmentsOverride ?? pendingAttachments;
+      const attachmentIds = attachments.map((file) => file.id).filter(Boolean);
       const userMessage: Message = {
         id: messageId,
         role: "user",
         content,
         timestamp: formatTime(),
+        createdAt: new Date().toISOString(),
         status: "sending",
+        attachments,
       };
 
       setMessages((current) => {
@@ -217,6 +266,10 @@ export function ChatInterface() {
         return [...current, userMessage];
       });
 
+      if (!retryMessageId) {
+        setPendingAttachments([]);
+      }
+
       // keep responding true until streaming completes
       setResponding(true);
       setError(null);
@@ -225,7 +278,11 @@ export function ChatInterface() {
         // Use streaming endpoint when available
         const resp = await apiClient.stream("/chat/stream", {
           method: "POST",
-          body: JSON.stringify({ message: content, conversation_id: currentConversation || undefined }),
+          body: JSON.stringify({
+            message: content,
+            conversation_id: currentConversation || undefined,
+            attachment_ids: attachmentIds,
+          }),
         });
 
         const reader = resp.body?.getReader();
@@ -352,6 +409,7 @@ export function ChatInterface() {
       conversationId,
       currentConversation,
       activeWorkspaceId,
+      pendingAttachments,
       refreshConversations,
       responding,
       router,
@@ -360,7 +418,7 @@ export function ChatInterface() {
   );
 
   function handleRetry(message: Message) {
-    sendMessage(message.content, message.id);
+    sendMessage(message.content, message.id, message.attachments ?? []);
   }
 
   function handleRegenerate(assistantMessageId: string) {
@@ -369,11 +427,24 @@ export function ChatInterface() {
     if (idx <= 0) return;
     const prev = messages[idx - 1];
     if (!prev || prev.role !== "user") return;
-    sendMessage(prev.content);
+    sendMessage(prev.content, undefined, prev.attachments ?? []);
   }
 
   function handlePromptSelect(prompt: string) {
     sendMessage(prompt);
+  }
+
+  function handleUploadSuccess(file: MessageAttachment) {
+    setPendingAttachments((current) => {
+      if (current.some((item) => item.id === file.id)) {
+        return current;
+      }
+      return [...current, file];
+    });
+  }
+
+  function handleRemoveAttachment(fileId: string) {
+    setPendingAttachments((current) => current.filter((file) => file.id !== fileId));
   }
 
   return (
@@ -444,41 +515,14 @@ export function ChatInterface() {
           onPromptSelect={handlePromptSelect}
           onRegenerate={handleRegenerate}
         />
-        
-        <div className="w-full mx-auto mb-2">
-            {chatFiles.length > 0 && (
-              <div className="mb-3">
-                <p className="mb-2 text-xs font-medium text-slate-400">
-                  {activeWorkspace?.is_shared ? "Workspace sources in this thread:" : "Retrieved sources in this thread:"}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {chatFiles.map(f => (
-                    <div key={f.id as string} className="flex items-center gap-2 bg-white/[0.04] border border-white/10 rounded-md px-3 py-1.5 text-xs text-slate-200">
-                      <FileText className="w-3 h-3 text-cyan-400" />
-                      <span className="truncate max-w-[150px]">{f.file_name as string}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {showUpload && (
-              <div className="mb-4">
-                <UploadDropzone conversationId={currentConversation || undefined} onUploadSuccess={() => {
-                  if (currentConversation) {
-                    apiClient.get<FileData[]>("/files?conversation_id=" + currentConversation).then(setChatFiles).catch(console.error);
-                  }
-                }} />
-              </div>
-            )}
-            <div className="flex justify-end mb-2">
-              <Button variant="ghost" size="sm" onClick={() => setShowUpload(!showUpload)} className="text-xs text-slate-400">
-                {showUpload ? "Hide upload" : activeWorkspace?.is_shared ? "Attach to workspace" : "Attach document"}
-              </Button>
-            </div>
-        </div>
-
-        <ChatInput onSend={sendMessage} loading={responding} />
+        <ChatInput
+          onSend={sendMessage}
+          loading={responding}
+          conversationId={currentConversation || undefined}
+          attachments={pendingAttachments}
+          onUploadSuccess={handleUploadSuccess}
+          onRemoveAttachment={handleRemoveAttachment}
+        />
       </div>
     </section>
   );

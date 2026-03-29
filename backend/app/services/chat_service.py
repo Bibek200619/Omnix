@@ -113,13 +113,22 @@ class OllamaChatService:
         max_tokens: int | None = None,
         stream: bool = False,
     ) -> dict[str, Any]:
-        return {
+        payload = {
             "model": model or self.default_model,
             "messages": self._build_messages(prompt, context, system_prompt),
             "temperature": temperature,
             "max_tokens": max_tokens or self.max_output_tokens,
             "stream": stream,
         }
+        logger.info(
+            "Prepared Ollama request: model=%s stream=%s messages=%d final_user_prompt_length=%d",
+            payload["model"],
+            stream,
+            len(payload["messages"]),
+            len(prompt or ""),
+        )
+        logger.debug("Ollama final user prompt preview: %r", (prompt or "")[:500])
+        return payload
 
     @staticmethod
     def _extract_content(payload: dict[str, Any]) -> str:
