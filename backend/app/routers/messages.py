@@ -21,10 +21,12 @@ from ..services.chat_service import (
 from ..services.document_context_service import build_uploaded_document_context
 from ..services.supabase_service import (
     SupabaseServiceError,
+    delete_many_trusted,
     insert_many,
     insert_one,
     select_all,
     select_all_trusted,
+    select_one_trusted,
     update_one,
     update_one_trusted,
 )
@@ -44,6 +46,7 @@ DEFAULT_MESSAGE_LIMIT = 50
 MAX_MESSAGE_LIMIT = 100
 MESSAGE_COLUMNS = "id,conversation_id,user_id,role,content,status,created_at"
 MESSAGE_CONTEXT_COLUMNS = "role,content,status,created_at"
+FILE_COLUMNS = "id,user_id,workspace_id,conversation_id,file_name,file_type,metadata,created_at"
 
 RATE_LIMIT_REQUESTS = 5
 RATE_LIMIT_WINDOW = 60.0
@@ -178,13 +181,132 @@ async def _touch_conversation(
         raise _database_error() from exc
 
 
+def _retrieval_debug_from_context(strategy: str, built_context: Any) -> dict[str, Any]:
+    chunks = built_context.chunks if getattr(built_context, "chunks", None) else []
+    sources = built_context.sources if getattr(built_context, "sources", None) else []
+    first_chunk: dict[str, Any] = chunks[0] if chunks else {}
+    first_source: dict[str, Any] = sources[0] if sources else {}
+    preview = (
+        first_chunk.get("content")
+        or first_source.get("chunk_preview")
+        or first_source.get("excerpt")
+        or ""
+    )
+
+    return {
+        "strategy": strategy,
+        "retrieved_chunks_count": len(chunks) or len(sources),
+        "first_chunk_preview": str(preview).replace("\n", " ")[:240],
+        "diagnostics": getattr(built_context, "diagnostics", {}),
+    }
+
+
+def _empty_retrieval_debug(strategy: str = "none") -> dict[str, Any]:
+    return {
+        "strategy": strategy,
+        "retrieved_chunks_count": 0,
+        "first_chunk_preview": "",
+        "diagnostics": {},
+    }
+
+
+def _log_ollama_prompt_debug(
+    *,
+    conversation_id: str,
+    prompt: str,
+    retrieval_debug: dict[str, Any],
+) -> None:
+    logger.info(
+        "Ollama prompt debug: conversation_id=%s retrieval_strategy=%s retrieved_chunks_count=%d "
+        "prompt_length=%d first_retrieved_chunk_preview=%r",
+        conversation_id,
+        retrieval_debug.get("strategy", "unknown"),
+        int(retrieval_debug.get("retrieved_chunks_count") or 0),
+        len(prompt or ""),
+        retrieval_debug.get("first_chunk_preview") or "",
+    )
+
+
+async def _attach_files_to_conversation(
+    attachment_ids: list[str],
+    *,
+    user_id: str,
+    conversation_id: str,
+    workspace_id: str | None,
+) -> None:
+    unique_attachment_ids = list(dict.fromkeys(str(item) for item in attachment_ids if item))
+    if not unique_attachment_ids:
+        return
+
+    for file_id in unique_attachment_ids:
+        try:
+            file_row = await select_one_trusted("files", FILE_COLUMNS, {"id": file_id})
+        except SupabaseServiceError as exc:
+            raise _database_error() from exc
+
+        if file_row is None:
+            logger.warning("Skipping unknown attachment %s for conversation %s.", file_id, conversation_id)
+            continue
+
+        if workspace_id:
+            if str(file_row.get("workspace_id") or "") != workspace_id:
+                logger.warning(
+                    "Skipping attachment %s because its workspace does not match conversation %s.",
+                    file_id,
+                    conversation_id,
+                )
+                continue
+
+            try:
+                await update_one_trusted(
+                    "files",
+                    {"id": file_id, "workspace_id": workspace_id},
+                    {"conversation_id": conversation_id},
+                )
+            except SupabaseServiceError as exc:
+                raise _database_error() from exc
+            continue
+
+        if str(file_row.get("user_id") or "") != user_id or file_row.get("workspace_id"):
+            logger.warning(
+                "Skipping attachment %s because it is outside the user's private scope.",
+                file_id,
+            )
+            continue
+
+        try:
+            await update_one(
+                "files",
+                {"id": file_id, "user_id": user_id},
+                {"conversation_id": conversation_id},
+            )
+        except SupabaseServiceError as exc:
+            raise _database_error() from exc
+
+
 async def _retrieve_prompt_context(
     message_text: str,
     user_id: str,
     conversation_id: str,
     workspace_id: str | None,
-) -> tuple[str, list[dict[str, Any]]]:
+) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
     prompt_message = message_text
+
+    try:
+        uploaded_context = await build_uploaded_document_context(
+            message_text,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            workspace_id=workspace_id,
+        )
+        if uploaded_context and uploaded_context.sources:
+            return (
+                uploaded_context.prompt,
+                uploaded_context.sources,
+                _retrieval_debug_from_context("uploaded_document", uploaded_context),
+            )
+    except Exception as exc:
+        logger.exception("Uploaded document context retrieval failed for conversation %s: %s", conversation_id, exc)
 
     try:
         from ..rag.startup import get_vector_store
@@ -198,23 +320,15 @@ async def _retrieve_prompt_context(
         )
 
         if built_context.sources:
-            return built_context.prompt, built_context.sources
+            return (
+                built_context.prompt,
+                built_context.sources,
+                _retrieval_debug_from_context("hybrid", built_context),
+            )
     except Exception as exc:
         logger.exception("Hybrid retrieval failed for conversation %s: %s", conversation_id, exc)
 
-    try:
-        uploaded_context = await build_uploaded_document_context(
-            message_text,
-            user_id=user_id,
-            conversation_id=conversation_id,
-            workspace_id=workspace_id,
-        )
-        if uploaded_context and uploaded_context.sources:
-            return uploaded_context.prompt, uploaded_context.sources
-    except Exception as exc:
-        logger.exception("Uploaded document context fallback failed for conversation %s: %s", conversation_id, exc)
-
-    return prompt_message, []
+    return prompt_message, [], _empty_retrieval_debug()
 
 
 @router.get(
@@ -237,6 +351,32 @@ async def get_messages(
         limit,
         offset,
     )
+
+
+@router.delete(
+    "/conversations/{conversation_id}/messages",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def clear_messages(
+    conversation_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> None:
+    user_id = _user_id_from_claims(current_user)
+    conversation, workspace_access = await require_conversation_access(conversation_id, user_id)
+    workspace_id = str(conversation.get("workspace_id") or "") if workspace_access is not None else None
+
+    try:
+        await delete_many_trusted("messages", {"conversation_id": conversation_id})
+        await _touch_conversation(
+            conversation_id,
+            user_id,
+            workspace_id,
+            {"last_message_at": utc_now_iso(), "updated_at": utc_now_iso()},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    return None
 
 
 @router.post("/ai/generate", response_model=AIGenerationResponse)
@@ -338,11 +478,23 @@ async def chat(
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
-    prompt_message, sources = await _retrieve_prompt_context(
+    await _attach_files_to_conversation(
+        payload.attachment_ids,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        workspace_id=workspace_id,
+    )
+
+    prompt_message, sources, retrieval_debug = await _retrieve_prompt_context(
         message_text,
         user_id,
         conversation_id,
         workspace_id,
+    )
+    _log_ollama_prompt_debug(
+        conversation_id=conversation_id,
+        prompt=prompt_message,
+        retrieval_debug=retrieval_debug,
     )
 
     try:
@@ -479,7 +631,14 @@ async def chat_stream(
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
-    prompt_message, sources = await _retrieve_prompt_context(
+    await _attach_files_to_conversation(
+        payload.attachment_ids,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        workspace_id=workspace_id,
+    )
+
+    prompt_message, sources, retrieval_debug = await _retrieve_prompt_context(
         message_text,
         user_id,
         conversation_id,
@@ -502,6 +661,11 @@ async def chat_stream(
         yield f"data: {json.dumps(status_payload)}\n\n"
 
         try:
+            _log_ollama_prompt_debug(
+                conversation_id=conversation_id,
+                prompt=prompt_message,
+                retrieval_debug=retrieval_debug,
+            )
             async for token in call_llm_stream(
                 prompt_message,
                 context=_build_context(recent_messages),

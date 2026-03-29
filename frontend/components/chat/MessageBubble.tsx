@@ -7,6 +7,7 @@ import type { Message } from "@/components/chat/types";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { apiClient } from "@/lib/api";
 
 type MessageBubbleProps = {
   message: Message;
@@ -18,6 +19,7 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
   const [copied, setCopied] = useState(false);
   const [gaveFeedback, setGaveFeedback] = useState<null | "up" | "down">(null);
   const [expandedSource, setExpandedSource] = useState<string | null>(null);
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
 
   const isUser = message.role === "user";
   const Icon = isUser ? User : Bot;
@@ -39,6 +41,40 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
 
   function giveFeedback(type: "up" | "down") {
     setGaveFeedback(type);
+  }
+
+  function attachmentName(file: NonNullable<Message["attachments"]>[number]) {
+    return file.file_name || file.filename || "Uploaded document";
+  }
+
+  function attachmentSize(file: NonNullable<Message["attachments"]>[number]) {
+    if (!file.size_bytes) return "Document";
+    if (file.size_bytes < 1024 * 1024) {
+      return `${Math.max(1, Math.round(file.size_bytes / 1024))} KB`;
+    }
+    return `${(file.size_bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  async function downloadAttachment(file: NonNullable<Message["attachments"]>[number]) {
+    if (!file.id || downloadingAttachmentId) return;
+
+    try {
+      setDownloadingAttachmentId(file.id);
+      const response = await apiClient.request(`/files/${file.id}/download`, {
+        method: "GET",
+      });
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = attachmentName(file);
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download attachment", err);
+    } finally {
+      setDownloadingAttachmentId(null);
+    }
   }
 
   return (
@@ -76,6 +112,29 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
         ) : (
           <MarkdownRenderer content={message.content} compact />
         )}
+
+        {isUser && message.attachments && message.attachments.length > 0 ? (
+          <div className="mt-3 flex flex-col gap-2">
+            {message.attachments.map((file) => (
+              <button
+                key={file.id}
+                type="button"
+                onClick={() => downloadAttachment(file)}
+                className="flex min-w-0 items-center gap-2 rounded-lg border border-emerald-200/20 bg-black/15 px-3 py-2 text-left text-emerald-50 transition hover:border-emerald-200/35 hover:bg-black/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200/60"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-emerald-200/20 bg-emerald-200/10">
+                  <FileText className="h-4 w-4 text-emerald-100" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{attachmentName(file)}</span>
+                  <span className="block text-xs text-emerald-100/60">
+                    {downloadingAttachmentId === file.id ? "Opening..." : attachmentSize(file)}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         {/* Citations block */}
         {!isUser && message.sources && message.sources.length > 0 && (

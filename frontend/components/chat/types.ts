@@ -3,9 +3,11 @@ export type Message = {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
+  createdAt?: string;
   // status now supports streaming to reflect progressive reveal
   status?: "sending" | "streaming" | "sent" | "failed";
   error?: string;
+  attachments?: MessageAttachment[];
   // UI helpers
   isStreaming?: boolean;
   // optional sources attached to assistant responses
@@ -15,6 +17,20 @@ export type Message = {
     url?: string;
     excerpt?: string;
   }>;
+};
+
+export type MessageAttachment = {
+  id: string;
+  file_name?: string;
+  filename?: string;
+  file_type?: string;
+  content_type?: string;
+  size_bytes?: number;
+  storage_path?: string;
+  conversation_id?: string | null;
+  workspace_id?: string | null;
+  created_at?: string;
+  metadata?: Record<string, unknown> | null;
 };
 
 export type ApiMessage = {
