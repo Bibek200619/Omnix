@@ -18,6 +18,7 @@ from ..services.chat_service import (
     call_llm_stream,
     generate_ai_response,
 )
+from ..services.document_context_service import build_uploaded_document_context
 from ..services.supabase_service import (
     SupabaseServiceError,
     insert_many,
@@ -200,6 +201,18 @@ async def _retrieve_prompt_context(
             return built_context.prompt, built_context.sources
     except Exception as exc:
         logger.exception("Hybrid retrieval failed for conversation %s: %s", conversation_id, exc)
+
+    try:
+        uploaded_context = await build_uploaded_document_context(
+            message_text,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            workspace_id=workspace_id,
+        )
+        if uploaded_context and uploaded_context.sources:
+            return uploaded_context.prompt, uploaded_context.sources
+    except Exception as exc:
+        logger.exception("Uploaded document context fallback failed for conversation %s: %s", conversation_id, exc)
 
     return prompt_message, []
 
