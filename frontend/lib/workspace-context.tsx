@@ -22,6 +22,8 @@ type WorkspaceContextType = {
   refreshActiveWorkspaceData: () => Promise<void>;
   refreshPendingInvites: () => Promise<void>;
   createWorkspace: (payload: { name: string; description?: string }) => Promise<Workspace>;
+  renameWorkspace: (workspaceId: string, payload: { name: string; description?: string | null }) => Promise<Workspace>;
+  deleteWorkspace: (workspaceId: string) => Promise<void>;
   inviteToActiveWorkspace: (email: string) => Promise<void>;
   removeWorkspaceMember: (userId: string) => Promise<void>;
   revokeInvite: (inviteId: string) => Promise<void>;
@@ -47,7 +49,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [membersLoading, setMembersLoading] = useState(false);
   const [invitesLoading, setInvitesLoading] = useState(false);
   const [pendingInvitesLoading, setPendingInvitesLoading] = useState(false);
-  const attemptedDefault = useRef(false);
+  const workspaceFetchIdRef = useRef(0);
+  const createWorkspaceInFlightRef = useRef<Map<string, Promise<Workspace>>>(new Map());
 
   const activeWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) || null,
@@ -55,6 +58,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   );
 
   const setActiveWorkspace = useCallback((id: string | null) => {
+    console.debug("[workspace] set active workspace", { id });
     setActiveWorkspaceId(id);
     try {
       if (typeof window !== "undefined") {
@@ -70,16 +74,31 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshWorkspaces = useCallback(async () => {
+    const requestId = workspaceFetchIdRef.current + 1;
+    workspaceFetchIdRef.current = requestId;
+    console.debug("[workspace] refresh start", { requestId });
+
     try {
       setLoading(true);
       const data = await apiClient.get<Workspace[]>("/workspaces");
+      if (workspaceFetchIdRef.current !== requestId) {
+        console.debug("[workspace] ignored stale refresh", { requestId });
+        return;
+      }
+      console.debug("[workspace] refresh success", { requestId, count: data?.length ?? 0 });
       setWorkspaces(data || []);
       setError(null);
     } catch (err) {
+      if (workspaceFetchIdRef.current !== requestId) {
+        return;
+      }
+      console.debug("[workspace] refresh failed", { requestId, err });
       setError(err instanceof Error ? err.message : "Failed to load workspaces");
       setWorkspaces([]);
     } finally {
-      setLoading(false);
+      if (workspaceFetchIdRef.current === requestId) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -137,10 +156,91 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [activeWorkspace, activeWorkspaceId]);
 
   const createWorkspace = useCallback(async (payload: { name: string; description?: string }) => {
-    const created = await apiClient.post<Workspace>("/workspaces", payload);
-    setWorkspaces((current) => [created, ...current.filter((workspace) => workspace.id !== created.id)]);
-    return created;
+    const normalizedPayload = {
+      ...payload,
+      name: payload.name.trim(),
+    };
+    const inFlightKey = `${normalizedPayload.name.toLowerCase()}::${normalizedPayload.description ?? ""}`;
+    const inFlight = createWorkspaceInFlightRef.current.get(inFlightKey);
+    if (inFlight) {
+      console.debug("[workspace] create deduped while request is in flight", { name: normalizedPayload.name });
+      return inFlight;
+    }
+
+    console.debug("[workspace] explicit create requested", { name: normalizedPayload.name });
+    const request = apiClient
+      .post<Workspace>("/workspaces", normalizedPayload)
+      .then((created) => {
+        console.debug("[workspace] create success", { id: created.id, name: created.name });
+        setWorkspaces((current) => [created, ...current.filter((workspace) => workspace.id !== created.id)]);
+        return created;
+      })
+      .finally(() => {
+        createWorkspaceInFlightRef.current.delete(inFlightKey);
+      });
+
+    createWorkspaceInFlightRef.current.set(inFlightKey, request);
+    return request;
   }, []);
+
+  const renameWorkspace = useCallback(async (workspaceId: string, payload: { name: string; description?: string | null }) => {
+    const nextName = payload.name.trim();
+    if (!nextName) {
+      throw new Error("Workspace name cannot be empty.");
+    }
+
+    console.debug("[workspace] rename requested", { workspaceId, nextName });
+    const previousWorkspaces = workspaces;
+    setWorkspaces((current) =>
+      current.map((workspace) =>
+        workspace.id === workspaceId
+          ? { ...workspace, name: nextName, description: payload.description ?? workspace.description }
+          : workspace,
+      ),
+    );
+
+    try {
+      const updated = await apiClient.patch<Workspace>(`/workspaces/${workspaceId}`, {
+        ...payload,
+        name: nextName,
+      });
+      console.debug("[workspace] rename success", { workspaceId, name: updated.name });
+      setWorkspaces((current) =>
+        current.map((workspace) => (workspace.id === workspaceId ? updated : workspace)),
+      );
+      return updated;
+    } catch (err) {
+      console.debug("[workspace] rename failed; rolling back", { workspaceId, err });
+      setWorkspaces(previousWorkspaces);
+      throw err;
+    }
+  }, [workspaces]);
+
+  const deleteWorkspace = useCallback(async (workspaceId: string) => {
+    console.debug("[workspace] delete requested", { workspaceId });
+    const previousWorkspaces = workspaces;
+    const remainingWorkspaces = workspaces.filter((workspace) => workspace.id !== workspaceId);
+
+    setWorkspaces(remainingWorkspaces);
+    if (activeWorkspaceId === workspaceId) {
+      setActiveWorkspace(remainingWorkspaces[0]?.id ?? null);
+      setActiveMembers([]);
+      setActiveInvites([]);
+    }
+
+    try {
+      await apiClient.delete(`/workspaces/${workspaceId}`);
+      console.debug("[workspace] delete success", { workspaceId });
+      await refreshWorkspaces();
+    } catch (err) {
+      console.debug("[workspace] delete failed; rolling back", { workspaceId, err });
+      setWorkspaces(previousWorkspaces);
+      if (activeWorkspaceId === workspaceId) {
+        setActiveWorkspace(workspaceId);
+      }
+      throw err;
+    }
+  }, [activeWorkspaceId, refreshWorkspaces, setActiveWorkspace, workspaces]);
 
   const inviteToActiveWorkspace = useCallback(
     async (email: string) => {
@@ -202,7 +302,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user) {
-      attemptedDefault.current = false;
+      workspaceFetchIdRef.current += 1;
+      createWorkspaceInFlightRef.current.clear();
       setWorkspaces([]);
       setActiveWorkspace(null);
       setActiveMembers([]);
@@ -217,6 +318,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     try {
       const saved = typeof window !== "undefined" ? window.localStorage.getItem(workspaceStorageKey()) : null;
+      console.debug("[workspace] hydration read saved active workspace", { saved });
       if (saved) {
         setActiveWorkspaceId(saved);
       }
@@ -230,28 +332,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (attemptedDefault.current) {
-      return;
-    }
-
     if (workspaces.length === 0) {
-      attemptedDefault.current = true;
-      void (async () => {
-        try {
-          const created = await createWorkspace({ name: "My Workspace" });
-          setActiveWorkspace(created.id);
-        } catch (err) {
-          console.error("Failed to create default workspace", err);
-        }
-      })();
+      console.debug("[workspace] no workspaces after verified fetch; waiting for explicit create");
+      if (activeWorkspaceId) {
+        setActiveWorkspace(null);
+      }
       return;
     }
 
     const activeExists = activeWorkspaceId && workspaces.some((workspace) => workspace.id === activeWorkspaceId);
     if (!activeExists) {
+      console.debug("[workspace] saved active workspace missing; selecting first available workspace", {
+        activeWorkspaceId,
+        nextWorkspaceId: workspaces[0].id,
+      });
       setActiveWorkspace(workspaces[0].id);
     }
-  }, [activeWorkspaceId, createWorkspace, loading, setActiveWorkspace, user, workspaces]);
+  }, [activeWorkspaceId, loading, setActiveWorkspace, user, workspaces]);
 
   useEffect(() => {
     void refreshActiveWorkspaceData();
@@ -275,6 +372,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       refreshActiveWorkspaceData,
       refreshPendingInvites,
       createWorkspace,
+      renameWorkspace,
+      deleteWorkspace,
       inviteToActiveWorkspace,
       removeWorkspaceMember,
       revokeInvite,
@@ -298,6 +397,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       refreshActiveWorkspaceData,
       refreshPendingInvites,
       createWorkspace,
+      renameWorkspace,
+      deleteWorkspace,
       inviteToActiveWorkspace,
       removeWorkspaceMember,
       revokeInvite,

@@ -159,7 +159,7 @@ export function ActionsMenu({ className }: { className?: string }) {
         <div
           role="menu"
           aria-label="Conversation actions"
-          className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-lg border border-white/10 bg-[#071017]/98 p-1 shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+          className="absolute right-0 top-full z-[100] mt-2 w-64 overflow-hidden rounded-lg border border-white/12 bg-[#05070b] p-1 shadow-[0_24px_70px_rgba(0,0,0,0.65)] ring-1 ring-black/40"
         >
           <div className="border-b border-white/8 px-3 py-2">
             <p className="truncate text-sm font-medium text-white">

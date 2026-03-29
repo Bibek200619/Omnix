@@ -435,6 +435,11 @@ export function ChatInterface() {
   }
 
   function handleUploadSuccess(file: MessageAttachment) {
+    console.debug("[upload] attaching uploaded file to pending chat message", {
+      fileId: file.id,
+      conversationId: currentConversation,
+      workspaceId: activeWorkspaceId,
+    });
     setPendingAttachments((current) => {
       if (current.some((item) => item.id === file.id)) {
         return current;

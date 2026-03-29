@@ -54,6 +54,18 @@ export function ChatInput({
     setValue("");
   }
 
+  function handleUploadSuccess(file: MessageAttachment) {
+    console.debug("[upload] composer received successful upload", { fileId: file.id, conversationId });
+    onUploadSuccess?.(file);
+  }
+
+  function handleUploadComplete(result: { hasSuccess: boolean }) {
+    console.debug("[upload] composer upload batch complete", { conversationId, hasSuccess: result.hasSuccess });
+    if (result.hasSuccess) {
+      setUploadOpen(false);
+    }
+  }
+
   return (
     <motion.div
       animate={{
@@ -96,7 +108,8 @@ export function ChatInput({
           <UploadDropzone
             compact
             conversationId={conversationId}
-            onUploadSuccess={onUploadSuccess}
+            onUploadSuccess={handleUploadSuccess}
+            onUploadComplete={handleUploadComplete}
           />
         </div>
       ) : null}
