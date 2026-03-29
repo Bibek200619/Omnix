@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://52.90.155.44";
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 console.log(
   "ENV =",

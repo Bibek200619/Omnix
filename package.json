@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "frontend": "npm --prefix frontend run dev",
-    "backend": "cd backend && uvicorn main:app --reload",
+    "backend": "cd backend && uvicorn app.main:app --reload",
     "dev": "concurrently \"npm run backend\" \"npm run frontend\""
   },
   "devDependencies": {
