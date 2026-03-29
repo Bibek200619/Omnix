@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
+  AlertTriangle,
   Check,
   ChevronDown,
   Clock,
@@ -49,6 +50,8 @@ function WorkspaceSelector() {
     activeMembers,
     setActiveWorkspace,
     createWorkspace,
+    renameWorkspace,
+    deleteWorkspace,
     inviteToActiveWorkspace,
   } = useWorkspace();
   const [open, setOpen] = useState(false);
@@ -59,12 +62,20 @@ function WorkspaceSelector() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const active = activeWorkspace || workspaces.find((w) => w.id === activeWorkspaceId) || null;
   const memberPreview = activeMembers.length > 0 ? activeMembers : active?.members_preview ?? [];
 
   async function handleCreate() {
-    if (!newWorkspaceName.trim()) return;
+    if (!newWorkspaceName.trim() || creatingWorkspace) return;
     try {
       setCreatingWorkspace(true);
       setCreateError(null);
@@ -101,6 +112,52 @@ function WorkspaceSelector() {
     }
   }
 
+  function openRenameWorkspace() {
+    if (!active) return;
+    setRenameDraft(active.name);
+    setRenameError(null);
+    setRenameOpen(true);
+  }
+
+  async function handleRenameWorkspace() {
+    if (!active || !renameDraft.trim() || renaming) return;
+
+    try {
+      setRenaming(true);
+      setRenameError(null);
+      await renameWorkspace(active.id, { name: renameDraft.trim() });
+      setRenameOpen(false);
+      setOpen(false);
+    } catch (err) {
+      setRenameError(err instanceof Error ? err.message : "Unable to rename workspace");
+    } finally {
+      setRenaming(false);
+    }
+  }
+
+  function openDeleteWorkspace() {
+    if (!active) return;
+    setDeleteConfirmText("");
+    setDeleteError(null);
+    setDeleteOpen(true);
+  }
+
+  async function handleDeleteWorkspace() {
+    if (!active || deleting || deleteConfirmText !== active.name) return;
+
+    try {
+      setDeleting(true);
+      setDeleteError(null);
+      await deleteWorkspace(active.id);
+      setDeleteOpen(false);
+      setOpen(false);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Unable to delete workspace");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="relative mt-3">
       <button
@@ -114,7 +171,7 @@ function WorkspaceSelector() {
             {active ? active.name.charAt(0).toUpperCase() : "M"}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-white">{active ? active.name : "My Workspace"}</div>
+            <div className="truncate text-sm font-medium text-white">{active ? active.name : "No workspace selected"}</div>
             <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
               <span>{active?.current_user_role === "owner" ? "Owner" : "Member"}</span>
               {active ? (
@@ -210,18 +267,40 @@ function WorkspaceSelector() {
             <div className="border-t border-white/6 p-3">
               <div className="space-y-2">
                 {active?.current_user_role === "owner" ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="w-full"
-                    leftIcon={<UserPlus className="h-4 w-4" />}
-                    onClick={() => {
-                      setInviteError(null);
-                      setInviteOpen(true);
-                    }}
-                  >
-                    Invite teammate
-                  </Button>
+                  <>
+                    <div className="grid gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="w-full"
+                        leftIcon={<Edit3 className="h-4 w-4" />}
+                        onClick={openRenameWorkspace}
+                      >
+                        Rename workspace
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        className="w-full"
+                        leftIcon={<Trash2 className="h-4 w-4" />}
+                        onClick={openDeleteWorkspace}
+                      >
+                        Delete workspace
+                      </Button>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="w-full"
+                      leftIcon={<UserPlus className="h-4 w-4" />}
+                      onClick={() => {
+                        setInviteError(null);
+                        setInviteOpen(true);
+                      }}
+                    >
+                      Invite teammate
+                    </Button>
+                  </>
                 ) : null}
 
                 {showCreateForm ? (
@@ -288,14 +367,145 @@ function WorkspaceSelector() {
         )}
       </AnimatePresence>
       {active ? (
-        <WorkspaceInviteModal
-          open={inviteOpen}
-          workspaceName={active.name}
-          loading={inviting}
-          error={inviteError}
-          onClose={() => setInviteOpen(false)}
-          onSubmit={handleInvite}
-        />
+        <>
+          <WorkspaceInviteModal
+            open={inviteOpen}
+            workspaceName={active.name}
+            loading={inviting}
+            error={inviteError}
+            onClose={() => setInviteOpen(false)}
+            onSubmit={handleInvite}
+          />
+          {renameOpen ? (
+            <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+              <div className="w-full max-w-md rounded-lg border border-white/10 bg-[#071017] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200">
+                      <Edit3 className="h-4 w-4" />
+                    </div>
+                    <h2 className="mt-4 text-lg font-semibold text-white">Rename workspace</h2>
+                    <p className="mt-1 text-sm leading-6 text-slate-400">
+                      Update the visible name for this workspace.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    aria-label="Close rename modal"
+                    title="Close rename modal"
+                    onClick={() => setRenameOpen(false)}
+                    disabled={renaming}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <form
+                  className="mt-5 space-y-4"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    handleRenameWorkspace();
+                  }}
+                >
+                  <Input
+                    id="workspace-rename"
+                    label="Workspace name"
+                    value={renameDraft}
+                    onChange={(event) => {
+                      setRenameDraft(event.target.value);
+                      setRenameError(null);
+                    }}
+                    disabled={renaming}
+                    autoFocus
+                  />
+
+                  {renameError ? (
+                    <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
+                      {renameError}
+                    </div>
+                  ) : null}
+
+                  <div className="flex items-center justify-end gap-2">
+                    <Button type="button" variant="ghost" onClick={() => setRenameOpen(false)} disabled={renaming}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" leftIcon={<Check className="h-4 w-4" />} isLoading={renaming} disabled={!renameDraft.trim()}>
+                      Save
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          ) : null}
+          {deleteOpen ? (
+            <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+              <div className="w-full max-w-md rounded-lg border border-rose-400/25 bg-[#071017] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.5)]">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-rose-300/30 bg-rose-400/10 text-rose-100">
+                      <AlertTriangle className="h-4 w-4" />
+                    </div>
+                    <h2 className="mt-4 text-lg font-semibold text-white">Delete workspace</h2>
+                    <p className="mt-1 text-sm leading-6 text-slate-400">
+                      This removes <span className="font-medium text-slate-200">{active.name}</span> from the workspace list and clears it from the active session.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    aria-label="Close delete modal"
+                    title="Close delete modal"
+                    onClick={() => setDeleteOpen(false)}
+                    disabled={deleting}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="mt-5 space-y-4">
+                  <Input
+                    id="workspace-delete-confirm"
+                    label={`Type "${active.name}" to confirm`}
+                    value={deleteConfirmText}
+                    onChange={(event) => {
+                      setDeleteConfirmText(event.target.value);
+                      setDeleteError(null);
+                    }}
+                    disabled={deleting}
+                    autoFocus
+                  />
+
+                  {deleteError ? (
+                    <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
+                      {deleteError}
+                    </div>
+                  ) : null}
+
+                  <div className="flex items-center justify-end gap-2">
+                    <Button type="button" variant="ghost" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      leftIcon={<Trash2 className="h-4 w-4" />}
+                      isLoading={deleting}
+                      disabled={deleteConfirmText !== active.name}
+                      onClick={handleDeleteWorkspace}
+                    >
+                      Delete workspace
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </>
       ) : null}
     </div>
   );

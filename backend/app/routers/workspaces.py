@@ -12,6 +12,7 @@ from ..schemas.chat import (
     WorkspaceInviteRead,
     WorkspaceMemberRead,
     WorkspaceRead,
+    WorkspaceUpdate,
 )
 from ..services.supabase_service import (
     SupabaseServiceError,
@@ -265,6 +266,51 @@ async def get_workspace(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
+    return await _enriched_workspace_for_user(workspace_id, user_id)
+
+
+@router.patch("/{workspace_id}", response_model=WorkspaceRead)
+async def update_workspace(
+    workspace_id: str,
+    workspace_payload: WorkspaceUpdate,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    await require_workspace_owner(workspace_id, user_id)
+
+    payload = workspace_payload.model_dump(exclude_none=True)
+    if "name" in payload:
+        payload["name"] = str(payload["name"]).strip()
+        if not payload["name"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workspace name cannot be empty.",
+            )
+
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No updatable fields were provided.",
+        )
+
+    payload["updated_at"] = utc_now_iso()
+
+    try:
+        updated_workspace = await update_one_trusted(
+            "workspaces",
+            {"id": workspace_id},
+            payload,
+        )
+    except SupabaseServiceError as exc:
+        logger.exception("Failed to update workspace")
+        raise _database_error() from exc
+
+    if updated_workspace is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found.",
+        )
+
     return await _enriched_workspace_for_user(workspace_id, user_id)
 
 
