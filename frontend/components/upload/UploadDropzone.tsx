@@ -13,6 +13,7 @@ type UploadDropzoneProps = {
   conversationId?: string;
   compact?: boolean;
   onUploadSuccess?: (file: MessageAttachment) => void;
+  onUploadComplete?: (result: { hasSuccess: boolean }) => void;
 };
 
 type UploadItem = {
@@ -23,12 +24,26 @@ type UploadItem = {
   preview?: string;
 };
 
-export function UploadDropzone({ conversationId, compact = false, onUploadSuccess }: UploadDropzoneProps = {}) {
+export function UploadDropzone({ conversationId, compact = false, onUploadSuccess, onUploadComplete }: UploadDropzoneProps = {}) {
   const [items, setItems] = useState<UploadItem[]>([]);
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const activeUploadsRef = useRef(0);
+  const batchHadSuccessRef = useRef(false);
+
+  const markUploadSettled = useCallback((success: boolean) => {
+    if (success) {
+      batchHadSuccessRef.current = true;
+    }
+    activeUploadsRef.current = Math.max(0, activeUploadsRef.current - 1);
+    if (activeUploadsRef.current === 0) {
+      onUploadComplete?.({ hasSuccess: batchHadSuccessRef.current });
+      batchHadSuccessRef.current = false;
+    }
+  }, [onUploadComplete]);
 
   const upload = useCallback(async (item: UploadItem) => {
+    console.debug("[upload] starting upload", { fileName: item.file.name, conversationId });
     setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "uploading" } : it));
 
     const fd = new FormData();
@@ -53,18 +68,23 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
         try {
           const uploaded = JSON.parse(xhr.responseText) as MessageAttachment;
           if (uploaded?.id) {
+            console.debug("[upload] upload success", { fileId: uploaded.id, conversationId });
             onUploadSuccess?.(uploaded);
           }
         } catch (err) {
           console.error("Unable to parse upload response", err);
         }
       } else {
+        console.debug("[upload] upload failed", { fileName: item.file.name, status: xhr.status });
         setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "error" } : it));
       }
+      markUploadSettled(xhr.status >= 200 && xhr.status < 300);
     };
 
     xhr.onerror = () => {
+      console.debug("[upload] upload network error", { fileName: item.file.name });
       setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "error" } : it));
+      markUploadSettled(false);
     };
 
     try {
@@ -90,7 +110,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
     }
 
     xhr.send(fd);
-  }, [conversationId, onUploadSuccess]);
+  }, [conversationId, markUploadSettled, onUploadSuccess]);
 
   const onFiles = useCallback((files: FileList | null) => {
     if (!files) return;
@@ -102,6 +122,10 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
       preview: file.type === "application/pdf" || file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
     }));
     setItems((s) => [...arr, ...s]);
+    if (activeUploadsRef.current === 0) {
+      batchHadSuccessRef.current = false;
+    }
+    activeUploadsRef.current += arr.length;
     arr.forEach((it) => {
       void upload(it);
     });
