@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EC2_HOST: 54.172.104.28
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -14,21 +18,38 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup SSH
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -T 15 -H "$EC2_HOST" >> ~/.ssh/known_hosts
 
       - name: Deploy Backend
+        shell: bash
         run: |
+          set -euo pipefail
+
           ssh -i ~/.ssh/id_ed25519 \
-          ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
+            -o BatchMode=yes \
+            -o ConnectTimeout=30 \
+            "${{ secrets.EC2_USERNAME }}@$EC2_HOST" << 'EOF'
+              set -euo pipefail
 
-            cd ~/Omnix
+              echo "Connected to $(hostname) as $(whoami)"
+              cd ~/Omnix
 
-            git pull origin main
+              git fetch origin main
+              git pull --ff-only origin main
 
-            sudo systemctl restart omnix
+              if systemctl list-unit-files | grep -q '^omnix\.service'; then
+                sudo -n systemctl restart omnix
+                sudo -n systemctl status omnix --no-pager -l
+              else
+                docker compose -f docker-compose.prod.yml up -d --build
+                docker compose -f docker-compose.prod.yml ps
+              fi
 
+              ./scripts/healthcheck.sh http://localhost:8000
           EOF
