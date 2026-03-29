@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import io
 import logging
 import os
@@ -139,13 +140,14 @@ async def upload_file(
 
     # Validate mime/extension
     file_type = (file.content_type or "").lower()
-    filename = file.filename or "unnamed"
+    filename = os.path.basename(file.filename or "unnamed")
     if file_type not in ALLOWED_MIMES and not any(filename.lower().endswith(ext) for ext in (".pdf", ".docx", ".txt", ".md")):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported file type")
 
     # Save raw file to disk
     try:
         storage_path = await _save_bytes_to_path(user_id, filename, contents)
+        logger.info("Document uploaded")
     except Exception as exc:
         logger.exception("Failed to persist uploaded file to disk: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to store file")
@@ -155,7 +157,7 @@ async def upload_file(
     normalized = ""
     extraction_error: str | None = None
     try:
-        extracted = _extract_text_from_bytes(filename, file_type, contents) or ""
+        extracted = (await asyncio.to_thread(_extract_text_from_bytes, filename, file_type, contents)) or ""
         normalized = "\n\n".join([line.strip() for line in extracted.splitlines() if line.strip()])
     except ImportError as exc:
         logger.exception("Missing dependency for text extraction: %s", exc)
@@ -203,6 +205,7 @@ async def upload_file(
                 }
             )
             file_row["metadata"] = metadata
+            logger.info("Chunks created")
         except Exception:
             logger.exception("Failed to persist immediate text chunks for file %s.", file_row.get("id"))
 
