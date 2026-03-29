@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
+import type { MessageAttachment } from "@/components/chat/types";
 
 
 type UploadDropzoneProps = {
   conversationId?: string;
-  onUploadSuccess?: () => void;
+  compact?: boolean;
+  onUploadSuccess?: (file: MessageAttachment) => void;
 };
 
 type UploadItem = {
@@ -21,7 +23,7 @@ type UploadItem = {
   preview?: string;
 };
 
-export function UploadDropzone({ conversationId, onUploadSuccess }: UploadDropzoneProps = {}) {
+export function UploadDropzone({ conversationId, compact = false, onUploadSuccess }: UploadDropzoneProps = {}) {
   const [items, setItems] = useState<UploadItem[]>([]);
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -48,7 +50,14 @@ export function UploadDropzone({ conversationId, onUploadSuccess }: UploadDropzo
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         setItems((s) => s.map((it) => it.id === item.id ? { ...it, progress: 100, status: "done" } : it));
-        if (onUploadSuccess) onUploadSuccess();
+        try {
+          const uploaded = JSON.parse(xhr.responseText) as MessageAttachment;
+          if (uploaded?.id) {
+            onUploadSuccess?.(uploaded);
+          }
+        } catch (err) {
+          console.error("Unable to parse upload response", err);
+        }
       } else {
         setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "error" } : it));
       }
@@ -147,10 +156,13 @@ export function UploadDropzone({ conversationId, onUploadSuccess }: UploadDropzo
           scale: isDragActive ? 1.01 : 1,
         }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        className="relative overflow-hidden rounded-xl border border-dashed p-8 text-center transition-shadow hover:border-white/20"
+        className={cn(
+          "relative overflow-hidden rounded-xl border border-dashed text-center transition-shadow hover:border-white/20",
+          compact ? "p-4" : "p-8",
+        )}
       >
         <div className="relative z-10 mx-auto max-w-lg">
-          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <div className={cn("flex items-center justify-center gap-4", compact ? "flex-row" : "flex-col sm:flex-row")}>
             <motion.div 
               animate={{ 
                 scale: isDragActive ? 1.1 : 1,
@@ -159,28 +171,30 @@ export function UploadDropzone({ conversationId, onUploadSuccess }: UploadDropzo
                 backgroundColor: isDragActive ? "rgba(34, 211, 238, 0.1)" : "rgba(255, 255, 255, 0.03)"
               }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl"
+              className={cn("flex shrink-0 items-center justify-center rounded-xl", compact ? "h-10 w-10" : "h-14 w-14")}
             >
-              <FilePlus className="h-7 w-7" />
+              <FilePlus className={cn(compact ? "h-5 w-5" : "h-7 w-7")} />
             </motion.div>
-            <div className="text-center sm:text-left">
+            <div className={cn("min-w-0", compact ? "text-left" : "text-center sm:text-left")}>
               <motion.p 
                 animate={{ color: isDragActive ? "#fff" : "#f8fafc" }}
-                className="text-base font-medium"
+                className={cn("font-medium", compact ? "text-sm" : "text-base")}
               >
                 {isDragActive ? "Drop files to upload" : "Upload documents"}
               </motion.p>
-              <p className="mt-1 text-xs text-slate-400">PDF, DOCX, TXT, Markdown supported. Drop files here or click to choose.</p>
+              <p className="mt-1 text-xs text-slate-400">
+                {compact ? "PDF, DOCX, TXT, or Markdown." : "PDF, DOCX, TXT, Markdown supported. Drop files here or click to choose."}
+              </p>
             </div>
           </div>
 
           <motion.div 
             animate={{ opacity: isDragActive ? 0 : 1, y: isDragActive ? 10 : 0 }}
             transition={{ duration: 0.2 }}
-            className="mt-6 flex items-center justify-center"
+            className={cn("flex items-center justify-center", compact ? "mt-4" : "mt-6")}
           >
             <input ref={fileInputRef} type="file" multiple onChange={handleChoose} className="hidden" accept=".pdf,.docx,.txt,.md,text/*,application/pdf" />
-            <Button type="button" onClick={triggerFilePicker} className="shadow-sm">Choose files</Button>
+            <Button type="button" size={compact ? "sm" : "md"} onClick={triggerFilePicker} className="shadow-sm">Choose files</Button>
           </motion.div>
         </div>
         
@@ -196,7 +210,7 @@ export function UploadDropzone({ conversationId, onUploadSuccess }: UploadDropzo
         </AnimatePresence>
       </motion.div>
 
-      <div className="mt-6 space-y-3">
+      <div className={cn("space-y-3", compact ? "mt-3" : "mt-6")}>
         <AnimatePresence>
           {items.map((it) => (
             <motion.div 
@@ -205,7 +219,10 @@ export function UploadDropzone({ conversationId, onUploadSuccess }: UploadDropzo
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
               transition={{ type: "spring", stiffness: 400, damping: 25 }}
-              className="group flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl border border-white/6 bg-white/[0.02] p-4 transition-colors hover:bg-white/[0.04]"
+              className={cn(
+                "group flex flex-col gap-4 rounded-xl border border-white/6 bg-white/[0.02] transition-colors hover:bg-white/[0.04] sm:flex-row sm:items-center",
+                compact ? "p-3" : "p-4",
+              )}
             >
               <div className="flex items-center gap-4 min-w-0 flex-1">
                 <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors", it.status === "done" ? "bg-emerald-500/10 text-emerald-400" : it.status === "error" ? "bg-rose-500/10 text-rose-400" : "bg-white/5 text-slate-300")}>
