@@ -59,6 +59,8 @@ class ChatRequest(BaseModel):
     conversation_id: str | None = None
     title: str | None = Field(default=None, max_length=255)
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    model: str | None = Field(default=None, max_length=120)
+    max_tokens: int | None = Field(default=None, ge=1, le=4096)
 
 
 class ChatResponse(BaseModel):
@@ -70,6 +72,27 @@ class ChatResponse(BaseModel):
     conversation: ConversationHistoryRead | None = None
     user_message: MessageRead | None = None
     assistant_message: MessageRead | None = None
+
+
+class AIMessage(BaseModel):
+    role: Literal["system", "user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=MAX_INPUT_SIZE)
+
+
+class AIGenerationRequest(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=MAX_INPUT_SIZE)
+    context: list[AIMessage] = Field(default_factory=list, max_length=40)
+    system_prompt: str | None = Field(default=None, max_length=4000)
+    model: str | None = Field(default=None, max_length=120)
+    temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    max_tokens: int | None = Field(default=None, ge=1, le=4096)
+
+
+class AIGenerationResponse(BaseModel):
+    response: str
+    model: str
+    provider: Literal["ollama"]
+    usage: dict[str, Any] = Field(default_factory=dict)
 
 
 class FileCreate(BaseModel):
