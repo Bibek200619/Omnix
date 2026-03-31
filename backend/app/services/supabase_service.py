@@ -47,16 +47,33 @@ def _is_supabase_network_error(exc: Exception) -> bool:
 
 def _raise_supabase_error(operation: str, table: str, exc: Exception) -> NoReturn:
     if _is_supabase_auth_error(exc):
-        logger.error("%s on '%s' failed: %s", operation, table, SUPABASE_AUTH_ERROR)
+        logger.error(
+            "%s on '%s' failed: %s | raw_error=%r",
+            operation,
+            table,
+            SUPABASE_AUTH_ERROR,
+            exc,
+        )
         raise SupabaseServiceError(SUPABASE_AUTH_ERROR) from exc
 
     if _is_supabase_network_error(exc):
-        logger.warning("%s on '%s' failed: %s", operation, table, SUPABASE_NETWORK_ERROR)
+        logger.warning(
+            "%s on '%s' failed: %s | raw_error=%r",
+            operation,
+            table,
+            SUPABASE_NETWORK_ERROR,
+            exc,
+        )
         raise SupabaseServiceError(SUPABASE_NETWORK_ERROR) from exc
 
-    logger.exception("%s on '%s' failed.", operation, table)
-    raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+    logger.exception(
+        "Supabase operation failed | operation=%s | table=%s | raw_error=%r",
+        operation,
+        table,
+        exc,
+    )
 
+    raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
 
 def _apply_filters(
     query: Any,
