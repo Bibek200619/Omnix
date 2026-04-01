@@ -371,6 +371,8 @@ async def invite_workspace_member(
     timestamp = utc_now_iso()
 
     try:
+        logger.info("Invite user_id debug: %s", user_id)
+        logger.info("Invite current_user debug: %s", current_user)
         created = await insert_one_trusted(
             "workspace_invites",
             {
