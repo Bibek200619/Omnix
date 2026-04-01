@@ -371,8 +371,23 @@ async def invite_workspace_member(
     timestamp = utc_now_iso()
 
     try:
-        logger.info("Invite user_id debug: %s", user_id)
-        logger.info("Invite current_user debug: %s", current_user)
+        user_id = None
+
+        if isinstance(current_user, dict):
+            user_id = current_user.get("id") or current_user.get("user_id") or current_user.get("sub")
+        else:
+            user_id = (
+                getattr(current_user, "id", None)
+                or getattr(current_user, "user_id", None)
+                or getattr(current_user, "sub", None)
+            )
+
+        if not user_id:
+            logger.error("Could not resolve authenticated user id from current_user=%r", current_user)
+            raise HTTPException(status_code=401, detail="Unable to resolve authenticated user")
+
+        logger.info("Invite debug | current_user_type=%s | user_id=%s | current_user=%r",
+                    type(current_user).__name__, user_id, current_user)
         created = await insert_one_trusted(
             "workspace_invites",
             {
