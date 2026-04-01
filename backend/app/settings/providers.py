@@ -21,6 +21,9 @@ class ProviderSettings(BaseAppSettings):
     OLLAMA_DEFAULT_MODEL: str = "gemma:2b"
     OPENAI_API_KEY: str | None = None
     ANTHROPIC_API_KEY: str | None = None
+    RESEND_API_KEY: str | None = None
+    RESEND_FROM_EMAIL: str = "Omnix <invites@omnix.app>"
+    OMNIX_APP_URL: str = "http://localhost:3000"
     
     @property
     def validated_model_url(self) -> str:
