@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -28,6 +29,7 @@ from ..services.workspace_service import (
 )
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
+logger = logging.getLogger(__name__)
 CONVERSATION_COLUMNS = "id,user_id,workspace_id,title,is_archived,created_at,updated_at,last_message_at"
 MESSAGE_PREVIEW_COLUMNS = "id,conversation_id,user_id,role,content,status,created_at"
 DEFAULT_CONVERSATION_LIMIT = 50

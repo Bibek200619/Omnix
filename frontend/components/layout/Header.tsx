@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, LogOut, Menu, MessageSquarePlus, Users } from "lucide-react";
+import { AlertCircle, LogOut, Mail, Menu, MessageSquarePlus, Users } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth-context";
@@ -88,10 +88,15 @@ export function Header({ onMenuClick }: HeaderProps) {
             <Button
               type="button"
               variant="secondary"
+              size="sm"
               className="hidden md:inline-flex"
+              leftIcon={<Mail className="h-3.5 w-3.5" />}
               onClick={() => router.push("/settings")}
             >
-              Invites {pendingInvites.length}
+              Invites
+              <span className="ml-1 rounded-full bg-cyan-300/15 px-1.5 text-[11px] text-cyan-100">
+                {pendingInvites.length}
+              </span>
             </Button>
           ) : null}
           <ActionsMenu className="inline-flex" />

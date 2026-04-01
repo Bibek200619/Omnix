@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 WORKSPACE_COLUMNS = "id,user_id,name,description,created_at,updated_at"
 WORKSPACE_MEMBER_COLUMNS = "workspace_id,user_id,role,created_at,updated_at"
 WORKSPACE_INVITE_COLUMNS = (
-    "id,workspace_id,email,role,status,invited_by_user_id,accepted_by_user_id,"
+    "id,workspace_id,email,role,status,invited_by,invited_by_user_id,accepted_by_user_id,"
     "created_at,updated_at,accepted_at"
 )
 MEMBERS_PREVIEW_LIMIT = 3
