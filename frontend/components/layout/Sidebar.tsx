@@ -17,6 +17,7 @@ import {
   Loader2,
   MessageSquare,
   MessageSquarePlus,
+  Plus,
   Search,
   Settings,
   Sparkles,
@@ -31,6 +32,7 @@ import { Input } from "@/components/ui/Input";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
+import { PendingWorkspaceInvites } from "@/components/workspace/PendingWorkspaceInvites";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModal";
 
@@ -48,6 +50,7 @@ function WorkspaceSelector() {
     activeWorkspaceId,
     activeWorkspace,
     activeMembers,
+    pendingInvites,
     setActiveWorkspace,
     createWorkspace,
     renameWorkspace,
@@ -163,16 +166,16 @@ function WorkspaceSelector() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/8 bg-white/[0.04] px-4 py-3 text-left transition hover:bg-white/[0.08]"
+        className="group flex w-full items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2.5 text-left transition hover:border-white/20 hover:bg-white/[0.065]"
         aria-expanded={open}
       >
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="h-8 w-8 flex-shrink-0 rounded-md bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center text-white text-sm font-semibold">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-cyan-300/25 bg-cyan-300/10 text-xs font-semibold text-cyan-100">
             {active ? active.name.charAt(0).toUpperCase() : "M"}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-white">{active ? active.name : "No workspace selected"}</div>
-            <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+            <div className="truncate text-sm font-semibold text-white">{active ? active.name : "No workspace selected"}</div>
+            <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
               <span>{active?.current_user_role === "owner" ? "Owner" : "Member"}</span>
               {active ? (
                 <>
@@ -182,10 +185,10 @@ function WorkspaceSelector() {
               ) : null}
             </div>
             {active ? (
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-1.5 flex items-center gap-2">
                 <span
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium",
+                    "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
                     active.is_shared
                       ? "border-cyan-300/20 bg-cyan-300/10 text-cyan-100"
                       : "border-white/10 bg-white/[0.04] text-slate-300",
@@ -199,7 +202,14 @@ function WorkspaceSelector() {
             ) : null}
           </div>
         </div>
-        <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform duration-200", open && "rotate-180")} />
+        <div className="flex shrink-0 items-center gap-1.5">
+          {pendingInvites.length > 0 ? (
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-cyan-300/20 bg-cyan-300/10 px-1.5 text-[10px] font-semibold text-cyan-100">
+              {pendingInvites.length}
+            </span>
+          ) : null}
+          <ChevronDown className={cn("h-4 w-4 text-slate-500 transition-transform duration-200 group-hover:text-slate-300", open && "rotate-180")} />
+        </div>
       </button>
 
       <AnimatePresence>
@@ -209,13 +219,13 @@ function WorkspaceSelector() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute left-0 top-full mt-2 w-full rounded-lg border border-white/8 bg-[#071017]/95 shadow-lg z-50 backdrop-blur-sm"
+            className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-white/10 bg-[#071017]/95 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-sm"
           >
-            <div className="max-h-56 overflow-y-auto">
+            <div className="max-h-64 overflow-y-auto py-1">
               {loading ? (
                 <div className="px-3 py-3 text-xs text-slate-500">Loading workspaces…</div>
               ) : workspaces.length === 0 ? (
-                <div className="px-3 py-3 text-sm text-slate-400">No workspaces yet</div>
+                <div className="px-3 py-4 text-sm text-slate-400">No workspaces yet</div>
               ) : (
                 <AnimatePresence mode="popLayout">
                   {workspaces.map((ws, index) => (
@@ -229,19 +239,24 @@ function WorkspaceSelector() {
                         setActiveWorkspace(ws.id);
                         setOpen(false);
                       }}
-                      className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-white/[0.08] transition"
+                      className={cn(
+                        "flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition",
+                        ws.id === activeWorkspaceId
+                          ? "bg-cyan-300/10"
+                          : "hover:bg-white/[0.06]",
+                      )}
                     >
-                      <div className="h-8 w-8 flex-shrink-0 rounded-md bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-sm font-medium text-white">{ws.name.charAt(0).toUpperCase()}</div>
+                      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.045] text-xs font-semibold text-white">{ws.name.charAt(0).toUpperCase()}</div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-white">{ws.name}</div>
-                        <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
                           <span>{ws.member_count} {ws.member_count === 1 ? "member" : "members"}</span>
                           <span className="h-1 w-1 rounded-full bg-white/15" />
                           <span>{ws.current_user_role === "owner" ? "Owner" : "Member"}</span>
                         </div>
                         {ws.description && <div className="mt-1 truncate text-xs text-slate-500">{ws.description}</div>}
                       </div>
-                      <WorkspaceMemberStack members={ws.members_preview} totalCount={ws.member_count} />
+                      <WorkspaceMemberStack members={ws.members_preview} totalCount={ws.member_count} className="hidden sm:flex" />
                       {ws.id === activeWorkspaceId && (
                         <Check className="h-4 w-4 shrink-0 text-cyan-300" />
                       )}
@@ -264,35 +279,38 @@ function WorkspaceSelector() {
               </motion.div>
             )}
 
-            <div className="border-t border-white/6 p-3">
+            <div className="border-t border-white/8 p-2.5">
               <div className="space-y-2">
                 {active?.current_user_role === "owner" ? (
                   <>
-                    <div className="grid gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <Button
                         type="button"
                         variant="secondary"
-                        className="w-full"
-                        leftIcon={<Edit3 className="h-4 w-4" />}
+                        size="sm"
+                        className="w-full justify-start"
+                        leftIcon={<Edit3 className="h-3.5 w-3.5" />}
                         onClick={openRenameWorkspace}
                       >
-                        Rename workspace
+                        Rename
                       </Button>
                       <Button
                         type="button"
                         variant="danger"
-                        className="w-full"
-                        leftIcon={<Trash2 className="h-4 w-4" />}
+                        size="sm"
+                        className="w-full justify-start"
+                        leftIcon={<Trash2 className="h-3.5 w-3.5" />}
                         onClick={openDeleteWorkspace}
                       >
-                        Delete workspace
+                        Delete
                       </Button>
                     </div>
                     <Button
                       type="button"
                       variant="secondary"
-                      className="w-full"
-                      leftIcon={<UserPlus className="h-4 w-4" />}
+                      size="sm"
+                      className="w-full justify-start"
+                      leftIcon={<UserPlus className="h-3.5 w-3.5" />}
                       onClick={() => {
                         setInviteError(null);
                         setInviteOpen(true);
@@ -324,11 +342,12 @@ function WorkspaceSelector() {
                       placeholder="Workspace name"
                       autoFocus
                       disabled={creatingWorkspace}
-                      className="h-9"
+                      className="h-9 rounded-md"
                     />
                     <div className="flex gap-2">
                       <Button
                         type="submit"
+                        size="sm"
                         disabled={!newWorkspaceName.trim() || creatingWorkspace}
                         className="flex-1"
                       >
@@ -344,6 +363,7 @@ function WorkspaceSelector() {
                       <Button
                         type="button"
                         variant="ghost"
+                        size="sm"
                         onClick={handleCancel}
                         disabled={creatingWorkspace}
                         className="flex-1"
@@ -356,9 +376,10 @@ function WorkspaceSelector() {
                   <button
                     type="button"
                     onClick={() => setShowCreateForm(true)}
-                    className="w-full rounded-md bg-cyan-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-cyan-500"
+                    className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-white/12 bg-white/[0.035] px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-cyan-300/30 hover:bg-cyan-300/10 hover:text-cyan-100"
                   >
-                    Create workspace
+                    <Plus className="h-4 w-4" />
+                    New workspace
                   </button>
                 )}
               </div>
@@ -637,6 +658,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               </Button>
             </div>
             <WorkspaceSelector />
+            <PendingWorkspaceInvites compact maxVisible={2} />
           </div>
         </div>
 

@@ -33,6 +33,7 @@ def create_app() -> FastAPI:
     app.include_router(upload.router)
     app.include_router(cache.router)
     app.include_router(workspaces.router)
+    app.include_router(workspaces.invite_router)
     app.include_router(actions.router)
     app.include_router(artifacts.router)
     app.include_router(insights.router)
