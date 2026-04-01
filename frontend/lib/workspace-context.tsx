@@ -329,6 +329,28 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [refreshPendingInvites, refreshWorkspaces, setActiveWorkspace, user]);
 
   useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshPendingInvites();
+    }, 60_000);
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        void refreshPendingInvites();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [refreshPendingInvites, user]);
+
+  useEffect(() => {
     if (!user || loading) {
       return;
     }

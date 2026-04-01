@@ -10,6 +10,21 @@ import { LoadingButton } from "@/components/ui/LoadingButton";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 
+function safeRedirectPath() {
+  if (typeof window === "undefined") return "/chat";
+  const redirect = new URLSearchParams(window.location.search).get("redirect");
+  if (!redirect || !redirect.startsWith("/") || redirect.startsWith("//")) {
+    return "/chat";
+  }
+  return redirect;
+}
+
+function authLink(path: string) {
+  if (typeof window === "undefined") return path;
+  const redirect = new URLSearchParams(window.location.search).get("redirect");
+  return redirect ? `${path}?redirect=${encodeURIComponent(redirect)}` : path;
+}
+
 export function RegisterForm() {
   const router = useRouter();
   const { authError, isConfigured, refreshSession } = useAuth();
@@ -50,7 +65,7 @@ export function RegisterForm() {
 
       if (data.session) {
         await refreshSession();
-        router.replace("/chat");
+        router.replace(safeRedirectPath());
         router.refresh();
         return;
       }
@@ -123,7 +138,7 @@ export function RegisterForm() {
       </LoadingButton>
       <p className="text-center text-sm text-slate-400">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-cyan-200 hover:text-cyan-100">
+        <Link href={authLink("/login")} className="font-medium text-cyan-200 hover:text-cyan-100">
           Login
         </Link>
       </p>

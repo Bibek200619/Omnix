@@ -10,6 +10,21 @@ import { Alert } from "@/components/ui/Alert";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 
+function safeRedirectPath() {
+  if (typeof window === "undefined") return "/chat";
+  const redirect = new URLSearchParams(window.location.search).get("redirect");
+  if (!redirect || !redirect.startsWith("/") || redirect.startsWith("//")) {
+    return "/chat";
+  }
+  return redirect;
+}
+
+function authLink(path: string) {
+  if (typeof window === "undefined") return path;
+  const redirect = new URLSearchParams(window.location.search).get("redirect");
+  return redirect ? `${path}?redirect=${encodeURIComponent(redirect)}` : path;
+}
+
 export function LoginForm() {
   const router = useRouter();
   const { authError, isConfigured, refreshSession } = useAuth();
@@ -50,7 +65,7 @@ export function LoginForm() {
       }
 
       await refreshSession();
-      router.replace("/chat");
+      router.replace(safeRedirectPath());
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
@@ -104,7 +119,7 @@ export function LoginForm() {
       </LoadingButton>
       <p className="text-center text-sm text-slate-400">
         New to Omnix?{" "}
-        <Link href="/register" className="font-medium text-cyan-200 hover:text-cyan-100">
+        <Link href={authLink("/register")} className="font-medium text-cyan-200 hover:text-cyan-100">
           Register
         </Link>
       </p>
