@@ -64,8 +64,7 @@ async def test_invite_succeeds_when_current_user_has_id(monkeypatch: pytest.Monk
 
     assert inserted_payloads[0]["invited_by"] == "user-id-1"
     assert inserted_payloads[0]["email"] == "teammate@example.com"
-    assert "invited_by_user_id" not in inserted_payloads[0]
-    assert response["invited_by_user_id"] == "user-id-1"
+    assert response["invited_by"] == "user-id-1"
 
 
 @pytest.mark.asyncio
@@ -105,11 +104,12 @@ async def test_top_level_pending_invites_uses_authenticated_email(monkeypatch: p
             {
                 "id": "invite-1",
                 "workspace_id": "workspace-1",
+                "invite_id": "invite-1",
                 "workspace_name": "Omnix Team Workspace",
                 "email": email,
                 "role": "member",
                 "status": "pending",
-                "invited_by_user_id": "owner-1",
+                "invited_by": "owner-1",
                 "inviter_name": "Bibek",
                 "inviter_email": "bibek@example.com",
                 "created_at": "2026-05-16T00:00:00+00:00",
@@ -341,7 +341,7 @@ async def test_decline_invite_marks_invite_declined(monkeypatch: pytest.MonkeyPa
         }
 
     async def fake_hydrate_invites(invites: list[dict[str, object]]):
-        return [{**invites[0], "invited_by_user_id": "owner-1"}]
+        return [{**invites[0], "invite_id": str(invites[0]["id"]), "invited_by": "owner-1"}]
 
     monkeypatch.setattr(workspaces, "select_one_trusted", fake_select_one_trusted)
     monkeypatch.setattr(workspaces, "update_one_trusted", fake_update_one_trusted)

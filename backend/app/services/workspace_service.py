@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 WORKSPACE_COLUMNS = "id,user_id,name,description,created_at,updated_at"
 WORKSPACE_MEMBER_COLUMNS = "workspace_id,user_id,role,created_at,updated_at"
 WORKSPACE_INVITE_COLUMNS = (
-    "id,workspace_id,email,role,status,invited_by,invited_by_user_id,accepted_by_user_id,"
+    "id,workspace_id,email,role,status,invited_by,accepted_by_user_id,"
     "created_at,updated_at,accepted_at"
 )
 MEMBERS_PREVIEW_LIMIT = 3
@@ -399,30 +399,18 @@ async def hydrate_invites(invites: list[dict[str, Any]]) -> list[dict[str, Any]]
     if not invites:
         return []
 
-    normalized_invites = [
-        (
-            {
-                **invite,
-                "invited_by_user_id": str(invite["invited_by"]),
-            }
-            if invite.get("invited_by_user_id") is None and invite.get("invited_by") is not None
-            else invite
-        )
-        for invite in invites
-    ]
-
     workspace_ids = sorted(
         {
             str(invite["workspace_id"])
-            for invite in normalized_invites
+            for invite in invites
             if invite.get("workspace_id")
         }
     )
     inviter_ids = sorted(
         {
-            str(invite["invited_by_user_id"])
-            for invite in normalized_invites
-            if invite.get("invited_by_user_id")
+            str(invite["invited_by"])
+            for invite in invites
+            if invite.get("invited_by")
         }
     )
 
@@ -443,13 +431,17 @@ async def hydrate_invites(invites: list[dict[str, Any]]) -> list[dict[str, Any]]
     profiles = await get_user_profiles(inviter_ids)
 
     hydrated: list[dict[str, Any]] = []
-    for invite in normalized_invites:
-        inviter_id = str(invite.get("invited_by_user_id") or "")
+    for invite in invites:
+        invite_id = str(invite.get("invite_id") or invite.get("id") or "")
+        inviter_id = str(invite.get("invited_by") or "")
         workspace = workspace_by_id.get(str(invite.get("workspace_id") or ""))
         profile = profiles.get(inviter_id, {})
         hydrated.append(
             {
                 **invite,
+                "id": invite_id,
+                "invite_id": invite_id,
+                "invited_by": inviter_id or None,
                 "workspace_name": workspace.get("name") if workspace else None,
                 "inviter_name": profile.get("full_name"),
                 "inviter_email": profile.get("email"),
