@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
 import { useWorkspace } from "@/lib/workspace-context";
+import { getWorkspaceInviteId } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
 
 type PendingWorkspaceInvitesProps = {
@@ -133,12 +134,13 @@ export function PendingWorkspaceInvites({
           </div>
         ) : (
           visibleInvites.map((invite) => {
-            const acceptBusy = busyKey === `accept:${invite.id}`;
-            const declineBusy = busyKey === `decline:${invite.id}`;
+            const inviteId = getWorkspaceInviteId(invite);
+            const acceptBusy = busyKey === `accept:${inviteId}`;
+            const declineBusy = busyKey === `decline:${inviteId}`;
 
             return (
               <article
-                key={invite.id}
+                key={inviteId}
                 className={cn(
                   "rounded-lg border border-white/10 bg-[#09131b]/80 transition hover:border-cyan-300/25 hover:bg-white/[0.045]",
                   compact ? "p-3" : "p-4",
@@ -173,7 +175,7 @@ export function PendingWorkspaceInvites({
                     size="sm"
                     className={compact ? "flex-1" : undefined}
                     leftIcon={<X className="h-3.5 w-3.5" />}
-                    onClick={() => handleDecline(invite.id)}
+                    onClick={() => handleDecline(inviteId)}
                     isLoading={declineBusy}
                     disabled={acceptBusy}
                   >
@@ -184,7 +186,7 @@ export function PendingWorkspaceInvites({
                     size="sm"
                     className={compact ? "flex-1" : undefined}
                     leftIcon={<Check className="h-3.5 w-3.5" />}
-                    onClick={() => handleAccept(invite.id)}
+                    onClick={() => handleAccept(inviteId)}
                     isLoading={acceptBusy}
                     disabled={declineBusy}
                   >

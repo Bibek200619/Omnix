@@ -52,7 +52,7 @@ def _safe_current_user_repr(current_user: Any) -> str:
         redacted: dict[str, Any] = {}
         for key, item in value.items():
             key_text = str(key).lower()
-            if any(marker in key_text for marker in ("authorization", "password", "secret", "token")):
+            if any(marker in key_text for marker in ("authorization", "password", "secret", "token", "email")):
                 redacted[str(key)] = "***REDACTED***"
             else:
                 redacted[str(key)] = item
@@ -138,6 +138,12 @@ def _is_missing_supabase_column(exc: SupabaseServiceError, column: str) -> bool:
     )
 
 
+def _email_log_domain(email: str | None) -> str:
+    if not email or "@" not in email:
+        return "unknown"
+    return email.rsplit("@", 1)[-1] or "unknown"
+
+
 async def _enriched_workspace_for_user(
     workspace_id: str,
     user_id: str,
@@ -165,34 +171,32 @@ async def _insert_workspace_invite(
         "email": email,
         "role": "member",
         "status": "pending",
+        "invited_by": inviter_user_id,
         "created_at": timestamp,
         "updated_at": timestamp,
     }
-    preferred_payload = {**base_payload, "invited_by_user_id": inviter_user_id}
-
-    try:
-        return await insert_one_trusted("workspace_invites", preferred_payload)
-    except SupabaseServiceError as exc:
-        if not _is_missing_supabase_column(exc, "invited_by_user_id"):
-            raise
-        logger.warning(
-            "workspace_invites.invited_by_user_id unavailable; retrying invite insert with invited_by | workspace_id=%s",
-            workspace_id,
-        )
-
-    fallback_payload = {**base_payload, "invited_by": inviter_user_id}
-    return await insert_one_trusted("workspace_invites", fallback_payload)
+    return await insert_one_trusted("workspace_invites", base_payload)
 
 
 async def _pending_workspace_invites_for_user(current_user: Any) -> list[dict[str, Any]]:
     user_email = user_email_from_claims(current_user)
     if user_email is None:
+        logger.info("Workspace invite fetch skipped | reason=missing_authenticated_email")
         return []
 
     try:
-        return await list_pending_invites_for_email(user_email)
+        invites = await list_pending_invites_for_email(user_email)
+        logger.info(
+            "Workspace invite fetch completed | email_domain=%s | count=%d",
+            _email_log_domain(user_email),
+            len(invites),
+        )
+        return invites
     except Exception:
-        logger.exception("Failed to fetch pending workspace invites; returning empty list instead of 500.")
+        logger.exception(
+            "Failed to fetch pending workspace invites; returning empty list instead of 500 | email_domain=%s",
+            _email_log_domain(user_email),
+        )
         return []
 
 
@@ -204,6 +208,11 @@ async def _accept_workspace_invite(invite_id: str, current_user: Any) -> dict[st
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Your account is missing an email address.",
         )
+    logger.info(
+        "Workspace invite accept requested | invite_id=%s | email_domain=%s",
+        invite_id,
+        _email_log_domain(user_email),
+    )
 
     try:
         invite = await select_one_trusted(
@@ -243,6 +252,7 @@ async def _accept_workspace_invite(invite_id: str, current_user: Any) -> dict[st
         )
 
     access = await resolve_workspace_access(workspace_id, user_id)
+    membership_created = False
     if access is None:
         try:
             await insert_one(
@@ -255,6 +265,7 @@ async def _accept_workspace_invite(invite_id: str, current_user: Any) -> dict[st
                     "updated_at": timestamp,
                 },
             )
+            membership_created = True
         except SupabaseServiceError as exc:
             logger.exception(
                 "Failed to create workspace membership from invite | workspace_id=%s | user_id=%s",
@@ -287,6 +298,12 @@ async def _accept_workspace_invite(invite_id: str, current_user: Any) -> dict[st
             logger.exception("Failed to mark workspace invite accepted | invite_id=%s", invite_id)
             raise _database_error() from exc
 
+    logger.info(
+        "Workspace invite accepted | invite_id=%s | workspace_id=%s | membership_created=%s",
+        invite_id,
+        workspace_id,
+        membership_created,
+    )
     return await _enriched_workspace_for_user(workspace_id, user_id)
 
 
@@ -297,6 +314,11 @@ async def _decline_workspace_invite(invite_id: str, current_user: Any) -> dict[s
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Your account is missing an email address.",
         )
+    logger.info(
+        "Workspace invite decline requested | invite_id=%s | email_domain=%s",
+        invite_id,
+        _email_log_domain(user_email),
+    )
 
     try:
         invite = await select_one_trusted(
@@ -337,6 +359,7 @@ async def _decline_workspace_invite(invite_id: str, current_user: Any) -> dict[s
         )
 
     hydrated = await hydrate_invites([declined])
+    logger.info("Workspace invite declined | invite_id=%s", invite_id)
     return hydrated[0]
 
 
@@ -531,9 +554,9 @@ async def invite_workspace_member(
         )
     except SupabaseServiceError as exc:
         logger.exception(
-            "Failed to check existing workspace invite | workspace_id=%s | email=%s | root_error=%r",
+            "Failed to check existing workspace invite | workspace_id=%s | invited_email_domain=%s | root_error=%r",
             workspace_id,
-            normalized_email,
+            _email_log_domain(normalized_email),
             exc.__cause__ or exc,
         )
         raise _database_error() from exc
@@ -548,10 +571,10 @@ async def invite_workspace_member(
 
     try:
         logger.info(
-            "Workspace invite insert auth context | current_user_type=%r | resolved_user_id=%s | current_user=%s",
-            type(current_user),
+            "Workspace invite create requested | workspace_id=%s | invited_email_domain=%s | inviter_user_id=%s",
+            workspace_id,
+            _email_log_domain(normalized_email),
             user_id,
-            _safe_current_user_repr(current_user),
         )
         created = await _insert_workspace_invite(
             workspace_id=workspace_id,
@@ -561,16 +584,13 @@ async def invite_workspace_member(
         )
     except SupabaseServiceError as exc:
         logger.exception(
-            "Failed to create workspace invite | workspace_id=%s | email=%s | invited_by=%s | root_error=%r",
+            "Failed to create workspace invite | workspace_id=%s | invited_email_domain=%s | invited_by=%s | root_error=%r",
             workspace_id,
-            normalized_email,
+            _email_log_domain(normalized_email),
             user_id,
             exc.__cause__ or exc,
         )
         raise _database_error() from exc
-
-    if created.get("invited_by_user_id") is None and created.get("invited_by") is not None:
-        created = {**created, "invited_by_user_id": str(created["invited_by"])}
 
     hydrated = await hydrate_invites([created])
     invite_id = str(created.get("id") or "")

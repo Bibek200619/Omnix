@@ -167,11 +167,12 @@ class WorkspaceInviteRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    invite_id: str
     workspace_id: str
     email: str
     role: Literal["member"]
     status: Literal["pending", "accepted", "declined", "revoked"]
-    invited_by_user_id: str
+    invited_by: str | None = None
     accepted_by_user_id: str | None = None
     workspace_name: str | None = None
     inviter_name: str | None = None

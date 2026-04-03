@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Bell, Check, ChevronDown, Loader2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useWorkspace } from "@/lib/workspace-context";
-import type { WorkspaceInvite } from "@/lib/workspace-types";
+import { getWorkspaceInviteId, type WorkspaceInvite } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
 
 function inviteWorkspaceName(invite: WorkspaceInvite) {
@@ -41,12 +41,13 @@ function InviteActionButtons({
   });
 
   async function run(action: "accept" | "decline") {
+    const inviteId = getWorkspaceInviteId(invite);
     try {
-      setState({ busyInviteId: `${invite.id}:${action}`, error: null });
+      setState({ busyInviteId: `${inviteId}:${action}`, error: null });
       if (action === "accept") {
-        await acceptInvite(invite.id);
+        await acceptInvite(inviteId);
       } else {
-        await declineInvite(invite.id);
+        await declineInvite(inviteId);
       }
       onSettled?.();
     } catch (err) {
@@ -60,8 +61,9 @@ function InviteActionButtons({
     setState({ busyInviteId: null, error: null });
   }
 
-  const acceptBusy = state.busyInviteId === `${invite.id}:accept`;
-  const declineBusy = state.busyInviteId === `${invite.id}:decline`;
+  const inviteId = getWorkspaceInviteId(invite);
+  const acceptBusy = state.busyInviteId === `${inviteId}:accept`;
+  const declineBusy = state.busyInviteId === `${inviteId}:decline`;
   const disabled = Boolean(state.busyInviteId);
 
   return (
@@ -103,14 +105,14 @@ export function InviteNotificationBar() {
   );
 
   const visibleInvites = useMemo(
-    () => pendingInvites.filter((invite) => !dismissedInviteIds.has(invite.id)),
+    () => pendingInvites.filter((invite) => !dismissedInviteIds.has(getWorkspaceInviteId(invite))),
     [dismissedInviteIds, pendingInvites],
   );
   const invite = visibleInvites[0];
 
   useEffect(() => {
     setDismissedInviteIds((current) => {
-      const liveIds = new Set(pendingInvites.map((item) => item.id));
+      const liveIds = new Set(pendingInvites.map((item) => getWorkspaceInviteId(item)));
       const next = new Set([...current].filter((id) => liveIds.has(id)));
       return next.size === current.size ? current : next;
     });
@@ -120,7 +122,7 @@ export function InviteNotificationBar() {
     <AnimatePresence initial={false}>
       {invite ? (
         <motion.div
-          key={invite.id}
+          key={getWorkspaceInviteId(invite)}
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
@@ -149,7 +151,7 @@ export function InviteNotificationBar() {
                 aria-label="Dismiss invite notification"
                 title="Dismiss"
                 onClick={() => {
-                  setDismissedInviteIds((current) => new Set(current).add(invite.id));
+                  setDismissedInviteIds((current) => new Set(current).add(getWorkspaceInviteId(invite)));
                 }}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-white/[0.06] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
               >
@@ -237,7 +239,7 @@ export function InviteNotificationBell() {
                 <div className="space-y-2">
                   {pendingInvites.map((invite) => (
                     <div
-                      key={invite.id}
+                      key={getWorkspaceInviteId(invite)}
                       className="rounded-lg border border-white/8 bg-white/[0.035] p-3 transition hover:border-white/14 hover:bg-white/[0.055]"
                     >
                       <div className="flex items-start gap-3">
