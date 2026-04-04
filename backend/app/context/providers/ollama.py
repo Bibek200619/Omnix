@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class OllamaProvider(ProviderBase):
     """Ollama provider implementation."""
 
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "phi3:latest"):
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = "phi3:mini"):
         self.base_url = base_url
         self.model = model
 

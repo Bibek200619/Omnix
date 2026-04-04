@@ -2,8 +2,11 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import Dict, Any
+from urllib.parse import urlparse
+import httpx
 from ..db.supabase_client import get_supabase
 from ..rag.startup import get_vector_store
+from ..core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +33,53 @@ async def check_redis() -> Dict[str, Any]:
     # Placeholder until Redis is fully integrated
     return {"status": "healthy", "info": "Redis check not fully implemented"}
 
+async def check_ollama() -> Dict[str, Any]:
+    settings = get_settings()
+    parsed_chat_url = urlparse(settings.ollama_chat_url)
+    base_url = f"{parsed_chat_url.scheme}://{parsed_chat_url.netloc}".rstrip("/")
+    expected_model = settings.ollama_model
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, connect=2.0)) as client:
+            response = await client.get(f"{base_url}/api/tags")
+            response.raise_for_status()
+            data = response.json()
+    except Exception as e:
+        logger.error("Ollama health check failed: %s", e)
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "base_url": base_url,
+            "expected_model": expected_model,
+        }
+
+    models = [
+        str(model.get("name") or "")
+        for model in data.get("models", [])
+        if isinstance(model, dict)
+    ]
+    if expected_model not in models:
+        return {
+            "status": "unhealthy",
+            "error": f"Expected Ollama model {expected_model!r} is not installed.",
+            "base_url": base_url,
+            "expected_model": expected_model,
+            "installed_models": models,
+        }
+
+    return {
+        "status": "healthy",
+        "base_url": base_url,
+        "model": expected_model,
+        "chat_endpoint": settings.ollama_chat_url,
+    }
+
 async def run_all_checks() -> Dict[str, Any]:
     results = await asyncio.gather(
         check_supabase(),
         check_vector_store(),
         check_redis(),
+        check_ollama(),
         return_exceptions=True
     )
     
@@ -42,4 +87,5 @@ async def run_all_checks() -> Dict[str, Any]:
         "supabase": results[0] if not isinstance(results[0], Exception) else {"status": "error", "error": str(results[0])},
         "vector_store": results[1] if not isinstance(results[1], Exception) else {"status": "error", "error": str(results[1])},
         "redis": results[2] if not isinstance(results[2], Exception) else {"status": "error", "error": str(results[2])},
+        "ollama": results[3] if not isinstance(results[3], Exception) else {"status": "error", "error": str(results[3])},
     }

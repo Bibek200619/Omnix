@@ -16,7 +16,7 @@ class Message(BaseModel):
 
 class GenerationConfig(BaseModel):
     temperature: float = 0.7
-    max_tokens: int = 256
+    max_tokens: int = 384
     top_p: float = 1.0
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0

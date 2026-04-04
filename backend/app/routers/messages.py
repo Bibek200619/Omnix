@@ -40,8 +40,8 @@ from .conversations import (
 router = APIRouter(tags=["messages"])
 logger = logging.getLogger(__name__)
 
-RECENT_CONTEXT_LIMIT = 8
-MAX_CONTEXT_CHARS = 16000
+RECENT_CONTEXT_LIMIT = 4
+MAX_CONTEXT_CHARS = 8000
 DEFAULT_MESSAGE_LIMIT = 50
 MAX_MESSAGE_LIMIT = 100
 MESSAGE_COLUMNS = "id,conversation_id,user_id,role,content,status,created_at"
@@ -308,6 +308,14 @@ async def _retrieve_prompt_context(
     except Exception as exc:
         logger.exception("Uploaded document context retrieval failed for conversation %s: %s", conversation_id, exc)
 
+    if not await _has_retrievable_documents(user_id=user_id, workspace_id=workspace_id):
+        logger.info(
+            "Skipping hybrid retrieval because no document chunks exist for conversation %s workspace_id=%s.",
+            conversation_id,
+            workspace_id,
+        )
+        return prompt_message, [], _empty_retrieval_debug("no_documents")
+
     try:
         from ..rag.startup import get_vector_store
         from ..retrieval.hybrid_search import HybridSearchEngine
@@ -329,6 +337,29 @@ async def _retrieve_prompt_context(
         logger.exception("Hybrid retrieval failed for conversation %s: %s", conversation_id, exc)
 
     return prompt_message, [], _empty_retrieval_debug()
+
+
+async def _has_retrievable_documents(*, user_id: str, workspace_id: str | None) -> bool:
+    try:
+        if workspace_id:
+            rows = await select_all_trusted(
+                "documents",
+                "id,workspace_id",
+                filters={"workspace_id": workspace_id},
+                limit=1,
+            )
+            return any(str(row.get("workspace_id") or "") == workspace_id for row in rows)
+
+        rows = await select_all(
+            "documents",
+            "id,workspace_id",
+            filters={"user_id": user_id},
+            limit=1,
+        )
+        return any(not row.get("workspace_id") for row in rows)
+    except Exception:
+        logger.exception("Unable to check document availability; allowing hybrid retrieval fallback.")
+        return True
 
 
 @router.get(
