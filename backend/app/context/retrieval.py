@@ -18,7 +18,7 @@ class RetrievalManager:
         self.hybrid_engine = HybridSearchEngine(self.vector_store)
 
     async def retrieve(
-        self, payload: ContextPayload, top_k: int = 8
+        self, payload: ContextPayload, top_k: int = 3
     ) -> List[Citation]:
         """Orchestrate retrieval and map to unified Citation objects."""
         if not payload.query or not payload.query.strip():

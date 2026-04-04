@@ -28,9 +28,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class HybridSearchConfig:
-    top_k: int = 8
-    semantic_pool_size: int = 16
-    keyword_pool_size: int = 16
+    top_k: int = 3
+    semantic_pool_size: int = 6
+    keyword_pool_size: int = 6
     semantic_weight: float = DEFAULT_SEMANTIC_WEIGHT
     keyword_weight: float = DEFAULT_KEYWORD_WEIGHT
     dynamic_weighting: bool = True
@@ -46,7 +46,7 @@ class HybridSearchConfig:
             getattr(settings, "HYBRID_SEMANTIC_WEIGHT", DEFAULT_SEMANTIC_WEIGHT),
             getattr(settings, "HYBRID_KEYWORD_WEIGHT", DEFAULT_KEYWORD_WEIGHT),
         )
-        top_k = max(1, int(getattr(settings, "HYBRID_TOP_K", 8)))
+        top_k = max(1, int(getattr(settings, "HYBRID_TOP_K", 3)))
         pool_size = max(top_k * 2, int(getattr(settings, "HYBRID_POOL_SIZE", top_k * 2)))
         return cls(
             top_k=top_k,

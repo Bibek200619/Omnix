@@ -131,7 +131,7 @@ async def build_uploaded_document_context(
     user_id: str,
     conversation_id: str | None,
     workspace_id: str | None,
-    top_k: int = 8,
+    top_k: int = 3,
 ) -> BuiltContext | None:
     """Build prompt context from uploaded document chunks when vector retrieval has no hit."""
     files = await _load_candidate_files(
