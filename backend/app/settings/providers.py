@@ -25,6 +25,13 @@ class ProviderSettings(BaseAppSettings):
     OLLAMA_DEFAULT_MODEL: str = "phi3:mini"
     OPENAI_API_KEY: str | None = None
     ANTHROPIC_API_KEY: str | None = None
+    TAVILY_API_KEY: str | None = None
+    WEB_SEARCH_ENABLED: bool = False
+    WEB_SEARCH_MAX_RESULTS: int = 5
+    WEB_SEARCH_TIMEOUT_SECONDS: float = 8.0
+    WEB_SEARCH_SNIPPET_MAX_CHARS: int = 700
+    WEB_SEARCH_DEPTH: str = "basic"
+    WEB_SEARCH_INCLUDE_ANSWER: bool = False
     RESEND_API_KEY: str | None = None
     RESEND_FROM_EMAIL: str = "Omnix <invites@omnix.app>"
     OMNIX_APP_URL: str = "http://localhost:3000"
