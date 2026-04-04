@@ -11,6 +11,14 @@ from app.routers import profile
 from app.services import profile_service
 
 
+def _missing_column_error(column: str) -> profile_service.SupabaseServiceError:
+    exc = profile_service.SupabaseServiceError("Internal server error")
+    exc.__cause__ = RuntimeError(
+        f"Could not find the '{column}' column of 'user_profiles' in the schema cache"
+    )
+    return exc
+
+
 def _profile_row(**overrides: Any) -> dict[str, Any]:
     row = {
         "user_id": "user-1",
@@ -175,6 +183,125 @@ async def test_update_user_profile_maps_username_to_handle_column(monkeypatch: p
     ]
     assert response["handle"] == "alex-morgan"
     assert response["username"] == "alex-morgan"
+
+
+@pytest.mark.asyncio
+async def test_update_user_profile_retries_without_updated_at_when_schema_is_behind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    update_payloads: list[dict[str, Any]] = []
+
+    async def fake_select_one_trusted(
+        table: str,
+        columns: str,
+        filters: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        assert table == "user_profiles"
+        return {
+            "user_id": "user-1",
+            "handle": "alex-dev",
+            "display_name": "Alex Dev",
+            "avatar_url": None,
+            "created_at": None,
+            "updated_at": None,
+        }
+
+    async def fake_update_one_trusted(
+        table: str,
+        filters: dict[str, Any],
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        assert table == "user_profiles"
+        assert filters == {"user_id": "user-1"}
+        update_payloads.append(payload)
+        if "updated_at" in payload:
+            raise _missing_column_error("updated_at")
+        return {
+            "user_id": "user-1",
+            "handle": "alex-dev",
+            "display_name": payload["display_name"],
+            "avatar_url": None,
+            "created_at": None,
+        }
+
+    monkeypatch.setattr(profile_service, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(profile_service, "update_one_trusted", fake_update_one_trusted)
+    monkeypatch.setattr(profile_service, "utc_now_iso", lambda: "2026-05-18T00:00:00+00:00")
+
+    response = await profile_service.update_user_profile(
+        {"sub": "user-1", "email": "alex@example.com"},
+        {"display_name": "Alex Morgan"},
+    )
+
+    assert update_payloads == [
+        {
+            "updated_at": "2026-05-18T00:00:00+00:00",
+            "display_name": "Alex Morgan",
+        },
+        {"display_name": "Alex Morgan"},
+    ]
+    assert response["display_name"] == "Alex Morgan"
+    assert response["handle"] == "alex-dev"
+    assert response["username"] == "alex-dev"
+
+
+@pytest.mark.asyncio
+async def test_ensure_user_profile_retries_insert_without_timestamps_when_schema_is_behind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inserted_payloads: list[dict[str, Any]] = []
+
+    async def fake_select_one_trusted(
+        table: str,
+        columns: str,
+        filters: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        assert table == "user_profiles"
+        assert filters == {"user_id": "user-1"}
+        return None
+
+    async def fake_insert_one_trusted(table: str, payload: dict[str, Any]) -> dict[str, Any]:
+        assert table == "user_profiles"
+        inserted_payloads.append(payload)
+        if "updated_at" in payload:
+            raise _missing_column_error("updated_at")
+        return {
+            "user_id": payload["user_id"],
+            "handle": payload["handle"],
+            "display_name": payload["display_name"],
+            "avatar_url": payload["avatar_url"],
+        }
+
+    monkeypatch.setattr(profile_service, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(profile_service, "insert_one_trusted", fake_insert_one_trusted)
+    monkeypatch.setattr(profile_service, "utc_now_iso", lambda: "2026-05-18T00:00:00+00:00")
+
+    response = await profile_service.ensure_user_profile(
+        {
+            "sub": "user-1",
+            "email": "Alex@Example.com",
+            "user_metadata": {"full_name": "Alex Dev", "username": "alex-dev"},
+        },
+    )
+
+    assert inserted_payloads == [
+        {
+            "user_id": "user-1",
+            "handle": "alex-dev",
+            "display_name": "Alex Dev",
+            "avatar_url": None,
+            "created_at": "2026-05-18T00:00:00+00:00",
+            "updated_at": "2026-05-18T00:00:00+00:00",
+        },
+        {
+            "user_id": "user-1",
+            "handle": "alex-dev",
+            "display_name": "Alex Dev",
+            "avatar_url": None,
+        },
+    ]
+    assert response["handle"] == "alex-dev"
+    assert response["username"] == "alex-dev"
 
 
 @pytest.mark.asyncio
