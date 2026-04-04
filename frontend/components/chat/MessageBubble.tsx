@@ -1,13 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, Check, Copy, RotateCcw, User, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { Bot, Check, Copy, RotateCcw, FileText, ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "@/components/chat/types";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api";
+import {
+  workspaceRoleAvatarClass,
+  workspaceRoleBadgeClass,
+  workspaceRoleLabel,
+} from "@/lib/workspace-roles";
 
 type MessageBubbleProps = {
   message: Message;
@@ -22,9 +27,13 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
 
   const isUser = message.role === "user";
-  const Icon = isUser ? User : Bot;
+  const isOwn = isUser && (message.isOwn ?? true);
+  const isOtherHuman = isUser && !isOwn;
   const failed = message.status === "failed";
   const sending = message.status === "sending" || message.status === "streaming";
+  const senderName = message.senderName || (isUser ? (isOwn ? "You" : "Teammate") : "Omnix AI");
+  const senderRole = message.senderRole || (isUser ? "member" : "assistant");
+  const avatarLabel = message.senderAvatar || (isUser ? senderName.charAt(0).toUpperCase() : "AI");
 
   async function copyMessage() {
     if (!navigator.clipboard || !message.content) return;
@@ -84,29 +93,53 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -6, scale: 0.99 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
-      className={cn("group flex gap-3", isUser && "flex-row-reverse")}
+      className={cn("group flex gap-3", isOwn && "flex-row-reverse")}
     >
       <div
         className={cn(
-          "mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+          "mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
           isUser
-            ? "border-emerald-300/30 bg-emerald-300/10 text-emerald-200"
-            : "border-cyan-300/30 bg-cyan-300/10 text-cyan-200",
+            ? workspaceRoleAvatarClass(senderRole)
+            : "border-cyan-300/30 bg-cyan-300/10 text-cyan-100",
         )}
+        title={senderName}
       >
-        <Icon className="h-4 w-4" />
+        {isUser ? avatarLabel : <Bot className="h-4 w-4" />}
       </div>
       <div
         className={cn(
           "max-w-[88%] rounded-lg border px-4 py-3 shadow-soft transition sm:max-w-[74%]",
           failed
             ? "border-rose-400/30 bg-rose-400/10 text-rose-50"
-            : isUser
+            : isOwn
             ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-50"
+            : isOtherHuman
+            ? "border-sky-300/20 bg-sky-300/10 text-sky-50"
             : "border-white/10 bg-white/[0.055] text-slate-100",
           sending && "opacity-80",
         )}
       >
+        <div className={cn("mb-2 flex items-center gap-2", isOwn && "justify-end")}>
+          <span
+            className={cn(
+              "truncate text-xs font-semibold",
+              isOwn ? "text-emerald-50" : isOtherHuman ? "text-sky-50" : "text-cyan-100",
+            )}
+          >
+            {senderName}
+          </span>
+          <span
+            className={cn(
+              "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+              isUser
+                ? workspaceRoleBadgeClass(senderRole)
+                : "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
+            )}
+          >
+            {isUser ? workspaceRoleLabel(senderRole) : "Assistant"}
+          </span>
+        </div>
+
         {isUser ? (
           <p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p>
         ) : (
@@ -120,14 +153,26 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
                 key={file.id}
                 type="button"
                 onClick={() => downloadAttachment(file)}
-                className="flex min-w-0 items-center gap-2 rounded-lg border border-emerald-200/20 bg-black/15 px-3 py-2 text-left text-emerald-50 transition hover:border-emerald-200/35 hover:bg-black/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200/60"
+                className={cn(
+                  "flex min-w-0 items-center gap-2 rounded-lg border bg-black/15 px-3 py-2 text-left transition hover:bg-black/25 focus:outline-none focus-visible:ring-2",
+                  isOwn
+                    ? "border-emerald-200/20 text-emerald-50 hover:border-emerald-200/35 focus-visible:ring-emerald-200/60"
+                    : "border-sky-200/20 text-sky-50 hover:border-sky-200/35 focus-visible:ring-sky-200/60",
+                )}
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-emerald-200/20 bg-emerald-200/10">
-                  <FileText className="h-4 w-4 text-emerald-100" />
+                <span
+                  className={cn(
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border",
+                    isOwn
+                      ? "border-emerald-200/20 bg-emerald-200/10"
+                      : "border-sky-200/20 bg-sky-200/10",
+                  )}
+                >
+                  <FileText className={cn("h-4 w-4", isOwn ? "text-emerald-100" : "text-sky-100")} />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{attachmentName(file)}</span>
-                  <span className="block text-xs text-emerald-100/60">
+                  <span className={cn("block text-xs", isOwn ? "text-emerald-100/60" : "text-sky-100/60")}>
                     {downloadingAttachmentId === file.id ? "Opening..." : attachmentSize(file)}
                   </span>
                 </span>
@@ -212,8 +257,10 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
               "text-[11px]",
               failed
                 ? "text-rose-100/70"
-                : isUser
+                : isOwn
                 ? "text-emerald-100/55"
+                : isOtherHuman
+                ? "text-sky-100/55"
                 : "text-slate-500",
             )}
           >
@@ -227,7 +274,8 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
                 onClick={copyMessage}
                 className={cn(
                   "inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-white/[0.07] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
-                  isUser && "text-emerald-100/50 hover:text-emerald-50",
+                  isOwn && "text-emerald-100/50 hover:text-emerald-50",
+                  isOtherHuman && "text-sky-100/50 hover:text-sky-50",
                 )}
                 aria-label="Copy message"
                 title="Copy message"

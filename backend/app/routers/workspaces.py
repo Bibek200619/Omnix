@@ -13,6 +13,7 @@ from ..schemas.chat import (
     WorkspaceInviteCreate,
     WorkspaceInviteRead,
     WorkspaceMemberRead,
+    WorkspaceMemberRoleUpdate,
     WorkspaceRead,
     WorkspaceUpdate,
 )
@@ -34,6 +35,7 @@ from ..services.workspace_service import (
     list_workspace_invites,
     list_workspace_members,
     normalize_email,
+    normalize_workspace_role,
     require_workspace_access,
     require_workspace_owner,
     resolve_workspace_access,
@@ -515,6 +517,64 @@ async def get_workspace_members(
     user_id = _user_id_from_claims(current_user)
     access = await require_workspace_access(workspace_id, user_id)
     return await list_workspace_members(access.workspace)
+
+
+@router.patch("/{workspace_id}/members/{member_user_id}", response_model=WorkspaceMemberRead)
+async def update_workspace_member_role(
+    workspace_id: str,
+    member_user_id: str,
+    role_payload: WorkspaceMemberRoleUpdate,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    access = await require_workspace_owner(workspace_id, user_id)
+
+    if str(access.workspace.get("user_id") or "") == member_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The workspace founder role cannot be changed.",
+        )
+
+    try:
+        membership = await select_one_trusted(
+            "workspace_members",
+            "workspace_id,user_id,role",
+            {"workspace_id": workspace_id, "user_id": member_user_id},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace member not found.",
+        )
+
+    next_role = normalize_workspace_role(role_payload.role)
+    if next_role == "owner":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only the original founder can have the founder role.",
+        )
+
+    try:
+        await update_one_trusted(
+            "workspace_members",
+            {"workspace_id": workspace_id, "user_id": member_user_id},
+            {"role": next_role, "updated_at": utc_now_iso()},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    members = await list_workspace_members(access.workspace)
+    for member in members:
+        if member.get("user_id") == member_user_id:
+            return member
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Workspace member not found.",
+    )
 
 
 @router.post("/{workspace_id}/invites", response_model=WorkspaceInviteRead, status_code=status.HTTP_201_CREATED)
