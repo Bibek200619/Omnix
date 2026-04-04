@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from ..db.supabase_client import get_supabase
+from ..services.supabase_service import execute_query_sync
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ class KeywordRetriever:
                 if conversation_id:
                     files_query = files_query.eq("conversation_id", conversation_id)
                 
-            files_resp = files_query.execute()
+            files_resp = execute_query_sync(files_query, operation="rag keyword files")
             files_data = getattr(files_resp, "data", []) or []
             
             file_ids = [f["id"] for f in files_data]
@@ -59,7 +60,7 @@ class KeywordRetriever:
             else:
                 docs_query = docs_query.eq("user_id", user_id)
 
-            docs_resp = docs_query.execute()
+            docs_resp = execute_query_sync(docs_query, operation="rag keyword documents")
             docs = getattr(docs_resp, "data", []) or []
             
             if not docs:
