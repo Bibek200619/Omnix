@@ -12,7 +12,7 @@ class LLMSettings(BaseSettings):
 
     # Ollama Settings
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_DEFAULT_MODEL: str = "llama3"
+    OLLAMA_DEFAULT_MODEL: str = "phi3:latest"
     OLLAMA_TIMEOUT_SECONDS: int = 60
 
     # Local Model Settings (Future)

@@ -52,7 +52,7 @@ async def test_provider_failure_handling():
     trace = ContextTrace()
     trace.provider.set_provider("openai", "gpt-4")
     trace.provider.record_error("Rate limit exceeded")
-    trace.provider.record_fallback("ollama", "llama3")
+    trace.provider.record_fallback("ollama", "phi3:latest")
     
     snapshot = trace.provider.get_snapshot()
     assert snapshot["error"] == "Rate limit exceeded"
