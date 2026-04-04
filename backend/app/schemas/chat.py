@@ -138,7 +138,7 @@ class WorkspaceRead(BaseModel):
     user_id: str
     name: str
     description: str | None = None
-    current_user_role: Literal["owner", "member"] = "owner"
+    current_user_role: Literal["owner", "co_owner", "member"] = "owner"
     member_count: int = 1
     is_shared: bool = False
     members_preview: list["WorkspaceMemberRead"] = Field(default_factory=list)
@@ -151,12 +151,16 @@ class WorkspaceMemberRead(BaseModel):
 
     workspace_id: str
     user_id: str
-    role: Literal["owner", "member"]
+    role: Literal["owner", "co_owner", "member"]
     email: str | None = None
     full_name: str | None = None
     avatar_label: str = "U"
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+class WorkspaceMemberRoleUpdate(BaseModel):
+    role: Literal["co_owner", "member"]
 
 
 class WorkspaceInviteCreate(BaseModel):

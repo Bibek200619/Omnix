@@ -6,7 +6,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.routers import workspaces
-from app.schemas.chat import WorkspaceInviteCreate
+from app.schemas.chat import WorkspaceInviteCreate, WorkspaceMemberRoleUpdate
 
 
 def _invite_payload(email: str = "teammate@example.com") -> WorkspaceInviteCreate:
@@ -355,3 +355,54 @@ async def test_decline_invite_marks_invite_declined(monkeypatch: pytest.MonkeyPa
 
     assert updates == [{"status": "declined", "updated_at": "2026-05-16T00:00:00+00:00"}]
     assert response["status"] == "declined"
+
+
+@pytest.mark.asyncio
+async def test_founder_can_promote_member_to_co_owner(monkeypatch: pytest.MonkeyPatch) -> None:
+    updates: list[dict[str, object]] = []
+
+    async def fake_require_workspace_owner(workspace_id: str, user_id: str):
+        assert workspace_id == "workspace-1"
+        assert user_id == "founder-1"
+        return SimpleNamespace(workspace={"id": workspace_id, "user_id": "founder-1"})
+
+    async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
+        assert table == "workspace_members"
+        return {"workspace_id": "workspace-1", "user_id": "member-1", "role": "member"}
+
+    async def fake_update_one_trusted(table: str, filters: dict[str, object], payload: dict[str, object]):
+        assert table == "workspace_members"
+        updates.append(payload)
+        return {"workspace_id": "workspace-1", "user_id": "member-1", **payload}
+
+    async def fake_list_workspace_members(workspace: dict[str, object]):
+        return [
+            {
+                "workspace_id": workspace["id"],
+                "user_id": "founder-1",
+                "role": "owner",
+                "avatar_label": "F",
+            },
+            {
+                "workspace_id": workspace["id"],
+                "user_id": "member-1",
+                "role": "co_owner",
+                "avatar_label": "M",
+            },
+        ]
+
+    monkeypatch.setattr(workspaces, "require_workspace_owner", fake_require_workspace_owner)
+    monkeypatch.setattr(workspaces, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspaces, "update_one_trusted", fake_update_one_trusted)
+    monkeypatch.setattr(workspaces, "list_workspace_members", fake_list_workspace_members)
+    monkeypatch.setattr(workspaces, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
+
+    response = await workspaces.update_workspace_member_role(
+        "workspace-1",
+        "member-1",
+        WorkspaceMemberRoleUpdate(role="co_owner"),
+        current_user={"sub": "founder-1"},
+    )
+
+    assert updates == [{"role": "co_owner", "updated_at": "2026-05-16T00:00:00+00:00"}]
+    assert response["role"] == "co_owner"

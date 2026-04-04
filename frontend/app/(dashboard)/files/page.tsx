@@ -6,6 +6,7 @@ import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { useWorkspace } from "@/lib/workspace-context";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
+import { workspaceRoleLabel } from "@/lib/workspace-roles";
 
 const UploadDropzone = dynamic(() => import("@/components/upload/UploadDropzone").then((m) => m.UploadDropzone), { ssr: false });
 
@@ -90,7 +91,7 @@ export default function FilesPage() {
             <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} size="md" />
             <div className="text-right text-xs text-slate-400">
               <div>{activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "member" : "members"}</div>
-              <div>{activeWorkspace.current_user_role === "owner" ? "Owner" : "Member"}</div>
+              <div>{workspaceRoleLabel(activeWorkspace.current_user_role)}</div>
             </div>
           </div>
         ) : null}

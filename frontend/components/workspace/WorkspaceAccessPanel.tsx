@@ -1,15 +1,40 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Ban, CheckCircle2, Clock3, ShieldCheck, UserPlus, Users, XCircle } from "lucide-react";
+import {
+  Ban,
+  CheckCircle2,
+  Clock3,
+  Crown,
+  Loader2,
+  MoreHorizontal,
+  Shield,
+  ShieldCheck,
+  UserRound,
+  UserPlus,
+  Users,
+  XCircle,
+} from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
 import { useWorkspace } from "@/lib/workspace-context";
-import { getWorkspaceInviteId, type WorkspaceMember } from "@/lib/workspace-types";
-import { PendingWorkspaceInvites } from "./PendingWorkspaceInvites";
+import {
+  getWorkspaceInviteId,
+  type WorkspaceMember,
+} from "@/lib/workspace-types";
+import {
+  workspaceRoleAvatarClass,
+  workspaceRoleBadgeClass,
+  workspaceRoleLabel,
+} from "@/lib/workspace-roles";
+import { cn } from "@/lib/utils";
 import { WorkspaceInviteModal } from "./WorkspaceInviteModal";
 import { WorkspaceMemberStack, workspaceMemberName } from "./WorkspaceMemberStack";
+
+type ConfirmAction =
+  | { type: "role"; member: WorkspaceMember; role: "co_owner" | "member" }
+  | { type: "remove"; member: WorkspaceMember };
 
 function memberEmailLabel(member: WorkspaceMember) {
   return member.email || member.user_id;
@@ -51,6 +76,12 @@ function inviteStatusMeta(status: string) {
   }
 }
 
+function roleIcon(role: WorkspaceMember["role"]) {
+  if (role === "owner") return Crown;
+  if (role === "co_owner") return ShieldCheck;
+  return UserRound;
+}
+
 export function WorkspaceAccessPanel() {
   const {
     activeWorkspace,
@@ -61,6 +92,7 @@ export function WorkspaceAccessPanel() {
     inviteToActiveWorkspace,
     removeWorkspaceMember,
     revokeInvite,
+    updateWorkspaceMemberRole,
   } = useWorkspace();
 
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -68,19 +100,26 @@ export function WorkspaceAccessPanel() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [openMemberMenu, setOpenMemberMenu] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
   const workspaceMembers = useMemo(
-    () => activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [],
+    () => (activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? []),
     [activeMembers, activeWorkspace],
   );
   const outgoingInvites = useMemo(
-    () => [...activeInvites].sort((a, b) => {
-      const statusDelta = inviteStatusOrder[a.status] - inviteStatusOrder[b.status];
-      if (statusDelta !== 0) return statusDelta;
-      return (Date.parse(b.updated_at || b.created_at || "") || 0) - (Date.parse(a.updated_at || a.created_at || "") || 0);
-    }),
+    () =>
+      [...activeInvites].sort((a, b) => {
+        const statusDelta = inviteStatusOrder[a.status] - inviteStatusOrder[b.status];
+        if (statusDelta !== 0) return statusDelta;
+        return (
+          (Date.parse(b.updated_at || b.created_at || "") || 0) -
+          (Date.parse(a.updated_at || a.created_at || "") || 0)
+        );
+      }),
     [activeInvites],
   );
+  const canManageTeam = activeWorkspace?.current_user_role === "owner";
 
   async function handleInvite(email: string) {
     try {
@@ -92,18 +131,6 @@ export function WorkspaceAccessPanel() {
       setInviteError(err instanceof Error ? err.message : "Unable to invite teammate.");
     } finally {
       setInviteLoading(false);
-    }
-  }
-
-  async function handleRemoveMember(userId: string) {
-    try {
-      setBusyKey(`member:${userId}`);
-      setActionError(null);
-      await removeWorkspaceMember(userId);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Unable to remove member.");
-    } finally {
-      setBusyKey(null);
     }
   }
 
@@ -119,35 +146,61 @@ export function WorkspaceAccessPanel() {
     }
   }
 
+  async function handleConfirmAction() {
+    if (!confirmAction) return;
+
+    const { member } = confirmAction;
+    const actionKey =
+      confirmAction.type === "role"
+        ? `role:${member.user_id}:${confirmAction.role}`
+        : `member:${member.user_id}`;
+
+    try {
+      setBusyKey(actionKey);
+      setActionError(null);
+      if (confirmAction.type === "role") {
+        await updateWorkspaceMemberRole(member.user_id, confirmAction.role);
+      } else {
+        await removeWorkspaceMember(member.user_id);
+      }
+      setConfirmAction(null);
+      setOpenMemberMenu(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Unable to update team member.");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   return (
     <section className="space-y-4">
-      <PendingWorkspaceInvites showEmpty />
-
       <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-3">
-              <Users className="h-5 w-5 text-cyan-200" />
-              <div>
-                <h2 className="font-semibold text-white">Workspace access</h2>
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-100">
+                <Users className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-white">Team Members</h2>
                 <p className="mt-1 text-sm text-slate-400">
-                  Manage the collaborators and invite flow for the active workspace.
+                  Manage workspace access, ownership level, and collaborator visibility.
                 </p>
               </div>
             </div>
             {activeWorkspace ? (
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="mt-4 flex flex-wrap items-center gap-3">
                 <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} size="md" />
-                <div>
-                  <div className="text-sm font-medium text-white">{activeWorkspace.name}</div>
-                  <div className="mt-1 text-xs text-slate-400">
-                    {activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "member" : "members"} • {activeWorkspace.current_user_role === "owner" ? "Owner" : "Member"}
-                  </div>
-                </div>
+                <span className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-xs font-medium text-slate-300">
+                  {activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "member" : "members"}
+                </span>
+                <span className={cn("rounded-full border px-3 py-1 text-xs font-semibold", workspaceRoleBadgeClass(activeWorkspace.current_user_role))}>
+                  Your role: {workspaceRoleLabel(activeWorkspace.current_user_role)}
+                </span>
               </div>
             ) : null}
           </div>
-          {activeWorkspace?.current_user_role === "owner" ? (
+          {canManageTeam ? (
             <Button
               type="button"
               variant="secondary"
@@ -163,119 +216,193 @@ export function WorkspaceAccessPanel() {
         </div>
 
         {actionError ? (
-          <Alert className="mt-4" variant="error" title="Workspace action failed">
+          <Alert className="mt-4" variant="error" title="Team action failed">
             {actionError}
           </Alert>
         ) : null}
 
         {!activeWorkspace ? (
-          <div className="mt-4 rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-slate-400">
-            Select a workspace to manage collaborators.
+          <div className="mt-5 rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-slate-400">
+            Select a workspace to manage its team.
           </div>
         ) : (
-          <div className="mt-5 grid gap-5 lg:grid-cols-[1.3fr_0.9fr]">
-            <div>
-              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-white">
-                <ShieldCheck className="h-4 w-4 text-emerald-200" />
-                Members
+          <div className="mt-5 space-y-2.5">
+            {membersLoading ? (
+              <div className="grid gap-2.5">
+                {[0, 1, 2].map((item) => (
+                  <div key={item} className="shimmer h-16 rounded-lg border border-white/10 bg-white/[0.04]" />
+                ))}
               </div>
-              <div className="space-y-3">
-                {membersLoading ? (
-                  <p className="text-sm text-slate-400">Loading members...</p>
-                ) : (
-                  workspaceMembers.map((member) => {
-                    const removable = activeWorkspace.current_user_role === "owner" && member.role !== "owner";
-                    return (
-                      <div
-                        key={member.user_id}
-                        className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-[#0d1720] text-sm font-semibold text-slate-200">
-                            {member.avatar_label}
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-white">{workspaceMemberName(member)}</div>
-                            <div className="mt-1 text-xs text-slate-400">{memberEmailLabel(member)}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-300">
-                            {member.role === "owner" ? "Owner" : "Member"}
+            ) : (
+              workspaceMembers.map((member) => {
+                const RoleIcon = roleIcon(member.role);
+                const isFounder = member.role === "owner";
+                const canActOnMember = canManageTeam && !isFounder;
+
+                return (
+                  <div
+                    key={member.user_id}
+                    className="relative flex flex-col gap-3 rounded-lg border border-white/10 bg-[#080d13]/80 px-3.5 py-3 transition hover:border-white/16 hover:bg-white/[0.045] sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-sm font-semibold", workspaceRoleAvatarClass(member.role))}>
+                        {member.avatar_label}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <div className="truncate text-sm font-semibold text-white">{workspaceMemberName(member)}</div>
+                          <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold", workspaceRoleBadgeClass(member.role))}>
+                            <RoleIcon className="h-3 w-3" />
+                            {workspaceRoleLabel(member.role)}
                           </span>
-                          {removable ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveMember(member.user_id)}
-                              isLoading={busyKey === `member:${member.user_id}`}
+                        </div>
+                        <div className="mt-1 truncate text-xs text-slate-500">{memberEmailLabel(member)}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 sm:justify-end">
+                      <div className="text-xs text-slate-500">
+                        Joined <ClientTime value={member.created_at} fallback="recently" />
+                      </div>
+                      {canActOnMember ? (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            aria-haspopup="menu"
+                            aria-expanded={openMemberMenu === member.user_id}
+                            aria-label={`Open actions for ${workspaceMemberName(member)}`}
+                            onClick={() =>
+                              setOpenMemberMenu((current) =>
+                                current === member.user_id ? null : member.user_id,
+                              )
+                            }
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/[0.045] text-slate-300 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+
+                          {openMemberMenu === member.user_id ? (
+                            <div
+                              role="menu"
+                              className="absolute right-0 top-full z-40 mt-2 w-44 overflow-hidden rounded-lg border border-white/12 bg-[#05070b] p-1.5 shadow-[0_18px_54px_rgba(0,0,0,0.58)] ring-1 ring-black/40"
                             >
-                              Remove
-                            </Button>
+                              {member.role !== "co_owner" ? (
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  onClick={() => setConfirmAction({ type: "role", member, role: "co_owner" })}
+                                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-amber-100 transition hover:bg-amber-300/10"
+                                >
+                                  <Shield className="h-4 w-4" />
+                                  Make co-owner
+                                </button>
+                              ) : null}
+                              {member.role !== "member" ? (
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  onClick={() => setConfirmAction({ type: "role", member, role: "member" })}
+                                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-sky-100 transition hover:bg-sky-300/10"
+                                >
+                                  <UserRound className="h-4 w-4" />
+                                  Make member
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => setConfirmAction({ type: "remove", member })}
+                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-rose-100 transition hover:bg-rose-400/10"
+                              >
+                                <Ban className="h-4 w-4" />
+                                Remove
+                              </button>
+                            </div>
                           ) : null}
                         </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-white">
-                <Clock3 className="h-4 w-4 text-amber-200" />
-                Invites
-              </div>
-              <div className="space-y-3">
-                {activeWorkspace.current_user_role !== "owner" ? (
-                  <p className="text-sm text-slate-400">Only workspace owners can manage outgoing invites.</p>
-                ) : invitesLoading ? (
-                  <p className="text-sm text-slate-400">Loading invites...</p>
-                ) : outgoingInvites.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-slate-400">
-                    No invites yet.
+                      ) : null}
+                    </div>
                   </div>
-                ) : (
-                  outgoingInvites.map((invite) => {
-                    const inviteId = getWorkspaceInviteId(invite);
-                    const status = inviteStatusMeta(invite.status);
-                    const StatusIcon = status.icon;
-
-                    return (
-                      <div key={inviteId} className="rounded-lg border border-white/10 bg-white/[0.03] p-3.5">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-medium text-white">{invite.email}</div>
-                            <div className="mt-1 text-xs text-slate-500">
-                              Sent <ClientTime value={invite.created_at} fallback="recently" format="date" />
-                            </div>
-                          </div>
-                          <span className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium ${status.className}`}>
-                            <StatusIcon className="h-3 w-3" />
-                            {status.label}
-                          </span>
-                        </div>
-                        {invite.status === "pending" ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="mt-3 h-8 px-2.5 text-xs text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
-                            onClick={() => handleRevokeInvite(inviteId)}
-                            isLoading={busyKey === `invite:${inviteId}`}
-                          >
-                            Revoke
-                          </Button>
-                        ) : null}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
+                );
+              })
+            )}
           </div>
         )}
+      </div>
+
+      <div className="rounded-lg border border-white/10 bg-white/[0.025] p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-white">
+              <Clock3 className="h-4 w-4 text-amber-200" />
+              Invitations
+            </div>
+            <p className="mt-1 text-sm text-slate-500">
+              Pending and recent invite activity stays here after the team roster.
+            </p>
+          </div>
+          {canManageTeam ? (
+            <Button type="button" variant="ghost" size="sm" leftIcon={<UserPlus className="h-4 w-4" />} onClick={() => setInviteOpen(true)}>
+              Invite
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="mt-4 space-y-2.5">
+          {!activeWorkspace ? (
+            <div className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-slate-500">
+              Select a workspace to view invites.
+            </div>
+          ) : activeWorkspace.current_user_role !== "owner" ? (
+            <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-slate-400">
+              Only the workspace founder can manage outgoing invites.
+            </div>
+          ) : invitesLoading ? (
+            <div className="flex items-center gap-2 text-sm text-slate-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading invitations
+            </div>
+          ) : outgoingInvites.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-slate-500">
+              No outgoing invitations yet.
+            </div>
+          ) : (
+            outgoingInvites.map((invite) => {
+              const inviteId = getWorkspaceInviteId(invite);
+              const status = inviteStatusMeta(invite.status);
+              const StatusIcon = status.icon;
+
+              return (
+                <div key={inviteId} className="flex flex-col gap-3 rounded-lg border border-white/10 bg-[#080d13]/70 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-white">{invite.email}</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      Sent <ClientTime value={invite.created_at} fallback="recently" format="date" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium ${status.className}`}>
+                      <StatusIcon className="h-3 w-3" />
+                      {status.label}
+                    </span>
+                    {invite.status === "pending" ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
+                        onClick={() => handleRevokeInvite(inviteId)}
+                        isLoading={busyKey === `invite:${inviteId}`}
+                      >
+                        Revoke
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {activeWorkspace ? (
@@ -287,6 +414,42 @@ export function WorkspaceAccessPanel() {
           onClose={() => setInviteOpen(false)}
           onSubmit={handleInvite}
         />
+      ) : null}
+
+      {confirmAction ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-lg border border-white/10 bg-[#071017] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
+            <div className="flex items-start gap-3">
+              <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full border", workspaceRoleAvatarClass(confirmAction.member.role))}>
+                {confirmAction.type === "remove" ? <Ban className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-white">
+                  {confirmAction.type === "remove" ? "Remove team member?" : "Change workspace role?"}
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-slate-400">
+                  {confirmAction.type === "remove"
+                    ? `${workspaceMemberName(confirmAction.member)} will lose access to this workspace.`
+                    : `${workspaceMemberName(confirmAction.member)} will become ${workspaceRoleLabel(confirmAction.role).toLowerCase()}.`}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setConfirmAction(null)} disabled={Boolean(busyKey)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant={confirmAction.type === "remove" ? "danger" : "primary"}
+                isLoading={Boolean(busyKey)}
+                onClick={handleConfirmAction}
+              >
+                {confirmAction.type === "remove" ? "Remove member" : "Update role"}
+              </Button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </section>
   );

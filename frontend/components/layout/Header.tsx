@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, LogOut, Menu, MessageSquarePlus, PanelLeftOpen, Users } from "lucide-react";
+import { AlertCircle, Menu, MessageSquarePlus, PanelLeftOpen, Users } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth-context";
@@ -9,6 +9,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 import { InviteNotificationBar, InviteNotificationBell } from "@/components/workspace/InviteNotifications";
 import { ActionsMenu } from "@/components/actions/ActionsMenu";
+import { ProfileMenu } from "@/components/layout/ProfileMenu";
 
 const routeTitles = [
   { match: "/chat", title: "Chat", eyebrow: "AI workspace" },
@@ -27,7 +28,7 @@ type HeaderProps = {
 export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const { activeWorkspace, activeMembers } = useWorkspace();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
@@ -112,15 +113,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
           >
             New chat
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            leftIcon={<LogOut className="h-4 w-4" />}
-            isLoading={signingOut}
-            onClick={handleSignOut}
-          >
-            {signingOut ? "Signing out" : "Sign out"}
-          </Button>
+          <ProfileMenu user={user} signingOut={signingOut} onSignOut={handleSignOut} />
         </div>
       </div>
       {signOutError ? (

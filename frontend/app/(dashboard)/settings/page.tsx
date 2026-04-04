@@ -135,7 +135,7 @@ export default function SettingsPage() {
                 {userInitial}
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-white">Profile</h2>
+                <h2 id="profile" className="text-xl font-semibold text-white">Profile</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-400">
                   Manage the identity attached to your authenticated Omnix workspace.
                 </p>
