@@ -20,7 +20,9 @@ _VOLATILE_TOPICS = re.compile(
     r"\b("
     r"price|prices|stock|stocks|earnings|funding|acquisition|ipo|layoff|lawsuit|election|poll|"
     r"weather|forecast|schedule|score|standings|ranking|benchmark|version|changelog|security advisory|"
-    r"vulnerability|cve|policy|regulation|rate|exchange rate"
+    r"vulnerability|cve|policy|regulation|rate|exchange rate|"
+    r"sports?|match|fixture|result|scoreline|winner|won|football|soccer|premier\s+league|ipl|"
+    r"nba|nfl|mlb|nhl|champions\s+league"
     r")\b",
     re.IGNORECASE,
 )

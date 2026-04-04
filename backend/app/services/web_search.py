@@ -74,7 +74,7 @@ class WebSearchResult:
         if self.published_date:
             parts.append(f"Published: {self.published_date}")
         if self.snippet:
-            parts.append(f"Snippet: {self.snippet}")
+            parts.append(f"Content: {self.snippet}")
         return "\n".join(parts)
 
 
@@ -126,6 +126,12 @@ class TavilySearchService:
         started_at = time.perf_counter()
         clean_query = sanitize_query(query)
         if not self.enabled:
+            logger.warning(
+                "Web search skipped: provider=tavily enabled=%s api_key_present=%s query=%r",
+                self.settings.WEB_SEARCH_ENABLED,
+                bool(self.api_key),
+                clean_query[:160],
+            )
             return WebSearchResponse(
                 query=clean_query,
                 results=[],
@@ -143,6 +149,13 @@ class TavilySearchService:
             "include_raw_content": False,
             "include_images": False,
         }
+        logger.info(
+            "Tavily search request: query=%r max_results=%d search_depth=%s timeout_seconds=%.1f",
+            clean_query[:240],
+            result_limit,
+            payload["search_depth"],
+            self.timeout_seconds,
+        )
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -157,9 +170,17 @@ class TavilySearchService:
                     response.raise_for_status()
                     data = response.json()
                 latency_ms = (time.perf_counter() - started_at) * 1000
+                results = self._parse_results(data.get("results"), limit=result_limit)
+                logger.info(
+                    "Tavily search response: query=%r results=%d latency_ms=%.2f first_domains=%s",
+                    clean_query[:160],
+                    len(results),
+                    latency_ms,
+                    [result.domain for result in results[:3]],
+                )
                 return WebSearchResponse(
                     query=clean_query,
-                    results=self._parse_results(data.get("results"), limit=result_limit),
+                    results=results,
                     answer=sanitize_text(data.get("answer"), max_chars=900) if data.get("answer") else None,
                     latency_ms=latency_ms,
                 )
@@ -182,6 +203,12 @@ class TavilySearchService:
                 await asyncio.sleep(0.2)
 
         latency_ms = (time.perf_counter() - started_at) * 1000
+        logger.warning(
+            "Tavily search failed: query=%r error=%s latency_ms=%.2f",
+            clean_query[:160],
+            last_error or "search_failed",
+            latency_ms,
+        )
         return WebSearchResponse(
             query=clean_query,
             results=[],
