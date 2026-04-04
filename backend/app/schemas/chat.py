@@ -52,12 +52,15 @@ class MessageRead(BaseModel):
     content: str
     status: Literal["pending", "completed", "failed"] | None = None
     created_at: datetime | None = None
+    metadata: dict[str, Any] | None = None
+    sources: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=MAX_INPUT_SIZE)
     conversation_id: str | None = None
     attachment_ids: list[str] = Field(default_factory=list, max_length=10)
+    search_mode: Literal["auto", "workspace", "web", "hybrid"] = "auto"
     title: str | None = Field(default=None, max_length=255)
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     model: str | None = Field(default=None, max_length=120)
