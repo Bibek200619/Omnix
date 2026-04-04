@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, Check, Copy, RotateCcw, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { Bot, Check, Copy, RotateCcw, FileText, ChevronDown, ChevronUp, ExternalLink, Globe2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "@/components/chat/types";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
@@ -34,6 +34,7 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
   const sending = message.status === "sending" || message.status === "streaming";
   const senderName = message.senderName || (isUser ? (isOwn ? "You" : "Teammate") : "Omnix AI");
   const senderRole = message.senderRole || (isUser ? "member" : "assistant");
+  const sources = message.sources ?? [];
 
   async function copyMessage() {
     if (!navigator.clipboard || !message.content) return;
@@ -83,6 +84,30 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
       console.error("Failed to download attachment", err);
     } finally {
       setDownloadingAttachmentId(null);
+    }
+  }
+
+  function sourceDomain(source: NonNullable<Message["sources"]>[number]) {
+    if (source.domain) return source.domain;
+    if (!source.url) return source.type === "web" ? "Web" : "Workspace";
+    try {
+      return new URL(source.url).hostname.replace(/^www\./, "");
+    } catch {
+      return "Web";
+    }
+  }
+
+  function sourceExcerpt(source: NonNullable<Message["sources"]>[number]) {
+    return source.excerpt || source.chunk_preview || "";
+  }
+
+  function safeUrl(url?: string) {
+    if (!url) return null;
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : null;
+    } catch {
+      return null;
     }
   }
 
@@ -189,54 +214,86 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
           </div>
         ) : null}
 
-        {/* Citations block */}
-        {!isUser && message.sources && message.sources.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-white/10">
-             <p className="text-xs font-medium text-slate-400 mb-3 flex items-center gap-2">
-               <FileText className="w-3.5 h-3.5" />
-               Retrieved Sources ({message.sources.length})
-             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {message.sources.map((s: Record<string, string>, i: number) => {
-                const sourceId = s.id || String(i);
+        {!isUser && sources.length > 0 ? (
+          <div className="mt-4 border-t border-white/10 pt-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="flex items-center gap-2 text-xs font-medium text-slate-400">
+                <Globe2 className="h-3.5 w-3.5 text-cyan-300/80" />
+                Sources ({sources.length})
+              </p>
+              <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2 py-0.5 text-[10px] font-medium text-cyan-100">
+                Hybrid context
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {sources.map((source, index) => {
+                const sourceId = source.id || source.url || String(index);
                 const isExpanded = expandedSource === sourceId;
-                
-                // Extract score if it exists in the excerpt like [Score: 4.5]
-                let scoreText = "";
-                let cleanExcerpt = s.excerpt || "";
-                const scoreMatch = cleanExcerpt.match(/\[Score:\s*([0-9.]+)\]/);
-                if (scoreMatch) {
-                  scoreText = scoreMatch[1];
-                  cleanExcerpt = cleanExcerpt.replace(scoreMatch[0], "").trim();
-                }
+                const url = safeUrl(source.url);
+                const excerpt = sourceExcerpt(source);
+                const domain = sourceDomain(source);
+                const isWeb = source.type === "web" || Boolean(url);
+                const label = source.label || `S${index + 1}`;
 
                 return (
-                  <div key={sourceId} className="flex flex-col rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden transition-colors hover:bg-white/[0.04]">
+                  <div
+                    key={sourceId}
+                    className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.025] transition-colors hover:bg-white/[0.045]"
+                  >
                     <button
                       type="button"
                       onClick={() => setExpandedSource(isExpanded ? null : sourceId)}
-                      className="flex items-center justify-between p-2.5 text-left focus:outline-none"
+                      className="flex w-full items-start justify-between gap-3 p-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
                     >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <FileText className="w-3.5 h-3.5 shrink-0 text-cyan-400/70" />
-                          <span className="truncate text-xs font-medium text-slate-200">{s.title || 'Unknown Source'}</span>
-                          {typeof s.chunk_index === 'number' && (
-                            <span className="ml-2 px-1.5 py-0.5 rounded bg-white/[0.02] text-slate-300 text-[10px] border border-white/6">
-                              #{s.chunk_index}
-                            </span>
+                      <div className="flex min-w-0 gap-2">
+                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-black/20">
+                          {source.favicon_url && isWeb ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={source.favicon_url} alt="" className="h-4 w-4 rounded-sm" />
+                          ) : isWeb ? (
+                            <Globe2 className="h-3.5 w-3.5 text-cyan-200" />
+                          ) : (
+                            <FileText className="h-3.5 w-3.5 text-emerald-200" />
                           )}
-                        </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {scoreText && (
-                          <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 text-[10px] font-medium border border-cyan-500/20">
-                            {scoreText}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="flex items-center gap-1.5">
+                            <span className="shrink-0 rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-slate-300">
+                              {label}
+                            </span>
+                            <span className="truncate text-xs font-semibold text-slate-100">
+                              {source.title || domain || "Source"}
+                            </span>
                           </span>
-                        )}
-                        {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+                          <span className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
+                            <span className="truncate">{domain}</span>
+                            {source.published_date ? <span>{source.published_date}</span> : null}
+                          </span>
+                        </span>
                       </div>
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        {url ? (
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(event) => event.stopPropagation()}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-white/[0.07] hover:text-cyan-100"
+                            aria-label={`Open ${source.title || domain}`}
+                            title="Open source"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        ) : null}
+                        {isExpanded ? (
+                          <ChevronUp className="h-3.5 w-3.5 text-slate-500" />
+                        ) : (
+                          <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+                        )}
+                      </span>
                     </button>
                     <AnimatePresence>
-                      {isExpanded && (
+                      {isExpanded && excerpt ? (
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
@@ -244,20 +301,18 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
                           transition={{ duration: 0.2, ease: "easeOut" }}
                           className="px-3 pb-3"
                         >
-                          <div className="pt-2 mt-1 border-t border-white/5">
-                            <p className="text-[11px] leading-relaxed text-slate-400 italic">
-                              &ldquo;{cleanExcerpt}&rdquo;
-                            </p>
-                          </div>
+                          <p className="border-t border-white/5 pt-2 text-[11px] leading-5 text-slate-400">
+                            {excerpt}
+                          </p>
                         </motion.div>
-                      )}
+                      ) : null}
                     </AnimatePresence>
                   </div>
                 );
               })}
             </div>
           </div>
-        )}
+        ) : null}
 
         <div className="mt-2 flex items-center justify-between gap-2">
           <p
