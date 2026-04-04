@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from typing import Any, AsyncIterator
 
@@ -51,6 +52,10 @@ FILE_COLUMNS = "id,user_id,workspace_id,conversation_id,file_name,file_type,meta
 RATE_LIMIT_REQUESTS = 5
 RATE_LIMIT_WINDOW = 60.0
 _chat_rate_limits: dict[str, list[float]] = {}
+DOCUMENT_INTENT_RE = re.compile(
+    r"\b(file|document|doc|pdf|docx|upload|attached|attachment|summari[sz]e|analy[sz]e|resume|contract|report|context|source)\b",
+    re.IGNORECASE,
+)
 
 
 def _check_rate_limit(user_id: str) -> None:
@@ -210,6 +215,17 @@ def _empty_retrieval_debug(strategy: str = "none") -> dict[str, Any]:
     }
 
 
+def _should_skip_retrieval_for_prompt(message_text: str) -> bool:
+    normalized = " ".join((message_text or "").strip().split())
+    if not normalized:
+        return True
+
+    if DOCUMENT_INTENT_RE.search(normalized):
+        return False
+
+    return len(normalized) <= 120
+
+
 def _log_ollama_prompt_debug(
     *,
     conversation_id: str,
@@ -289,8 +305,18 @@ async def _retrieve_prompt_context(
     user_id: str,
     conversation_id: str,
     workspace_id: str | None,
+    attachment_ids: list[str] | None = None,
 ) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
     prompt_message = message_text
+    has_new_attachments = any(str(item).strip() for item in attachment_ids or [])
+
+    if not has_new_attachments and _should_skip_retrieval_for_prompt(message_text):
+        logger.info(
+            "Skipping retrieval for lightweight prompt: conversation_id=%s workspace_id=%s.",
+            conversation_id,
+            workspace_id,
+        )
+        return prompt_message, [], _empty_retrieval_debug("lightweight_prompt")
 
     try:
         uploaded_context = await build_uploaded_document_context(
@@ -521,6 +547,7 @@ async def chat(
         user_id,
         conversation_id,
         workspace_id,
+        payload.attachment_ids,
     )
     _log_ollama_prompt_debug(
         conversation_id=conversation_id,
@@ -674,6 +701,7 @@ async def chat_stream(
         user_id,
         conversation_id,
         workspace_id,
+        payload.attachment_ids,
     )
 
     async def event_generator() -> AsyncIterator[str]:

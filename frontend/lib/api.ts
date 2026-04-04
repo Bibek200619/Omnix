@@ -3,22 +3,27 @@ import { supabase } from "@/lib/supabase";
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://18.204.231.209";
 
-console.log(
-  "ENV =",
-  process.env.NEXT_PUBLIC_API_BASE_URL
-);
-
 export type ApiStatus = "idle" | "loading" | "success" | "error";
 
 class ApiClient {
-  private applyWorkspaceHeader(headers: Headers) {
+  private inFlightGets = new Map<string, Promise<unknown>>();
+
+  private getActiveWorkspaceId() {
     try {
       if (typeof window !== "undefined") {
-        const activeWorkspace = window.localStorage.getItem("omnix.activeWorkspaceId");
-        if (activeWorkspace) headers.set("X-Omnix-Workspace", activeWorkspace);
+        return window.localStorage.getItem("omnix.activeWorkspaceId");
       }
     } catch {
       // Ignore localStorage failures
+    }
+
+    return null;
+  }
+
+  private applyWorkspaceHeader(headers: Headers) {
+    const activeWorkspace = this.getActiveWorkspaceId();
+    if (activeWorkspace) {
+      headers.set("X-Omnix-Workspace", activeWorkspace);
     }
   }
 
@@ -152,10 +157,22 @@ class ApiClient {
   }
 
   async get<T>(endpoint: string): Promise<T> {
-    const response = await this.request(endpoint, {
+    const key = `${this.getActiveWorkspaceId() ?? "none"}::${endpoint}`;
+    const inFlight = this.inFlightGets.get(key);
+    if (inFlight) {
+      return inFlight as Promise<T>;
+    }
+
+    const request = this.request(endpoint, {
       method: "GET",
-    });
-    return response.json() as Promise<T>;
+    })
+      .then((response) => response.json() as Promise<T>)
+      .finally(() => {
+        this.inFlightGets.delete(key);
+      });
+
+    this.inFlightGets.set(key, request);
+    return request;
   }
 
   async delete(endpoint: string): Promise<void> {
