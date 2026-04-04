@@ -21,9 +21,19 @@ export type Message = {
   // optional sources attached to assistant responses
   sources?: Array<{
     id?: string;
+    label?: string;
+    type?: string;
     title?: string;
     url?: string;
+    domain?: string;
+    favicon_url?: string;
+    published_date?: string;
     excerpt?: string;
+    chunk_preview?: string;
+    score?: number;
+    chunk_index?: number | null;
+    file_id?: string | null;
+    metadata?: Record<string, unknown>;
   }>;
 };
 
@@ -50,6 +60,8 @@ export type ApiMessage = {
   status?: "pending" | "completed" | "failed";
   created_at?: string;
   timestamp?: string;
+  metadata?: Record<string, unknown> | null;
+  sources?: Message["sources"];
 };
 
 export type ConversationSummary = {
@@ -76,3 +88,5 @@ export type ChatApiResponse = {
   user_message?: ApiMessage | null;
   assistant_message?: ApiMessage | null;
 };
+
+export type SearchMode = "auto" | "workspace" | "web" | "hybrid";
