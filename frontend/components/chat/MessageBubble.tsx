@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "@/components/chat/types";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { Button } from "@/components/ui/Button";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api";
 import {
@@ -33,7 +34,6 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
   const sending = message.status === "sending" || message.status === "streaming";
   const senderName = message.senderName || (isUser ? (isOwn ? "You" : "Teammate") : "Omnix AI");
   const senderRole = message.senderRole || (isUser ? "member" : "assistant");
-  const avatarLabel = message.senderAvatar || (isUser ? senderName.charAt(0).toUpperCase() : "AI");
 
   async function copyMessage() {
     if (!navigator.clipboard || !message.content) return;
@@ -95,17 +95,22 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
       transition={{ duration: 0.22, ease: "easeOut" }}
       className={cn("group flex gap-3", isOwn && "flex-row-reverse")}
     >
-      <div
-        className={cn(
-          "mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
-          isUser
-            ? workspaceRoleAvatarClass(senderRole)
-            : "border-cyan-300/30 bg-cyan-300/10 text-cyan-100",
-        )}
-        title={senderName}
-      >
-        {isUser ? avatarLabel : <Bot className="h-4 w-4" />}
-      </div>
+      {isUser ? (
+        <ProfileAvatar
+          name={senderName}
+          email={message.senderEmail}
+          handle={message.senderHandle}
+          avatarUrl={message.senderAvatarUrl}
+          className={cn("mt-1 h-9 w-9 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]", workspaceRoleAvatarClass(senderRole))}
+        />
+      ) : (
+        <div
+          className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cyan-300/30 bg-cyan-300/10 text-xs font-semibold text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+          title={senderName}
+        >
+          <Bot className="h-4 w-4" />
+        </div>
+      )}
       <div
         className={cn(
           "max-w-[88%] rounded-lg border px-4 py-3 shadow-soft transition sm:max-w-[74%]",
@@ -128,6 +133,9 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
           >
             {senderName}
           </span>
+          {isUser && message.senderHandle ? (
+            <span className="truncate text-[10px] font-medium text-slate-400">@{message.senderHandle}</span>
+          ) : null}
           <span
             className={cn(
               "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold",

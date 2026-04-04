@@ -16,6 +16,7 @@ from .supabase_service import (
     select_all_trusted,
     select_one_trusted,
 )
+from .profile_service import get_user_profile_map
 
 logger = logging.getLogger(__name__)
 
@@ -222,6 +223,8 @@ def _lookup_user_profiles_sync(user_ids: list[str]) -> dict[str, dict[str, Any]]
         profiles[user_id] = {
             "email": email,
             "full_name": full_name,
+            "handle": None,
+            "avatar_url": None,
             "avatar_label": _avatar_label(full_name, email, user_id),
         }
 
@@ -231,7 +234,29 @@ def _lookup_user_profiles_sync(user_ids: list[str]) -> dict[str, dict[str, Any]]
 async def get_user_profiles(user_ids: list[str]) -> dict[str, dict[str, Any]]:
     if not user_ids:
         return {}
-    return await run_in_threadpool(_lookup_user_profiles_sync, user_ids)
+    auth_profiles = await run_in_threadpool(_lookup_user_profiles_sync, user_ids)
+    app_profiles = await get_user_profile_map(user_ids)
+
+    for user_id, app_profile in app_profiles.items():
+        profile = auth_profiles.setdefault(
+            user_id,
+            {
+                "email": None,
+                "full_name": None,
+                "handle": None,
+                "avatar_url": None,
+                "avatar_label": _avatar_label(None, None, user_id),
+            },
+        )
+        display_name = app_profile.get("display_name") or profile.get("full_name")
+        avatar_url = app_profile.get("avatar_url") or profile.get("avatar_url")
+        handle = app_profile.get("handle") or profile.get("handle")
+        profile["full_name"] = display_name
+        profile["avatar_url"] = avatar_url
+        profile["handle"] = handle
+        profile["avatar_label"] = _avatar_label(display_name, profile.get("email") or handle, user_id)
+
+    return auth_profiles
 
 
 def _hydrate_member_records(
@@ -270,6 +295,8 @@ def _hydrate_member_records(
                 "role": role,
                 "email": profile.get("email"),
                 "full_name": profile.get("full_name"),
+                "handle": profile.get("handle"),
+                "avatar_url": profile.get("avatar_url"),
                 "avatar_label": profile.get("avatar_label") or _avatar_label(None, None, member_user_id),
                 "created_at": row.get("created_at"),
                 "updated_at": row.get("updated_at"),

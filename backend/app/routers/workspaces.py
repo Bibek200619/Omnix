@@ -26,6 +26,7 @@ from ..services.supabase_service import (
     update_one_trusted,
 )
 from ..services.email_service import send_workspace_invite_email
+from ..services.profile_service import get_auth_profile_for_user, resolve_profile_by_handle
 from ..services.workspace_service import (
     WORKSPACE_COLUMNS,
     WORKSPACE_INVITE_COLUMNS,
@@ -165,13 +166,14 @@ async def _insert_workspace_invite(
     *,
     workspace_id: str,
     email: str,
+    role: str,
     inviter_user_id: str,
     timestamp: str,
 ) -> dict[str, Any]:
     base_payload = {
         "workspace_id": workspace_id,
         "email": email,
-        "role": "member",
+        "role": normalize_workspace_role(role),
         "status": "pending",
         "invited_by": inviter_user_id,
         "created_at": timestamp,
@@ -256,13 +258,16 @@ async def _accept_workspace_invite(invite_id: str, current_user: Any) -> dict[st
     access = await resolve_workspace_access(workspace_id, user_id)
     membership_created = False
     if access is None:
+        invite_role = normalize_workspace_role(invite.get("role"))
+        if invite_role == "owner":
+            invite_role = "co_owner"
         try:
             await insert_one(
                 "workspace_members",
                 {
                     "workspace_id": workspace_id,
                     "user_id": user_id,
-                    "role": "member",
+                    "role": invite_role,
                     "created_at": timestamp,
                     "updated_at": timestamp,
                 },
@@ -587,7 +592,29 @@ async def invite_workspace_member(
     current_user_email = user_email_from_claims(current_user)
     access = await require_workspace_owner(workspace_id, user_id)
 
-    normalized_email = normalize_email(invite_payload.email)
+    raw_invite_target = invite_payload.email.strip()
+    requested_role = normalize_workspace_role(invite_payload.role)
+    if requested_role == "owner":
+        requested_role = "co_owner"
+
+    target_profile: dict[str, Any] | None = None
+    if "@" in raw_invite_target:
+        normalized_email = normalize_email(raw_invite_target)
+    else:
+        target_profile = await resolve_profile_by_handle(raw_invite_target)
+        if target_profile is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No Omnix user with that handle was found.",
+            )
+        auth_profile = await get_auth_profile_for_user(str(target_profile["user_id"]))
+        if not auth_profile.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="That Omnix user does not have an email address available for invites.",
+            )
+        normalized_email = normalize_email(auth_profile.email)
+
     if current_user_email and normalized_email == current_user_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -639,6 +666,7 @@ async def invite_workspace_member(
         created = await _insert_workspace_invite(
             workspace_id=workspace_id,
             email=normalized_email,
+            role=requested_role,
             inviter_user_id=user_id,
             timestamp=timestamp,
         )

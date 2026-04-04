@@ -154,6 +154,8 @@ class WorkspaceMemberRead(BaseModel):
     role: Literal["owner", "co_owner", "member"]
     email: str | None = None
     full_name: str | None = None
+    handle: str | None = None
+    avatar_url: str | None = None
     avatar_label: str = "U"
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -165,6 +167,7 @@ class WorkspaceMemberRoleUpdate(BaseModel):
 
 class WorkspaceInviteCreate(BaseModel):
     email: str = Field(..., min_length=3, max_length=320)
+    role: Literal["co_owner", "member"] = "member"
 
 
 class WorkspaceInviteRead(BaseModel):
@@ -174,7 +177,7 @@ class WorkspaceInviteRead(BaseModel):
     invite_id: str
     workspace_id: str
     email: str
-    role: Literal["member"]
+    role: Literal["co_owner", "member"]
     status: Literal["pending", "accepted", "declined", "revoked"]
     invited_by: str | None = None
     accepted_by_user_id: str | None = None

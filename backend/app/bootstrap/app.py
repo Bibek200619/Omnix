@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import vector_store, observability, workers, redis, shutdown, middleware
 from ..runtime.manager import RuntimeManager
 from ..health.router import router as health_router
-from ..routers import conversations, files, cache, messages, upload, workspaces, actions, artifacts, insights, automations, google_drive, admin
+from ..routers import conversations, files, cache, messages, upload, workspaces, actions, artifacts, insights, automations, google_drive, admin, profile
 from ..core.security import auth_context_middleware
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,7 @@ def create_app() -> FastAPI:
     app.include_router(files.router)
     app.include_router(upload.router)
     app.include_router(cache.router)
+    app.include_router(profile.router)
     app.include_router(workspaces.router)
     app.include_router(workspaces.invite_router)
     app.include_router(actions.router)

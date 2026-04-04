@@ -16,7 +16,14 @@ const routeTitles = [
   { match: "/files", title: "Files", eyebrow: "Workspace knowledge" },
   { match: "/history", title: "History", eyebrow: "Previous conversations" },
   { match: "/settings/terms", title: "Terms", eyebrow: "Product policies" },
-  { match: "/settings", title: "Settings", eyebrow: "Account controls" },
+  { match: "/settings/profile", title: "Profile", eyebrow: "Account identity" },
+  { match: "/settings/workspace", title: "Workspace Settings", eyebrow: "Workspace controls" },
+  { match: "/settings/team", title: "Team Members", eyebrow: "Collaboration" },
+  { match: "/settings/notifications", title: "Notifications", eyebrow: "Preferences" },
+  { match: "/settings/security", title: "Security", eyebrow: "Session controls" },
+  { match: "/settings/interface", title: "Interface", eyebrow: "Preferences" },
+  { match: "/settings/about", title: "About", eyebrow: "Product policies" },
+  { match: "/settings", title: "Settings", eyebrow: "Workspace controls" },
 ];
 
 type HeaderProps = {
@@ -55,7 +62,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-canvas/85 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-white/10 bg-[#060910]/90 backdrop-blur-xl">
       <InviteNotificationBar />
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
@@ -92,9 +99,9 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
             </h1>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {activeWorkspace ? (
-            <div className="hidden items-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-300 lg:flex">
+            <div className="hidden items-center gap-3 rounded-lg border border-white/10 bg-white/[0.045] px-3 py-2 text-sm text-slate-300 xl:flex">
               <div className="flex items-center gap-2 text-slate-400">
                 <Users className="h-4 w-4 text-cyan-200" />
                 <span>{activeWorkspace.member_count}</span>
@@ -109,7 +116,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
             variant="secondary"
             leftIcon={<MessageSquarePlus className="h-4 w-4" />}
             onClick={() => router.push("/chat")}
-            className="hidden sm:inline-flex"
+            className="hidden md:inline-flex"
           >
             New chat
           </Button>
