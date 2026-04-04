@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Database, FileSearch, ShieldCheck, Users, WifiOff } from "lucide-react";
 import { ChatInput } from "@/components/chat/ChatInput";
@@ -30,6 +30,7 @@ function normalizeMessage(message: ApiMessage, index: number): Message {
   const failed = message.status === "failed";
   const pending = message.status === "pending";
   const role = message.role === "user" ? "user" : "assistant";
+  const status = failed ? "failed" : pending ? (role === "assistant" ? "streaming" : "sending") : "sent";
   const content =
     message.content ||
     (failed && role === "assistant"
@@ -42,8 +43,9 @@ function normalizeMessage(message: ApiMessage, index: number): Message {
     content,
     timestamp: formatTime(message.timestamp ?? message.created_at),
     createdAt: message.timestamp ?? message.created_at,
-    status: failed ? "failed" : pending ? "sending" : "sent",
+    status,
     error: failed ? "Not completed" : undefined,
+    isStreaming: pending && role === "assistant",
   };
 }
 
@@ -100,11 +102,116 @@ type StreamEvent = {
   detail?: string;
 };
 
+const MESSAGE_SYNC_INTERVAL_MS = 8_000;
+const WORKSPACE_SYNC_INTERVAL_MS = 30_000;
+
+async function fetchConversationSnapshot(convId: string) {
+  const [data, files] = await Promise.all([
+    apiClient.get<ApiMessage[]>(`/conversations/${convId}/messages`),
+    apiClient
+      .get<MessageAttachment[]>("/files?conversation_id=" + convId)
+      .catch((err) => {
+        console.error("Failed to load conversation files", err);
+        return [];
+      }),
+  ]);
+
+  return attachFilesToMessages(data.map(normalizeMessage), files);
+}
+
+function mergeAttachments(
+  current?: MessageAttachment[],
+  incoming?: MessageAttachment[],
+) {
+  const byId = new Map<string, MessageAttachment>();
+  for (const file of current ?? []) byId.set(file.id, file);
+  for (const file of incoming ?? []) byId.set(file.id, file);
+  return [...byId.values()];
+}
+
+function isOptimisticDuplicate(localMessage: Message, serverMessages: Message[]) {
+  if (
+    localMessage.role !== "user" ||
+    (localMessage.status !== "sending" && localMessage.status !== "failed")
+  ) {
+    return false;
+  }
+
+  const localContent = localMessage.content.trim();
+  if (!localContent) {
+    return false;
+  }
+
+  return serverMessages.some(
+    (message) =>
+      message.role === "user" &&
+      message.content.trim() === localContent &&
+      message.status === "sent",
+  );
+}
+
+function reconcileMessageLists(
+  currentMessages: Message[],
+  serverMessages: Message[],
+) {
+  const currentById = new Map(currentMessages.map((message) => [message.id, message]));
+  const serverIds = new Set(serverMessages.map((message) => message.id));
+
+  const reconciled = serverMessages.map((serverMessage) => {
+    const current = currentById.get(serverMessage.id);
+    if (!current) {
+      return serverMessage;
+    }
+
+    const merged: Message = {
+      ...serverMessage,
+      attachments: mergeAttachments(current.attachments, serverMessage.attachments),
+      sources: serverMessage.sources?.length ? serverMessage.sources : current.sources,
+    };
+
+    if (
+      current.status === "streaming" &&
+      serverMessage.role === "assistant" &&
+      serverMessage.status === "streaming" &&
+      (!serverMessage.content || current.content.length > serverMessage.content.length)
+    ) {
+      return {
+        ...merged,
+        content: current.content,
+        status: current.status,
+        isStreaming: current.isStreaming,
+        error: current.error,
+      };
+    }
+
+    return merged;
+  });
+
+  const localOnly = currentMessages.filter((message) => {
+    if (serverIds.has(message.id)) {
+      return false;
+    }
+
+    if (isOptimisticDuplicate(message, serverMessages)) {
+      return false;
+    }
+
+    return message.status === "sending" || message.status === "streaming" || message.status === "failed";
+  });
+
+  return [...reconciled, ...localOnly];
+}
+
 export function ChatInterface() {
   const params = useSearchParams();
   const router = useRouter();
   const { session } = useAuth();
-  const { activeWorkspace, activeMembers, activeWorkspaceId } = useWorkspace();
+  const {
+    activeWorkspace,
+    activeMembers,
+    activeWorkspaceId,
+    refreshActiveWorkspaceData,
+  } = useWorkspace();
   const {
     refreshConversations,
     setActiveConversation,
@@ -123,27 +230,85 @@ export function ChatInterface() {
   );
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
+  const mountedRef = useRef(false);
+  const currentConversationRef = useRef<string | null>(conversationId);
+  const respondingRef = useRef(false);
+  const lastWorkspaceSyncRef = useRef(0);
+  const loadRequestIdRef = useRef(0);
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    currentConversationRef.current = currentConversation;
+  }, [currentConversation]);
+
+  useEffect(() => {
+    respondingRef.current = responding;
+  }, [responding]);
+
+  const reconcileConversationMessages = useCallback(
+    async (
+      convId: string,
+      options: {
+        silent?: boolean;
+        allowInactiveConversation?: boolean;
+      } = {},
+    ) => {
+      try {
+        const serverMessages = await fetchConversationSnapshot(convId);
+        if (!mountedRef.current) {
+          return false;
+        }
+
+        const activeConversationRef = currentConversationRef.current;
+        if (
+          !options.allowInactiveConversation &&
+          activeConversationRef &&
+          activeConversationRef !== convId
+        ) {
+          return false;
+        }
+
+        setMessages((current) =>
+          reconcileMessageLists(current, serverMessages),
+        );
+        setError(null);
+        return true;
+      } catch (err) {
+        if (!options.silent && mountedRef.current) {
+          setError(err instanceof Error ? err.message : "Failed to sync conversation");
+        }
+        return false;
+      }
+    },
+    [],
+  );
 
   const loadConversation = useCallback(
     async (convId: string) => {
+      const requestId = loadRequestIdRef.current + 1;
+      loadRequestIdRef.current = requestId;
+
       try {
         setLoadingConversation(true);
         setError(null);
-        const [data, files] = await Promise.all([
-          apiClient.get<ApiMessage[]>(`/conversations/${convId}/messages`),
-          apiClient
-            .get<MessageAttachment[]>("/files?conversation_id=" + convId)
-            .catch((err) => {
-              console.error("Failed to load conversation files", err);
-              return [];
-            }),
-        ]);
-        setMessages(attachFilesToMessages(data.map(normalizeMessage), files));
+        const serverMessages = await fetchConversationSnapshot(convId);
+        if (!mountedRef.current || loadRequestIdRef.current !== requestId) {
+          return;
+        }
+        setMessages(serverMessages);
         setCurrentConversation(convId);
         setCurrentConversationWorkspaceId(activeWorkspaceId);
         setActiveConversation(convId);
       } catch (err) {
+        if (!mountedRef.current || loadRequestIdRef.current !== requestId) {
+          return;
+        }
         const message =
           err instanceof Error ? err.message : "Failed to load conversation";
         setError(message);
@@ -156,11 +321,54 @@ export function ChatInterface() {
           router.replace("/chat", { scroll: false });
         }
       } finally {
-        setLoadingConversation(false);
+        if (mountedRef.current && loadRequestIdRef.current === requestId) {
+          setLoadingConversation(false);
+        }
       }
     },
     [activeWorkspaceId, refreshConversations, router, setActiveConversation],
   );
+
+  useEffect(() => {
+    if (!session || typeof window === "undefined") {
+      return;
+    }
+
+    const syncActiveConversation = () => {
+      if (document.visibilityState === "hidden") {
+        return;
+      }
+
+      const convId = currentConversationRef.current;
+      void refreshConversations({ silent: true });
+
+      if (convId) {
+        void reconcileConversationMessages(convId, { silent: true });
+      }
+
+      const now = Date.now();
+      if (now - lastWorkspaceSyncRef.current > WORKSPACE_SYNC_INTERVAL_MS) {
+        lastWorkspaceSyncRef.current = now;
+        void refreshActiveWorkspaceData();
+      }
+    };
+
+    syncActiveConversation();
+    const intervalId = window.setInterval(syncActiveConversation, MESSAGE_SYNC_INTERVAL_MS);
+    window.addEventListener("focus", syncActiveConversation);
+    document.addEventListener("visibilitychange", syncActiveConversation);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", syncActiveConversation);
+      document.removeEventListener("visibilitychange", syncActiveConversation);
+    };
+  }, [
+    reconcileConversationMessages,
+    refreshActiveWorkspaceData,
+    refreshConversations,
+    session,
+  ]);
 
   useEffect(() => {
     if (conversationId) {
@@ -169,6 +377,7 @@ export function ChatInterface() {
     }
 
     setCurrentConversation(null);
+    loadRequestIdRef.current += 1;
     setCurrentConversationWorkspaceId(activeWorkspaceId);
     setActiveConversation(null);
     setMessages([]);
@@ -239,7 +448,7 @@ export function ChatInterface() {
       retryMessageId?: string,
       attachmentsOverride?: MessageAttachment[],
     ) => {
-      if (responding) return;
+      if (respondingRef.current) return;
 
       const messageId = retryMessageId ?? crypto.randomUUID();
       const attachments = attachmentsOverride ?? pendingAttachments;
@@ -271,8 +480,12 @@ export function ChatInterface() {
       }
 
       // keep responding true until streaming completes
+      respondingRef.current = true;
       setResponding(true);
       setError(null);
+      let assistantId: string | null = null;
+      let persistedUserMessageId: string | null = null;
+      let streamConversationId: string | null = currentConversation;
 
       try {
         // Use streaming endpoint when available
@@ -306,15 +519,12 @@ export function ChatInterface() {
           }
         };
 
-        // stateful ids for updating messages
-        let assistantId: string | null = null;
-        let persistedUserMessageId: string | null = null;
-
         const handleStreamEvent = (obj: StreamEvent) => {
           const t = obj.type;
           if (t === "init") {
             // persist conversation & user message ids
             if (obj.conversation_id) {
+              streamConversationId = obj.conversation_id;
               setCurrentConversation(obj.conversation_id);
               setCurrentConversationWorkspaceId(activeWorkspaceId);
               setActiveConversation(obj.conversation_id);
@@ -323,30 +533,44 @@ export function ChatInterface() {
             assistantId = obj.assistant_message_id ?? crypto.randomUUID();
 
             // update messages list: replace optimistic user message and add assistant placeholder
-            setMessages((current) =>
-              current.map((message) =>
+            setMessages((current) => {
+              const next = current.map((message) =>
                 message.id === messageId
                   ? {
                       ...message,
                       id: persistedUserMessageId ?? message.id,
-                      status: "sent",
+                      status: "sent" as const,
                     }
                   : message,
-              ),
-            );
+              );
 
-            setMessages((current) => [
-              ...current,
-              {
-                id: assistantId as string,
-                role: "assistant",
-                content: "",
-                timestamp: formatTime(),
-                status: "streaming",
-                isStreaming: true,
-                sources: obj.sources ?? [],
-              },
-            ]);
+              if (next.some((message) => message.id === assistantId)) {
+                return next.map((message) =>
+                  message.id === assistantId
+                    ? {
+                        ...message,
+                        status: "streaming",
+                        isStreaming: true,
+                        sources: obj.sources ?? message.sources ?? [],
+                      }
+                    : message,
+                );
+              }
+
+              return [
+                ...next,
+                {
+                  id: assistantId as string,
+                  role: "assistant",
+                  content: "",
+                  timestamp: formatTime(),
+                  createdAt: new Date().toISOString(),
+                  status: "streaming",
+                  isStreaming: true,
+                  sources: obj.sources ?? [],
+                },
+              ];
+            });
           } else if (t === "status") {
             // Status events are transport metadata. Keep them out of the
             // persisted assistant text so streamed tokens remain clean.
@@ -365,6 +589,7 @@ export function ChatInterface() {
               );
             }
           } else if (t === "done") {
+            streamConversationId = obj.conversation_id ?? streamConversationId;
             if (assistantId) {
               setMessages((current) =>
                 current.map((m) => (m.id === assistantId ? { ...m, status: "sent", isStreaming: false } : m)),
@@ -374,7 +599,7 @@ export function ChatInterface() {
             if (!conversationId && obj.conversation_id) {
               router.replace(`/chat?conversation=${obj.conversation_id}`, { scroll: false });
             }
-            void refreshConversations();
+            void refreshConversations({ silent: true });
           }
         };
 
@@ -387,21 +612,44 @@ export function ChatInterface() {
           buffer = parts.pop() || "";
           for (const part of parts) processEvent(part);
         }
+        if (buffer.trim()) {
+          processEvent(buffer);
+        }
+
+        const targetConversationId = streamConversationId || currentConversationRef.current;
+        if (targetConversationId) {
+          await reconcileConversationMessages(targetConversationId, {
+            allowInactiveConversation: true,
+            silent: true,
+          });
+        }
+        await refreshConversations({ silent: true });
 
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Failed to send message";
-        setError(message);
-        refreshConversations();
-        setMessages((current) =>
-          current.map((item) =>
-            item.id === messageId
-              ? { ...item, status: "failed", error: "Not sent" }
-              : item,
-          ),
-        );
+        const targetConversationId = streamConversationId || currentConversationRef.current;
+        const recovered = targetConversationId
+          ? await reconcileConversationMessages(targetConversationId, {
+              allowInactiveConversation: true,
+              silent: true,
+            })
+          : false;
+
+        if (!recovered) {
+          setError(message);
+          setMessages((current) =>
+            current.map((item) =>
+              item.id === (persistedUserMessageId ?? messageId)
+                ? { ...item, status: "failed", error: "Not sent" }
+                : item,
+            ),
+          );
+        }
+        await refreshConversations({ silent: true });
       } finally {
         // ensure responding is cleared when streaming completes or error occurred
+        respondingRef.current = false;
         setResponding(false);
       }
     },
@@ -411,7 +659,7 @@ export function ChatInterface() {
       activeWorkspaceId,
       pendingAttachments,
       refreshConversations,
-      responding,
+      reconcileConversationMessages,
       router,
       setActiveConversation,
     ],
