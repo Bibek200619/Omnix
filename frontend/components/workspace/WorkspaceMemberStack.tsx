@@ -1,8 +1,9 @@
 "use client";
 
 import type { WorkspaceMember } from "@/lib/workspace-types";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { cn } from "@/lib/utils";
-import { workspaceRoleAvatarClass, workspaceRoleLabel } from "@/lib/workspace-roles";
+import { workspaceRoleAvatarClass } from "@/lib/workspace-roles";
 
 type WorkspaceMemberStackProps = {
   members: WorkspaceMember[];
@@ -33,18 +34,19 @@ export function WorkspaceMemberStack({
     <div className={cn("flex items-center", className)}>
       <div className="flex items-center">
         {visibleMembers.map((member, index) => (
-          <div
+          <ProfileAvatar
             key={member.user_id}
-            title={`${workspaceMemberName(member)} · ${workspaceRoleLabel(member.role)}`}
+            name={workspaceMemberName(member)}
+            email={member.email}
+            handle={member.handle}
+            avatarUrl={member.avatar_url}
             className={cn(
-              "flex items-center justify-center rounded-lg border font-semibold shadow-[0_8px_18px_rgba(0,0,0,0.22)]",
+              "rounded-lg font-semibold shadow-[0_8px_18px_rgba(0,0,0,0.22)]",
               workspaceRoleAvatarClass(member.role),
               sizeClasses[size],
               index > 0 && "-ml-2",
             )}
-          >
-            {member.avatar_label}
-          </div>
+          />
         ))}
         {overflowCount > 0 ? (
           <div

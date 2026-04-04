@@ -5,6 +5,8 @@ export type Message = {
   senderName?: string;
   senderEmail?: string | null;
   senderAvatar?: string;
+  senderAvatarUrl?: string | null;
+  senderHandle?: string | null;
   senderRole?: "owner" | "co_owner" | "member" | "assistant";
   isOwn?: boolean;
   content: string;

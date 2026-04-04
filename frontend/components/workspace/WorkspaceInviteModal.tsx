@@ -1,9 +1,12 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Mail, UserPlus, X } from "lucide-react";
+import { Mail, ShieldCheck, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import type { WorkspaceRole } from "@/lib/workspace-types";
+import { workspaceRoleBadgeClass } from "@/lib/workspace-roles";
+import { cn } from "@/lib/utils";
 
 type WorkspaceInviteModalProps = {
   open: boolean;
@@ -11,7 +14,8 @@ type WorkspaceInviteModalProps = {
   loading?: boolean;
   error?: string | null;
   onClose: () => void;
-  onSubmit: (email: string) => Promise<void>;
+  allowRoleSelection?: boolean;
+  onSubmit: (target: string, role: "co_owner" | "member") => Promise<void>;
 };
 
 export function WorkspaceInviteModal({
@@ -19,30 +23,33 @@ export function WorkspaceInviteModal({
   workspaceName,
   loading = false,
   error = null,
+  allowRoleSelection = false,
   onClose,
   onSubmit,
 }: WorkspaceInviteModalProps) {
-  const [email, setEmail] = useState("");
+  const [target, setTarget] = useState("");
+  const [role, setRole] = useState<"co_owner" | "member">("member");
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
-      setEmail("");
+      setTarget("");
+      setRole("member");
       setLocalError(null);
     }
   }, [open]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) {
-      setLocalError("Enter an email address.");
+    const normalizedTarget = target.trim().toLowerCase();
+    if (!normalizedTarget) {
+      setLocalError("Enter an email address or Omnix handle.");
       return;
     }
 
     setLocalError(null);
-    await onSubmit(normalizedEmail);
-    setEmail("");
+    await onSubmit(normalizedTarget, role);
+    setTarget("");
   }
 
   if (!open) {
@@ -59,7 +66,7 @@ export function WorkspaceInviteModal({
             </div>
             <h2 className="mt-4 text-lg font-semibold text-white">Invite teammate</h2>
             <p className="mt-1 text-sm leading-6 text-slate-400">
-              Add a collaborator to <span className="text-slate-200">{workspaceName}</span>.
+              Add a collaborator to <span className="text-slate-200">{workspaceName}</span> by email or Omnix handle.
             </p>
           </div>
           <Button
@@ -78,15 +85,42 @@ export function WorkspaceInviteModal({
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           <Input
             id="invite-email"
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="teammate@company.com"
+            label="Email or handle"
+            type="text"
+            value={target}
+            onChange={(event) => setTarget(event.target.value)}
+            placeholder="teammate@company.com or @alex"
             icon={<Mail className="h-4 w-4" />}
             disabled={loading}
             autoFocus
           />
+
+          {allowRoleSelection ? (
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-300">
+                <ShieldCheck className="h-4 w-4 text-amber-200" />
+                Invite role
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(["member", "co_owner"] as Array<Exclude<WorkspaceRole, "owner">>).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setRole(option)}
+                    disabled={loading}
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-left text-sm transition",
+                      role === option
+                        ? workspaceRoleBadgeClass(option)
+                        : "border-white/10 bg-white/[0.035] text-slate-300 hover:bg-white/[0.06]",
+                    )}
+                  >
+                    {option === "co_owner" ? "Co-owner" : "Member"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {localError || error ? (
             <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">

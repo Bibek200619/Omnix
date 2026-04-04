@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
 import { useWorkspace } from "@/lib/workspace-context";
 import { getWorkspaceInviteId } from "@/lib/workspace-types";
+import { workspaceRoleLabel } from "@/lib/workspace-roles";
 import { cn } from "@/lib/utils";
 
 type PendingWorkspaceInvitesProps = {
@@ -172,7 +173,7 @@ export function PendingWorkspaceInvites({
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
                       <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-slate-300">
-                        Role: Member
+                        Role: {workspaceRoleLabel(invite.role)}
                       </span>
                       <span className="inline-flex items-center gap-1">
                         <Clock3 className="h-3 w-3" />

@@ -32,9 +32,9 @@ export default function TermsPage() {
         type="button"
         variant="ghost"
         leftIcon={<ArrowLeft className="h-4 w-4" />}
-        onClick={() => router.push("/settings")}
+        onClick={() => router.push("/settings/about")}
       >
-        Back to settings
+        Back to About
       </Button>
 
       <div className="mt-6 flex items-start gap-4">
