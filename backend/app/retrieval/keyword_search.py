@@ -9,6 +9,7 @@ from typing import Any
 from starlette.concurrency import run_in_threadpool
 
 from ..db.supabase_client import get_supabase
+from ..services.supabase_service import execute_query_sync
 from .scoring import RetrievalResult
 
 logger = logging.getLogger(__name__)
@@ -66,15 +67,18 @@ class KeywordSearch:
         workspace_id: str | None,
         top_k: int,
     ) -> list[dict[str, Any]]:
-        response = get_supabase().rpc(
-            "search_documents_keyword",
-            {
-                "q": query,
-                "p_top_k": top_k,
-                "p_user": user_id,
-                "p_workspace": workspace_id,
-            },
-        ).execute()
+        response = execute_query_sync(
+            get_supabase().rpc(
+                "search_documents_keyword",
+                {
+                    "q": query,
+                    "p_top_k": top_k,
+                    "p_user": user_id,
+                    "p_workspace": workspace_id,
+                },
+            ),
+            operation="keyword retrieval rpc",
+        )
         return list(getattr(response, "data", None) or [])
 
     def _fallback_search_sync(
@@ -91,7 +95,10 @@ class KeywordSearch:
         else:
             doc_query = doc_query.eq("user_id", user_id)
 
-        response = doc_query.limit(max(top_k * 50, 100)).execute()
+        response = execute_query_sync(
+            doc_query.limit(max(top_k * 50, 100)),
+            operation="keyword retrieval fallback documents",
+        )
         docs = list(getattr(response, "data", None) or [])
         if workspace_id:
             docs = [row for row in docs if str(row.get("workspace_id") or "") == workspace_id]
@@ -136,7 +143,7 @@ class KeywordSearch:
         else:
             query = query.eq("user_id", user_id)
 
-        response = query.execute()
+        response = execute_query_sync(query, operation="keyword retrieval fallback files")
         rows = list(getattr(response, "data", None) or [])
         if workspace_id:
             rows = [row for row in rows if str(row.get("workspace_id") or "") == workspace_id]

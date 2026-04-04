@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import logging
+import time
 from typing import Any, NoReturn
 
+import httpx
 from starlette.concurrency import run_in_threadpool
 
 from ..db.supabase_client import get_supabase
@@ -19,6 +21,45 @@ SUPABASE_NETWORK_ERROR = (
     "the Supabase project is available."
 )
 
+TRANSIENT_SUPABASE_ERRORS = (
+    httpx.TransportError,
+    httpx.TimeoutException,
+)
+
+
+def _execute_with_retry(
+    query: Any,
+    *,
+    operation: str = "execute",
+    retries: int = 3,
+    base_delay: float = 0.25,
+) -> Any:
+    last_exc: Exception | None = None
+
+    for attempt in range(retries):
+        try:
+            return query.execute()
+        except TRANSIENT_SUPABASE_ERRORS as exc:
+            last_exc = exc
+            logger.warning(
+                "Supabase transient transport error during %s (attempt %s/%s): %s",
+                operation,
+                attempt + 1,
+                retries,
+                exc,
+            )
+
+            if attempt < retries - 1:
+                time.sleep(base_delay * (2**attempt))
+
+    if last_exc is not None:
+        raise last_exc
+
+    return query.execute()
+
+
+def execute_query_sync(query: Any, *, operation: str = "execute") -> Any:
+    return _execute_with_retry(query, operation=operation)
 
 class SupabaseServiceError(RuntimeError):
     pass
@@ -41,6 +82,13 @@ def _is_supabase_network_error(exc: Exception) -> bool:
             "name or service not known",
             "temporary failure in name resolution",
             "network is unreachable",
+            "remoteprotocolerror",
+            "server disconnected",
+            "connection reset",
+            "readtimeout",
+            "connecttimeout",
+            "pooltimeout",
+            "timed out",
         )
     )
 
@@ -146,7 +194,10 @@ def _upsert_one_sync(table: str, payload: Mapping[str, Any], on_conflict: str) -
         logger.error("Rejected upsert into '%s' without explicit user_id.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
-    response = get_supabase().table(table).upsert(dict(payload), on_conflict=on_conflict).execute()
+    response = _execute_with_retry(
+        get_supabase().table(table).upsert(dict(payload), on_conflict=on_conflict),
+        operation=f"upsert {table}",
+    )
     data = getattr(response, "data", None) or []
     if not data:
         logger.error("Upsert into '%s' returned no rows.", table)
@@ -181,7 +232,7 @@ def _select_all_sync(
         query = query.offset(offset)
 
     try:
-        response = query.execute()
+        response = _execute_with_retry(query, operation=f"select {table}")
         return list(getattr(response, "data", None) or [])
     except Exception as exc:
         msg = str(exc)
@@ -208,7 +259,7 @@ def _select_all_sync(
                         query = query.limit(limit)
                     if offset is not None:
                         query = query.offset(offset)
-                    response = query.execute()
+                    response = _execute_with_retry(query, operation=f"select {table} without missing column")
                     return list(getattr(response, "data", None) or [])
                 else:
                     # No usable columns left after removing missing column; try selecting all
@@ -221,7 +272,7 @@ def _select_all_sync(
                         query = query.limit(limit)
                     if offset is not None:
                         query = query.offset(offset)
-                    response = query.execute()
+                    response = _execute_with_retry(query, operation=f"select {table} fallback all columns")
                     return list(getattr(response, "data", None) or [])
         # If we couldn't handle it, re-raise
         raise
@@ -247,7 +298,7 @@ def _select_all_trusted_sync(
         query = query.offset(offset)
 
     try:
-        response = query.execute()
+        response = _execute_with_retry(query, operation=f"trusted select {table}")
         return list(getattr(response, "data", None) or [])
     except Exception as exc:
         msg = str(exc)
@@ -271,7 +322,7 @@ def _select_all_trusted_sync(
                         query = query.limit(limit)
                     if offset is not None:
                         query = query.offset(offset)
-                    response = query.execute()
+                    response = _execute_with_retry(query, operation=f"trusted select {table} without missing column")
                     return list(getattr(response, "data", None) or [])
                 else:
                     logger.warning("No columns left after removing missing column '%s' on %s; retrying select *", missing_col, table)
@@ -283,7 +334,7 @@ def _select_all_trusted_sync(
                         query = query.limit(limit)
                     if offset is not None:
                         query = query.offset(offset)
-                    response = query.execute()
+                    response = _execute_with_retry(query, operation=f"trusted select {table} fallback all columns")
                     return list(getattr(response, "data", None) or [])
         raise
 
@@ -302,7 +353,10 @@ def _select_one_sync(
     query = get_supabase().table(table).select(columns)
     query = _apply_filters(query, filters)
     try:
-        response = query.limit(1).maybe_single().execute()
+        response = _execute_with_retry(
+            query.limit(1).maybe_single(),
+            operation=f"select one {table}",
+        )
         return getattr(response, "data", None)
     except Exception as exc:
         msg = str(exc)
@@ -320,13 +374,19 @@ def _select_one_sync(
                     logger.warning("Retrying select on %s without missing column '%s'", table, missing_col)
                     query = get_supabase().table(table).select(new_columns)
                     query = _apply_filters(query, filters)
-                    response = query.limit(1).maybe_single().execute()
+                    response = _execute_with_retry(
+                        query.limit(1).maybe_single(),
+                        operation=f"select one {table} without missing column",
+                    )
                     return getattr(response, "data", None)
                 else:
                     logger.warning("No columns left after removing missing column '%s' on %s; retrying select *", missing_col, table)
                     query = get_supabase().table(table).select("*")
                     query = _apply_filters(query, filters)
-                    response = query.limit(1).maybe_single().execute()
+                    response = _execute_with_retry(
+                        query.limit(1).maybe_single(),
+                        operation=f"select one {table} fallback all columns",
+                    )
                     return getattr(response, "data", None)
         raise
 
@@ -339,7 +399,10 @@ def _select_one_trusted_sync(
     query = get_supabase().table(table).select(columns)
     query = _apply_filters(query, filters)
     try:
-        response = query.limit(1).maybe_single().execute()
+        response = _execute_with_retry(
+            query.limit(1).maybe_single(),
+            operation=f"trusted select one {table}",
+        )
         return getattr(response, "data", None)
     except Exception as exc:
         msg = str(exc)
@@ -356,7 +419,10 @@ def _select_one_trusted_sync(
                     logger.warning("Retrying trusted select on %s without missing column '%s'", table, missing_col)
                     query = get_supabase().table(table).select(new_columns)
                     query = _apply_filters(query, filters)
-                    response = query.limit(1).maybe_single().execute()
+                    response = _execute_with_retry(
+                        query.limit(1).maybe_single(),
+                        operation=f"trusted select one {table} without missing column",
+                    )
                     return getattr(response, "data", None)
         raise
 
@@ -378,7 +444,7 @@ def _update_one_sync(
 
     query = get_supabase().table(table).update(dict(payload))
     query = _apply_filters(query, filters)
-    response = query.execute()
+    response = _execute_with_retry(query, operation=f"update {table}")
     data = getattr(response, "data", None) or []
     if not data:
         return None
@@ -396,7 +462,7 @@ def _update_one_trusted_sync(
 
     query = get_supabase().table(table).update(dict(payload))
     query = _apply_filters(query, filters)
-    response = query.execute()
+    response = _execute_with_retry(query, operation=f"trusted update {table}")
     data = getattr(response, "data", None) or []
     if not data:
         return None
@@ -409,7 +475,7 @@ def _delete_many_trusted_sync(
 ) -> list[dict[str, Any]]:
     query = get_supabase().table(table).delete()
     query = _apply_filters(query, filters)
-    response = query.execute()
+    response = _execute_with_retry(query, operation=f"trusted delete {table}")
     return list(getattr(response, "data", None) or [])
 
 

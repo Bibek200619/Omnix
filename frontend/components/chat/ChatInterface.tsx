@@ -102,8 +102,9 @@ type StreamEvent = {
   detail?: string;
 };
 
-const MESSAGE_SYNC_INTERVAL_MS = 8_000;
-const WORKSPACE_SYNC_INTERVAL_MS = 30_000;
+const MESSAGE_VALIDATION_INTERVAL_MS = 45_000;
+const MESSAGE_FOCUS_STALE_MS = 12_000;
+const WORKSPACE_SYNC_INTERVAL_MS = 60_000;
 
 async function fetchConversationSnapshot(convId: string) {
   const [data, files] = await Promise.all([
@@ -234,12 +235,16 @@ export function ChatInterface() {
   const currentConversationRef = useRef<string | null>(conversationId);
   const respondingRef = useRef(false);
   const lastWorkspaceSyncRef = useRef(0);
+  const lastMessageSyncRef = useRef(0);
+  const messageSyncInFlightRef = useRef(false);
   const loadRequestIdRef = useRef(0);
+  const activeStreamAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      activeStreamAbortRef.current?.abort();
     };
   }, []);
 
@@ -255,10 +260,25 @@ export function ChatInterface() {
     async (
       convId: string,
       options: {
+        force?: boolean;
         silent?: boolean;
         allowInactiveConversation?: boolean;
       } = {},
     ) => {
+      const now = Date.now();
+      if (
+        options.silent &&
+        !options.force &&
+        now - lastMessageSyncRef.current < MESSAGE_FOCUS_STALE_MS
+      ) {
+        return false;
+      }
+
+      if (messageSyncInFlightRef.current) {
+        return false;
+      }
+
+      messageSyncInFlightRef.current = true;
       try {
         const serverMessages = await fetchConversationSnapshot(convId);
         if (!mountedRef.current) {
@@ -278,12 +298,15 @@ export function ChatInterface() {
           reconcileMessageLists(current, serverMessages),
         );
         setError(null);
+        lastMessageSyncRef.current = Date.now();
         return true;
       } catch (err) {
         if (!options.silent && mountedRef.current) {
           setError(err instanceof Error ? err.message : "Failed to sync conversation");
         }
         return false;
+      } finally {
+        messageSyncInFlightRef.current = false;
       }
     },
     [],
@@ -302,6 +325,7 @@ export function ChatInterface() {
           return;
         }
         setMessages(serverMessages);
+        lastMessageSyncRef.current = Date.now();
         setCurrentConversation(convId);
         setCurrentConversationWorkspaceId(activeWorkspaceId);
         setActiveConversation(convId);
@@ -334,39 +358,56 @@ export function ChatInterface() {
       return;
     }
 
-    const syncActiveConversation = () => {
+    const syncActiveConversation = (options?: { forceMessages?: boolean; forceWorkspace?: boolean }) => {
       if (document.visibilityState === "hidden") {
         return;
       }
 
       const convId = currentConversationRef.current;
-      void refreshConversations({ silent: true });
+      const now = Date.now();
 
-      if (convId) {
-        void reconcileConversationMessages(convId, { silent: true });
+      if (
+        convId &&
+        !respondingRef.current &&
+        (options?.forceMessages || now - lastMessageSyncRef.current > MESSAGE_VALIDATION_INTERVAL_MS)
+      ) {
+        void reconcileConversationMessages(convId, {
+          force: options?.forceMessages,
+          silent: true,
+        });
       }
 
-      const now = Date.now();
-      if (now - lastWorkspaceSyncRef.current > WORKSPACE_SYNC_INTERVAL_MS) {
+      if (
+        options?.forceWorkspace ||
+        now - lastWorkspaceSyncRef.current > WORKSPACE_SYNC_INTERVAL_MS
+      ) {
         lastWorkspaceSyncRef.current = now;
-        void refreshActiveWorkspaceData();
+        void refreshActiveWorkspaceData({ silent: true });
       }
     };
 
-    syncActiveConversation();
-    const intervalId = window.setInterval(syncActiveConversation, MESSAGE_SYNC_INTERVAL_MS);
-    window.addEventListener("focus", syncActiveConversation);
-    document.addEventListener("visibilitychange", syncActiveConversation);
+    const syncOnFocus = () => {
+      syncActiveConversation({ forceMessages: false, forceWorkspace: false });
+    };
+
+    const syncOnVisibility = () => {
+      if (document.visibilityState === "visible") {
+        syncActiveConversation({ forceMessages: true, forceWorkspace: true });
+      }
+    };
+
+    const intervalId = window.setInterval(syncActiveConversation, MESSAGE_VALIDATION_INTERVAL_MS);
+    window.addEventListener("focus", syncOnFocus);
+    document.addEventListener("visibilitychange", syncOnVisibility);
 
     return () => {
       window.clearInterval(intervalId);
-      window.removeEventListener("focus", syncActiveConversation);
-      document.removeEventListener("visibilitychange", syncActiveConversation);
+      window.removeEventListener("focus", syncOnFocus);
+      document.removeEventListener("visibilitychange", syncOnVisibility);
     };
   }, [
     reconcileConversationMessages,
     refreshActiveWorkspaceData,
-    refreshConversations,
     session,
   ]);
 
@@ -378,6 +419,7 @@ export function ChatInterface() {
 
     setCurrentConversation(null);
     loadRequestIdRef.current += 1;
+    lastMessageSyncRef.current = 0;
     setCurrentConversationWorkspaceId(activeWorkspaceId);
     setActiveConversation(null);
     setMessages([]);
@@ -393,6 +435,7 @@ export function ChatInterface() {
     if (currentConversationWorkspaceId !== activeWorkspaceId) {
       setCurrentConversation(null);
       setCurrentConversationWorkspaceId(activeWorkspaceId);
+      lastMessageSyncRef.current = 0;
       setPendingAttachments([]);
       setMessages([]);
       setActiveConversation(null);
@@ -486,11 +529,14 @@ export function ChatInterface() {
       let assistantId: string | null = null;
       let persistedUserMessageId: string | null = null;
       let streamConversationId: string | null = currentConversation;
+      const streamAbortController = new AbortController();
+      activeStreamAbortRef.current = streamAbortController;
 
       try {
         // Use streaming endpoint when available
         const resp = await apiClient.stream("/chat/stream", {
           method: "POST",
+          signal: streamAbortController.signal,
           body: JSON.stringify({
             message: content,
             conversation_id: currentConversation || undefined,
@@ -599,7 +645,6 @@ export function ChatInterface() {
             if (!conversationId && obj.conversation_id) {
               router.replace(`/chat?conversation=${obj.conversation_id}`, { scroll: false });
             }
-            void refreshConversations({ silent: true });
           }
         };
 
@@ -620,18 +665,24 @@ export function ChatInterface() {
         if (targetConversationId) {
           await reconcileConversationMessages(targetConversationId, {
             allowInactiveConversation: true,
+            force: true,
             silent: true,
           });
         }
-        await refreshConversations({ silent: true });
+        await refreshConversations({ force: true, silent: true });
 
       } catch (err) {
+        if (streamAbortController.signal.aborted && !mountedRef.current) {
+          return;
+        }
+
         const message =
           err instanceof Error ? err.message : "Failed to send message";
         const targetConversationId = streamConversationId || currentConversationRef.current;
         const recovered = targetConversationId
           ? await reconcileConversationMessages(targetConversationId, {
               allowInactiveConversation: true,
+              force: true,
               silent: true,
             })
           : false;
@@ -646,11 +697,16 @@ export function ChatInterface() {
             ),
           );
         }
-        await refreshConversations({ silent: true });
+        await refreshConversations({ force: true, silent: true });
       } finally {
         // ensure responding is cleared when streaming completes or error occurred
         respondingRef.current = false;
-        setResponding(false);
+        if (mountedRef.current) {
+          setResponding(false);
+        }
+        if (activeStreamAbortRef.current === streamAbortController) {
+          activeStreamAbortRef.current = null;
+        }
       }
     },
     [

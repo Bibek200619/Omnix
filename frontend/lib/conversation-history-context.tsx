@@ -20,7 +20,7 @@ type ConversationHistoryContextType = {
   loading: boolean;
   error: string | null;
   activeConversationId: string | null;
-  refreshConversations: (options?: { silent?: boolean }) => Promise<void>;
+  refreshConversations: (options?: { force?: boolean; silent?: boolean }) => Promise<void>;
   setActiveConversation: (conversationId: string | null) => void;
   upsertConversation: (conversation: ConversationSummary) => void;
   renameConversation: (conversationId: string, title: string) => Promise<void>;
@@ -29,6 +29,9 @@ type ConversationHistoryContextType = {
 
 const ConversationHistoryContext =
   createContext<ConversationHistoryContextType | undefined>(undefined);
+
+const CONVERSATION_REFRESH_INTERVAL_MS = 30_000;
+const CONVERSATION_SILENT_REFRESH_MIN_MS = 15_000;
 
 function sortConversations(items: ConversationSummary[]) {
   return [...items].sort((a, b) => {
@@ -58,6 +61,7 @@ export function ConversationHistoryProvider({
     null,
   );
   const refreshInFlightRef = useRef(false);
+  const lastRefreshAtRef = useRef(0);
 
   const setActiveConversation = useCallback((conversationId: string | null) => {
     setActiveConversationId(conversationId);
@@ -75,7 +79,16 @@ export function ConversationHistoryProvider({
     window.localStorage.removeItem(key);
   }, [activeWorkspaceId]);
 
-  const refreshConversations = useCallback(async (options?: { silent?: boolean }) => {
+  const refreshConversations = useCallback(async (options?: { force?: boolean; silent?: boolean }) => {
+    const now = Date.now();
+    if (
+      options?.silent &&
+      !options.force &&
+      now - lastRefreshAtRef.current < CONVERSATION_SILENT_REFRESH_MIN_MS
+    ) {
+      return;
+    }
+
     if (refreshInFlightRef.current) {
       return;
     }
@@ -88,6 +101,7 @@ export function ConversationHistoryProvider({
       const data = await apiClient.get<ConversationSummary[]>("/conversations");
       setConversations(sortConversations(data));
       setError(null);
+      lastRefreshAtRef.current = Date.now();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load conversations");
       if (!options?.silent) {
@@ -156,6 +170,7 @@ export function ConversationHistoryProvider({
       return;
     }
 
+    lastRefreshAtRef.current = 0;
     setActiveConversationId(
       window.localStorage.getItem(conversationStorageKey(activeWorkspaceId)),
     );
@@ -170,7 +185,7 @@ export function ConversationHistoryProvider({
       return;
     }
 
-    refreshConversations();
+    refreshConversations({ force: true });
   }, [activeWorkspaceId, refreshConversations, setActiveConversation, user]);
 
   useEffect(() => {
@@ -185,14 +200,21 @@ export function ConversationHistoryProvider({
       void refreshConversations({ silent: true });
     };
 
-    const intervalId = window.setInterval(refreshSilently, 10_000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+      void refreshConversations({ silent: true });
+    };
+
+    const intervalId = window.setInterval(refreshSilently, CONVERSATION_REFRESH_INTERVAL_MS);
     window.addEventListener("focus", refreshSilently);
-    document.addEventListener("visibilitychange", refreshSilently);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
 
     return () => {
       window.clearInterval(intervalId);
       window.removeEventListener("focus", refreshSilently);
-      document.removeEventListener("visibilitychange", refreshSilently);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, [refreshConversations, user]);
 
