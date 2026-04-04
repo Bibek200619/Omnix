@@ -22,7 +22,7 @@ class PgVectorStore(VectorStore):
         # This method is retained for interface compatibility.
         pass
 
-    def search(self, query_embedding: list[float], user_id: str, workspace_id: str | None = None, top_k: int = 5) -> list[tuple[str, float]]:
+    def search(self, query_embedding: list[float], user_id: str, workspace_id: str | None = None, top_k: int = 3) -> list[tuple[str, float]]:
         if not query_embedding:
             return []
 

@@ -24,6 +24,7 @@ def test_build_payload_uses_phi3_and_preserves_context():
     )
 
     assert payload["model"] == "phi3:latest"
+    assert payload["max_tokens"] == 256
     assert payload["temperature"] == 0.1
     assert payload["stream"] is False
     assert payload["messages"][0]["role"] == "system"
@@ -32,6 +33,20 @@ def test_build_payload_uses_phi3_and_preserves_context():
         "content": "The workspace was updated.",
     }
     assert payload["messages"][-1] == {"role": "user", "content": "What changed?"}
+
+
+def test_build_payload_limits_history_to_last_eight_messages():
+    service = OllamaChatService()
+    context = [
+        {"role": "user" if index % 2 == 0 else "assistant", "content": f"message {index}"}
+        for index in range(10)
+    ]
+
+    payload = service._build_payload("Continue", context=context)
+
+    assert [message["content"] for message in payload["messages"][1:-1]] == [
+        f"message {index}" for index in range(2, 10)
+    ]
 
 
 def test_extract_content_supports_openai_compatible_response():
