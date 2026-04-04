@@ -77,15 +77,20 @@ export function PendingWorkspaceInvites({
   return (
     <section
       className={cn(
-        "rounded-lg border border-white/10 bg-white/[0.035] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
-        compact ? "p-3" : "p-4 sm:p-5",
+        "rounded-lg border border-white/10 bg-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
+        compact ? "p-2.5" : "p-4 sm:p-5",
         className,
       )}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
-            <Mail className="h-4 w-4" />
+          <span
+            className={cn(
+              "flex shrink-0 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-300/10 text-cyan-100",
+              compact ? "h-7 w-7" : "h-8 w-8",
+            )}
+          >
+            <Mail className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
           </span>
           <div className="min-w-0">
             <h2 className={cn("font-semibold text-white", compact ? "text-sm" : "text-base")}>
@@ -117,12 +122,15 @@ export function PendingWorkspaceInvites({
         </Alert>
       ) : null}
 
-      <div className={cn("mt-3", compact ? "space-y-2" : "space-y-3")}>
+      <div className={cn("mt-3", compact ? "space-y-1.5" : "space-y-3")}>
         {pendingInvitesLoading ? (
           [0, 1].map((item) => (
             <div
               key={item}
-              className="shimmer rounded-lg border border-white/10 bg-white/[0.04] p-3"
+              className={cn(
+                "shimmer rounded-md border border-white/10 bg-white/[0.04]",
+                compact ? "p-2.5" : "p-3",
+              )}
             >
               <div className="h-3 w-3/4 rounded-full bg-white/10" />
               <div className="mt-2 h-2.5 w-1/2 rounded-full bg-white/10" />
@@ -142,12 +150,17 @@ export function PendingWorkspaceInvites({
               <article
                 key={inviteId}
                 className={cn(
-                  "rounded-lg border border-white/10 bg-[#09131b]/80 transition hover:border-cyan-300/25 hover:bg-white/[0.045]",
-                  compact ? "p-3" : "p-4",
+                  "rounded-md border border-white/10 bg-[#09131b]/85 transition hover:border-cyan-300/25 hover:bg-white/[0.045]",
+                  compact ? "p-2.5" : "p-4",
                 )}
               >
-                <div className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.05] text-sm font-semibold text-cyan-100">
+                <div className="flex items-start gap-2.5">
+                  <div
+                    className={cn(
+                      "flex shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] font-semibold text-cyan-100",
+                      compact ? "h-7 w-7 text-xs" : "h-9 w-9 text-sm",
+                    )}
+                  >
                     {(invite.workspace_name || "W").charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -173,7 +186,7 @@ export function PendingWorkspaceInvites({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className={compact ? "flex-1" : undefined}
+                    className={compact ? "h-8 flex-1 px-2 text-xs" : undefined}
                     leftIcon={<X className="h-3.5 w-3.5" />}
                     onClick={() => handleDecline(inviteId)}
                     isLoading={declineBusy}
@@ -184,7 +197,7 @@ export function PendingWorkspaceInvites({
                   <Button
                     type="button"
                     size="sm"
-                    className={compact ? "flex-1" : undefined}
+                    className={compact ? "h-8 flex-1 px-2 text-xs" : undefined}
                     leftIcon={<Check className="h-3.5 w-3.5" />}
                     onClick={() => handleAccept(inviteId)}
                     isLoading={acceptBusy}
