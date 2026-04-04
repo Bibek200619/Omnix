@@ -42,7 +42,7 @@ const navItems = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/files", label: "Files", icon: FileText },
   { href: "/history", label: "History", icon: History },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/settings/workspace", label: "Settings", icon: Settings },
 ];
 
 function WorkspaceSelector() {
@@ -101,11 +101,11 @@ function WorkspaceSelector() {
     setCreateError(null);
   }
 
-  async function handleInvite(email: string) {
+  async function handleInvite(target: string, role: "co_owner" | "member") {
     try {
       setInviting(true);
       setInviteError(null);
-      await inviteToActiveWorkspace(email);
+      await inviteToActiveWorkspace(target, role);
       setInviteOpen(false);
       setOpen(false);
     } catch (err) {
@@ -162,11 +162,11 @@ function WorkspaceSelector() {
   }
 
   return (
-    <div className="relative mt-2">
+    <div className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="group flex w-full items-center justify-between gap-2 rounded-lg border border-cyan-300/20 bg-[#0d1720] px-2.5 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.045),0_10px_28px_rgba(0,0,0,0.22)] transition hover:border-cyan-300/35 hover:bg-[#10202b]"
+        className="group flex w-full items-center justify-between gap-2 rounded-lg border border-white/12 bg-white/[0.055] px-2.5 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.045),0_10px_28px_rgba(0,0,0,0.18)] transition hover:border-cyan-300/30 hover:bg-white/[0.08]"
         aria-expanded={open}
       >
         <div className="flex min-w-0 items-center gap-2.5">
@@ -388,6 +388,7 @@ function WorkspaceSelector() {
             workspaceName={active.name}
             loading={inviting}
             error={inviteError}
+            allowRoleSelection={active.current_user_role === "owner"}
             onClose={() => setInviteOpen(false)}
             onSubmit={handleInvite}
           />
@@ -667,7 +668,14 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                 </Button>
               </div>
             </div>
-            <WorkspaceSelector />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Workspace
+                </p>
+              </div>
+              <WorkspaceSelector />
+            </div>
             <PendingWorkspaceInvites compact maxVisible={2} />
           </div>
         </div>
@@ -676,7 +684,9 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
+              item.href.startsWith("/settings")
+                ? pathname.startsWith("/settings")
+                : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
             return (
               <Link

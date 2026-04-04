@@ -29,7 +29,7 @@ type WorkspaceContextType = {
   createWorkspace: (payload: { name: string; description?: string }) => Promise<Workspace>;
   renameWorkspace: (workspaceId: string, payload: { name: string; description?: string | null }) => Promise<Workspace>;
   deleteWorkspace: (workspaceId: string) => Promise<void>;
-  inviteToActiveWorkspace: (email: string) => Promise<void>;
+  inviteToActiveWorkspace: (target: string, role?: "co_owner" | "member") => Promise<void>;
   updateWorkspaceMemberRole: (userId: string, role: "co_owner" | "member") => Promise<WorkspaceMember>;
   removeWorkspaceMember: (userId: string) => Promise<void>;
   revokeInvite: (inviteId: string) => Promise<void>;
@@ -376,13 +376,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [activeWorkspaceId, refreshWorkspaces, setActiveWorkspace, workspaces]);
 
   const inviteToActiveWorkspace = useCallback(
-    async (email: string) => {
+    async (target: string, role: "co_owner" | "member" = "member") => {
       if (!activeWorkspaceId) {
         throw new Error("Select a workspace first.");
       }
 
       const invite = await apiClient.post<WorkspaceInvite>(`/workspaces/${activeWorkspaceId}/invites`, {
-        email,
+        email: target,
+        role,
       });
       const nextInviteId = getWorkspaceInviteId(invite);
       setActiveInvites((current) =>

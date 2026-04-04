@@ -14,6 +14,7 @@ import { Alert } from "@/components/ui/Alert";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
+import { useProfile } from "@/lib/profile-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { initialsFromText, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { WorkspaceMember } from "@/lib/workspace-types";
@@ -32,6 +33,8 @@ type SenderLookup = {
   currentUserId?: string | null;
   currentUserEmail?: string | null;
   currentUserName?: string | null;
+  currentUserHandle?: string | null;
+  currentUserAvatarUrl?: string | null;
   currentUserWorkspaceRole?: Message["senderRole"];
   membersById: Map<string, WorkspaceMember>;
 };
@@ -72,6 +75,14 @@ function normalizeMessage(message: ApiMessage, index: number, senderLookup: Send
     role === "assistant"
       ? "AI"
       : member?.avatar_label || initialsFromText(senderName || senderEmail || userId || "U");
+  const senderAvatarUrl =
+    role === "assistant"
+      ? null
+      : member?.avatar_url ?? (isOwn ? senderLookup.currentUserAvatarUrl ?? null : null);
+  const senderHandle =
+    role === "assistant"
+      ? null
+      : member?.handle ?? (isOwn ? senderLookup.currentUserHandle ?? null : null);
 
   return {
     id: message.id ?? `message-${index}`,
@@ -80,6 +91,8 @@ function normalizeMessage(message: ApiMessage, index: number, senderLookup: Send
     senderName,
     senderEmail,
     senderAvatar,
+    senderAvatarUrl,
+    senderHandle,
     senderRole:
       role === "assistant"
         ? "assistant"
@@ -255,6 +268,7 @@ export function ChatInterface() {
   const params = useSearchParams();
   const router = useRouter();
   const { session, user } = useAuth();
+  const { profile } = useProfile();
   const {
     activeWorkspace,
     activeMembers,
@@ -291,11 +305,13 @@ export function ChatInterface() {
     return {
       currentUserId: user?.id ?? null,
       currentUserEmail: user?.email ?? null,
-      currentUserName: currentUserNameFromSession(user?.email ?? null, user?.user_metadata),
+      currentUserName: profile?.display_name || currentUserNameFromSession(user?.email ?? null, user?.user_metadata),
+      currentUserHandle: profile?.handle ?? null,
+      currentUserAvatarUrl: profile?.avatar_url ?? null,
       currentUserWorkspaceRole: activeWorkspace?.current_user_role ?? "member",
       membersById,
     };
-  }, [activeWorkspace?.current_user_role, user?.email, user?.id, user?.user_metadata, workspaceMembers]);
+  }, [activeWorkspace?.current_user_role, profile?.avatar_url, profile?.display_name, profile?.handle, user?.email, user?.id, user?.user_metadata, workspaceMembers]);
   const mountedRef = useRef(false);
   const currentConversationRef = useRef<string | null>(conversationId);
   const respondingRef = useRef(false);
@@ -570,6 +586,8 @@ export function ChatInterface() {
         senderName: "You",
         senderEmail: user?.email ?? null,
         senderAvatar: initialsFromText(senderLookup.currentUserName || user?.email || "You"),
+        senderAvatarUrl: senderLookup.currentUserAvatarUrl ?? null,
+        senderHandle: senderLookup.currentUserHandle ?? null,
         senderRole: activeWorkspace?.current_user_role ?? "member",
         isOwn: true,
         content,

@@ -18,6 +18,7 @@ import {
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { useWorkspace } from "@/lib/workspace-context";
 import {
   getWorkspaceInviteId,
@@ -121,11 +122,11 @@ export function WorkspaceAccessPanel() {
   );
   const canManageTeam = activeWorkspace?.current_user_role === "owner";
 
-  async function handleInvite(email: string) {
+  async function handleInvite(target: string, role: "co_owner" | "member") {
     try {
       setInviteLoading(true);
       setInviteError(null);
-      await inviteToActiveWorkspace(email);
+      await inviteToActiveWorkspace(target, role);
       setInviteOpen(false);
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "Unable to invite teammate.");
@@ -245,9 +246,13 @@ export function WorkspaceAccessPanel() {
                     className="relative flex flex-col gap-3 rounded-lg border border-white/10 bg-[#080d13]/80 px-3.5 py-3 transition hover:border-white/16 hover:bg-white/[0.045] sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-sm font-semibold", workspaceRoleAvatarClass(member.role))}>
-                        {member.avatar_label}
-                      </div>
+                      <ProfileAvatar
+                        name={workspaceMemberName(member)}
+                        email={member.email}
+                        handle={member.handle}
+                        avatarUrl={member.avatar_url}
+                        className={cn("h-10 w-10 text-sm", workspaceRoleAvatarClass(member.role))}
+                      />
                       <div className="min-w-0">
                         <div className="flex min-w-0 flex-wrap items-center gap-2">
                           <div className="truncate text-sm font-semibold text-white">{workspaceMemberName(member)}</div>
@@ -256,7 +261,10 @@ export function WorkspaceAccessPanel() {
                             {workspaceRoleLabel(member.role)}
                           </span>
                         </div>
-                        <div className="mt-1 truncate text-xs text-slate-500">{memberEmailLabel(member)}</div>
+                        <div className="mt-1 truncate text-xs text-slate-500">
+                          {member.handle ? `@${member.handle} · ` : ""}
+                          {memberEmailLabel(member)}
+                        </div>
                       </div>
                     </div>
 
@@ -377,7 +385,7 @@ export function WorkspaceAccessPanel() {
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-white">{invite.email}</div>
                     <div className="mt-1 text-xs text-slate-500">
-                      Sent <ClientTime value={invite.created_at} fallback="recently" format="date" />
+                      Sent <ClientTime value={invite.created_at} fallback="recently" format="date" /> · {workspaceRoleLabel(invite.role)}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -411,6 +419,7 @@ export function WorkspaceAccessPanel() {
           workspaceName={activeWorkspace.name}
           loading={inviteLoading}
           error={inviteError}
+          allowRoleSelection={canManageTeam}
           onClose={() => setInviteOpen(false)}
           onSubmit={handleInvite}
         />
@@ -420,9 +429,13 @@ export function WorkspaceAccessPanel() {
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-lg border border-white/10 bg-[#071017] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
             <div className="flex items-start gap-3">
-              <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full border", workspaceRoleAvatarClass(confirmAction.member.role))}>
-                {confirmAction.type === "remove" ? <Ban className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
-              </div>
+              <ProfileAvatar
+                name={workspaceMemberName(confirmAction.member)}
+                email={confirmAction.member.email}
+                handle={confirmAction.member.handle}
+                avatarUrl={confirmAction.member.avatar_url}
+                className={cn("h-10 w-10", workspaceRoleAvatarClass(confirmAction.member.role))}
+              />
               <div>
                 <h3 className="text-base font-semibold text-white">
                   {confirmAction.type === "remove" ? "Remove team member?" : "Change workspace role?"}
