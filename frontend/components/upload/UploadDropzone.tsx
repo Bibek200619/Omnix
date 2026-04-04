@@ -54,7 +54,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
 
 
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000") + "/upload");
+    xhr.open("POST", (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://18.204.231.209") + "/upload");
 
     xhr.upload.onprogress = (ev) => {
       if (!ev.lengthComputable) return;

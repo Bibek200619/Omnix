@@ -7,7 +7,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  EC2_HOST: 54.172.104.28
+  EC2_HOST: 18.204.231.209
 
 jobs:
   deploy:
