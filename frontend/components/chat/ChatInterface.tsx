@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Database, FileSearch, ShieldCheck, Users, WifiOff } from "lucide-react";
+import { Database, FileSearch, Globe2, ShieldCheck, Users, WifiOff } from "lucide-react";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageList } from "@/components/chat/MessageList";
 import type {
   ApiMessage,
   Message,
   MessageAttachment,
+  SearchMode,
 } from "@/components/chat/types";
 import { Alert } from "@/components/ui/Alert";
 import { apiClient } from "@/lib/api";
@@ -104,7 +105,16 @@ function normalizeMessage(message: ApiMessage, index: number, senderLookup: Send
     status,
     error: failed ? "Not completed" : undefined,
     isStreaming: pending && role === "assistant",
+    sources: role === "assistant" ? message.sources ?? sourcesFromMetadata(message.metadata) : undefined,
   };
+}
+
+function sourcesFromMetadata(metadata?: Record<string, unknown> | null): Message["sources"] {
+  const sources = metadata?.sources;
+  if (!Array.isArray(sources)) return [];
+  return sources.filter((source): source is NonNullable<Message["sources"]>[number] => {
+    return Boolean(source && typeof source === "object");
+  });
 }
 
 function timestampMs(value?: string) {
@@ -150,7 +160,7 @@ function attachFilesToMessages(messages: Message[], files: MessageAttachment[]) 
 }
 
 type StreamEvent = {
-  type: "init" | "status" | "token" | "error" | "done";
+  type: "init" | "status" | "sources" | "token" | "error" | "done";
   conversation_id?: string;
   user_message_id?: string;
   assistant_message_id?: string;
@@ -292,6 +302,7 @@ export function ChatInterface() {
     activeWorkspaceId,
   );
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
+  const [searchMode, setSearchMode] = useState<SearchMode>("auto");
   const workspaceMembers = useMemo(
     () => (activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? []),
     [activeMembers, activeWorkspace?.members_preview],
@@ -555,6 +566,19 @@ export function ChatInterface() {
         color: "text-emerald-200",
       },
       {
+        icon: Globe2,
+        label: "Research",
+        value:
+          searchMode === "auto"
+            ? "Auto hybrid"
+            : searchMode === "workspace"
+            ? "Workspace only"
+            : searchMode === "web"
+            ? "Live web"
+            : "Workspace + web",
+        color: "text-violet-200",
+      },
+      {
         icon: ShieldCheck,
         label: "Access",
         value: activeWorkspace?.current_user_role === "owner"
@@ -565,7 +589,7 @@ export function ChatInterface() {
         color: "text-amber-200",
       },
     ],
-    [activeWorkspace, session?.user?.email],
+    [activeWorkspace, searchMode, session?.user?.email],
   );
 
   const sendMessage = useCallback(
@@ -632,6 +656,7 @@ export function ChatInterface() {
             message: content,
             conversation_id: currentConversation || undefined,
             attachment_ids: attachmentIds,
+            search_mode: searchMode,
           }),
         });
 
@@ -716,6 +741,13 @@ export function ChatInterface() {
             // Status events are transport metadata. Keep them out of the
             // persisted assistant text so streamed tokens remain clean.
             return;
+          } else if (t === "sources") {
+            if (!assistantId) return;
+            setMessages((current) =>
+              current.map((m) =>
+                m.id === assistantId ? { ...m, sources: obj.sources ?? [] } : m,
+              ),
+            );
           } else if (t === "token") {
             if (!assistantId) return;
             const txt = obj.text ?? "";
@@ -813,6 +845,7 @@ export function ChatInterface() {
       refreshConversations,
       reconcileConversationMessages,
       router,
+      searchMode,
       senderLookup,
       setActiveConversation,
       user?.email,
@@ -857,7 +890,7 @@ export function ChatInterface() {
 
   return (
     <section className="flex min-h-[calc(100vh-8rem)] flex-col gap-4">
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-4">
         {statusItems.map((item) => {
           const Icon = item.icon;
           return (
@@ -928,6 +961,8 @@ export function ChatInterface() {
           loading={responding}
           conversationId={currentConversation || undefined}
           attachments={pendingAttachments}
+          searchMode={searchMode}
+          onSearchModeChange={setSearchMode}
           onUploadSuccess={handleUploadSuccess}
           onRemoveAttachment={handleRemoveAttachment}
         />
