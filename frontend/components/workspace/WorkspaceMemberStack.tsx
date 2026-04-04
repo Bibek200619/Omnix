@@ -2,6 +2,7 @@
 
 import type { WorkspaceMember } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
+import { workspaceRoleAvatarClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 
 type WorkspaceMemberStackProps = {
   members: WorkspaceMember[];
@@ -34,9 +35,10 @@ export function WorkspaceMemberStack({
         {visibleMembers.map((member, index) => (
           <div
             key={member.user_id}
-            title={workspaceMemberName(member)}
+            title={`${workspaceMemberName(member)} · ${workspaceRoleLabel(member.role)}`}
             className={cn(
-              "flex items-center justify-center rounded-lg border border-white/15 bg-[#0d1720] font-semibold text-slate-200 shadow-[0_8px_18px_rgba(0,0,0,0.22)]",
+              "flex items-center justify-center rounded-lg border font-semibold shadow-[0_8px_18px_rgba(0,0,0,0.22)]",
+              workspaceRoleAvatarClass(member.role),
               sizeClasses[size],
               index > 0 && "-ml-2",
             )}

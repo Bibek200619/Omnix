@@ -1,6 +1,12 @@
 export type Message = {
   id: string;
   role: "user" | "assistant";
+  userId?: string | null;
+  senderName?: string;
+  senderEmail?: string | null;
+  senderAvatar?: string;
+  senderRole?: "owner" | "co_owner" | "member" | "assistant";
+  isOwn?: boolean;
   content: string;
   timestamp: string;
   createdAt?: string;

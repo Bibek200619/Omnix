@@ -27,7 +27,7 @@ WORKSPACE_INVITE_COLUMNS = (
 )
 MEMBERS_PREVIEW_LIMIT = 3
 
-WorkspaceRole = Literal["owner", "member"]
+WorkspaceRole = Literal["owner", "co_owner", "member"]
 WorkspaceInviteStatus = Literal["pending", "accepted", "declined", "revoked"]
 
 
@@ -43,6 +43,23 @@ class WorkspaceAccess:
     @property
     def is_owner(self) -> bool:
         return self.role == "owner"
+
+
+def normalize_workspace_role(
+    value: Any,
+    *,
+    member_user_id: str | None = None,
+    owner_user_id: str | None = None,
+) -> WorkspaceRole:
+    if owner_user_id and member_user_id and member_user_id == owner_user_id:
+        return "owner"
+
+    role = str(value or "").strip().lower().replace("-", "_")
+    if role == "owner":
+        return "co_owner"
+    if role == "co_owner":
+        return "co_owner"
+    return "member"
 
 
 def utc_now_iso() -> str:
@@ -119,7 +136,11 @@ async def resolve_workspace_access(
     if membership is None:
         return None
 
-    role: WorkspaceRole = "owner" if membership.get("role") == "owner" else "member"
+    role = normalize_workspace_role(
+        membership.get("role"),
+        member_user_id=user_id,
+        owner_user_id=owner_user_id,
+    )
     return WorkspaceAccess(workspace=workspace, role=role)
 
 
@@ -141,7 +162,7 @@ async def require_workspace_owner(
     if not access.is_owner:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only workspace owners can perform this action.",
+            detail="Only the workspace founder can perform this action.",
         )
     return access
 
@@ -236,7 +257,11 @@ def _hydrate_member_records(
 
     members: list[dict[str, Any]] = []
     for member_user_id, row in member_map.items():
-        role: WorkspaceRole = "owner" if member_user_id == owner_user_id or row.get("role") == "owner" else "member"
+        role = normalize_workspace_role(
+            row.get("role"),
+            member_user_id=member_user_id,
+            owner_user_id=owner_user_id,
+        )
         profile = profiles.get(member_user_id, {})
         members.append(
             {
@@ -253,7 +278,7 @@ def _hydrate_member_records(
 
     members.sort(
         key=lambda item: (
-            0 if item["role"] == "owner" else 1,
+            {"owner": 0, "co_owner": 1, "member": 2}.get(item["role"], 3),
             (item.get("full_name") or item.get("email") or item["user_id"]).lower(),
         )
     )
@@ -336,7 +361,7 @@ async def list_user_workspaces(user_id: str) -> list[dict[str, Any]]:
         if not workspace_id:
             continue
         if workspace_id not in role_by_workspace_id:
-            role_by_workspace_id[workspace_id] = "owner" if row.get("role") == "owner" else "member"
+            role_by_workspace_id[workspace_id] = normalize_workspace_role(row.get("role"))
 
     for workspace in shared_workspaces:
         workspace_by_id.setdefault(str(workspace["id"]), workspace)

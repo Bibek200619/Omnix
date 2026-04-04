@@ -15,6 +15,8 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspace } from "@/lib/workspace-context";
+import { initialsFromText, workspaceRoleLabel } from "@/lib/workspace-roles";
+import type { WorkspaceMember } from "@/lib/workspace-types";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 
 function formatTime(value?: string) {
@@ -26,7 +28,23 @@ function formatTime(value?: string) {
   }).format(Number.isNaN(date.getTime()) ? new Date() : date);
 }
 
-function normalizeMessage(message: ApiMessage, index: number): Message {
+type SenderLookup = {
+  currentUserId?: string | null;
+  currentUserEmail?: string | null;
+  currentUserName?: string | null;
+  currentUserWorkspaceRole?: Message["senderRole"];
+  membersById: Map<string, WorkspaceMember>;
+};
+
+function currentUserNameFromSession(email?: string | null, metadata?: Record<string, unknown>) {
+  const fullName = metadata?.full_name;
+  const name = metadata?.name;
+  if (typeof fullName === "string" && fullName.trim()) return fullName.trim();
+  if (typeof name === "string" && name.trim()) return name.trim();
+  return email || "You";
+}
+
+function normalizeMessage(message: ApiMessage, index: number, senderLookup: SenderLookup): Message {
   const failed = message.status === "failed";
   const pending = message.status === "pending";
   const role = message.role === "user" ? "user" : "assistant";
@@ -37,9 +55,36 @@ function normalizeMessage(message: ApiMessage, index: number): Message {
       ? "The assistant response failed before it could be completed."
       : "");
 
+  const userId = message.user_id ?? null;
+  const member = userId ? senderLookup.membersById.get(userId) : undefined;
+  const isOwn = role === "user" && Boolean(userId && userId === senderLookup.currentUserId);
+  const senderName =
+    role === "assistant"
+      ? "Omnix AI"
+      : isOwn
+      ? "You"
+      : member?.full_name || member?.email || "Teammate";
+  const senderEmail =
+    role === "assistant"
+      ? null
+      : member?.email ?? (isOwn ? senderLookup.currentUserEmail ?? null : null);
+  const senderAvatar =
+    role === "assistant"
+      ? "AI"
+      : member?.avatar_label || initialsFromText(senderName || senderEmail || userId || "U");
+
   return {
     id: message.id ?? `message-${index}`,
     role,
+    userId,
+    senderName,
+    senderEmail,
+    senderAvatar,
+    senderRole:
+      role === "assistant"
+        ? "assistant"
+        : member?.role ?? (isOwn ? senderLookup.currentUserWorkspaceRole ?? "member" : "member"),
+    isOwn,
     content,
     timestamp: formatTime(message.timestamp ?? message.created_at),
     createdAt: message.timestamp ?? message.created_at,
@@ -106,7 +151,7 @@ const MESSAGE_VALIDATION_INTERVAL_MS = 45_000;
 const MESSAGE_FOCUS_STALE_MS = 12_000;
 const WORKSPACE_SYNC_INTERVAL_MS = 60_000;
 
-async function fetchConversationSnapshot(convId: string) {
+async function fetchConversationSnapshot(convId: string, senderLookup: SenderLookup) {
   const [data, files] = await Promise.all([
     apiClient.get<ApiMessage[]>(`/conversations/${convId}/messages`),
     apiClient
@@ -117,7 +162,10 @@ async function fetchConversationSnapshot(convId: string) {
       }),
   ]);
 
-  return attachFilesToMessages(data.map(normalizeMessage), files);
+  return attachFilesToMessages(
+    data.map((message, index) => normalizeMessage(message, index, senderLookup)),
+    files,
+  );
 }
 
 function mergeAttachments(
@@ -206,7 +254,7 @@ function reconcileMessageLists(
 export function ChatInterface() {
   const params = useSearchParams();
   const router = useRouter();
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const {
     activeWorkspace,
     activeMembers,
@@ -230,7 +278,24 @@ export function ChatInterface() {
     activeWorkspaceId,
   );
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
-  const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
+  const workspaceMembers = useMemo(
+    () => (activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? []),
+    [activeMembers, activeWorkspace?.members_preview],
+  );
+  const senderLookup = useMemo<SenderLookup>(() => {
+    const membersById = new Map<string, WorkspaceMember>();
+    for (const member of workspaceMembers) {
+      membersById.set(member.user_id, member);
+    }
+
+    return {
+      currentUserId: user?.id ?? null,
+      currentUserEmail: user?.email ?? null,
+      currentUserName: currentUserNameFromSession(user?.email ?? null, user?.user_metadata),
+      currentUserWorkspaceRole: activeWorkspace?.current_user_role ?? "member",
+      membersById,
+    };
+  }, [activeWorkspace?.current_user_role, user?.email, user?.id, user?.user_metadata, workspaceMembers]);
   const mountedRef = useRef(false);
   const currentConversationRef = useRef<string | null>(conversationId);
   const respondingRef = useRef(false);
@@ -280,7 +345,7 @@ export function ChatInterface() {
 
       messageSyncInFlightRef.current = true;
       try {
-        const serverMessages = await fetchConversationSnapshot(convId);
+        const serverMessages = await fetchConversationSnapshot(convId, senderLookup);
         if (!mountedRef.current) {
           return false;
         }
@@ -309,7 +374,7 @@ export function ChatInterface() {
         messageSyncInFlightRef.current = false;
       }
     },
-    [],
+    [senderLookup],
   );
 
   const loadConversation = useCallback(
@@ -320,7 +385,7 @@ export function ChatInterface() {
       try {
         setLoadingConversation(true);
         setError(null);
-        const serverMessages = await fetchConversationSnapshot(convId);
+        const serverMessages = await fetchConversationSnapshot(convId, senderLookup);
         if (!mountedRef.current || loadRequestIdRef.current !== requestId) {
           return;
         }
@@ -350,7 +415,7 @@ export function ChatInterface() {
         }
       }
     },
-    [activeWorkspaceId, refreshConversations, router, setActiveConversation],
+    [activeWorkspaceId, refreshConversations, router, senderLookup, setActiveConversation],
   );
 
   useEffect(() => {
@@ -477,7 +542,9 @@ export function ChatInterface() {
         icon: ShieldCheck,
         label: "Access",
         value: activeWorkspace?.current_user_role === "owner"
-          ? "Owner controls"
+          ? "Founder controls"
+          : activeWorkspace?.current_user_role
+          ? workspaceRoleLabel(activeWorkspace.current_user_role)
           : session?.user?.email ?? "Collaborator",
         color: "text-amber-200",
       },
@@ -499,6 +566,12 @@ export function ChatInterface() {
       const userMessage: Message = {
         id: messageId,
         role: "user",
+        userId: user?.id ?? null,
+        senderName: "You",
+        senderEmail: user?.email ?? null,
+        senderAvatar: initialsFromText(senderLookup.currentUserName || user?.email || "You"),
+        senderRole: activeWorkspace?.current_user_role ?? "member",
+        isOwn: true,
         content,
         timestamp: formatTime(),
         createdAt: new Date().toISOString(),
@@ -608,6 +681,10 @@ export function ChatInterface() {
                 {
                   id: assistantId as string,
                   role: "assistant",
+                  senderName: "Omnix AI",
+                  senderAvatar: "AI",
+                  senderRole: "assistant",
+                  isOwn: false,
                   content: "",
                   timestamp: formatTime(),
                   createdAt: new Date().toISOString(),
@@ -712,12 +789,16 @@ export function ChatInterface() {
     [
       conversationId,
       currentConversation,
+      activeWorkspace?.current_user_role,
       activeWorkspaceId,
       pendingAttachments,
       refreshConversations,
       reconcileConversationMessages,
       router,
+      senderLookup,
       setActiveConversation,
+      user?.email,
+      user?.id,
     ],
   );
 
@@ -798,7 +879,7 @@ export function ChatInterface() {
             <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} size="md" />
             <div className="text-right text-xs text-slate-400">
               <div>{activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "contributor" : "contributors"}</div>
-              <div>{activeWorkspace.current_user_role === "owner" ? "Owner" : "Member"}</div>
+              <div>{workspaceRoleLabel(activeWorkspace.current_user_role)}</div>
             </div>
           </div>
         </div>

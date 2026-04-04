@@ -30,6 +30,7 @@ type WorkspaceContextType = {
   renameWorkspace: (workspaceId: string, payload: { name: string; description?: string | null }) => Promise<Workspace>;
   deleteWorkspace: (workspaceId: string) => Promise<void>;
   inviteToActiveWorkspace: (email: string) => Promise<void>;
+  updateWorkspaceMemberRole: (userId: string, role: "co_owner" | "member") => Promise<WorkspaceMember>;
   removeWorkspaceMember: (userId: string) => Promise<void>;
   revokeInvite: (inviteId: string) => Promise<void>;
   acceptInvite: (inviteId: string) => Promise<Workspace>;
@@ -407,6 +408,39 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [activeWorkspaceId, refreshWorkspaces],
   );
 
+  const updateWorkspaceMemberRole = useCallback(
+    async (userId: string, role: "co_owner" | "member") => {
+      if (!activeWorkspaceId) {
+        throw new Error("Select a workspace first.");
+      }
+
+      const previousMembers = activeMembers;
+      setActiveMembers((current) =>
+        current.map((member) =>
+          member.user_id === userId
+            ? { ...member, role, updated_at: new Date().toISOString() }
+            : member,
+        ),
+      );
+
+      try {
+        const updated = await apiClient.patch<WorkspaceMember>(
+          `/workspaces/${activeWorkspaceId}/members/${userId}`,
+          { role },
+        );
+        setActiveMembers((current) =>
+          current.map((member) => (member.user_id === userId ? updated : member)),
+        );
+        await refreshWorkspaces({ force: true, silent: true });
+        return updated;
+      } catch (err) {
+        setActiveMembers(previousMembers);
+        throw err;
+      }
+    },
+    [activeMembers, activeWorkspaceId, refreshWorkspaces],
+  );
+
   const revokeInvite = useCallback(
     async (inviteId: string) => {
       if (!activeWorkspaceId) {
@@ -540,6 +574,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       renameWorkspace,
       deleteWorkspace,
       inviteToActiveWorkspace,
+      updateWorkspaceMemberRole,
       removeWorkspaceMember,
       revokeInvite,
       acceptInvite,
@@ -565,6 +600,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       renameWorkspace,
       deleteWorkspace,
       inviteToActiveWorkspace,
+      updateWorkspaceMemberRole,
       removeWorkspaceMember,
       revokeInvite,
       acceptInvite,
