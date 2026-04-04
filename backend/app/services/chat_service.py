@@ -129,16 +129,33 @@ class OllamaChatService:
                 "num_predict": output_tokens,
             },
         }
+        messages_summary = [
+            {
+                "index": index,
+                "role": message.get("role"),
+                "chars": len(message.get("content") or ""),
+                "has_web_search_results": "WEB SEARCH RESULTS:" in (message.get("content") or ""),
+                "has_document_context": "DOCUMENT CONTEXT:" in (message.get("content") or ""),
+                "preview": (message.get("content") or "").replace("\n", " ")[:360],
+            }
+            for index, message in enumerate(payload["messages"])
+        ]
         logger.info(
-            "Prepared Ollama request: url=%s model=%s stream=%s messages=%d num_predict=%d final_user_prompt_length=%d",
+            "Prepared Ollama request: url=%s model=%s stream=%s messages=%d num_predict=%d "
+            "final_user_prompt_length=%d has_web_results=%s has_document_context=%s messages_summary=%s",
             self.model_url,
             payload["model"],
             stream,
             len(payload["messages"]),
             output_tokens,
             len(prompt or ""),
+            "WEB SEARCH RESULTS:" in (prompt or ""),
+            "DOCUMENT CONTEXT:" in (prompt or ""),
+            messages_summary,
         )
         logger.debug("Ollama final user prompt preview: %r", (prompt or "")[:500])
+        if self.settings.DEV_MODE:
+            logger.debug("Ollama final payload debug: %s", json.dumps(payload, ensure_ascii=False))
         return payload
 
     @staticmethod

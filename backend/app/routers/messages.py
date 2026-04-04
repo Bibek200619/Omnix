@@ -313,14 +313,27 @@ def _log_ollama_prompt_debug(
     prompt: str,
     retrieval_debug: dict[str, Any],
 ) -> None:
+    diagnostics = retrieval_debug.get("diagnostics") if isinstance(retrieval_debug.get("diagnostics"), dict) else {}
+    web_search = diagnostics.get("web_search") if isinstance(diagnostics.get("web_search"), dict) else {}
+    context_diag = diagnostics if isinstance(diagnostics, dict) else {}
     logger.info(
         "Ollama prompt debug: conversation_id=%s retrieval_strategy=%s retrieved_chunks_count=%d "
-        "prompt_length=%d first_retrieved_chunk_preview=%r",
+        "prompt_length=%d has_web_results=%s has_document_context=%s web_search=%s context_counts=%s "
+        "first_retrieved_chunk_preview=%r prompt_preview=%r",
         conversation_id,
         retrieval_debug.get("strategy", "unknown"),
         int(retrieval_debug.get("retrieved_chunks_count") or 0),
         len(prompt or ""),
+        "WEB SEARCH RESULTS:" in (prompt or ""),
+        "DOCUMENT CONTEXT:" in (prompt or ""),
+        web_search,
+        {
+            "web_context_count": context_diag.get("web_context_count"),
+            "document_context_count": context_diag.get("document_context_count"),
+            "estimated_context_tokens": context_diag.get("estimated_context_tokens"),
+        },
         retrieval_debug.get("first_chunk_preview") or "",
+        (prompt or "").replace("\n", " ")[:1000],
     )
 
 
@@ -389,6 +402,15 @@ async def _build_web_supplements(
 ) -> tuple[list[Any], list[dict[str, Any]], SearchDecision, dict[str, Any]]:
     decision = classify_search_need(message_text, search_mode)
     diagnostics: dict[str, Any] = {"decision": decision.to_dict(), "search": None}
+    logger.info(
+        "Web search decision: mode=%s effective_mode=%s needs_web=%s confidence=%.2f reasons=%s query=%r",
+        decision.requested_mode,
+        decision.effective_mode,
+        decision.needs_web,
+        decision.confidence,
+        decision.reasons,
+        message_text[:240],
+    )
     if not decision.needs_web:
         return [], [], decision, diagnostics
 
@@ -402,6 +424,11 @@ async def _build_web_supplements(
 
     diagnostics["search"] = search_response.to_diagnostics()
     if not search_response.results:
+        logger.warning(
+            "Web search returned no usable results: query=%r diagnostics=%s",
+            message_text[:160],
+            diagnostics["search"],
+        )
         return [], [], decision, diagnostics
 
     supplements = [
@@ -412,6 +439,16 @@ async def _build_web_supplements(
         result.to_source(label=f"W{index}")
         for index, result in enumerate(search_response.results, start=1)
     ]
+    logger.info(
+        "Web context formatted: query=%r result_count=%d first_result=%s",
+        message_text[:160],
+        len(supplements),
+        {
+            "title": search_response.results[0].title,
+            "url": search_response.results[0].url,
+            "snippet_preview": search_response.results[0].snippet[:240],
+        },
+    )
     return supplements, sources, decision, diagnostics
 
 
@@ -537,6 +574,7 @@ async def _retrieve_prompt_context(
 
     try:
         from ..rag.startup import get_vector_store
+        from ..retrieval.context_builder import ContextBuilder
         from ..retrieval.hybrid_search import HybridSearchEngine
 
         engine = HybridSearchEngine(get_vector_store())
@@ -545,7 +583,23 @@ async def _retrieve_prompt_context(
             user_id=user_id,
             workspace_id=workspace_id,
         )
-        built_context = engine.context_builder.build(
+        if web_supplements:
+            context_builder = ContextBuilder(
+                max_chunks=min(engine.context_builder.max_chunks + len(web_supplements), 10),
+                token_budget=min(engine.context_builder.token_budget + (len(web_supplements) * 360), 4200),
+                max_chunk_tokens=engine.context_builder.max_chunk_tokens,
+            )
+            logger.info(
+                "Hybrid context builder expanded for web: base_max_chunks=%d web_supplements=%d final_max_chunks=%d token_budget=%d",
+                engine.context_builder.max_chunks,
+                len(web_supplements),
+                context_builder.max_chunks,
+                context_builder.token_budget,
+            )
+        else:
+            context_builder = engine.context_builder
+
+        built_context = context_builder.build(
             message_text,
             response.results,
             workspace_id=workspace_id,
