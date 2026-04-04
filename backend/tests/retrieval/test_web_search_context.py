@@ -8,6 +8,7 @@ os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "service")
 
 from app.retrieval.context_builder import ContextBuilder, ContextSupplement
 from app.settings import get_settings
+from app.services.chat_service import OllamaChatService
 from app.services.query_classifier import classify_search_need
 from app.services.web_search import TavilySearchService
 
@@ -20,6 +21,14 @@ def test_query_classifier_detects_current_web_need() -> None:
     assert "current_time_sensitive_terms" in decision.reasons
 
 
+def test_query_classifier_detects_live_sports_queries() -> None:
+    decision = classify_search_need("Latest Manchester City Premier League match score")
+
+    assert decision.needs_web is True
+    assert decision.effective_mode == "hybrid"
+    assert "volatile_topic" in decision.reasons
+
+
 def test_query_classifier_respects_workspace_mode() -> None:
     decision = classify_search_need("latest roadmap in our uploaded docs", "workspace")
 
@@ -30,7 +39,7 @@ def test_query_classifier_respects_workspace_mode() -> None:
 def test_context_builder_accepts_web_supplements() -> None:
     builder = ContextBuilder(max_chunks=2, token_budget=260, max_chunk_tokens=120)
     supplement = ContextSupplement(
-        content="Title: Omnix research\nURL: https://example.com/research\nSnippet: Live web context.",
+        content="Title: Omnix research\nURL: https://example.com/research\nContent: Live web context.",
         title="Omnix research",
         source_type="web",
         source_id="https://example.com/research",
@@ -46,11 +55,44 @@ def test_context_builder_accepts_web_supplements() -> None:
         supplemental_contexts=[supplement],
     )
 
-    assert "SOURCE CONTEXT" in built.prompt
+    assert "WEB SEARCH RESULTS" in built.prompt
+    assert "\n\nDOCUMENT CONTEXT:" not in built.prompt
     assert "Live web context" in built.prompt
     assert built.sources[0]["type"] == "web"
     assert built.sources[0]["url"] == "https://example.com/research"
     assert built.sources[0]["domain"] == "example.com"
+
+
+def test_ollama_payload_contains_explicit_web_context() -> None:
+    builder = ContextBuilder(max_chunks=2, token_budget=900, max_chunk_tokens=300)
+    supplement = ContextSupplement(
+        content=(
+            "Title: Manchester City 3-1 Bournemouth\n"
+            "URL: https://example.com/match\n"
+            "Content: Manchester City beat Bournemouth 3-1 in their latest Premier League match."
+        ),
+        title="Manchester City 3-1 Bournemouth",
+        source_type="web",
+        source_id="https://example.com/match",
+        score=0.98,
+        metadata={
+            "url": "https://example.com/match",
+            "domain": "example.com",
+            "snippet": "Manchester City beat Bournemouth 3-1 in their latest Premier League match.",
+        },
+    )
+
+    built = builder.build(
+        "Latest Manchester City Premier League match score",
+        [],
+        supplemental_contexts=[supplement],
+    )
+    payload = OllamaChatService()._build_payload(built.prompt, context=[], stream=True)
+    final_user_message = payload["messages"][-1]["content"]
+
+    assert "WEB SEARCH RESULTS:" in final_user_message
+    assert "Manchester City beat Bournemouth 3-1" in final_user_message
+    assert "If WEB SEARCH RESULTS are present, do not say you lack live/current access" in final_user_message
 
 
 def test_tavily_parser_sanitizes_and_deduplicates_results(monkeypatch) -> None:
