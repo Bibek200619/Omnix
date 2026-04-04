@@ -40,7 +40,7 @@ class VectorStore(ABC):
         query_embedding: list[float],
         user_id: str,
         workspace_id: str | None = None,
-        top_k: int = 5,
+        top_k: int = 3,
     ) -> list[tuple[str, float]]:
         """
         Search for the most similar embeddings to a query vector.
@@ -52,7 +52,7 @@ class VectorStore(ABC):
             query_embedding (list[float]): The query vector to search for.
             user_id (str): The user performing the search. Only embeddings owned by this user are returned.
             workspace_id (str | None): Optional workspace to narrow results to a project.
-            top_k (int): Maximum number of results to return. Defaults to 5.
+            top_k (int): Maximum number of results to return. Defaults to 3.
 
         Returns:
             list[tuple[str, float]]: List of (id, distance) tuples sorted by distance.

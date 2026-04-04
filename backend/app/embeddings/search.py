@@ -21,7 +21,7 @@ async def embed_query(text: str) -> List[float]:
     return embedding
 
 
-async def semantic_search(query: str, user_id: str, workspace_id: str | None = None, top_k: int = 5) -> List[dict[str, Any]]:
+async def semantic_search(query: str, user_id: str, workspace_id: str | None = None, top_k: int = 3) -> List[dict[str, Any]]:
     """Embed the query and perform pgvector RPC search. Returns list of rows.
 
     Each row includes id, content, similarity (0..1).

@@ -21,7 +21,7 @@ class KeywordRetriever:
         user_id: str,
         conversation_id: str | None = None,
         workspace_id: str | None = None,
-        top_k: int = 5,
+        top_k: int = 3,
     ) -> list[dict[str, Any]]:
         if not query or not query.strip():
             logger.warning("Empty query provided to keyword retriever.")

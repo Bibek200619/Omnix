@@ -40,7 +40,7 @@ from .conversations import (
 router = APIRouter(tags=["messages"])
 logger = logging.getLogger(__name__)
 
-RECENT_CONTEXT_LIMIT = 20
+RECENT_CONTEXT_LIMIT = 8
 MAX_CONTEXT_CHARS = 16000
 DEFAULT_MESSAGE_LIMIT = 50
 MAX_MESSAGE_LIMIT = 100

@@ -14,8 +14,8 @@ class ProviderSettings(BaseAppSettings):
     AI_REQUEST_TIMEOUT_SECONDS: float = 60.0
     AI_STREAM_TIMEOUT_SECONDS: float = 120.0
     AI_MAX_RETRIES: int = 2
-    AI_MAX_OUTPUT_TOKENS: int = 900
-    AI_MAX_CONTEXT_MESSAGES: int = 20
+    AI_MAX_OUTPUT_TOKENS: int = 256
+    AI_MAX_CONTEXT_MESSAGES: int = 8
     AI_MAX_CONTEXT_CHARS: int = 16000
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_DEFAULT_MODEL: str = "phi3:latest"
