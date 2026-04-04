@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, LogOut, Menu, MessageSquarePlus, Users } from "lucide-react";
+import { AlertCircle, LogOut, Menu, MessageSquarePlus, PanelLeftOpen, Users } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth-context";
@@ -19,10 +19,12 @@ const routeTitles = [
 ];
 
 type HeaderProps = {
+  sidebarCollapsed?: boolean;
   onMenuClick: () => void;
+  onExpandSidebar?: () => void;
 };
 
-export function Header({ onMenuClick }: HeaderProps) {
+export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { signOut } = useAuth();
@@ -67,6 +69,19 @@ export function Header({ onMenuClick }: HeaderProps) {
           >
             <Menu className="h-5 w-5" />
           </Button>
+          {sidebarCollapsed ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="hidden h-9 w-9 lg:inline-flex"
+              aria-label="Expand workspace sidebar"
+              title="Expand workspace sidebar"
+              onClick={onExpandSidebar}
+            >
+              <PanelLeftOpen className="h-4 w-4" />
+            </Button>
+          ) : null}
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200/70">
               {activeWorkspace ? activeWorkspace.name : active.eyebrow}
