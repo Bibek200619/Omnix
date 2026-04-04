@@ -41,19 +41,25 @@ class ModelServiceError(Exception):
 
 
 class OllamaChatService:
-    """Async Ollama chat client using the OpenAI-compatible API surface."""
+    """Async Ollama chat client using the native /api/chat API."""
 
     def __init__(self) -> None:
         self.settings = get_settings()
-        self.model_url = self.settings.MODEL_URL
-        self.default_model = self.settings.AI_MODEL or self.settings.OLLAMA_DEFAULT_MODEL
+        self.model_url = self.settings.ollama_chat_url
+        self.default_model = self.settings.ollama_model
         self.system_prompt = self.settings.AI_SYSTEM_PROMPT
         self.request_timeout = self.settings.AI_REQUEST_TIMEOUT_SECONDS
         self.stream_timeout = self.settings.AI_STREAM_TIMEOUT_SECONDS
         self.max_retries = max(0, self.settings.AI_MAX_RETRIES)
-        self.max_output_tokens = self.settings.AI_MAX_OUTPUT_TOKENS
-        self.max_context_messages = self.settings.AI_MAX_CONTEXT_MESSAGES
-        self.max_context_chars = self.settings.AI_MAX_CONTEXT_CHARS
+        self.max_output_tokens = max(1, min(int(self.settings.AI_MAX_OUTPUT_TOKENS), 512))
+        self.max_context_messages = max(1, min(int(self.settings.AI_MAX_CONTEXT_MESSAGES), 4))
+        self.max_context_chars = max(1000, min(int(self.settings.AI_MAX_CONTEXT_CHARS), 8000))
+        if self.settings.MODEL_URL.rstrip("/") != self.model_url.rstrip("/"):
+            logger.warning(
+                "MODEL_URL points at %s; using native Ollama chat endpoint %s.",
+                self.settings.MODEL_URL,
+                self.model_url,
+            )
 
     def _normalize_context(
         self,
@@ -113,18 +119,23 @@ class OllamaChatService:
         max_tokens: int | None = None,
         stream: bool = False,
     ) -> dict[str, Any]:
+        output_tokens = max(1, min(int(max_tokens or self.max_output_tokens), 512))
         payload = {
             "model": model or self.default_model,
             "messages": self._build_messages(prompt, context, system_prompt),
-            "temperature": temperature,
-            "max_tokens": max_tokens or self.max_output_tokens,
             "stream": stream,
+            "options": {
+                "temperature": temperature,
+                "num_predict": output_tokens,
+            },
         }
         logger.info(
-            "Prepared Ollama request: model=%s stream=%s messages=%d final_user_prompt_length=%d",
+            "Prepared Ollama request: url=%s model=%s stream=%s messages=%d num_predict=%d final_user_prompt_length=%d",
+            self.model_url,
             payload["model"],
             stream,
             len(payload["messages"]),
+            output_tokens,
             len(prompt or ""),
         )
         logger.debug("Ollama final user prompt preview: %r", (prompt or "")[:500])
@@ -197,9 +208,14 @@ class OllamaChatService:
                 last_error = exc
                 status_code = exc.response.status_code
                 if 400 <= status_code < 500:
-                    logger.warning("Ollama rejected request with HTTP %s.", status_code)
+                    logger.warning(
+                        "Ollama rejected request with HTTP %s at %s: %s",
+                        status_code,
+                        self.model_url,
+                        exc.response.text[:500],
+                    )
                     raise ModelServiceError(
-                        "Model service rejected the request.",
+                        "Ollama rejected the request. Check that phi3:mini is installed and MODEL_URL uses /api/chat.",
                         status.HTTP_502_BAD_GATEWAY,
                     ) from exc
                 logger.warning("Ollama HTTP %s on attempt %s.", status_code, attempt + 1)
@@ -211,7 +227,7 @@ class OllamaChatService:
                 await asyncio.sleep(0.25 * (2**attempt))
 
         raise ModelServiceError(
-            "Model service unavailable. Ensure Ollama is running and phi3:latest is installed.",
+            "Model service unavailable. Ensure Ollama is running and phi3:mini is installed.",
             status.HTTP_503_SERVICE_UNAVAILABLE,
         ) from last_error
 
@@ -237,12 +253,14 @@ class OllamaChatService:
         timeout = httpx.Timeout(self.stream_timeout, connect=10.0)
 
         try:
+            emitted_token = False
             async with httpx.AsyncClient(timeout=timeout) as client:
                 async with client.stream("POST", self.model_url, json=payload) as response:
                     response.raise_for_status()
                     async for line in response.aiter_lines():
                         token = self._parse_stream_line(line)
                         if token:
+                            emitted_token = True
                             yield token
         except httpx.TimeoutException as exc:
             logger.warning("Ollama stream timed out.")
@@ -250,10 +268,28 @@ class OllamaChatService:
                 "Model stream timed out.",
                 status.HTTP_504_GATEWAY_TIMEOUT,
             ) from exc
+        except ModelServiceError:
+            raise
         except httpx.HTTPError as exc:
-            logger.warning("Ollama stream failed: %s", exc)
+            logger.warning("Ollama stream failed at %s: %s", self.model_url, exc)
+            if not emitted_token:
+                try:
+                    logger.info("Retrying Ollama request once without streaming after pre-token stream failure.")
+                    fallback = await self.generate(
+                        prompt,
+                        context,
+                        system_prompt=system_prompt,
+                        temperature=temperature,
+                        model=model,
+                        max_tokens=max_tokens,
+                    )
+                    if fallback.content:
+                        yield fallback.content
+                        return
+                except Exception:
+                    logger.exception("Non-streaming Ollama fallback failed.")
             raise ModelServiceError(
-                "Model service unavailable. Ensure Ollama is running and phi3:latest is installed.",
+                "Model service unavailable. Ensure Ollama is running and phi3:mini is installed.",
                 status.HTTP_503_SERVICE_UNAVAILABLE,
             ) from exc
 
@@ -270,6 +306,12 @@ class OllamaChatService:
             chunk = json.loads(data)
         except json.JSONDecodeError:
             return ""
+
+        if isinstance(chunk.get("error"), str) and chunk["error"].strip():
+            raise ModelServiceError(
+                f"Ollama returned an error: {chunk['error'].strip()}",
+                status.HTTP_502_BAD_GATEWAY,
+            )
 
         choices = chunk.get("choices")
         if isinstance(choices, list) and choices:

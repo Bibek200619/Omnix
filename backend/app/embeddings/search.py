@@ -26,7 +26,11 @@ async def semantic_search(query: str, user_id: str, workspace_id: str | None = N
 
     Each row includes id, content, similarity (0..1).
     """
-    embedding = await embed_query(query)
+    try:
+        embedding = await embed_query(query)
+    except Exception:
+        logger.exception("Semantic query embedding unavailable; returning no semantic matches.")
+        return []
     if not embedding:
         return []
 

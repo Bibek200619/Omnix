@@ -35,9 +35,10 @@ class ProviderManager:
             )
             
         # Register Ollama 
+        ollama_model = "phi3:mini" if llm_settings.OLLAMA_DEFAULT_MODEL == "phi3:latest" else llm_settings.OLLAMA_DEFAULT_MODEL
         self.providers["ollama"] = OllamaProvider(
             base_url=llm_settings.OLLAMA_BASE_URL,
-            default_model=llm_settings.OLLAMA_DEFAULT_MODEL,
+            default_model=ollama_model,
             timeout=llm_settings.OLLAMA_TIMEOUT_SECONDS
         )
         

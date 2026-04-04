@@ -7,7 +7,9 @@ os.environ["SUPABASE_ANON_KEY"] = "anon"
 os.environ["SUPABASE_SERVICE_ROLE_KEY"] = "service"
 os.environ["DEV_MODE"] = "false"
 os.environ["MODEL_URL"] = "http://127.0.0.1:11434/v1/chat/completions"
-os.environ["AI_MODEL"] = "phi3:latest"
+os.environ["AI_MODEL"] = "phi3:mini"
+os.environ["AI_MAX_OUTPUT_TOKENS"] = "384"
+os.environ["AI_MAX_CONTEXT_MESSAGES"] = "4"
 
 from app.services import chat_service
 from app.services.chat_service import AIMessage, AIGeneration, OllamaChatService
@@ -23,9 +25,10 @@ def test_build_payload_uses_phi3_and_preserves_context():
         stream=False,
     )
 
-    assert payload["model"] == "phi3:latest"
-    assert payload["max_tokens"] == 256
-    assert payload["temperature"] == 0.1
+    assert service.model_url == "http://127.0.0.1:11434/api/chat"
+    assert payload["model"] == "phi3:mini"
+    assert payload["options"]["num_predict"] == 384
+    assert payload["options"]["temperature"] == 0.1
     assert payload["stream"] is False
     assert payload["messages"][0]["role"] == "system"
     assert payload["messages"][1] == {
@@ -35,7 +38,7 @@ def test_build_payload_uses_phi3_and_preserves_context():
     assert payload["messages"][-1] == {"role": "user", "content": "What changed?"}
 
 
-def test_build_payload_limits_history_to_last_eight_messages():
+def test_build_payload_limits_history_to_recent_messages():
     service = OllamaChatService()
     context = [
         {"role": "user" if index % 2 == 0 else "assistant", "content": f"message {index}"}
@@ -45,7 +48,7 @@ def test_build_payload_limits_history_to_last_eight_messages():
     payload = service._build_payload("Continue", context=context)
 
     assert [message["content"] for message in payload["messages"][1:-1]] == [
-        f"message {index}" for index in range(2, 10)
+        f"message {index}" for index in range(6, 10)
     ]
 
 
@@ -63,21 +66,27 @@ def test_parse_stream_line_supports_sse_delta_chunks():
     assert OllamaChatService._parse_stream_line(line) == "hello"
 
 
+def test_parse_stream_line_supports_native_ollama_chunks():
+    line = '{"message":{"role":"assistant","content":"native hello"},"done":false}'
+
+    assert OllamaChatService._parse_stream_line(line) == "native hello"
+
+
 @pytest.mark.asyncio
 async def test_call_llm_uses_service_abstraction(monkeypatch):
     class FakeService:
         async def generate(self, prompt, context=None, **kwargs):
             assert prompt == "Summarize this"
             assert context == [AIMessage(role="user", content="Prior context")]
-            assert kwargs["model"] == "phi3:latest"
-            return AIGeneration(content="Done", model="phi3:latest")
+            assert kwargs["model"] == "phi3:mini"
+            return AIGeneration(content="Done", model="phi3:mini")
 
     monkeypatch.setattr(chat_service, "get_chat_service", lambda: FakeService())
 
     result = await chat_service.generate_ai_response(
         "Summarize this",
         context=[AIMessage(role="user", content="Prior context")],
-        model="phi3:latest",
+        model="phi3:mini",
     )
 
     assert result.content == "Done"
