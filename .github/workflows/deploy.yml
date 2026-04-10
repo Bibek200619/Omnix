@@ -1,55 +1,39 @@
-name: Deploy Backend to EC2
+name: Deploy Omnix Backend
 
 on:
   push:
     branches:
       - main
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  EC2_HOST: 18.204.231.209
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
 
-      - name: Setup SSH
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -T 15 -H "$EC2_HOST" >> ~/.ssh/known_hosts
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
 
-      - name: Deploy Backend
-        shell: bash
-        run: |
-          set -euo pipefail
+          script: |
+            cd ~/Omnix
 
-          ssh -i ~/.ssh/id_ed25519 \
-            -o BatchMode=yes \
-            -o ConnectTimeout=30 \
-            "${{ secrets.EC2_USERNAME }}@$EC2_HOST" << 'EOF'
-              set -euo pipefail
+            git fetch origin
+            git reset --hard origin/main
 
-              echo "Connected to $(hostname) as $(whoami)"
-              cd ~/Omnix
+            cd backend
 
-              git fetch origin main
-              git pull --ff-only origin main
+            source venv/bin/activate
 
-              if systemctl list-unit-files | grep -q '^omnix\.service'; then
-                sudo -n systemctl restart omnix
-                sudo -n systemctl status omnix --no-pager -l
-              else
-                docker compose -f docker-compose.prod.yml up -d --build
-                docker compose -f docker-compose.prod.yml ps
-              fi
+            pip install -r requirements.txt --quiet
 
-              ./scripts/healthcheck.sh http://localhost:8000
-          EOF
+            sudo systemctl restart omnix
+
+            sleep 5
+
+            curl -f http://localhost:8000/health || exit 1
+
+            echo "Deployment completed"
