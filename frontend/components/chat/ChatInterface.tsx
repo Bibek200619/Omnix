@@ -84,6 +84,17 @@ function normalizeMessage(message: ApiMessage, index: number, senderLookup: Send
     role === "assistant"
       ? null
       : member?.handle ?? (isOwn ? senderLookup.currentUserHandle ?? null : null);
+  const payloadSources = sourcesFromPayload(message.payload);
+  const metadataSources = sourcesFromPayload(message.metadata);
+  const sources =
+    role === "assistant"
+      ? message.sources?.length
+        ? message.sources
+        : payloadSources.length
+        ? payloadSources
+        : metadataSources
+      : undefined;
+  const sourceMode = sourceModeFromPayload(message.payload);
 
   return {
     id: message.id ?? `message-${index}`,
@@ -105,16 +116,36 @@ function normalizeMessage(message: ApiMessage, index: number, senderLookup: Send
     status,
     error: failed ? "Not completed" : undefined,
     isStreaming: pending && role === "assistant",
-    sources: role === "assistant" ? message.sources ?? sourcesFromMetadata(message.metadata) : undefined,
+    sources,
+    sourceMode,
+    webSearchUsed: webSearchUsedFromPayload(message.payload),
+    citations: citationsFromPayload(message.payload),
   };
 }
 
-function sourcesFromMetadata(metadata?: Record<string, unknown> | null): Message["sources"] {
-  const sources = metadata?.sources;
+function sourcesFromPayload(payload?: Record<string, unknown> | null): NonNullable<Message["sources"]> {
+  const sources = payload?.sources;
   if (!Array.isArray(sources)) return [];
   return sources.filter((source): source is NonNullable<Message["sources"]>[number] => {
     return Boolean(source && typeof source === "object");
   });
+}
+
+function sourceModeFromPayload(payload?: Record<string, unknown> | null): SearchMode | undefined {
+  const mode = payload?.mode;
+  return mode === "auto" || mode === "workspace" || mode === "web" || mode === "hybrid"
+    ? mode
+    : undefined;
+}
+
+function webSearchUsedFromPayload(payload?: Record<string, unknown> | null) {
+  return typeof payload?.web_search_used === "boolean" ? payload.web_search_used : undefined;
+}
+
+function citationsFromPayload(payload?: Record<string, unknown> | null) {
+  const citations = payload?.citations;
+  if (!Array.isArray(citations)) return undefined;
+  return citations.filter((item): item is string => typeof item === "string" && Boolean(item));
 }
 
 function timestampMs(value?: string) {

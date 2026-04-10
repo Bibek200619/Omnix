@@ -53,6 +53,7 @@ class MessageRead(BaseModel):
     status: Literal["pending", "completed", "failed"] | None = None
     created_at: datetime | None = None
     metadata: dict[str, Any] | None = None
+    payload: dict[str, Any] | None = None
     sources: list[dict[str, Any]] = Field(default_factory=list)
 
 

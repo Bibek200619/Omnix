@@ -99,7 +99,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
   }
 
   function sourceExcerpt(source: NonNullable<Message["sources"]>[number]) {
-    return source.excerpt || source.chunk_preview || "";
+    return source.snippet || source.excerpt || source.chunk_preview || "";
   }
 
   function safeUrl(url?: string) {
@@ -110,6 +110,13 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
     } catch {
       return null;
     }
+  }
+
+  function sourceBadgeLabel() {
+    if (message.sourceMode === "web") return "Web context";
+    if (message.sourceMode === "hybrid") return "Hybrid context";
+    if (message.sourceMode === "workspace") return "Workspace context";
+    return message.webSearchUsed ? "Hybrid context" : "Workspace context";
   }
 
   return (
@@ -234,7 +241,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                 Sources ({sources.length})
               </p>
               <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2 py-0.5 text-[10px] font-medium text-cyan-100">
-                Hybrid context
+                {sourceBadgeLabel()}
               </span>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">

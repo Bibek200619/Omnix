@@ -18,6 +18,9 @@ export type Message = {
   attachments?: MessageAttachment[];
   // UI helpers
   isStreaming?: boolean;
+  sourceMode?: SearchMode;
+  webSearchUsed?: boolean;
+  citations?: string[];
   // optional sources attached to assistant responses
   sources?: Array<{
     id?: string;
@@ -28,6 +31,7 @@ export type Message = {
     domain?: string;
     favicon_url?: string;
     published_date?: string;
+    snippet?: string;
     excerpt?: string;
     chunk_preview?: string;
     score?: number;
@@ -61,6 +65,7 @@ export type ApiMessage = {
   created_at?: string;
   timestamp?: string;
   metadata?: Record<string, unknown> | null;
+  payload?: Record<string, unknown> | null;
   sources?: Message["sources"];
 };
 
