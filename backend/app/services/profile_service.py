@@ -193,13 +193,13 @@ def _merge_profile(row: dict[str, Any] | None, auth_profile: AuthUserProfile, us
 
 async def _insert_user_profile(payload: Mapping[str, Any]) -> dict[str, Any]:
     try:
-        return await insert_one_trusted("user_profiles", payload)
+        return await insert_one_trusted("profiles", payload)
     except SupabaseServiceError as exc:
         if not _has_missing_profile_timestamp(exc):
             raise
 
         logger.warning(
-            "user_profiles timestamp columns are unavailable; creating profile without timestamps | user_id=%s",
+            "profiles timestamp columns are unavailable; creating profile without timestamps | user_id=%s",
             payload.get("user_id"),
         )
         fallback_payload = {
@@ -207,7 +207,7 @@ async def _insert_user_profile(payload: Mapping[str, Any]) -> dict[str, Any]:
             for key, value in payload.items()
             if key not in PROFILE_TIMESTAMP_COLUMNS
         }
-        return await insert_one_trusted("user_profiles", fallback_payload)
+        return await insert_one_trusted("profiles", fallback_payload)
 
 
 async def ensure_user_profile(current_user: Any) -> dict[str, Any]:
@@ -215,7 +215,7 @@ async def ensure_user_profile(current_user: Any) -> dict[str, Any]:
     auth_profile = _metadata_profile(current_user)
 
     try:
-        existing = await select_one_trusted("user_profiles", USER_PROFILE_COLUMNS, {"user_id": user_id})
+        existing = await select_one_trusted("profiles", USER_PROFILE_COLUMNS, {"user_id": user_id})
     except SupabaseServiceError as exc:
         logger.exception("Failed to load user profile | user_id=%s", user_id)
         raise HTTPException(status_code=500, detail="Internal server error") from exc
@@ -281,13 +281,13 @@ async def update_user_profile(current_user: Any, payload: Mapping[str, Any]) -> 
         if current_handle and next_handle != current_handle:
             raise HTTPException(status_code=400, detail="Handle is already set and cannot be changed.")
         if not current_handle:
-            existing = await select_one_trusted("user_profiles", USER_PROFILE_COLUMNS, {"handle": next_handle})
+            existing = await select_one_trusted("profiles", USER_PROFILE_COLUMNS, {"handle": next_handle})
             if existing is not None and str(existing.get("user_id")) != user_id:
                 raise HTTPException(status_code=409, detail="That handle is already taken.")
             updates["handle"] = next_handle
 
     try:
-        updated = await update_one_trusted("user_profiles", {"user_id": user_id}, updates)
+        updated = await update_one_trusted("profiles", {"user_id": user_id}, updates)
     except SupabaseServiceError as exc:
         if _is_unique_profile_violation(exc):
             raise HTTPException(status_code=409, detail="That handle is already taken.") from exc
@@ -296,17 +296,17 @@ async def update_user_profile(current_user: Any, payload: Mapping[str, Any]) -> 
             fallback_updates = {key: value for key, value in updates.items() if key != "updated_at"}
             if not fallback_updates:
                 logger.warning(
-                    "user_profiles.updated_at is unavailable and no profile fields changed | user_id=%s",
+                    "profiles.updated_at is unavailable and no profile fields changed | user_id=%s",
                     user_id,
                 )
                 return current
 
             logger.warning(
-                "user_profiles.updated_at is unavailable; updating profile without timestamp | user_id=%s",
+                "profiles.updated_at is unavailable; updating profile without timestamp | user_id=%s",
                 user_id,
             )
             try:
-                updated = await update_one_trusted("user_profiles", {"user_id": user_id}, fallback_updates)
+                updated = await update_one_trusted("profiles", {"user_id": user_id}, fallback_updates)
             except SupabaseServiceError as fallback_exc:
                 if _is_unique_profile_violation(fallback_exc):
                     raise HTTPException(status_code=409, detail="That handle is already taken.") from fallback_exc
@@ -326,7 +326,7 @@ async def get_user_profile_map(user_ids: list[str]) -> dict[str, dict[str, Any]]
 
     try:
         rows = await select_all_trusted(
-            "user_profiles",
+            "profiles",
             USER_PROFILE_COLUMNS,
             filters={"user_id": ids},
         )
@@ -340,6 +340,6 @@ async def get_user_profile_map(user_ids: list[str]) -> dict[str, dict[str, Any]]
 async def resolve_profile_by_handle(handle: str) -> dict[str, Any] | None:
     normalized = validate_handle(handle)
     try:
-        return await select_one_trusted("user_profiles", USER_PROFILE_COLUMNS, {"handle": normalized})
+        return await select_one_trusted("profiles", USER_PROFILE_COLUMNS, {"handle": normalized})
     except SupabaseServiceError as exc:
         raise HTTPException(status_code=500, detail="Internal server error") from exc
