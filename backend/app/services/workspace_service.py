@@ -204,7 +204,7 @@ def _avatar_label(full_name: str | None, email: str | None, user_id: str) -> str
     return "U"
 
 
-def _lookup_user_profiles_sync(user_ids: list[str]) -> dict[str, dict[str, Any]]:
+def _lookup_profiles_sync(user_ids: list[str]) -> dict[str, dict[str, Any]]:
     profiles: dict[str, dict[str, Any]] = {}
     auth_admin = get_supabase().auth.admin
 
@@ -231,10 +231,10 @@ def _lookup_user_profiles_sync(user_ids: list[str]) -> dict[str, dict[str, Any]]
     return profiles
 
 
-async def get_user_profiles(user_ids: list[str]) -> dict[str, dict[str, Any]]:
+async def get_profiles(user_ids: list[str]) -> dict[str, dict[str, Any]]:
     if not user_ids:
         return {}
-    auth_profiles = await run_in_threadpool(_lookup_user_profiles_sync, user_ids)
+    auth_profiles = await run_in_threadpool(_lookup_profiles_sync, user_ids)
     app_profiles = await get_user_profile_map(user_ids)
 
     for user_id, app_profile in app_profiles.items():
@@ -330,7 +330,7 @@ async def list_workspace_members(
 
     user_ids = [str(workspace.get("user_id") or "")]
     user_ids.extend(str(row.get("user_id") or "") for row in member_rows)
-    profiles = await get_user_profiles(user_ids)
+    profiles = await get_profiles(user_ids)
     return _hydrate_member_records(workspace, member_rows, profiles)
 
 
@@ -422,7 +422,7 @@ async def list_user_workspaces(user_id: str) -> list[dict[str, Any]]:
         member_rows_by_workspace_id.setdefault(workspace_id, []).append(row)
         user_ids.append(str(row.get("user_id") or ""))
 
-    profiles = await get_user_profiles(user_ids)
+    profiles = await get_profiles(user_ids)
 
     enriched: list[dict[str, Any]] = []
     for workspace in workspaces:
@@ -480,7 +480,7 @@ async def hydrate_invites(invites: list[dict[str, Any]]) -> list[dict[str, Any]]
         raise _database_error() from exc
 
     workspace_by_id = {str(workspace["id"]): workspace for workspace in workspace_rows}
-    profiles = await get_user_profiles(inviter_ids)
+    profiles = await get_profiles(inviter_ids)
 
     hydrated: list[dict[str, Any]] = []
     for invite in invites:
