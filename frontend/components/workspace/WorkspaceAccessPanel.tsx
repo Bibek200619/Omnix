@@ -25,6 +25,7 @@ import {
   type WorkspaceMember,
 } from "@/lib/workspace-types";
 import {
+  isWorkspaceFounderRole,
   workspaceRoleAvatarClass,
   workspaceRoleBadgeClass,
   workspaceRoleLabel,
@@ -78,7 +79,7 @@ function inviteStatusMeta(status: string) {
 }
 
 function roleIcon(role: WorkspaceMember["role"]) {
-  if (role === "owner") return Crown;
+  if (isWorkspaceFounderRole(role)) return Crown;
   if (role === "co_owner") return ShieldCheck;
   return UserRound;
 }
@@ -120,7 +121,8 @@ export function WorkspaceAccessPanel() {
       }),
     [activeInvites],
   );
-  const canManageTeam = activeWorkspace?.current_user_role === "owner";
+  const activeRole = activeWorkspace?.current_user_role;
+  const canManageRoles = isWorkspaceFounderRole(activeRole);
 
   async function handleInvite(target: string, role: "co_owner" | "member") {
     try {
@@ -201,7 +203,7 @@ export function WorkspaceAccessPanel() {
               </div>
             ) : null}
           </div>
-          {canManageTeam ? (
+          {canManageRoles ? (
             <Button
               type="button"
               variant="secondary"
@@ -237,8 +239,10 @@ export function WorkspaceAccessPanel() {
             ) : (
               workspaceMembers.map((member) => {
                 const RoleIcon = roleIcon(member.role);
-                const isFounder = member.role === "owner";
-                const canActOnMember = canManageTeam && !isFounder;
+                const isFounder = isWorkspaceFounderRole(member.role);
+                const canActOnMember =
+                  !isFounder &&
+                  (canManageRoles || (activeRole === "co_owner" && member.role === "member"));
 
                 return (
                   <div
@@ -294,7 +298,7 @@ export function WorkspaceAccessPanel() {
                               role="menu"
                               className="absolute right-0 top-full z-40 mt-2 w-44 overflow-hidden rounded-lg border border-white/12 bg-[#05070b] p-1.5 shadow-[0_18px_54px_rgba(0,0,0,0.58)] ring-1 ring-black/40"
                             >
-                              {member.role !== "co_owner" ? (
+                              {canManageRoles && member.role !== "co_owner" ? (
                                 <button
                                   type="button"
                                   role="menuitem"
@@ -305,7 +309,7 @@ export function WorkspaceAccessPanel() {
                                   Make co-owner
                                 </button>
                               ) : null}
-                              {member.role !== "member" ? (
+                              {canManageRoles && member.role !== "member" ? (
                                 <button
                                   type="button"
                                   role="menuitem"
@@ -349,7 +353,7 @@ export function WorkspaceAccessPanel() {
               Pending and recent invite activity stays here after the team roster.
             </p>
           </div>
-          {canManageTeam ? (
+          {canManageRoles ? (
             <Button type="button" variant="ghost" size="sm" leftIcon={<UserPlus className="h-4 w-4" />} onClick={() => setInviteOpen(true)}>
               Invite
             </Button>
@@ -361,7 +365,7 @@ export function WorkspaceAccessPanel() {
             <div className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-slate-500">
               Select a workspace to view invites.
             </div>
-          ) : activeWorkspace.current_user_role !== "owner" ? (
+          ) : !isWorkspaceFounderRole(activeWorkspace.current_user_role) ? (
             <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-slate-400">
               Only the workspace founder can manage outgoing invites.
             </div>
@@ -419,7 +423,7 @@ export function WorkspaceAccessPanel() {
           workspaceName={activeWorkspace.name}
           loading={inviteLoading}
           error={inviteError}
-          allowRoleSelection={canManageTeam}
+          allowRoleSelection={canManageRoles}
           onClose={() => setInviteOpen(false)}
           onSubmit={handleInvite}
         />

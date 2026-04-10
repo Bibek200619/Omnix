@@ -2,6 +2,7 @@ import type { WorkspaceRole } from "@/lib/workspace-types";
 
 export function workspaceRoleLabel(role?: WorkspaceRole | string | null) {
   switch (role) {
+    case "founder":
     case "owner":
       return "Founder";
     case "co_owner":
@@ -15,6 +16,7 @@ export function workspaceRoleLabel(role?: WorkspaceRole | string | null) {
 
 export function workspaceRoleBadgeClass(role?: WorkspaceRole | string | null) {
   switch (role) {
+    case "founder":
     case "owner":
       return "border-rose-300/30 bg-rose-400/12 text-rose-100";
     case "co_owner":
@@ -28,6 +30,7 @@ export function workspaceRoleBadgeClass(role?: WorkspaceRole | string | null) {
 
 export function workspaceRoleAvatarClass(role?: WorkspaceRole | string | null) {
   switch (role) {
+    case "founder":
     case "owner":
       return "border-rose-300/35 bg-rose-400/15 text-rose-100";
     case "co_owner":
@@ -37,6 +40,10 @@ export function workspaceRoleAvatarClass(role?: WorkspaceRole | string | null) {
     default:
       return "border-white/15 bg-white/[0.06] text-slate-200";
   }
+}
+
+export function isWorkspaceFounderRole(role?: WorkspaceRole | string | null) {
+  return role === "founder" || role === "owner";
 }
 
 export function initialsFromText(value?: string | null) {

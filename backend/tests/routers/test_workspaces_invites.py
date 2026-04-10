@@ -43,11 +43,15 @@ def _patch_successful_invite_dependencies(
     async def fake_hydrate_invites(invites: list[dict[str, object]]):
         return invites
 
+    async def fake_send_workspace_invite_email(**kwargs):
+        return SimpleNamespace(status="skipped", provider_id=None)
+
     monkeypatch.setattr(workspaces, "require_workspace_owner", fake_require_workspace_owner)
     monkeypatch.setattr(workspaces, "list_workspace_members", fake_list_workspace_members)
     monkeypatch.setattr(workspaces, "select_one_trusted", fake_select_one_trusted)
     monkeypatch.setattr(workspaces, "insert_one_trusted", fake_insert_one_trusted)
     monkeypatch.setattr(workspaces, "hydrate_invites", fake_hydrate_invites)
+    monkeypatch.setattr(workspaces, "send_workspace_invite_email", fake_send_workspace_invite_email)
     monkeypatch.setattr(workspaces, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
 
 
@@ -361,10 +365,10 @@ async def test_decline_invite_marks_invite_declined(monkeypatch: pytest.MonkeyPa
 async def test_founder_can_promote_member_to_co_owner(monkeypatch: pytest.MonkeyPatch) -> None:
     updates: list[dict[str, object]] = []
 
-    async def fake_require_workspace_owner(workspace_id: str, user_id: str):
+    async def fake_require_workspace_access(workspace_id: str, user_id: str):
         assert workspace_id == "workspace-1"
         assert user_id == "founder-1"
-        return SimpleNamespace(workspace={"id": workspace_id, "user_id": "founder-1"})
+        return SimpleNamespace(workspace={"id": workspace_id, "user_id": "founder-1"}, role="founder")
 
     async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
         assert table == "workspace_members"
@@ -380,7 +384,7 @@ async def test_founder_can_promote_member_to_co_owner(monkeypatch: pytest.Monkey
             {
                 "workspace_id": workspace["id"],
                 "user_id": "founder-1",
-                "role": "owner",
+                "role": "founder",
                 "avatar_label": "F",
             },
             {
@@ -391,7 +395,7 @@ async def test_founder_can_promote_member_to_co_owner(monkeypatch: pytest.Monkey
             },
         ]
 
-    monkeypatch.setattr(workspaces, "require_workspace_owner", fake_require_workspace_owner)
+    monkeypatch.setattr(workspaces, "require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(workspaces, "select_one_trusted", fake_select_one_trusted)
     monkeypatch.setattr(workspaces, "update_one_trusted", fake_update_one_trusted)
     monkeypatch.setattr(workspaces, "list_workspace_members", fake_list_workspace_members)
@@ -406,3 +410,72 @@ async def test_founder_can_promote_member_to_co_owner(monkeypatch: pytest.Monkey
 
     assert updates == [{"role": "co_owner", "updated_at": "2026-05-16T00:00:00+00:00"}]
     assert response["role"] == "co_owner"
+
+
+def test_workspace_member_patch_routes_are_registered() -> None:
+    assert any(
+        route.path == "/workspaces/{workspace_id}/members/{member_user_id}"
+        and getattr(route, "methods", set())
+        and "PATCH" in route.methods
+        for route in workspaces.router.routes
+    )
+    assert any(
+        route.path == "/workspaces/{workspace_id}/members/{member_user_id}/"
+        and getattr(route, "methods", set())
+        and "PATCH" in route.methods
+        for route in workspaces.router.routes
+    )
+
+
+@pytest.mark.asyncio
+async def test_member_cannot_update_workspace_roles(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_require_workspace_access(workspace_id: str, user_id: str):
+        assert workspace_id == "workspace-1"
+        assert user_id == "member-1"
+        return SimpleNamespace(workspace={"id": workspace_id, "user_id": "founder-1"}, role="member")
+
+    monkeypatch.setattr(workspaces, "require_workspace_access", fake_require_workspace_access)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await workspaces.update_workspace_member_role(
+            "workspace-1",
+            "member-2",
+            WorkspaceMemberRoleUpdate(role="co_owner"),
+            current_user={"sub": "member-1"},
+        )
+
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_co_owner_cannot_promote_member(monkeypatch: pytest.MonkeyPatch) -> None:
+    update_called = False
+
+    async def fake_require_workspace_access(workspace_id: str, user_id: str):
+        assert workspace_id == "workspace-1"
+        assert user_id == "co-owner-1"
+        return SimpleNamespace(workspace={"id": workspace_id, "user_id": "founder-1"}, role="co_owner")
+
+    async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
+        assert table == "workspace_members"
+        return {"workspace_id": "workspace-1", "user_id": "member-1", "role": "member"}
+
+    async def fake_update_one_trusted(*args, **kwargs):
+        nonlocal update_called
+        update_called = True
+        return None
+
+    monkeypatch.setattr(workspaces, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(workspaces, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspaces, "update_one_trusted", fake_update_one_trusted)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await workspaces.update_workspace_member_role(
+            "workspace-1",
+            "member-1",
+            WorkspaceMemberRoleUpdate(role="co_owner"),
+            current_user={"sub": "co-owner-1"},
+        )
+
+    assert exc_info.value.status_code == 403
+    assert update_called is False
