@@ -250,7 +250,7 @@ async def get_profiles(user_ids: list[str]) -> dict[str, dict[str, Any]]:
         )
         display_name = app_profile.get("display_name") or profile.get("full_name")
         avatar_url = app_profile.get("avatar_url") or profile.get("avatar_url")
-        handle = app_profile.get("handle") or profile.get("handle")
+        handle = app_profile.get("username") or profile.get("handle")
         profile["full_name"] = display_name
         profile["avatar_url"] = avatar_url
         profile["handle"] = handle

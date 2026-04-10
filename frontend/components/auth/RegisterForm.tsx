@@ -61,7 +61,7 @@ export function RegisterForm() {
         options: {
           data: {
             full_name: name || undefined,
-            handle,
+            username: handle,
           },
         },
       });

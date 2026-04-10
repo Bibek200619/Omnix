@@ -17,7 +17,6 @@ export type UserProfile = {
 
 export type UserProfileUpdate = {
   display_name?: string;
-  handle?: string;
   username?: string;
   avatar_url?: string | null;
   remove_avatar?: boolean;

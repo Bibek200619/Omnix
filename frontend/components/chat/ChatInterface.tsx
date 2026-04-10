@@ -317,12 +317,12 @@ export function ChatInterface() {
       currentUserId: user?.id ?? null,
       currentUserEmail: user?.email ?? null,
       currentUserName: profile?.display_name || currentUserNameFromSession(user?.email ?? null, user?.user_metadata),
-      currentUserHandle: profile?.handle ?? null,
+      currentUserHandle: profile?.username ?? profile?.handle ?? null,
       currentUserAvatarUrl: profile?.avatar_url ?? null,
       currentUserWorkspaceRole: activeWorkspace?.current_user_role ?? "member",
       membersById,
     };
-  }, [activeWorkspace?.current_user_role, profile?.avatar_url, profile?.display_name, profile?.handle, user?.email, user?.id, user?.user_metadata, workspaceMembers]);
+  }, [activeWorkspace?.current_user_role, profile?.avatar_url, profile?.display_name, profile?.handle, profile?.username, user?.email, user?.id, user?.user_metadata, workspaceMembers]);
   const mountedRef = useRef(false);
   const currentConversationRef = useRef<string | null>(conversationId);
   const respondingRef = useRef(false);

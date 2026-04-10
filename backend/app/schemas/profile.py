@@ -10,7 +10,6 @@ class UserProfileRead(BaseModel):
 
     user_id: str
     email: str | None = None
-    handle: str | None = None
     username: str | None = None
     display_name: str | None = None
     avatar_url: str | None = None
@@ -22,7 +21,6 @@ class UserProfileUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     display_name: str | None = Field(default=None, min_length=1, max_length=80)
-    handle: str | None = Field(default=None, min_length=3, max_length=30)
     username: str | None = Field(default=None, min_length=3, max_length=30)
     avatar_url: str | None = Field(default=None, max_length=300_000)
     remove_avatar: bool = False

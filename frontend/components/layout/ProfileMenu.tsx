@@ -27,7 +27,8 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
   const menuRef = useRef<HTMLDivElement | null>(null);
   const displayName = profile?.display_name || userDisplayName(user);
   const email = profile?.email || user?.email || "";
-  const handle = profile?.handle ? `@${profile.handle}` : null;
+  const username = profile?.username || profile?.handle || null;
+  const handle = username ? `@${username}` : null;
 
   useEffect(() => {
     if (!open) return;
@@ -76,7 +77,7 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
         <ProfileAvatar
           name={displayName}
           email={email}
-          handle={profile?.handle}
+          handle={username}
           avatarUrl={profile?.avatar_url}
           className="h-full w-full border-0 bg-transparent"
         />
@@ -92,7 +93,7 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
               <ProfileAvatar
                 name={displayName}
                 email={email}
-                handle={profile?.handle}
+                handle={username}
                 avatarUrl={profile?.avatar_url}
                 className="h-10 w-10 border-cyan-300/30 bg-cyan-300/12 text-cyan-50"
               />
