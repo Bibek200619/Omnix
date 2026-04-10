@@ -6,7 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useWorkspace } from "@/lib/workspace-context";
-import { workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
+import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import { cn } from "@/lib/utils";
 
 export function WorkspaceSettingsPanel() {
@@ -56,7 +56,7 @@ export function WorkspaceSettingsPanel() {
     );
   }
 
-  const canEdit = activeWorkspace.current_user_role === "owner";
+  const canEdit = isWorkspaceFounderRole(activeWorkspace.current_user_role);
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -100,7 +100,7 @@ export function WorkspaceSettingsPanel() {
         </div>
 
         {!canEdit ? (
-          <Alert className="mt-5" variant="warning" title="Workspace edits are owner-only">
+          <Alert className="mt-5" variant="warning" title="Workspace edits are founder-only">
             You can collaborate here, but only the workspace founder can rename or edit details.
           </Alert>
         ) : null}

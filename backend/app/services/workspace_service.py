@@ -28,7 +28,7 @@ WORKSPACE_INVITE_COLUMNS = (
 )
 MEMBERS_PREVIEW_LIMIT = 3
 
-WorkspaceRole = Literal["owner", "co_owner", "member"]
+WorkspaceRole = Literal["founder", "co_owner", "member"]
 WorkspaceInviteStatus = Literal["pending", "accepted", "declined", "revoked"]
 
 
@@ -42,8 +42,12 @@ class WorkspaceAccess:
         return str(self.workspace["id"])
 
     @property
+    def is_founder(self) -> bool:
+        return self.role == "founder"
+
+    @property
     def is_owner(self) -> bool:
-        return self.role == "owner"
+        return self.is_founder
 
 
 def normalize_workspace_role(
@@ -53,11 +57,13 @@ def normalize_workspace_role(
     owner_user_id: str | None = None,
 ) -> WorkspaceRole:
     if owner_user_id and member_user_id and member_user_id == owner_user_id:
-        return "owner"
+        return "founder"
 
     role = str(value or "").strip().lower().replace("-", "_")
+    if role == "founder":
+        return "founder"
     if role == "owner":
-        return "co_owner"
+        return "founder" if owner_user_id and member_user_id == owner_user_id else "co_owner"
     if role == "co_owner":
         return "co_owner"
     return "member"
@@ -123,7 +129,7 @@ async def resolve_workspace_access(
 
     owner_user_id = str(workspace.get("user_id") or "")
     if owner_user_id == user_id:
-        return WorkspaceAccess(workspace=workspace, role="owner")
+        return WorkspaceAccess(workspace=workspace, role="founder")
 
     try:
         membership = await select_one_trusted(
@@ -160,7 +166,7 @@ async def require_workspace_owner(
     user_id: str,
 ) -> WorkspaceAccess:
     access = await require_workspace_access(workspace_id, user_id)
-    if not access.is_owner:
+    if not access.is_founder:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the workspace founder can perform this action.",
@@ -275,7 +281,7 @@ def _hydrate_member_records(
         member_map[owner_user_id] = {
             "workspace_id": workspace.get("id"),
             "user_id": owner_user_id,
-            "role": "owner",
+            "role": "founder",
             "created_at": workspace.get("created_at"),
             "updated_at": workspace.get("updated_at"),
         }
@@ -305,7 +311,7 @@ def _hydrate_member_records(
 
     members.sort(
         key=lambda item: (
-            {"owner": 0, "co_owner": 1, "member": 2}.get(item["role"], 3),
+            {"founder": 0, "co_owner": 1, "member": 2}.get(item["role"], 3),
             (item.get("full_name") or item.get("email") or item["user_id"]).lower(),
         )
     )
@@ -381,7 +387,7 @@ async def list_user_workspaces(user_id: str) -> list[dict[str, Any]]:
     for workspace in owned_workspaces:
         workspace_id = str(workspace["id"])
         workspace_by_id[workspace_id] = workspace
-        role_by_workspace_id[workspace_id] = "owner"
+        role_by_workspace_id[workspace_id] = "founder"
 
     for row in membership_rows:
         workspace_id = str(row.get("workspace_id") or "")

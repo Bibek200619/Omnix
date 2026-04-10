@@ -102,7 +102,7 @@ export function WorkspaceInviteModal({
                 Invite role
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {(["member", "co_owner"] as Array<Exclude<WorkspaceRole, "owner">>).map((option) => (
+                {(["member", "co_owner"] as Array<Extract<WorkspaceRole, "member" | "co_owner">>).map((option) => (
                   <button
                     key={option}
                     type="button"

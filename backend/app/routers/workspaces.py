@@ -525,6 +525,7 @@ async def get_workspace_members(
 
 
 @router.patch("/{workspace_id}/members/{member_user_id}", response_model=WorkspaceMemberRead)
+@router.patch("/{workspace_id}/members/{member_user_id}/", response_model=WorkspaceMemberRead, include_in_schema=False)
 async def update_workspace_member_role(
     workspace_id: str,
     member_user_id: str,
@@ -532,9 +533,16 @@ async def update_workspace_member_role(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
-    access = await require_workspace_owner(workspace_id, user_id)
+    access = await require_workspace_access(workspace_id, user_id)
 
-    if str(access.workspace.get("user_id") or "") == member_user_id:
+    if access.role == "member":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only workspace founders and co-owners can manage roles.",
+        )
+
+    founder_user_id = str(access.workspace.get("user_id") or "")
+    if founder_user_id == member_user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="The workspace founder role cannot be changed.",
@@ -556,10 +564,22 @@ async def update_workspace_member_role(
         )
 
     next_role = normalize_workspace_role(role_payload.role)
-    if next_role == "owner":
+    current_member_role = normalize_workspace_role(
+        membership.get("role"),
+        member_user_id=member_user_id,
+        owner_user_id=founder_user_id,
+    )
+
+    if next_role == "founder":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only the original founder can have the founder role.",
+        )
+
+    if access.role == "co_owner" and (current_member_role != "member" or next_role != "member"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Co-owners can manage members only.",
         )
 
     try:
@@ -710,18 +730,26 @@ async def get_workspace_invites(
 
 
 @router.delete("/{workspace_id}/members/{member_user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{workspace_id}/members/{member_user_id}/", status_code=status.HTTP_204_NO_CONTENT, include_in_schema=False)
 async def remove_workspace_member(
     workspace_id: str,
     member_user_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> None:
     user_id = _user_id_from_claims(current_user)
-    access = await require_workspace_owner(workspace_id, user_id)
+    access = await require_workspace_access(workspace_id, user_id)
 
-    if str(access.workspace.get("user_id") or "") == member_user_id:
+    if access.role == "member":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only workspace founders and co-owners can remove members.",
+        )
+
+    founder_user_id = str(access.workspace.get("user_id") or "")
+    if founder_user_id == member_user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The workspace owner cannot be removed.",
+            detail="The workspace founder cannot be removed.",
         )
 
     try:
@@ -737,6 +765,17 @@ async def remove_workspace_member(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Workspace member not found.",
+        )
+
+    target_role = normalize_workspace_role(
+        membership.get("role"),
+        member_user_id=member_user_id,
+        owner_user_id=founder_user_id,
+    )
+    if access.role == "co_owner" and target_role != "member":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Co-owners can remove members only.",
         )
 
     try:

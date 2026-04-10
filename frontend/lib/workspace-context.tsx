@@ -3,6 +3,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "./api";
 import { useAuth } from "./auth-context";
+import { isWorkspaceFounderRole } from "./workspace-roles";
 import { getWorkspaceInviteId, type Workspace, type WorkspaceInvite, type WorkspaceMember } from "./workspace-types";
 
 type RefreshOptions = {
@@ -260,7 +261,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      if (activeWorkspace.current_user_role !== "owner") {
+      if (!isWorkspaceFounderRole(activeWorkspace.current_user_role)) {
         setActiveInvites([]);
         lastActiveWorkspaceDataRefreshAtRef.current = Date.now();
         activeWorkspaceDataInFlightRef.current = null;
