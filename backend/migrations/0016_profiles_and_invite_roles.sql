@@ -2,14 +2,14 @@
 
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS user_profiles (
+CREATE TABLE IF NOT EXISTS profiles (
   user_id uuid PRIMARY KEY,
   handle text,
   display_name text,
   avatar_url text,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now(),
-  CONSTRAINT user_profiles_handle_format_check
+  CONSTRAINT profiles_handle_format_check
     CHECK (handle IS NULL OR handle ~ '^[a-z0-9][a-z0-9_-]{2,29}$')
 );
 
@@ -18,32 +18,32 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1
     FROM pg_constraint
-    WHERE conname = 'user_profiles_user_id_fkey'
+    WHERE conname = 'profiles_user_id_fkey'
   ) THEN
     BEGIN
-      ALTER TABLE user_profiles
-      ADD CONSTRAINT user_profiles_user_id_fkey
+      ALTER TABLE profiles
+      ADD CONSTRAINT profiles_user_id_fkey
       FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
     EXCEPTION WHEN undefined_table OR undefined_object THEN
-      RAISE NOTICE 'Skipping user_profiles.user_id FK creation - auth.users not available.';
+      RAISE NOTICE 'Skipping profiles.user_id FK creation - auth.users not available.';
     END;
   END IF;
 END$$;
 
-CREATE UNIQUE INDEX IF NOT EXISTS ux_user_profiles_handle_lower
-ON user_profiles(lower(handle))
+CREATE UNIQUE INDEX IF NOT EXISTS ux_profiles_handle_lower
+ON profiles(lower(handle))
 WHERE handle IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id
-ON user_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_user_id
+ON profiles(user_id);
 
-INSERT INTO user_profiles (user_id, created_at, updated_at)
+INSERT INTO profiles (user_id, created_at, updated_at)
 SELECT DISTINCT wm.user_id, now(), now()
 FROM workspace_members wm
 WHERE wm.user_id IS NOT NULL
 ON CONFLICT (user_id) DO NOTHING;
 
-INSERT INTO user_profiles (user_id, created_at, updated_at)
+INSERT INTO profiles (user_id, created_at, updated_at)
 SELECT DISTINCT w.user_id, now(), now()
 FROM workspaces w
 WHERE w.user_id IS NOT NULL

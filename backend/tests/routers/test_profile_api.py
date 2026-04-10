@@ -14,7 +14,7 @@ from app.services import profile_service
 def _missing_column_error(column: str) -> profile_service.SupabaseServiceError:
     exc = profile_service.SupabaseServiceError("Internal server error")
     exc.__cause__ = RuntimeError(
-        f"Could not find the '{column}' column of 'user_profiles' in the schema cache"
+        f"Could not find the '{column}' column of 'profiles' in the schema cache"
     )
     return exc
 
@@ -129,7 +129,7 @@ async def test_update_user_profile_maps_username_to_handle_column(monkeypatch: p
         columns: str,
         filters: dict[str, Any],
     ) -> dict[str, Any] | None:
-        assert table == "user_profiles"
+        assert table == "profiles"
         selected_filters.append(filters)
         if "user_id" in filters:
             return {
@@ -147,7 +147,7 @@ async def test_update_user_profile_maps_username_to_handle_column(monkeypatch: p
         filters: dict[str, Any],
         payload: dict[str, Any],
     ) -> dict[str, Any]:
-        assert table == "user_profiles"
+        assert table == "profiles"
         assert filters == {"user_id": "user-1"}
         update_payloads.append(payload)
         return {
@@ -196,7 +196,7 @@ async def test_update_user_profile_retries_without_updated_at_when_schema_is_beh
         columns: str,
         filters: dict[str, Any],
     ) -> dict[str, Any] | None:
-        assert table == "user_profiles"
+        assert table == "profiles"
         return {
             "user_id": "user-1",
             "handle": "alex-dev",
@@ -211,7 +211,7 @@ async def test_update_user_profile_retries_without_updated_at_when_schema_is_beh
         filters: dict[str, Any],
         payload: dict[str, Any],
     ) -> dict[str, Any]:
-        assert table == "user_profiles"
+        assert table == "profiles"
         assert filters == {"user_id": "user-1"}
         update_payloads.append(payload)
         if "updated_at" in payload:
@@ -256,12 +256,12 @@ async def test_ensure_user_profile_retries_insert_without_timestamps_when_schema
         columns: str,
         filters: dict[str, Any],
     ) -> dict[str, Any] | None:
-        assert table == "user_profiles"
+        assert table == "profiles"
         assert filters == {"user_id": "user-1"}
         return None
 
     async def fake_insert_one_trusted(table: str, payload: dict[str, Any]) -> dict[str, Any]:
-        assert table == "user_profiles"
+        assert table == "profiles"
         inserted_payloads.append(payload)
         if "updated_at" in payload:
             raise _missing_column_error("updated_at")
