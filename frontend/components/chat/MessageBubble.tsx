@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Bot, Check, Copy, RotateCcw, FileText, ChevronDown, ChevronUp, ExternalLink, Globe2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "@/components/chat/types";
-import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
+import { MarkdownRenderer, StreamingTextRenderer } from "@/components/chat/MarkdownRenderer";
 import { Button } from "@/components/ui/Button";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,7 @@ type MessageBubbleProps = {
   onRegenerate?: (assistantMessageId: string) => void;
 };
 
-export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [gaveFeedback, setGaveFeedback] = useState<null | "up" | "down">(null);
   const [expandedSource, setExpandedSource] = useState<string | null>(null);
@@ -32,6 +32,7 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
   const isOtherHuman = isUser && !isOwn;
   const failed = message.status === "failed";
   const sending = message.status === "sending" || message.status === "streaming";
+  const activelyStreaming = !isUser && (message.isStreaming || message.status === "streaming");
   const senderName = message.senderName || (isUser ? (isOwn ? "You" : "Teammate") : "Omnix AI");
   const senderRole = message.senderRole || (isUser ? "member" : "assistant");
   const sources = message.sources ?? [];
@@ -113,7 +114,7 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
 
   return (
     <motion.div
-      layout
+      layout={!activelyStreaming}
       initial={{ opacity: 0, y: 10, scale: 0.99 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -6, scale: 0.99 }}
@@ -175,6 +176,8 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
 
         {isUser ? (
           <p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p>
+        ) : activelyStreaming ? (
+          <StreamingTextRenderer content={message.content} compact />
         ) : (
           <MarkdownRenderer content={message.content} compact />
         )}
@@ -214,7 +217,16 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
           </div>
         ) : null}
 
-        {!isUser && sources.length > 0 ? (
+        {!isUser && activelyStreaming && sources.length > 0 ? (
+          <div className="mt-4 border-t border-white/10 pt-3">
+            <p className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[11px] font-medium text-cyan-100">
+              <Globe2 className="h-3.5 w-3.5" />
+              Sources ready ({sources.length})
+            </p>
+          </div>
+        ) : null}
+
+        {!isUser && !activelyStreaming && sources.length > 0 ? (
           <div className="mt-4 border-t border-white/10 pt-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="flex items-center gap-2 text-xs font-medium text-slate-400">
@@ -404,4 +416,4 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
       </div>
     </motion.div>
   );
-}
+});
