@@ -325,6 +325,7 @@ export function ChatInterface() {
   }, [activeWorkspace?.current_user_role, profile?.avatar_url, profile?.display_name, profile?.handle, profile?.username, user?.email, user?.id, user?.user_metadata, workspaceMembers]);
   const mountedRef = useRef(false);
   const currentConversationRef = useRef<string | null>(conversationId);
+  const messagesRef = useRef<Message[]>([]);
   const respondingRef = useRef(false);
   const lastWorkspaceSyncRef = useRef(0);
   const lastMessageSyncRef = useRef(0);
@@ -343,6 +344,10 @@ export function ChatInterface() {
   useEffect(() => {
     currentConversationRef.current = currentConversation;
   }, [currentConversation]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     respondingRef.current = responding;
@@ -646,6 +651,36 @@ export function ChatInterface() {
       let streamConversationId: string | null = currentConversation;
       const streamAbortController = new AbortController();
       activeStreamAbortRef.current = streamAbortController;
+      let pendingTokenText = "";
+      let tokenFlushFrame: number | null = null;
+
+      const applyPendingTokens = () => {
+        if (!assistantId || !pendingTokenText) return;
+
+        const nextText = pendingTokenText;
+        pendingTokenText = "";
+        setMessages((current) =>
+          current.map((m) =>
+            m.id === assistantId ? { ...m, content: (m.content || "") + nextText } : m,
+          ),
+        );
+      };
+
+      const flushPendingTokens = () => {
+        if (tokenFlushFrame !== null) {
+          window.cancelAnimationFrame(tokenFlushFrame);
+          tokenFlushFrame = null;
+        }
+        applyPendingTokens();
+      };
+
+      const scheduleTokenFlush = () => {
+        if (tokenFlushFrame !== null) return;
+        tokenFlushFrame = window.requestAnimationFrame(() => {
+          tokenFlushFrame = null;
+          applyPendingTokens();
+        });
+      };
 
       try {
         // Use streaming endpoint when available
@@ -751,10 +786,11 @@ export function ChatInterface() {
           } else if (t === "token") {
             if (!assistantId) return;
             const txt = obj.text ?? "";
-            setMessages((current) =>
-              current.map((m) => (m.id === assistantId ? { ...m, content: (m.content || "") + txt } : m)),
-            );
+            if (!txt) return;
+            pendingTokenText += txt;
+            scheduleTokenFlush();
           } else if (t === "error") {
+            flushPendingTokens();
             const detail = obj.detail ?? "Unknown error";
             if (assistantId) {
               setMessages((current) =>
@@ -762,6 +798,7 @@ export function ChatInterface() {
               );
             }
           } else if (t === "done") {
+            flushPendingTokens();
             streamConversationId = obj.conversation_id ?? streamConversationId;
             if (assistantId) {
               setMessages((current) =>
@@ -787,6 +824,7 @@ export function ChatInterface() {
         if (buffer.trim()) {
           processEvent(buffer);
         }
+        flushPendingTokens();
 
         const targetConversationId = streamConversationId || currentConversationRef.current;
         if (targetConversationId) {
@@ -799,6 +837,9 @@ export function ChatInterface() {
         await refreshConversations({ force: true, silent: true });
 
       } catch (err) {
+        if (mountedRef.current) {
+          flushPendingTokens();
+        }
         if (streamAbortController.signal.aborted && !mountedRef.current) {
           return;
         }
@@ -826,6 +867,10 @@ export function ChatInterface() {
         }
         await refreshConversations({ force: true, silent: true });
       } finally {
+        if (tokenFlushFrame !== null) {
+          window.cancelAnimationFrame(tokenFlushFrame);
+          tokenFlushFrame = null;
+        }
         // ensure responding is cleared when streaming completes or error occurred
         respondingRef.current = false;
         if (mountedRef.current) {
@@ -853,18 +898,19 @@ export function ChatInterface() {
     ],
   );
 
-  function handleRetry(message: Message) {
+  const handleRetry = useCallback((message: Message) => {
     sendMessage(message.content, message.id, message.attachments ?? []);
-  }
+  }, [sendMessage]);
 
-  function handleRegenerate(assistantMessageId: string) {
+  const handleRegenerate = useCallback((assistantMessageId: string) => {
     // find the preceding user message and resend it
-    const idx = messages.findIndex((m) => m.id === assistantMessageId);
+    const currentMessages = messagesRef.current;
+    const idx = currentMessages.findIndex((m) => m.id === assistantMessageId);
     if (idx <= 0) return;
-    const prev = messages[idx - 1];
+    const prev = currentMessages[idx - 1];
     if (!prev || prev.role !== "user") return;
     sendMessage(prev.content, undefined, prev.attachments ?? []);
-  }
+  }, [sendMessage]);
 
   function handlePromptSelect(prompt: string) {
     sendMessage(prompt);

@@ -13,6 +13,10 @@ type MarkdownRendererProps = {
   compact?: boolean;
 };
 
+type StreamingTextRendererProps = MarkdownRendererProps & {
+  showCursor?: boolean;
+};
+
 function CodeBlock({ code, language }: { code: string; language?: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -153,6 +157,31 @@ export function MarkdownRenderer({ content, compact = false }: MarkdownRendererP
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {content}
       </ReactMarkdown>
+    </div>
+  );
+}
+
+export function StreamingTextRenderer({
+  content,
+  compact = false,
+  showCursor = true,
+}: StreamingTextRendererProps) {
+  return (
+    <div className="break-words text-slate-100">
+      <p
+        className={cn(
+          "whitespace-pre-wrap leading-7 text-slate-200",
+          compact ? "text-sm" : "text-[15px]",
+        )}
+      >
+        {content}
+        {showCursor ? (
+          <span
+            aria-hidden="true"
+            className="ml-0.5 inline-block h-4 w-1 translate-y-0.5 animate-pulse rounded-full bg-cyan-200/80 align-middle"
+          />
+        ) : null}
+      </p>
     </div>
   );
 }
