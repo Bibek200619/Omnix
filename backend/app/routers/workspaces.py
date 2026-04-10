@@ -26,7 +26,7 @@ from ..services.supabase_service import (
     update_one_trusted,
 )
 from ..services.email_service import send_workspace_invite_email
-from ..services.profile_service import get_auth_profile_for_user, resolve_profile_by_handle
+from ..services.profile_service import get_auth_profile_for_user, resolve_profile_by_username
 from ..services.workspace_service import (
     WORKSPACE_COLUMNS,
     WORKSPACE_INVITE_COLUMNS,
@@ -601,13 +601,13 @@ async def invite_workspace_member(
     if "@" in raw_invite_target:
         normalized_email = normalize_email(raw_invite_target)
     else:
-        target_profile = await resolve_profile_by_handle(raw_invite_target)
+        target_profile = await resolve_profile_by_username(raw_invite_target)
         if target_profile is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No Omnix user with that handle was found.",
+                detail="No Omnix user with that username was found.",
             )
-        auth_profile = await get_auth_profile_for_user(str(target_profile["user_id"]))
+        auth_profile = await get_auth_profile_for_user(str(target_profile["id"]))
         if not auth_profile.email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
