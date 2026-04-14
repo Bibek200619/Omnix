@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Mail } from "lucide-react";
+import { ArrowRight, Lock, Mail, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { LoadingButton } from "@/components/ui/LoadingButton";
 import { Alert } from "@/components/ui/Alert";
@@ -74,7 +74,7 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       {!isConfigured ? (
         <Alert variant="warning" title="Authentication is not configured">
           {authError}
@@ -95,6 +95,7 @@ export function LoginForm() {
         required
         icon={<Mail className="h-4 w-4" />}
         disabled={loading || !isConfigured}
+        className="h-12 rounded-lg border-white/10 bg-white/[0.045]"
       />
       <Input
         id="password"
@@ -107,20 +108,31 @@ export function LoginForm() {
         minLength={8}
         icon={<Lock className="h-4 w-4" />}
         disabled={loading || !isConfigured}
+        className="h-12 rounded-lg border-white/10 bg-white/[0.045]"
       />
       <LoadingButton
         type="submit"
-        className="w-full"
+        size="lg"
+        className="w-full font-black"
         isLoading={loading}
         loadingText="Signing in"
         disabled={!isConfigured}
+        rightIcon={<ArrowRight className="h-4 w-4" />}
       >
-        Sign in
+        Sign in to workspace
       </LoadingButton>
+      <div className="flex items-start gap-3 rounded-lg border border-white/[0.07] bg-white/[0.035] p-3 text-xs leading-5 text-slate-500">
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-cyan-200" aria-hidden="true" />
+        Your session keeps workspace research, files, and team history tied to
+        your account.
+      </div>
       <p className="text-center text-sm text-slate-400">
         New to Omnix?{" "}
-        <Link href={authLink("/register")} className="font-medium text-cyan-200 hover:text-cyan-100">
-          Register
+        <Link
+          href={authLink("/register")}
+          className="font-semibold text-cyan-200 transition hover:text-cyan-100"
+        >
+          Create an account
         </Link>
       </p>
     </form>

@@ -5,7 +5,8 @@ export default function RegisterPage() {
   return (
     <AuthCard
       title="Create your account"
-      description="Create a Supabase-backed Omnix account for your AI workspace."
+      description="Create an Omnix account for collaborative AI research, uploads, web search, and team knowledge."
+      mode="register"
     >
       <RegisterForm />
     </AuthCard>
