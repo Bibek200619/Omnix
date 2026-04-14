@@ -51,7 +51,7 @@ export function WorkspaceMemberStack({
         {overflowCount > 0 ? (
           <div
             className={cn(
-              "ml-2 flex items-center justify-center rounded-lg border border-white/10 bg-white/[0.05] px-2 text-slate-400",
+              "ml-2 flex items-center justify-center rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-2 text-[var(--omnix-text-2)]",
               size === "sm" ? "h-7 text-[11px]" : "h-8 text-xs",
             )}
           >

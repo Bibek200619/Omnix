@@ -49,7 +49,7 @@ class WorkspaceContextManager:
                         Citation(
                             source_id=str(row.get("id")),
                             source_type=ContextSourceType.WORKSPACE,
-                            content=f"Artifact ({row.get("title", "Untitled")}): {content[:500]}",
+                            content=f"Artifact ({row.get("title", "Omnix")}): {content[:500]}",
                             metadata=row.get("metadata") or {},
                         )
                     )

@@ -9,7 +9,7 @@ export default function AboutSettingsPage() {
       description="Product context, policies, and presentation-ready account responsibilities."
     >
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+        <section className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5">
           <Sparkles className="h-5 w-5 text-cyan-200" />
           <h3 className="mt-3 font-semibold text-white">Omnix</h3>
           <p className="mt-2 text-sm leading-6 text-slate-400">
@@ -18,7 +18,7 @@ export default function AboutSettingsPage() {
         </section>
         <Link
           href="/settings/terms"
-          className="rounded-lg border border-white/10 bg-white/[0.035] p-5 transition hover:border-cyan-300/30 hover:bg-white/[0.06]"
+          className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5 transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)]"
         >
           <FileText className="h-5 w-5 text-amber-200" />
           <h3 className="mt-3 font-semibold text-white">Terms and policies</h3>

@@ -165,7 +165,7 @@ export function AccountProfileSettings() {
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-      <section className="rounded-lg border border-white/10 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
+      <section className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
           <ProfileAvatar
             name={displayName}
@@ -223,13 +223,13 @@ export function AccountProfileSettings() {
             </div>
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-lg border border-white/10 bg-black/15 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Email</p>
+              <div className="rounded-lg border border-[var(--omnix-border)] bg-black/15 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Email</p>
                 <p className="mt-2 break-all text-sm text-slate-200">{email || "No email available"}</p>
               </div>
-              <div className="rounded-lg border border-white/10 bg-black/15 p-4">
+              <div className="rounded-lg border border-[var(--omnix-border)] bg-black/15 p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Omnix handle</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Omnix handle</p>
                   {handle ? (
                     <button type="button" onClick={copyHandle} className="text-slate-500 transition hover:text-cyan-200" aria-label="Copy handle">
                       <Copy className="h-3.5 w-3.5" />
@@ -273,7 +273,7 @@ export function AccountProfileSettings() {
         </div>
       </section>
 
-      <aside className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+      <aside className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="font-semibold text-white">Profile picture</h3>

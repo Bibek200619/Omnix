@@ -50,7 +50,7 @@ export function WorkspaceSettingsPanel() {
 
   if (!activeWorkspace) {
     return (
-      <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.025] p-6 text-sm text-slate-400">
+      <div className="rounded-xl border border-dashed border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-6 text-sm text-[var(--omnix-text-2)]">
         Select a workspace from the sidebar before editing workspace settings.
       </div>
     );
@@ -60,7 +60,7 @@ export function WorkspaceSettingsPanel() {
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-      <section className="rounded-lg border border-white/10 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
+      <section className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
         <div className="flex items-start gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-100">
             <Settings className="h-5 w-5" />
@@ -93,7 +93,7 @@ export function WorkspaceSettingsPanel() {
               }}
               disabled={!canEdit || saving}
               rows={4}
-              className="mt-2 w-full resize-none rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-300/40 focus:ring-2 focus:ring-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-60"
+              className="omnix-input mt-2 w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
               placeholder="What is this workspace for?"
             />
           </label>
@@ -129,14 +129,14 @@ export function WorkspaceSettingsPanel() {
       </section>
 
       <aside className="space-y-4">
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Current workspace</p>
+        <div className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Current workspace</p>
           <h3 className="mt-2 truncate text-lg font-semibold text-white">{activeWorkspace.name}</h3>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", workspaceRoleBadgeClass(activeWorkspace.current_user_role))}>
               {workspaceRoleLabel(activeWorkspace.current_user_role)}
             </span>
-            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-slate-300">
+            <span className="rounded-full border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-2.5 py-1 text-xs text-[var(--omnix-text-2)]">
               {activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "member" : "members"}
             </span>
           </div>

@@ -1,18 +1,20 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 type PageTransitionProps = {
   children: React.ReactNode;
+  className?: string;
 };
 
-export function PageTransition({ children }: PageTransitionProps) {
+export function PageTransition({ children, className }: PageTransitionProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
-      className="min-h-[calc(100vh-6.5rem)]"
+      className={cn("min-h-[calc(100vh-6.5rem)]", className)}
     >
       {children}
     </motion.div>
