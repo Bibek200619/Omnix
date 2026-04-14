@@ -3,7 +3,8 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { Loader2, ShieldAlert } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { currentRouteRedirect } from "@/lib/auth-redirects";
 import { useAuth } from "@/lib/auth-context";
 
 type RequireAuthProps = {
@@ -12,13 +13,14 @@ type RequireAuthProps = {
 
 export function RequireAuth({ children }: RequireAuthProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { authError, isConfigured, loading, session } = useAuth();
 
   useEffect(() => {
     if (isConfigured && !loading && !session) {
-      router.replace("/login");
+      router.replace(`/login?redirect=${encodeURIComponent(currentRouteRedirect())}`);
     }
-  }, [isConfigured, loading, router, session]);
+  }, [isConfigured, loading, pathname, router, session]);
 
   if (!isConfigured) {
     return (

@@ -17,6 +17,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { OmnixMark } from "@/components/brand/OmnixMark";
+import { redirectFromWindow } from "@/lib/auth-redirects";
 import { useAuth } from "@/lib/auth-context";
 
 type AuthCardProps = {
@@ -50,7 +51,7 @@ export function AuthCard({
 
   useEffect(() => {
     if (isConfigured && !loading && session) {
-      router.replace("/chat");
+      router.replace(redirectFromWindow());
     }
   }, [isConfigured, loading, router, session]);
 
