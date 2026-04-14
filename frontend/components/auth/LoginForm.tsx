@@ -7,23 +7,10 @@ import { ArrowRight, Lock, Mail, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { LoadingButton } from "@/components/ui/LoadingButton";
 import { Alert } from "@/components/ui/Alert";
+import { OAuthButtons } from "@/components/auth/OAuthButtons";
+import { authLink, redirectFromWindow } from "@/lib/auth-redirects";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
-
-function safeRedirectPath() {
-  if (typeof window === "undefined") return "/chat";
-  const redirect = new URLSearchParams(window.location.search).get("redirect");
-  if (!redirect || !redirect.startsWith("/") || redirect.startsWith("//")) {
-    return "/chat";
-  }
-  return redirect;
-}
-
-function authLink(path: string) {
-  if (typeof window === "undefined") return path;
-  const redirect = new URLSearchParams(window.location.search).get("redirect");
-  return redirect ? `${path}?redirect=${encodeURIComponent(redirect)}` : path;
-}
 
 export function LoginForm() {
   const router = useRouter();
@@ -65,7 +52,7 @@ export function LoginForm() {
       }
 
       await refreshSession();
-      router.replace(safeRedirectPath());
+      router.replace(redirectFromWindow());
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
@@ -85,6 +72,17 @@ export function LoginForm() {
           {error}
         </Alert>
       )}
+      <OAuthButtons disabled={loading || !isConfigured} mode="login" onError={setError} />
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center" aria-hidden="true">
+          <div className="h-px w-full bg-white/10" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-[#07111f] px-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            or continue with email
+          </span>
+        </div>
+      </div>
       <Input
         id="email"
         name="email"
