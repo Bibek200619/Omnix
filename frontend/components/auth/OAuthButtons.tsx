@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Github, Loader2 } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { AUTH_C } from "@/components/auth/OmnixAuthVisuals";
 import { oauthCallbackUrl, redirectFromWindow } from "@/lib/auth-redirects";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -58,7 +59,7 @@ function oauthErrorMessage(provider: OAuthProvider, error: unknown) {
   return `${providerName} sign-in could not start. Please try again.`;
 }
 
-export function OAuthButtons({ disabled = false, mode = "login", onError }: OAuthButtonsProps) {
+export function OAuthButtons({ disabled = false, onError }: OAuthButtonsProps) {
   const [loadingProvider, setLoadingProvider] = useState<OAuthProvider | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -91,7 +92,7 @@ export function OAuthButtons({ disabled = false, mode = "login", onError }: OAut
     }
   }
 
-  const action = mode === "register" ? "Sign up" : "Continue";
+  const action = "Continue";
 
   return (
     <div className="space-y-3">
@@ -100,7 +101,7 @@ export function OAuthButtons({ disabled = false, mode = "login", onError }: OAut
           {localError}
         </Alert>
       ) : null}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {(["google", "github"] as OAuthProvider[]).map((provider) => {
           const isLoading = loadingProvider === provider;
           return (
@@ -113,9 +114,10 @@ export function OAuthButtons({ disabled = false, mode = "login", onError }: OAut
               onClick={() => continueWith(provider)}
               leftIcon={providerIcon(provider, isLoading)}
               className={cn(
-                "w-full justify-center border-white/12 bg-white/[0.045] text-sm font-bold hover:-translate-y-0.5 hover:border-cyan-300/25 hover:bg-white/[0.08]",
+                "w-full justify-center rounded-xl border-white/[0.08] bg-white/[0.03] py-3 text-sm font-semibold text-white/55 shadow-none hover:-translate-y-0.5 hover:border-white/[0.16] hover:bg-white/[0.055] hover:text-white",
                 isLoading && "border-cyan-300/30 bg-cyan-300/10 text-cyan-50",
               )}
+              style={{ color: isLoading ? AUTH_C.white : undefined }}
             >
               {isLoading ? "Redirecting" : `${action} with ${providerLabels[provider]}`}
             </Button>
