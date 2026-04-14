@@ -5,7 +5,7 @@ import { AuthProvider } from "@/lib/auth-context";
 export const metadata: Metadata = {
   title: "Omnix",
   description:
-    "A premium AI workspace for secure chat, searchable history, and account-managed knowledge workflows.",
+    "A collaborative AI research workspace for secure chat, live web intelligence, uploads, RAG, and team knowledge synthesis.",
 };
 
 export default function RootLayout({
