@@ -19,8 +19,8 @@ body {
   min-height: 100vh;
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(34, 211, 238, 0.08), transparent 30rem),
-    linear-gradient(180deg, #07080b 0%, #050608 46%, #040509 100%);
+    radial-gradient(circle at top left, rgba(0, 255, 255, 0.08), transparent 30rem),
+    linear-gradient(180deg, #061020 0%, #061020 46%, #050b16 100%);
   color: #f8fafc;
   font-family: var(--font-geist-sans);
   text-rendering: optimizeLegibility;
@@ -81,6 +81,25 @@ textarea {
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
+  }
+}
+
+@keyframes auth-drift {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) translate3d(-20px, -15px, 0) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) translate3d(20px, 15px, 0) scale(1.12);
+  }
+}
+
+@keyframes auth-grid {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 64px 64px;
   }
 }
 
