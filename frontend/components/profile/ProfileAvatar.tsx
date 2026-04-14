@@ -25,7 +25,7 @@ export function ProfileAvatar({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/12 bg-white/[0.07] text-sm font-semibold text-slate-100",
+        "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-sm font-semibold text-slate-100",
         className,
       )}
       title={name || handle || email || "User"}

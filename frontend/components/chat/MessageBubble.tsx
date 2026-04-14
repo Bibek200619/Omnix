@@ -126,7 +126,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -6, scale: 0.99 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
-      className={cn("group flex gap-3", isOwn && "flex-row-reverse")}
+      className="group flex gap-3"
     >
       {isUser ? (
         <ProfileAvatar
@@ -138,7 +138,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         />
       ) : (
         <div
-          className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cyan-300/30 bg-cyan-300/10 text-xs font-semibold text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+          className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-300/35 bg-[linear-gradient(135deg,#00ffff,#0055ff)] text-xs font-semibold text-white shadow-[var(--omnix-glow-md)]"
           title={senderName}
         >
           <Bot className="h-4 w-4" />
@@ -146,22 +146,23 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
       )}
       <div
         className={cn(
-          "max-w-[88%] rounded-lg border px-4 py-3 shadow-soft transition sm:max-w-[74%]",
+          "relative max-w-[92%] transition sm:max-w-[78%]",
           failed
-            ? "border-rose-400/30 bg-rose-400/10 text-rose-50"
-            : isOwn
-            ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-50"
-            : isOtherHuman
-            ? "border-sky-300/20 bg-sky-300/10 text-sky-50"
-            : "border-white/10 bg-white/[0.055] text-slate-100",
+            ? "overflow-hidden rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-rose-50"
+          : isUser
+            ? "max-w-[680px] overflow-visible border-0 bg-transparent px-0 py-0 text-[var(--omnix-text-2)]"
+            : "max-w-[740px] overflow-hidden rounded-[16px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-5 py-[18px] text-slate-100 shadow-[var(--omnix-glow-sm)]",
           sending && "opacity-80",
         )}
       >
-        <div className={cn("mb-2 flex items-center gap-2", isOwn && "justify-end")}>
+        {!isUser ? (
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--omnix-cyan),transparent)] opacity-55" />
+        ) : null}
+        <div className="mb-2 flex flex-wrap items-center gap-2">
           <span
             className={cn(
-              "truncate text-xs font-semibold",
-              isOwn ? "text-emerald-50" : isOtherHuman ? "text-sky-50" : "text-cyan-100",
+              "truncate text-[13px] font-semibold",
+              isOwn ? "text-cyan-50" : isOtherHuman ? "text-sky-50" : "text-cyan-100",
             )}
           >
             {senderName}
@@ -171,7 +172,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
           ) : null}
           <span
             className={cn(
-              "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+              "inline-flex shrink-0 items-center rounded px-1.5 py-px text-[9px] font-bold uppercase tracking-[0.08em]",
               isUser
                 ? workspaceRoleBadgeClass(senderRole)
                 : "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
@@ -182,7 +183,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         </div>
 
         {isUser ? (
-          <p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p>
+          <p className="whitespace-pre-wrap text-sm font-light leading-[1.65] text-[var(--omnix-text-2)]">{message.content}</p>
         ) : activelyStreaming ? (
           <StreamingTextRenderer content={message.content} compact />
         ) : (
@@ -225,7 +226,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         ) : null}
 
         {!isUser && activelyStreaming && sources.length > 0 ? (
-          <div className="mt-4 border-t border-white/10 pt-3">
+          <div className="mt-4 border-t border-[var(--omnix-border)] pt-3">
             <p className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[11px] font-medium text-cyan-100">
               <Globe2 className="h-3.5 w-3.5" />
               Sources ready ({sources.length})
@@ -234,9 +235,9 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         ) : null}
 
         {!isUser && !activelyStreaming && sources.length > 0 ? (
-          <div className="mt-4 border-t border-white/10 pt-4">
+          <div className="mt-4 border-t border-[var(--omnix-border)] pt-4">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="flex items-center gap-2 text-xs font-medium text-slate-400">
+              <p className="flex items-center gap-2 text-xs font-medium text-[var(--omnix-text-2)]">
                 <Globe2 className="h-3.5 w-3.5 text-cyan-300/80" />
                 Sources ({sources.length})
               </p>
@@ -257,7 +258,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                 return (
                   <div
                     key={sourceId}
-                    className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.025] transition-colors hover:bg-white/[0.045]"
+                    className="overflow-hidden rounded-lg border border-[var(--omnix-border)] bg-[rgba(0,0,0,0.22)] transition-colors hover:border-[var(--omnix-border-2)] hover:bg-[var(--omnix-surface)]"
                   >
                     <button
                       type="button"
@@ -265,7 +266,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                       className="flex w-full items-start justify-between gap-3 p-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
                     >
                       <div className="flex min-w-0 gap-2">
-                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-black/20">
+                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-cyan-300/15 bg-cyan-300/10">
                           {source.favicon_url && isWeb ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={source.favicon_url} alt="" className="h-4 w-4 rounded-sm" />
@@ -277,14 +278,14 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                         </span>
                         <span className="min-w-0">
                           <span className="flex items-center gap-1.5">
-                            <span className="shrink-0 rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-slate-300">
+                            <span className="shrink-0 rounded border border-cyan-300/20 bg-cyan-300/10 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-100">
                               {label}
                             </span>
                             <span className="truncate text-xs font-semibold text-slate-100">
                               {source.title || domain || "Source"}
                             </span>
                           </span>
-                          <span className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
+                          <span className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--omnix-text-3)]">
                             <span className="truncate">{domain}</span>
                             {source.published_date ? <span>{source.published_date}</span> : null}
                           </span>
@@ -297,7 +298,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                             target="_blank"
                             rel="noreferrer"
                             onClick={(event) => event.stopPropagation()}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-white/[0.07] hover:text-cyan-100"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-cyan-300/10 hover:text-cyan-100"
                             aria-label={`Open ${source.title || domain}`}
                             title="Open source"
                           >
@@ -320,7 +321,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                           transition={{ duration: 0.2, ease: "easeOut" }}
                           className="px-3 pb-3"
                         >
-                          <p className="border-t border-white/5 pt-2 text-[11px] leading-5 text-slate-400">
+                          <p className="border-t border-[var(--omnix-border)] pt-2 text-[11px] leading-5 text-[var(--omnix-text-2)]">
                             {excerpt}
                           </p>
                         </motion.div>
@@ -340,10 +341,10 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
               failed
                 ? "text-rose-100/70"
                 : isOwn
-                ? "text-emerald-100/55"
+                ? "text-cyan-100/55"
                 : isOtherHuman
                 ? "text-sky-100/55"
-                : "text-slate-500",
+                : "text-[var(--omnix-text-3)]",
             )}
           >
             {sending ? (message.status === "streaming" ? "Thinking…" : "Sending...") : message.timestamp}
@@ -355,7 +356,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                 type="button"
                 onClick={copyMessage}
                 className={cn(
-                  "inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-white/[0.07] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
+                  "inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
                   isOwn && "text-emerald-100/50 hover:text-emerald-50",
                   isOtherHuman && "text-sky-100/50 hover:text-sky-50",
                 )}
@@ -373,7 +374,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                   onClick={handleRegenerate}
                   title="Regenerate"
                   aria-label="Regenerate"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-white/[0.06]"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                 </button>
@@ -384,7 +385,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                   title="Helpful"
                   aria-label="Helpful"
                   className={cn(
-                    "inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-white/[0.06]",
+                    "inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white",
                     gaveFeedback === "up" && "bg-emerald-400/10 text-emerald-200",
                   )}
                 >
@@ -397,7 +398,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                   title="Not helpful"
                   aria-label="Not helpful"
                   className={cn(
-                    "inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-white/[0.06]",
+                    "inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white",
                     gaveFeedback === "down" && "bg-rose-400/10 text-rose-200",
                   )}
                 >

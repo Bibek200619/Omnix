@@ -78,7 +78,7 @@ export function PendingWorkspaceInvites({
   return (
     <section
       className={cn(
-        "rounded-lg border border-white/10 bg-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
+        "rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
         compact ? "p-2.5" : "p-4 sm:p-5",
         className,
       )}
@@ -129,16 +129,16 @@ export function PendingWorkspaceInvites({
             <div
               key={item}
               className={cn(
-                "shimmer rounded-md border border-white/10 bg-white/[0.04]",
+                "shimmer rounded-md border border-[var(--omnix-border)] bg-[var(--omnix-surface)]",
                 compact ? "p-2.5" : "p-3",
               )}
             >
-              <div className="h-3 w-3/4 rounded-full bg-white/10" />
-              <div className="mt-2 h-2.5 w-1/2 rounded-full bg-white/10" />
+              <div className="h-3 w-3/4 rounded-full bg-[var(--omnix-surface-hover)]" />
+              <div className="mt-2 h-2.5 w-1/2 rounded-full bg-[var(--omnix-surface-hover)]" />
             </div>
           ))
         ) : visibleInvites.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-sm text-slate-500">
+          <div className="rounded-lg border border-dashed border-[var(--omnix-border)] px-3 py-4 text-sm text-[var(--omnix-text-3)]">
             No pending invites.
           </div>
         ) : (
@@ -151,14 +151,14 @@ export function PendingWorkspaceInvites({
               <article
                 key={inviteId}
                 className={cn(
-                  "rounded-md border border-white/10 bg-[#09131b]/85 transition hover:border-cyan-300/25 hover:bg-white/[0.045]",
+                  "rounded-md border border-[var(--omnix-border)] bg-[#09131b]/85 transition hover:border-cyan-300/25 hover:bg-[var(--omnix-surface)]",
                   compact ? "p-2.5" : "p-4",
                 )}
               >
                 <div className="flex items-start gap-2.5">
                   <div
                     className={cn(
-                      "flex shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] font-semibold text-cyan-100",
+                      "flex shrink-0 items-center justify-center rounded-md border border-[var(--omnix-border)] bg-cyan-300/10 font-semibold text-cyan-100",
                       compact ? "h-7 w-7 text-xs" : "h-9 w-9 text-sm",
                     )}
                   >
@@ -172,7 +172,7 @@ export function PendingWorkspaceInvites({
                       Invited by {inviterLabel(invite.inviter_name, invite.inviter_email)}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                      <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-slate-300">
+                      <span className="rounded-md border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-2 py-0.5 text-slate-300">
                         Role: {workspaceRoleLabel(invite.role)}
                       </span>
                       <span className="inline-flex items-center gap-1">

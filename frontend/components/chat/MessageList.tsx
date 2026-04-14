@@ -25,17 +25,17 @@ const suggestedPrompts = [
 
 function ConversationSkeleton() {
   return (
-    <div className="flex min-h-[420px] flex-1 flex-col gap-4 rounded-lg border border-white/10 bg-[#080a0f]/95 p-4 sm:p-5">
+    <div className="omnix-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-6 sm:px-6">
       {[0, 1, 2].map((item) => (
         <div
           key={item}
-          className={`shimmer rounded-lg border border-white/10 bg-white/[0.04] p-4 ${
+          className={`shimmer rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-4 ${
             item === 1 ? "ml-auto w-[74%]" : "w-[82%] sm:w-[62%]"
           }`}
         >
-          <div className="h-3 w-24 rounded-full bg-white/10" />
-          <div className="mt-4 h-2.5 w-full rounded-full bg-white/10" />
-          <div className="mt-2 h-2.5 w-2/3 rounded-full bg-white/10" />
+          <div className="h-3 w-24 rounded-full bg-[var(--omnix-surface-hover)]" />
+          <div className="mt-4 h-2.5 w-full rounded-full bg-[var(--omnix-surface-hover)]" />
+          <div className="mt-2 h-2.5 w-2/3 rounded-full bg-[var(--omnix-surface-hover)]" />
         </div>
       ))}
     </div>
@@ -70,15 +70,16 @@ export function MessageList({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.24, ease: "easeOut" }}
-        className="flex min-h-[420px] flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.03] p-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:p-8"
+        className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 py-10 text-center sm:p-8"
       >
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 shadow-glow">
+        <div className="relative flex h-14 w-14 items-center justify-center rounded-xl border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-md)]">
+          <span className="absolute inset-0 rounded-xl bg-cyan-300/10 blur-xl" />
           <MessageSquare className="h-5 w-5" />
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-white">
+        <h2 className="omnix-display mt-5 text-xl font-semibold text-white">
           Ask Omnix anything your workspace should know
         </h2>
-        <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
+        <p className="mt-2 max-w-md text-sm leading-6 text-[var(--omnix-text-2)]">
           Start from a document, a customer question, or a knowledge gap. Omnix
           will save the thread and return a backend response.
         </p>
@@ -88,7 +89,7 @@ export function MessageList({
               key={prompt}
               type="button"
               variant="secondary"
-              className="h-auto min-h-20 whitespace-normal px-3 py-3 text-left text-sm leading-5 hover:-translate-y-0.5"
+              className="omnix-card-hover h-auto min-h-20 whitespace-normal rounded-xl border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 py-3 text-left text-sm leading-5 hover:-translate-y-0.5"
               leftIcon={
                 index === 0 ? (
                   <FileText className="h-4 w-4 shrink-0" />
@@ -107,7 +108,7 @@ export function MessageList({
   }
 
   return (
-    <div className="scrollbar-thin flex min-h-[420px] flex-1 flex-col gap-5 overflow-y-auto rounded-lg border border-white/10 bg-[#080a0f]/95 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:p-5">
+    <div className="omnix-scrollbar flex min-h-0 flex-1 flex-col gap-[26px] overflow-y-auto px-5 py-6 pb-32 sm:px-7">
       <AnimatePresence initial={false}>
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} onRetry={onRetry} onRegenerate={onRegenerate} />
@@ -122,7 +123,7 @@ export function MessageList({
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
           >
-            <div className="mt-1 h-9 w-9 shrink-0 rounded-lg border border-cyan-300/30 bg-cyan-300/10" />
+            <div className="mt-1 h-9 w-9 shrink-0 rounded-lg border border-cyan-300/30 bg-cyan-300/10 shadow-[var(--omnix-glow-xs)]" />
             <TypingIndicator />
           </motion.div>
         ) : null}
