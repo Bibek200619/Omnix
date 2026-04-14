@@ -12,11 +12,15 @@ import { ActionsMenu } from "@/components/actions/ActionsMenu";
 import { ProfileMenu } from "@/components/layout/ProfileMenu";
 
 const routeTitles = [
-  { match: "/chat", title: "Chat", eyebrow: "AI workspace" },
-  { match: "/files", title: "Files", eyebrow: "Workspace knowledge" },
+  { match: "/dashboard", title: "Dashboard", eyebrow: "Workspace command center" },
+  { match: "/chat", title: "AI Chat", eyebrow: "Collaborative intelligence" },
+  { match: "/files", title: "Sources", eyebrow: "Workspace knowledge" },
   { match: "/history", title: "History", eyebrow: "Previous conversations" },
   { match: "/settings/terms", title: "Terms", eyebrow: "Product policies" },
   { match: "/settings/profile", title: "Profile", eyebrow: "Account identity" },
+  { match: "/settings/account", title: "Account", eyebrow: "Session controls" },
+  { match: "/settings/ai", title: "AI Settings", eyebrow: "Model behavior" },
+  { match: "/settings/appearance", title: "Appearance", eyebrow: "Interface preferences" },
   { match: "/settings/workspace", title: "Workspace Settings", eyebrow: "Workspace controls" },
   { match: "/settings/team", title: "Team Members", eyebrow: "Collaboration" },
   { match: "/settings/notifications", title: "Notifications", eyebrow: "Preferences" },
@@ -62,15 +66,15 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-[#060910]/90 backdrop-blur-xl">
+    <header className="relative z-30 shrink-0 border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.96)] backdrop-blur-[20px]">
       <InviteNotificationBar />
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+      <div className="flex h-[var(--omnix-header-h)] w-full items-center justify-between gap-3 px-4 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="lg:hidden"
+            className="h-[34px] w-[34px] rounded-[9px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)] lg:hidden"
             aria-label="Open navigation"
             title="Open navigation"
             onClick={onMenuClick}
@@ -82,7 +86,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
               type="button"
               variant="ghost"
               size="icon"
-              className="hidden h-9 w-9 lg:inline-flex"
+              className="hidden h-[34px] w-[34px] rounded-[9px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)] lg:inline-flex"
               aria-label="Expand workspace sidebar"
               title="Expand workspace sidebar"
               onClick={onExpandSidebar}
@@ -91,19 +95,19 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
             </Button>
           ) : null}
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200/70">
-              {activeWorkspace ? activeWorkspace.name : active.eyebrow}
-            </p>
-            <h1 className="truncate text-lg font-semibold text-white sm:text-xl">
+            <h1 className="omnix-display truncate text-[15px] font-semibold tracking-[0.01em] text-white">
               {active.title}
             </h1>
+            <p className="mt-0.5 truncate text-[10px] tracking-[0.03em] text-[var(--omnix-text-3)]">
+              {activeWorkspace ? `${activeWorkspace.name} workspace` : active.eyebrow}
+            </p>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {activeWorkspace ? (
-            <div className="hidden items-center gap-3 rounded-lg border border-white/10 bg-white/[0.045] px-3 py-2 text-sm text-slate-300 xl:flex">
-              <div className="flex items-center gap-2 text-slate-400">
-                <Users className="h-4 w-4 text-cyan-200" />
+            <div className="hidden h-[34px] items-center gap-3 rounded-[9px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 text-xs text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-border-2)] xl:flex">
+              <div className="flex items-center gap-2 text-[var(--omnix-text-2)]">
+                <Users className="h-4 w-4 text-[var(--omnix-cyan)]" />
                 <span>{activeWorkspace.member_count}</span>
               </div>
               <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} />
@@ -111,12 +115,13 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
           ) : null}
           <InviteNotificationBell />
           <ActionsMenu className="inline-flex" />
+          <div className="hidden h-5 w-px bg-[var(--omnix-border)] md:block" />
           <Button
             type="button"
             variant="secondary"
             leftIcon={<MessageSquarePlus className="h-4 w-4" />}
             onClick={() => router.push("/chat")}
-            className="hidden md:inline-flex"
+            className="hidden h-[34px] rounded-[9px] border-[var(--omnix-cyan)] bg-transparent px-3.5 text-xs font-semibold tracking-[0.02em] text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] hover:-translate-y-0.5 hover:border-[var(--omnix-cyan)] hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] md:inline-flex"
           >
             New chat
           </Button>
@@ -125,7 +130,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
       </div>
       {signOutError ? (
         <div className="border-t border-rose-400/20 bg-rose-400/10 px-4 py-2 text-sm text-rose-100 sm:px-6 lg:px-8">
-          <div className="mx-auto flex max-w-7xl items-center gap-2">
+          <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0" />
             {signOutError}
           </div>

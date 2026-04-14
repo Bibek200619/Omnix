@@ -2,7 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Database, FileSearch, Globe2, ShieldCheck, Users, WifiOff } from "lucide-react";
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Database,
+  FileSearch,
+  Globe2,
+  Hash,
+  MessageSquare,
+  MoreVertical,
+  Pin,
+  Search,
+  ShieldCheck,
+  WifiOff,
+} from "lucide-react";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageList } from "@/components/chat/MessageList";
 import type {
@@ -317,6 +331,8 @@ export function ChatInterface() {
     refreshActiveWorkspaceData,
   } = useWorkspace();
   const {
+    activeConversationId,
+    conversations,
     refreshConversations,
     setActiveConversation,
   } = useConversationHistory();
@@ -334,6 +350,7 @@ export function ChatInterface() {
   );
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const [searchMode, setSearchMode] = useState<SearchMode>("auto");
+  const [historyOpen, setHistoryOpen] = useState(true);
   const workspaceMembers = useMemo(
     () => (activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? []),
     [activeMembers, activeWorkspace?.members_preview],
@@ -965,66 +982,157 @@ export function ChatInterface() {
     setPendingAttachments((current) => current.filter((file) => file.id !== fileId));
   }
 
+  function openConversationFromPanel(conversationId: string) {
+    setActiveConversation(conversationId);
+    router.push(`/chat?conversation=${conversationId}`, { scroll: false });
+  }
+
+  const visibleHistory = conversations.slice(0, 7);
+  const activeHistoryItem = visibleHistory.find((item) => item.id === activeConversationId) ?? visibleHistory[0];
+
   return (
-    <section className="flex min-h-[calc(100vh-8rem)] flex-col gap-4">
-      <div className="grid gap-3 md:grid-cols-4">
-        {statusItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <div
-              key={item.label}
-              className="rounded-lg border border-white/10 bg-white/[0.04] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] transition hover:border-white/15 hover:bg-white/[0.055]"
+    <section className="flex h-full w-full overflow-hidden bg-[var(--omnix-bg)] text-[var(--omnix-text)]">
+      {historyOpen ? (
+        <aside className="hidden w-[264px] shrink-0 flex-col border-r border-[var(--omnix-border)] bg-[rgba(5,12,23,0.6)] backdrop-blur-2xl md:flex">
+          <div className="flex items-center gap-2 border-b border-[var(--omnix-border)] px-3 py-2.5">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--omnix-text-3)]" />
+              <input
+                type="text"
+                placeholder="Search chats..."
+                className="omnix-input h-[30px] w-full rounded-full pl-7 pr-3 text-xs"
+                readOnly
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(false)}
+              className="omnix-ghost-action flex h-[26px] w-[26px] items-center justify-center rounded-[7px]"
+              aria-label="Close history"
+              title="Close history"
             >
-              <div className="flex items-center gap-3">
-                <Icon className={`h-5 w-5 ${item.color}`} />
-                <div className="min-w-0">
-                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                    {item.label}
-                  </p>
-                  <p className="truncate text-sm font-medium text-white">
-                    {item.value}
-                  </p>
-                </div>
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="omnix-scrollbar flex-1 overflow-y-auto px-2 py-2">
+            <div className="mb-3">
+              <div className="flex items-center gap-1.5 px-2 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--omnix-text-3)]">
+                <Pin className="h-2.5 w-2.5" />
+                Pinned
+              </div>
+              {activeHistoryItem ? (
+                <button
+                  type="button"
+                  onClick={() => openConversationFromPanel(activeHistoryItem.id)}
+                  className="w-full rounded-[8px] border border-cyan-300/15 bg-cyan-300/[0.07] px-2.5 py-2 text-left shadow-[var(--omnix-glow-xs)] transition hover:border-cyan-300/30 hover:bg-cyan-300/10"
+                >
+                  <div className="mb-0.5 flex justify-between gap-2">
+                    <span className="truncate text-xs font-medium text-white">{activeHistoryItem.title || "Omnix conversation"}</span>
+                    <span className="text-[10px] text-[var(--omnix-cyan)]">Now</span>
+                  </div>
+                  <span className="block truncate text-[11px] text-[var(--omnix-text-2)]">{activeHistoryItem.preview || "Workspace context ready..."}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => router.push("/chat")}
+                  className="w-full rounded-[8px] border border-cyan-300/15 bg-cyan-300/[0.07] px-2.5 py-2 text-left shadow-[var(--omnix-glow-xs)] transition hover:border-cyan-300/30 hover:bg-cyan-300/10"
+                >
+                  <div className="mb-0.5 flex justify-between gap-2">
+                    <span className="truncate text-xs font-medium text-white">New AI session</span>
+                    <span className="text-[10px] text-[var(--omnix-cyan)]">Now</span>
+                  </div>
+                  <span className="block truncate text-[11px] text-[var(--omnix-text-2)]">Start a collaborative intelligence thread.</span>
+                </button>
+              )}
+            </div>
+
+            <div>
+              <div className="flex items-center gap-1.5 px-2 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--omnix-text-3)]">
+                <MessageSquare className="h-2.5 w-2.5" />
+                Recent
+              </div>
+              {visibleHistory.map((conversation) => (
+                <button
+                  key={conversation.id}
+                  type="button"
+                  onClick={() => openConversationFromPanel(conversation.id)}
+                  className="mb-px w-full rounded-[8px] border border-transparent px-2.5 py-2 text-left transition hover:bg-[var(--omnix-surface)]"
+                >
+                  <div className="mb-0.5 flex justify-between gap-2">
+                    <span className="max-w-[150px] truncate text-xs font-medium text-[var(--omnix-text-2)]">{conversation.title || "Omnix conversation"}</span>
+                    <span className="shrink-0 text-[10px] text-[var(--omnix-text-3)]">Live</span>
+                  </div>
+                  <span className="block truncate text-[11px] text-[var(--omnix-text-3)]">{conversation.preview || "No preview yet"}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </aside>
+      ) : null}
+
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.85)] px-[18px] backdrop-blur-xl">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {!historyOpen ? (
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(true)}
+                className="omnix-ghost-action hidden h-7 w-7 items-center justify-center rounded-[7px] md:flex"
+                aria-label="Open history"
+                title="Open history"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+            <div className="omnix-icon-tile h-7 w-7 bg-cyan-300/[0.08]">
+              <Hash className="h-3.5 w-3.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="omnix-display truncate text-sm font-semibold text-white">
+                {currentConversation ? "Active intelligence session" : "New intelligence session"}
+              </div>
+              <div className="mt-0.5 flex items-center gap-1 text-[10px] text-[var(--omnix-text-3)]">
+                <span className="h-[5px] w-[5px] rounded-full bg-[var(--omnix-green)] shadow-[0_0_5px_var(--omnix-green)]" />
+                Active collaborative session
               </div>
             </div>
-          );
-        })}
-      </div>
-      {activeWorkspace ? (
-        <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-sm font-medium text-white">
-              <Users className="h-4 w-4 text-cyan-200" />
-              Collaborative AI context
-            </div>
-            <p className="mt-1 text-sm leading-6 text-slate-400">
-              {activeWorkspace.is_shared
-                ? `Retrieval and conversation history are shared across ${activeWorkspace.name}.`
-                : `This workspace keeps knowledge isolated to you until you invite teammates.`}
-            </p>
           </div>
-          <div className="flex items-center gap-3">
-            <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} size="md" />
-            <div className="text-right text-xs text-slate-400">
-              <div>{activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "contributor" : "contributors"}</div>
-              <div>{workspaceRoleLabel(activeWorkspace.current_user_role)}</div>
+
+          <div className="flex items-center gap-2.5">
+            {activeWorkspace ? (
+              <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} size="sm" />
+            ) : null}
+            <div className="hidden items-center gap-1.5 rounded-[7px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-2.5 py-1.5 text-[11px] text-[var(--omnix-text-2)] sm:flex">
+              <BookOpen className="h-3 w-3" />
+              Sources
+              <span className="rounded-full border border-cyan-300/25 bg-cyan-300/15 px-1.5 py-px text-[9px] font-bold text-[var(--omnix-cyan)]">
+                {statusItems.length}
+              </span>
             </div>
+            <button type="button" className="flex items-center text-[var(--omnix-text-3)] transition hover:text-white" aria-label="Session actions" title="Session actions">
+              <MoreVertical className="h-4 w-4" />
+            </button>
           </div>
         </div>
-      ) : null}
+
       {error ? (
-        <Alert
-          variant="error"
-          title="Omnix could not complete the request"
-          className="items-start"
-        >
-          <span className="inline-flex items-start gap-2">
-            <WifiOff className="mt-1 h-3.5 w-3.5 shrink-0" />
-            {error}
-          </span>
-        </Alert>
+        <div className="px-4 pt-4">
+          <Alert
+            variant="error"
+            title="Omnix could not complete the request"
+            className="items-start"
+          >
+            <span className="inline-flex items-start gap-2">
+              <WifiOff className="mt-1 h-3.5 w-3.5 shrink-0" />
+              {error}
+            </span>
+          </Alert>
+        </div>
       ) : null}
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
+
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <MessageList
           messages={messages}
           loading={responding}
@@ -1033,16 +1141,19 @@ export function ChatInterface() {
           onPromptSelect={handlePromptSelect}
           onRegenerate={handleRegenerate}
         />
-        <ChatInput
-          onSend={sendMessage}
-          loading={responding}
-          conversationId={currentConversation || undefined}
-          attachments={pendingAttachments}
-          searchMode={searchMode}
-          onSearchModeChange={setSearchMode}
-          onUploadSuccess={handleUploadSuccess}
-          onRemoveAttachment={handleRemoveAttachment}
-        />
+        <div className="shrink-0 bg-gradient-to-t from-[var(--omnix-bg)] via-[rgba(5,12,23,0.94)] to-transparent px-3 pb-[18px] pt-7 sm:px-[22px]">
+          <ChatInput
+            onSend={sendMessage}
+            loading={responding}
+            conversationId={currentConversation || undefined}
+            attachments={pendingAttachments}
+            searchMode={searchMode}
+            onSearchModeChange={setSearchMode}
+            onUploadSuccess={handleUploadSuccess}
+            onRemoveAttachment={handleRemoveAttachment}
+          />
+        </div>
+      </div>
       </div>
     </section>
   );

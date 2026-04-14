@@ -58,10 +58,10 @@ export function WorkspaceInviteModal({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-lg border border-white/10 bg-[#071017] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.4)]">
+      <div className="w-full max-w-md rounded-xl border border-[var(--omnix-border-2)] bg-[#07131f] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.48),var(--omnix-glow-xs)]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200">
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
               <UserPlus className="h-4 w-4" />
             </div>
             <h2 className="mt-4 text-lg font-semibold text-white">Invite teammate</h2>
@@ -112,7 +112,7 @@ export function WorkspaceInviteModal({
                       "rounded-lg border px-3 py-2 text-left text-sm transition",
                       role === option
                         ? workspaceRoleBadgeClass(option)
-                        : "border-white/10 bg-white/[0.035] text-slate-300 hover:bg-white/[0.06]",
+                        : "border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-slate-300 hover:bg-[var(--omnix-surface-hover)]",
                     )}
                   >
                     {option === "co_owner" ? "Co-owner" : "Member"}

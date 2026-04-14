@@ -83,7 +83,7 @@ class MemoryManager:
                     Citation(
                         source_id=str(c.get("id")),
                         source_type=ContextSourceType.MEMORY,
-                        content=f"Recent Conversation: {c.get("title") or "Untitled"}",
+                        content=f"Recent Conversation: {c.get("title") or "Omnix"}",
                     )
                 )
             return citations

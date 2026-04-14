@@ -74,7 +74,7 @@ export function AppShell({ children }: AppShellProps) {
     <WorkspaceProvider>
       <ProfileProvider>
         <ConversationHistoryProvider>
-          <div className="surface-noise min-h-screen bg-canvas text-white">
+          <div className="omnix-app-bg relative h-screen overflow-hidden text-white">
             <Sidebar
               isOpen={isSidebarOpen}
               collapsed={isSidebarCollapsed}
@@ -83,8 +83,8 @@ export function AppShell({ children }: AppShellProps) {
             />
             <div
               className={cn(
-                "min-h-screen transition-[padding] duration-200 ease-out",
-                isSidebarCollapsed ? "lg:pl-0" : "lg:pl-[17rem]",
+                "relative z-[1] flex h-screen min-h-0 flex-col transition-[padding] duration-200 ease-out",
+                isSidebarCollapsed ? "lg:pl-0" : "lg:pl-[var(--omnix-sidebar-w)]",
               )}
             >
               <Header
@@ -92,8 +92,8 @@ export function AppShell({ children }: AppShellProps) {
                 onMenuClick={() => setIsSidebarOpen(true)}
                 onExpandSidebar={() => setIsSidebarCollapsed(false)}
               />
-              <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-5 sm:px-6 lg:px-8">
-                <PageTransition>{children}</PageTransition>
+              <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+                <PageTransition className="flex min-h-0 flex-1 flex-col">{children}</PageTransition>
               </main>
             </div>
           </div>

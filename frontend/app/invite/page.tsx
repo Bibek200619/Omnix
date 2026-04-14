@@ -61,15 +61,15 @@ export default function InvitePage() {
   }, [acceptedWorkspace, accepting, inviteId, loading, router, session]);
 
   return (
-    <main className="surface-noise flex min-h-screen items-center justify-center bg-canvas px-4 py-10 text-white">
-      <section className="w-full max-w-lg rounded-lg border border-white/10 bg-[#071017] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.4)]">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-100">
+    <main className="omnix-app-bg relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10 text-white">
+      <section className="relative z-[1] w-full max-w-lg rounded-2xl border border-[var(--omnix-border-2)] bg-[rgba(6,16,32,0.94)] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.58),var(--omnix-glow-xs)] backdrop-blur-2xl">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]">
           {acceptedWorkspace ? <Check className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
         </div>
-        <h1 className="mt-5 text-2xl font-semibold tracking-tight">
+        <h1 className="omnix-display mt-5 text-2xl font-semibold tracking-tight">
           {acceptedWorkspace ? "Workspace joined" : "Workspace invitation"}
         </h1>
-        <p className="mt-2 text-sm leading-6 text-slate-400">
+        <p className="mt-2 text-sm leading-6 text-[var(--omnix-text-2)]">
           {acceptedWorkspace
             ? `You now have access to ${acceptedWorkspace.name}.`
             : "Sign in with the invited email address to accept this workspace invitation."}
@@ -88,7 +88,7 @@ export default function InvitePage() {
         ) : null}
 
         {loading || accepting ? (
-          <div className="mt-6 flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-slate-300">
+          <div className="mt-6 flex items-center gap-3 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-4 py-3 text-sm text-slate-300">
             <Loader2 className="h-4 w-4 animate-spin text-cyan-200" />
             {loading ? "Checking session..." : "Accepting invitation..."}
           </div>
@@ -96,7 +96,7 @@ export default function InvitePage() {
 
         {!loading && !session && inviteId ? (
           <div className="mt-6 space-y-3">
-            <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4">
+            <div className="rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-4">
               <div className="flex items-start gap-3">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-cyan-200" />
                 <p className="text-sm leading-6 text-slate-300">
@@ -113,7 +113,7 @@ export default function InvitePage() {
               </Link>
               <Link
                 href={`/register?redirect=${authRedirect}`}
-                className="inline-flex h-10 flex-1 items-center justify-center rounded-lg border border-white/10 bg-white/[0.06] px-4 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/[0.1] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                className="inline-flex h-10 flex-1 items-center justify-center rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-4 text-sm font-medium text-white transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
                 Create account
               </Link>
