@@ -9,13 +9,13 @@ export function TypingIndicator() {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -4, scale: 0.98 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
-      className="flex w-fit items-center gap-2 rounded-lg border border-white/10 bg-white/[0.055] px-4 py-3 shadow-soft"
+      className="flex w-fit items-center gap-2 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-4 py-3 shadow-[var(--omnix-glow-xs)]"
     >
-      <span className="text-xs font-medium text-slate-400">Omnix is thinking</span>
+      <span className="text-xs font-medium text-[var(--omnix-text-2)]">Omnix is thinking</span>
       {[0, 1, 2].map((item) => (
         <span
           key={item}
-          className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-200"
+          className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-200 shadow-[0_0_8px_rgba(0,255,255,0.7)]"
           style={{ animationDelay: `${item * 110}ms` }}
         />
       ))}

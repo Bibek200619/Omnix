@@ -27,7 +27,7 @@ export default function TermsPage() {
   const router = useRouter();
 
   return (
-    <article className="mx-auto max-w-3xl rounded-lg border border-white/10 bg-white/[0.04] p-5 sm:p-7">
+    <article className="mx-auto max-w-3xl rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5 sm:p-7">
       <Button
         type="button"
         variant="ghost"
@@ -55,7 +55,7 @@ export default function TermsPage() {
         {terms.map((term, index) => (
           <section
             key={term.title}
-            className="rounded-lg border border-white/10 bg-black/20 p-4"
+            className="rounded-lg border border-[var(--omnix-border)] bg-black/20 p-4"
           >
             <p className="text-sm font-medium uppercase tracking-[0.16em] text-cyan-200/70">
               Section {index + 1}

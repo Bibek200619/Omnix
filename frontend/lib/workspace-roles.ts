@@ -18,9 +18,9 @@ export function workspaceRoleBadgeClass(role?: WorkspaceRole | string | null) {
   switch (role) {
     case "founder":
     case "owner":
-      return "border-rose-300/30 bg-rose-400/12 text-rose-100";
+      return "border-red-300/35 bg-red-400/12 text-red-100";
     case "co_owner":
-      return "border-amber-300/35 bg-amber-300/12 text-amber-100";
+      return "border-amber-300/40 bg-amber-300/12 text-amber-100";
     case "member":
       return "border-sky-300/30 bg-sky-300/12 text-sky-100";
     default:
@@ -32,7 +32,7 @@ export function workspaceRoleAvatarClass(role?: WorkspaceRole | string | null) {
   switch (role) {
     case "founder":
     case "owner":
-      return "border-rose-300/35 bg-rose-400/15 text-rose-100";
+      return "border-red-300/35 bg-red-400/15 text-red-100";
     case "co_owner":
       return "border-amber-300/35 bg-amber-300/15 text-amber-100";
     case "member":

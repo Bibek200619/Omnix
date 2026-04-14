@@ -4,7 +4,7 @@ import { WorkspaceAccessPanel } from "@/components/workspace/WorkspaceAccessPane
 export default function TeamSettingsPage() {
   return (
     <SettingsShell
-      title="Team Members"
+      title="Team Management"
       description="Review workspace membership, roles, and invite activity without mixing account-level profile settings."
     >
       <WorkspaceAccessPanel />

@@ -71,7 +71,7 @@ export function ActionsMenu({ className }: { className?: string }) {
     if (!conversationId) return;
     const nextTitle = window.prompt(
       "Rename chat",
-      activeConversation?.title || "Untitled conversation",
+      activeConversation?.title || "Omnix conversation",
     );
     if (nextTitle === null || !nextTitle.trim()) return;
 
@@ -151,6 +151,7 @@ export function ActionsMenu({ className }: { className?: string }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Conversation actions"
+        className="h-9 rounded-lg border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 text-xs hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)]"
       >
         <span className="hidden md:inline">Actions</span>
       </Button>
@@ -159,11 +160,11 @@ export function ActionsMenu({ className }: { className?: string }) {
         <div
           role="menu"
           aria-label="Conversation actions"
-          className="absolute right-0 top-full z-[100] mt-2 w-64 overflow-hidden rounded-lg border border-white/12 bg-[#05070b] p-1 shadow-[0_24px_70px_rgba(0,0,0,0.65)] ring-1 ring-black/40"
+          className="absolute right-0 top-full z-[100] mt-2 w-64 overflow-hidden rounded-xl border border-[var(--omnix-border-2)] bg-[#07131f] p-1 shadow-[0_24px_70px_rgba(0,0,0,0.65),var(--omnix-glow-xs)] ring-1 ring-black/40"
         >
           <div className="border-b border-white/8 px-3 py-2">
             <p className="truncate text-sm font-medium text-white">
-              {activeConversation?.title || (conversationId ? "Untitled conversation" : "No active chat")}
+              {activeConversation?.title || (conversationId ? "Omnix conversation" : "No active chat")}
             </p>
             <p className="mt-0.5 text-xs text-slate-500">
               {conversationId ? "Conversation tools" : "Start or open a chat first"}
@@ -186,7 +187,7 @@ export function ActionsMenu({ className }: { className?: string }) {
                     "flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60 disabled:cursor-not-allowed disabled:opacity-45",
                     item.danger
                       ? "text-rose-100 hover:bg-rose-400/10"
-                      : "text-slate-200 hover:bg-white/[0.06] hover:text-white",
+                      : "text-slate-200 hover:bg-[var(--omnix-surface)] hover:text-white",
                   )}
                 >
                   {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}

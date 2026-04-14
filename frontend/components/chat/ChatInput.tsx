@@ -84,16 +84,16 @@ export function ChatInput({
   return (
     <motion.div
       animate={{
-        borderColor: focused ? "rgba(103, 232, 249, 0.36)" : "rgba(255,255,255,0.1)",
+        borderColor: focused ? "rgba(0, 255, 255, 0.45)" : "rgba(0,255,255,0.12)",
         boxShadow: focused
-          ? "0 18px 70px rgba(34, 211, 238, 0.12)"
-          : "0 12px 38px rgba(0, 0, 0, 0.22)",
+          ? "0 0 0 3px rgba(0,255,255,0.08), var(--omnix-glow-sm), 0 18px 70px rgba(0,0,0,0.28)"
+          : "0 12px 38px rgba(0, 0, 0, 0.26)",
       }}
       transition={{ duration: 0.18, ease: "easeOut" }}
-      className="sticky bottom-3 z-20 rounded-xl border bg-[#080a0f]/95 p-2 shadow-soft backdrop-blur-xl"
+      className="z-20 mx-auto w-full max-w-[860px] overflow-hidden rounded-[15px] border bg-[rgba(8,16,30,0.88)] shadow-[0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-[20px]"
     >
       {attachments.length > 0 ? (
-        <div className="mb-2 flex flex-wrap gap-2 rounded-lg border border-white/8 bg-white/[0.03] p-2">
+        <div className="mb-2 flex flex-wrap gap-2 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-2">
           {attachments.map((file) => (
             <div
               key={file.id}
@@ -106,7 +106,7 @@ export function ChatInput({
               </div>
               <button
                 type="button"
-                className="ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-cyan-100/55 transition hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                className="ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-cyan-100/55 transition hover:bg-cyan-300/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
                 aria-label={`Remove ${attachmentName(file)}`}
                 title="Remove attachment"
                 onClick={() => onRemoveAttachment?.(file.id)}
@@ -119,7 +119,7 @@ export function ChatInput({
       ) : null}
 
       {uploadOpen ? (
-        <div className="mb-2 rounded-lg border border-white/8 bg-black/20 p-2">
+        <div className="mb-2 rounded-lg border border-[var(--omnix-border)] bg-black/20 p-2">
           <UploadDropzone
             compact
             conversationId={conversationId}
@@ -129,7 +129,10 @@ export function ChatInput({
         </div>
       ) : null}
 
-      <div className="mb-2 flex flex-wrap items-center gap-1 rounded-lg border border-white/8 bg-white/[0.025] p-1">
+      <div className="mx-3 mb-2 mt-3 flex flex-wrap items-center gap-1 rounded-lg border border-[var(--omnix-border)] bg-black/20 p-1">
+        <span className="hidden px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--omnix-text-3)] sm:inline">
+          AI Mode
+        </span>
         {searchModes.map((mode) => {
           const Icon = mode.icon;
           const active = searchMode === mode.value;
@@ -141,8 +144,8 @@ export function ChatInput({
               className={cn(
                 "inline-flex h-8 min-w-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70",
                 active
-                  ? "border-cyan-300/35 bg-cyan-300/12 text-cyan-50"
-                  : "border-transparent text-slate-400 hover:bg-white/[0.055] hover:text-slate-100",
+                  ? "border-cyan-300/35 bg-cyan-300/12 text-cyan-50 shadow-[var(--omnix-glow-xs)]"
+                  : "border-transparent text-[var(--omnix-text-3)] hover:bg-[var(--omnix-surface)] hover:text-slate-100",
               )}
               aria-pressed={active}
               title={`${mode.label} search mode`}
@@ -154,7 +157,7 @@ export function ChatInput({
         })}
       </div>
 
-      <div className="flex items-end gap-2 rounded-lg border border-white/8 bg-white/[0.035] p-1.5 transition focus-within:border-cyan-300/30 focus-within:bg-white/[0.05]">
+      <div className="flex items-end gap-2 border-t border-[var(--omnix-border)] bg-[rgba(0,0,0,0.2)] px-3 py-2.5 transition focus-within:bg-[var(--omnix-surface)]">
         <Button
           type="button"
           variant={uploadOpen ? "secondary" : "ghost"}
@@ -162,7 +165,7 @@ export function ChatInput({
           aria-label={uploadOpen ? "Hide document upload" : "Attach document"}
           title={uploadOpen ? "Hide document upload" : "Attach document"}
           onClick={() => setUploadOpen((current) => !current)}
-          className={cn("h-10 w-10", uploadOpen && "text-cyan-100")}
+          className={cn("h-10 w-10 rounded-lg border border-transparent text-[var(--omnix-text-3)] hover:bg-[var(--omnix-surface)] hover:text-white", uploadOpen && "border-cyan-300/25 bg-cyan-300/10 text-cyan-100")}
         >
           <Plus className={cn("h-4 w-4 transition-transform", uploadOpen && "rotate-45")} />
         </Button>
@@ -181,7 +184,7 @@ export function ChatInput({
           rows={1}
           placeholder="Ask Omnix..."
           disabled={loading}
-          className="max-h-40 min-h-10 flex-1 resize-none border border-transparent bg-transparent px-2 py-2.5 text-sm leading-6 text-white outline-none transition placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-70 sm:px-3"
+          className="max-h-40 min-h-10 flex-1 resize-none border border-transparent bg-transparent px-2 py-2.5 text-sm leading-6 text-white outline-none transition placeholder:text-[var(--omnix-text-3)] disabled:cursor-not-allowed disabled:opacity-70 sm:px-3"
         />
         <Button
           type="button"
@@ -191,7 +194,7 @@ export function ChatInput({
           isLoading={loading}
           disabled={!value.trim()}
           onClick={submit}
-          className="h-10 w-10"
+          className="h-[30px] w-[30px] rounded-lg bg-[var(--omnix-grad-primary)] text-[#050c17] shadow-[var(--omnix-glow-sm)] hover:shadow-[var(--omnix-glow-md)] disabled:bg-[var(--omnix-surface)] disabled:text-[var(--omnix-text-3)] disabled:shadow-none"
         >
           <Send className="h-4 w-4" />
         </Button>

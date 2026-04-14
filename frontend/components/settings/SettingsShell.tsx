@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   Bell,
+  BrainCircuit,
   FileText,
   Monitor,
   Settings,
@@ -15,13 +16,14 @@ import {
 import { cn } from "@/lib/utils";
 
 const settingsNav = [
-  { href: "/settings/profile", label: "Profile / Account", description: "Identity, avatar, handle", icon: UserRound },
+  { href: "/settings/profile", label: "Profile", description: "Avatar, display name, handle", icon: UserRound },
+  { href: "/settings/account", label: "Account", description: "Session and identity controls", icon: ShieldCheck },
   { href: "/settings/workspace", label: "Workspace", description: "Name and workspace details", icon: Settings },
-  { href: "/settings/team", label: "Team Members", description: "Roles, members, invites", icon: Users },
+  { href: "/settings/ai", label: "AI Settings", description: "Model behavior and context", icon: BrainCircuit },
+  { href: "/settings/appearance", label: "Appearance", description: "Local interface preferences", icon: Monitor },
   { href: "/settings/notifications", label: "Notifications", description: "Invite and email preferences", icon: Bell },
-  { href: "/settings/security", label: "Security / Session", description: "Session and sign out", icon: ShieldCheck },
-  { href: "/settings/interface", label: "Interface", description: "Local UI preferences", icon: Monitor },
-  { href: "/settings/about", label: "About / Terms", description: "Product notes and policies", icon: FileText },
+  { href: "/settings/team", label: "Team Management", description: "Roles, members, invites", icon: Users },
+  { href: "/settings/about", label: "About", description: "Product notes and policies", icon: FileText },
 ];
 
 type SettingsShellProps = {
@@ -34,13 +36,12 @@ export function SettingsShell({ title, description, children }: SettingsShellPro
   const pathname = usePathname();
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]">
-      <aside className="h-fit rounded-lg border border-white/10 bg-white/[0.03] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
-        <div className="px-3 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200/70">Settings</p>
-          <p className="mt-1 text-sm leading-5 text-slate-400">Account and workspace controls are separated here.</p>
+    <div className="flex h-full w-full overflow-hidden text-[var(--omnix-text)]">
+      <aside className="hidden w-[220px] shrink-0 border-r border-[var(--omnix-border)] bg-[rgba(5,12,23,0.6)] px-2.5 py-4 backdrop-blur-xl md:block">
+        <div className="px-2 pb-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--omnix-text-3)]">Settings Menu</p>
         </div>
-        <nav className="space-y-1">
+        <nav className="flex flex-col gap-0.5">
           {settingsNav.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -50,16 +51,17 @@ export function SettingsShell({ title, description, children }: SettingsShellPro
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-start gap-3 rounded-md border px-3 py-2.5 transition",
+                  "relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition",
                   active
-                    ? "border-cyan-300/25 bg-cyan-300/10 text-white"
-                    : "border-transparent text-slate-400 hover:border-white/10 hover:bg-white/[0.045] hover:text-slate-100",
+                    ? "bg-[var(--omnix-surface-hover)] font-medium text-white shadow-[var(--omnix-glow-xs)]"
+                    : "text-[var(--omnix-text-2)] hover:bg-[var(--omnix-surface)] hover:text-white",
                 )}
               >
-                <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", active ? "text-cyan-200" : "text-slate-500")} />
+                {active ? <span className="omnix-active-rail" /> : null}
+                <Icon className={cn("h-3.5 w-3.5 shrink-0", active ? "text-[var(--omnix-cyan)]" : "text-[var(--omnix-text-3)]")} />
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold">{item.label}</span>
-                  <span className="mt-0.5 block text-xs leading-4 text-slate-500">{item.description}</span>
+                  <span className="block truncate">{item.label}</span>
+                  <span className="sr-only">{item.description}</span>
                 </span>
               </Link>
             );
@@ -67,12 +69,14 @@ export function SettingsShell({ title, description, children }: SettingsShellPro
         </nav>
       </aside>
 
-      <section className="min-w-0">
-        <div className="mb-5 rounded-lg border border-white/10 bg-white/[0.025] px-4 py-4 sm:px-5">
-          <h2 className="text-xl font-semibold tracking-tight text-white">{title}</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">{description}</p>
+      <section className="omnix-scrollbar min-w-0 flex-1 overflow-y-auto px-5 py-8 sm:px-8 lg:px-10">
+        <div className="mx-auto max-w-[680px] pb-20">
+        <div className="mb-6">
+          <h2 className="omnix-display text-[22px] font-bold text-white">{title}</h2>
+          <p className="mt-1 text-[13px] leading-6 text-[var(--omnix-text-3)]">{description}</p>
         </div>
         {children}
+        </div>
       </section>
     </div>
   );
