@@ -127,11 +127,11 @@ export function InviteNotificationBar() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
           transition={{ duration: 0.18, ease: "easeOut" }}
-          className="border-b border-cyan-300/20 bg-[#061018] shadow-[0_16px_40px_rgba(0,0,0,0.26)]"
+          className="border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.96)] shadow-[0_16px_40px_rgba(0,0,0,0.26),var(--omnix-glow-xs)] backdrop-blur-xl"
         >
-          <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <div className="flex w-full flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-100">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]">
                 {pendingInvitesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
               </div>
               <div className="min-w-0">
@@ -153,7 +153,7 @@ export function InviteNotificationBar() {
                 onClick={() => {
                   setDismissedInviteIds((current) => new Set(current).add(getWorkspaceInviteId(invite)));
                 }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-white/[0.06] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-cyan-300/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -205,7 +205,7 @@ export function InviteNotificationBell() {
           setOpen((current) => !current);
           void refreshPendingInvites();
         }}
-        className="relative"
+        className="relative h-9 w-9 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)]"
       >
         {pendingInvitesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
         {pendingInvites.length > 0 ? (
@@ -222,9 +222,9 @@ export function InviteNotificationBell() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ duration: 0.16, ease: "easeOut" }}
-            className="absolute right-0 top-full z-[100] mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-white/12 bg-[#05070b] shadow-[0_24px_70px_rgba(0,0,0,0.65)] ring-1 ring-black/40"
+            className="absolute right-0 top-full z-[100] mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-[var(--omnix-border-2)] bg-[#07131f] shadow-[0_24px_70px_rgba(0,0,0,0.65),var(--omnix-glow-xs)] ring-1 ring-black/40"
           >
-            <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3">
+            <div className="flex items-center justify-between gap-3 border-b border-[var(--omnix-border)] px-4 py-3">
               <div>
                 <p className="text-sm font-semibold text-white">Invitations</p>
                 <p className="mt-0.5 text-xs text-slate-500">
@@ -234,13 +234,13 @@ export function InviteNotificationBell() {
               <ChevronDown className={cn("h-4 w-4 text-slate-500 transition", open && "rotate-180")} />
             </div>
 
-            <div className="max-h-[70vh] overflow-y-auto p-2">
+            <div className="omnix-scrollbar max-h-[70vh] overflow-y-auto p-2">
               {pendingInvites.length ? (
                 <div className="space-y-2">
                   {pendingInvites.map((invite) => (
                     <div
                       key={getWorkspaceInviteId(invite)}
-                      className="rounded-lg border border-white/8 bg-white/[0.035] p-3 transition hover:border-white/14 hover:bg-white/[0.055]"
+                      className="rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-3 transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)]"
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-300/10 text-sm font-semibold text-cyan-100">
@@ -263,7 +263,7 @@ export function InviteNotificationBell() {
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center px-5 py-8 text-center">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-400">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-slate-400">
                     <UserPlus className="h-4 w-4" />
                   </div>
                   <p className="mt-3 text-sm font-medium text-white">You are all caught up</p>

@@ -29,15 +29,15 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
   }
 
   return (
-    <div className="my-3 overflow-hidden rounded-lg border border-white/10 bg-[#05070b] shadow-[0_16px_50px_rgba(0,0,0,0.28)]">
-      <div className="flex h-10 items-center justify-between border-b border-white/10 bg-white/[0.035] px-3">
+    <div className="my-3 overflow-hidden rounded-lg border border-[var(--omnix-border)] bg-[#05070b] shadow-[0_16px_50px_rgba(0,0,0,0.28)]">
+      <div className="flex h-10 items-center justify-between border-b border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3">
         <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
           {language || "code"}
         </span>
         <button
           type="button"
           onClick={handleCopy}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-white/[0.07] hover:text-white"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-[var(--omnix-surface)] hover:text-white"
           aria-label="Copy code"
           title="Copy code"
         >
@@ -72,7 +72,7 @@ export function MarkdownRenderer({ content, compact = false }: MarkdownRendererP
   const components: Components = {
     p({ children }) {
       return (
-        <p className={cn("leading-7 text-slate-200", compact ? "text-sm" : "text-[15px]")}>
+        <p className={cn("leading-7 text-[var(--omnix-text-2)]", compact ? "text-sm" : "text-[15px]")}>
           {children}
         </p>
       );
@@ -90,17 +90,17 @@ export function MarkdownRenderer({ content, compact = false }: MarkdownRendererP
       );
     },
     ul({ children }) {
-      return <ul className="my-3 list-disc space-y-1.5 pl-5 text-slate-200">{children}</ul>;
+      return <ul className="my-3 list-disc space-y-1.5 pl-5 text-[var(--omnix-text-2)]">{children}</ul>;
     },
     ol({ children }) {
-      return <ol className="my-3 list-decimal space-y-1.5 pl-5 text-slate-200">{children}</ol>;
+      return <ol className="my-3 list-decimal space-y-1.5 pl-5 text-[var(--omnix-text-2)]">{children}</ol>;
     },
     li({ children }) {
       return <li className="leading-6">{children}</li>;
     },
     blockquote({ children }) {
       return (
-        <blockquote className="my-3 border-l-2 border-cyan-300/40 pl-4 text-slate-300">
+        <blockquote className="my-3 border-l-2 border-cyan-300/50 bg-cyan-300/5 py-1 pl-4 text-slate-300">
           {children}
         </blockquote>
       );
@@ -109,18 +109,18 @@ export function MarkdownRenderer({ content, compact = false }: MarkdownRendererP
       return <>{children}</>;
     },
     h1({ children }) {
-      return <h1 className="mb-3 text-xl font-semibold text-white">{children}</h1>;
+      return <h1 className="omnix-display mb-3 text-xl font-semibold text-white">{children}</h1>;
     },
     h2({ children }) {
-      return <h2 className="mb-3 text-lg font-semibold text-white">{children}</h2>;
+      return <h2 className="omnix-display mb-3 text-lg font-semibold text-white">{children}</h2>;
     },
     h3({ children }) {
-      return <h3 className="mb-2 text-base font-semibold text-white">{children}</h3>;
+      return <h3 className="omnix-display mb-2 text-base font-semibold text-white">{children}</h3>;
     },
     table({ children }) {
       return (
-        <div className="scrollbar-thin my-3 overflow-x-auto rounded-lg border border-white/10">
-          <table className="min-w-full divide-y divide-white/10 text-sm">
+        <div className="omnix-scrollbar my-3 overflow-x-auto rounded-lg border border-[var(--omnix-border)] bg-black/20">
+          <table className="min-w-full divide-y divide-[var(--omnix-border)] text-sm">
             {children}
           </table>
         </div>
@@ -128,13 +128,13 @@ export function MarkdownRenderer({ content, compact = false }: MarkdownRendererP
     },
     th({ children }) {
       return (
-        <th className="bg-white/[0.04] px-3 py-2 text-left font-medium text-white">
+        <th className="bg-[var(--omnix-surface)] px-3 py-2 text-left font-medium text-white">
           {children}
         </th>
       );
     },
     td({ children }) {
-      return <td className="px-3 py-2 text-slate-300">{children}</td>;
+      return <td className="border-t border-[var(--omnix-border)] px-3 py-2 text-[var(--omnix-text-2)]">{children}</td>;
     },
     code({ className, children }) {
       const value = String(children).replace(/\n$/, "");
@@ -142,7 +142,7 @@ export function MarkdownRenderer({ content, compact = false }: MarkdownRendererP
 
       if (!match && !value.includes("\n")) {
         return (
-          <code className="rounded-md border border-white/10 bg-white/[0.07] px-1.5 py-0.5 text-[0.9em] text-cyan-100">
+          <code className="rounded-md border border-cyan-300/15 bg-cyan-300/10 px-1.5 py-0.5 text-[0.9em] text-cyan-100">
             {children}
           </code>
         );
@@ -170,7 +170,7 @@ export function StreamingTextRenderer({
     <div className="break-words text-slate-100">
       <p
         className={cn(
-          "whitespace-pre-wrap leading-7 text-slate-200",
+          "whitespace-pre-wrap leading-7 text-[var(--omnix-text-2)]",
           compact ? "text-sm" : "text-[15px]",
         )}
       >

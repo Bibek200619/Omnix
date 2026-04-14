@@ -70,8 +70,8 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
         className={cn(
           "flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold shadow-[0_10px_30px_rgba(0,0,0,0.24)] transition",
           open
-            ? "border-cyan-300/45 bg-cyan-300/15 text-cyan-50 ring-2 ring-cyan-300/20"
-            : "border-white/12 bg-white/[0.075] text-slate-100 hover:border-cyan-300/35 hover:bg-white/[0.11]",
+            ? "border-cyan-300/45 bg-cyan-300/15 text-cyan-50 shadow-[var(--omnix-glow-xs)] ring-2 ring-cyan-300/20"
+            : "border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-slate-100 hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)]",
         )}
       >
         <ProfileAvatar
@@ -86,9 +86,9 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-full z-[110] mt-2 w-64 overflow-hidden rounded-lg border border-white/12 bg-[#05070b] shadow-[0_24px_70px_rgba(0,0,0,0.68)] ring-1 ring-black/40"
+          className="absolute right-0 top-full z-[110] mt-2 w-64 overflow-hidden rounded-xl border border-[var(--omnix-border-2)] bg-[#07131f] shadow-[0_24px_70px_rgba(0,0,0,0.68),var(--omnix-glow-xs)] ring-1 ring-black/40"
         >
-          <div className="border-b border-white/8 px-4 py-3">
+          <div className="border-b border-[var(--omnix-border)] px-4 py-3">
             <div className="flex items-center gap-3">
               <ProfileAvatar
                 name={displayName}
@@ -110,7 +110,7 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
               type="button"
               role="menuitem"
               onClick={() => goTo("/settings/profile")}
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm text-slate-300 transition hover:bg-white/[0.07] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
+              className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm text-slate-300 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
             >
               <UserRound className="h-4 w-4 text-cyan-200" />
               Profile
@@ -119,7 +119,7 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
               type="button"
               role="menuitem"
               onClick={() => goTo("/settings/workspace")}
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm text-slate-300 transition hover:bg-white/[0.07] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
+              className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm text-slate-300 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
             >
               <Settings className="h-4 w-4 text-slate-400" />
               Workspace Settings

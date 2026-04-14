@@ -43,7 +43,7 @@ export function HistoryList() {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return conversations;
     return conversations.filter((chat) => {
-      const title = chat.title || "Untitled conversation";
+      const title = chat.title || "Omnix conversation";
       const preview = chat.preview || "";
       return `${title} ${preview}`.toLowerCase().includes(normalized);
     });
@@ -56,7 +56,7 @@ export function HistoryList() {
 
   function startRename(chatId: string, title?: string | null) {
     setEditingId(chatId);
-    setDraftTitle(title || "Untitled conversation");
+    setDraftTitle(title || "Omnix conversation");
     setActionError(null);
   }
 
@@ -96,7 +96,8 @@ export function HistoryList() {
   }
 
   return (
-    <section className="space-y-5">
+    <section className="omnix-scrollbar h-full w-full overflow-y-auto px-5 py-6 md:px-8">
+      <div className="mx-auto max-w-5xl space-y-5 pb-12">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Input
           value={query}
@@ -147,13 +148,13 @@ export function HistoryList() {
           {[0, 1, 2, 3].map((item) => (
             <div
               key={item}
-              className="shimmer rounded-lg border border-white/10 bg-white/[0.04] p-4"
+              className="shimmer rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-4"
             >
               <div className="flex items-center justify-between gap-4">
-                <div className="h-4 w-48 rounded-full bg-white/10" />
-                <div className="h-3 w-20 rounded-full bg-white/10" />
+                <div className="h-4 w-48 rounded-full bg-[var(--omnix-surface-hover)]" />
+                <div className="h-3 w-20 rounded-full bg-[var(--omnix-surface-hover)]" />
               </div>
-              <div className="mt-4 h-3 w-2/3 rounded-full bg-white/10" />
+              <div className="mt-4 h-3 w-2/3 rounded-full bg-[var(--omnix-surface-hover)]" />
             </div>
           ))}
         </div>
@@ -179,10 +180,10 @@ export function HistoryList() {
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.18, ease: "easeOut" }}
                   className={cn(
-                    "group rounded-lg border p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition hover:border-cyan-300/30 hover:bg-white/[0.07]",
+                    "group rounded-xl border p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)]",
                     isActive
-                      ? "border-cyan-300/35 bg-cyan-300/10"
-                      : "border-white/10 bg-white/[0.04]",
+                      ? "border-cyan-300/35 bg-cyan-300/10 shadow-[var(--omnix-glow-xs)]"
+                      : "border-[var(--omnix-border)] bg-[var(--omnix-surface)]",
                   )}
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -239,7 +240,7 @@ export function HistoryList() {
                           />
                           <MessageSquareText className="h-4 w-4 text-cyan-200" />
                           <h2 className="truncate text-base font-semibold text-white">
-                            {chat.title || "Untitled conversation"}
+                            {chat.title || "Omnix conversation"}
                           </h2>
                         </div>
                         {isActive ? (
@@ -291,7 +292,7 @@ export function HistoryList() {
                   <button
                     type="button"
                     onClick={() => openChat(chat.id)}
-                    className="mt-4 block w-full border-t border-white/10 pt-3 text-left"
+                    className="mt-4 block w-full border-t border-[var(--omnix-border)] pt-3 text-left"
                     disabled={isEditing}
                   >
                     <p className="line-clamp-2 text-sm leading-6 text-slate-400">
@@ -307,8 +308,8 @@ export function HistoryList() {
           </AnimatePresence>
         </div>
       ) : (
-        <div className="flex min-h-[360px] flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200">
+        <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-8 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
             <MessageSquareText className="h-5 w-5" />
           </div>
           <h2 className="mt-4 text-lg font-semibold text-white">
@@ -331,6 +332,7 @@ export function HistoryList() {
           </Button>
         </div>
       )}
+      </div>
     </section>
   );
 }
