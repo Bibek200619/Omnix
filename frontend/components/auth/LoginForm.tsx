@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Lock, Mail, ShieldCheck } from "lucide-react";
-import { Input } from "@/components/ui/Input";
 import { LoadingButton } from "@/components/ui/LoadingButton";
 import { Alert } from "@/components/ui/Alert";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
+import {
+  AUTH_C,
+  AUTH_ICONS,
+  AuthIcon,
+  AuthInput,
+} from "@/components/auth/OmnixAuthVisuals";
 import { authLink, redirectFromWindow } from "@/lib/auth-redirects";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
@@ -61,7 +65,7 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       {!isConfigured ? (
         <Alert variant="warning" title="Authentication is not configured">
           {authError}
@@ -75,15 +79,15 @@ export function LoginForm() {
       <OAuthButtons disabled={loading || !isConfigured} mode="login" onError={setError} />
       <div className="relative">
         <div className="absolute inset-0 flex items-center" aria-hidden="true">
-          <div className="h-px w-full bg-white/10" />
+          <div className="h-px w-full" style={{ background: AUTH_C.border }} />
         </div>
         <div className="relative flex justify-center">
-          <span className="bg-[#07111f] px-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <span className="bg-[#061020] px-3 text-xs" style={{ color: AUTH_C.faint }}>
             or continue with email
           </span>
         </div>
       </div>
-      <Input
+      <AuthInput
         id="email"
         name="email"
         label="Email"
@@ -91,11 +95,10 @@ export function LoginForm() {
         autoComplete="email"
         placeholder="you@company.com"
         required
-        icon={<Mail className="h-4 w-4" />}
+        icon={<AuthIcon d={AUTH_ICONS.mail} size={16} stroke="currentColor" sw={1.8} />}
         disabled={loading || !isConfigured}
-        className="h-12 rounded-lg border-white/10 bg-white/[0.045]"
       />
-      <Input
+      <AuthInput
         id="password"
         name="password"
         label="Password"
@@ -104,31 +107,36 @@ export function LoginForm() {
         placeholder="Enter your password"
         required
         minLength={8}
-        icon={<Lock className="h-4 w-4" />}
+        icon={<AuthIcon d={AUTH_ICONS.lock} size={16} stroke="currentColor" sw={1.8} />}
         disabled={loading || !isConfigured}
-        className="h-12 rounded-lg border-white/10 bg-white/[0.045]"
       />
       <LoadingButton
         type="submit"
         size="lg"
-        className="w-full font-black"
+        className="w-full rounded-xl border-0 bg-[#00FFFF] py-3.5 text-sm font-black text-[#061020] shadow-[0_0_32px_rgba(0,255,255,0.3)] hover:-translate-y-0.5 hover:bg-[#00FFFF] hover:shadow-[0_0_50px_rgba(0,255,255,0.55)]"
         isLoading={loading}
         loadingText="Signing in"
         disabled={!isConfigured}
-        rightIcon={<ArrowRight className="h-4 w-4" />}
+        rightIcon={<AuthIcon d={AUTH_ICONS.arrow} size={16} stroke={AUTH_C.navyDark} sw={2.5} />}
       >
         Sign in to workspace
       </LoadingButton>
-      <div className="flex items-start gap-3 rounded-lg border border-white/[0.07] bg-white/[0.035] p-3 text-xs leading-5 text-slate-500">
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-cyan-200" aria-hidden="true" />
+      <div
+        className="flex items-start gap-3 rounded-2xl p-3 text-xs leading-5"
+        style={{ background: "rgba(0,255,255,0.04)", border: "1px solid rgba(0,255,255,0.12)", color: AUTH_C.faint }}
+      >
+        <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full" style={{ color: AUTH_C.cyan }}>
+          <AuthIcon d={AUTH_ICONS.check} size={10} stroke="currentColor" sw={2.5} />
+        </span>
         Your session keeps workspace research, files, and team history tied to
         your account.
       </div>
-      <p className="text-center text-sm text-slate-400">
+      <p className="text-center text-xs" style={{ color: AUTH_C.faint }}>
         New to Omnix?{" "}
         <Link
           href={authLink("/register")}
-          className="font-semibold text-cyan-200 transition hover:text-cyan-100"
+          className="font-semibold transition hover:opacity-80"
+          style={{ color: AUTH_C.cyan }}
         >
           Create an account
         </Link>
