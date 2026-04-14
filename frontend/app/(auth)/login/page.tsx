@@ -5,7 +5,8 @@ export default function LoginPage() {
   return (
     <AuthCard
       title="Welcome back"
-      description="Sign in to continue your Omnix conversations, history, and account settings."
+      description="Sign in to continue your Omnix conversations, shared workspaces, source-backed research, and account settings."
+      mode="login"
     >
       <LoginForm />
     </AuthCard>

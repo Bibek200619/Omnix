@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AtSign, Lock, Mail, UserRound, UserPlus } from "lucide-react";
+import { ArrowRight, AtSign, Lock, Mail, UserRound, UserPlus } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
 import { Input } from "@/components/ui/Input";
 import { LoadingButton } from "@/components/ui/LoadingButton";
@@ -95,7 +95,7 @@ export function RegisterForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       {!isConfigured ? (
         <Alert variant="warning" title="Authentication is not configured">
           {authError}
@@ -115,6 +115,7 @@ export function RegisterForm() {
         placeholder="Alex Morgan"
         icon={<UserRound className="h-4 w-4" />}
         disabled={loading || !isConfigured}
+        className="h-12 rounded-lg border-white/10 bg-white/[0.045]"
       />
       <Input
         id="handle"
@@ -129,6 +130,7 @@ export function RegisterForm() {
         icon={<AtSign className="h-4 w-4" />}
         hint="Unique ID for workspace invites. Lowercase letters, numbers, hyphens, and underscores."
         disabled={loading || !isConfigured}
+        className="h-12 rounded-lg border-white/10 bg-white/[0.045]"
       />
       <Input
         id="email"
@@ -140,6 +142,7 @@ export function RegisterForm() {
         required
         icon={<Mail className="h-4 w-4" />}
         disabled={loading || !isConfigured}
+        className="h-12 rounded-lg border-white/10 bg-white/[0.045]"
       />
       <Input
         id="password"
@@ -153,21 +156,31 @@ export function RegisterForm() {
         icon={<Lock className="h-4 w-4" />}
         hint="Use at least 8 characters."
         disabled={loading || !isConfigured}
+        className="h-12 rounded-lg border-white/10 bg-white/[0.045]"
       />
+      <div className="rounded-lg border border-cyan-300/14 bg-cyan-300/[0.045] p-3 text-xs leading-5 text-slate-400">
+        Your Omnix handle is the identity teammates use for workspace invites
+        and shared research.
+      </div>
       <LoadingButton
         type="submit"
-        className="w-full"
+        size="lg"
+        className="w-full font-black"
         isLoading={loading}
         loadingText="Creating account"
         disabled={!isConfigured}
         leftIcon={<UserPlus className="h-4 w-4" />}
+        rightIcon={<ArrowRight className="h-4 w-4" />}
       >
         Create account
       </LoadingButton>
       <p className="text-center text-sm text-slate-400">
         Already have an account?{" "}
-        <Link href={authLink("/login")} className="font-medium text-cyan-200 hover:text-cyan-100">
-          Login
+        <Link
+          href={authLink("/login")}
+          className="font-semibold text-cyan-200 transition hover:text-cyan-100"
+        >
+          Sign in
         </Link>
       </p>
     </form>
