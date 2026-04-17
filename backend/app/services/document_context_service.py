@@ -7,7 +7,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from ..rag.chunking import split_text_into_chunks
+from ..rag.chunking import chunk_text
 from ..retrieval.context_builder import BuiltContext, ContextBuilder, ContextSupplement
 from ..retrieval.scoring import RetrievalResult
 from ..services.supabase_service import (
@@ -21,7 +21,7 @@ from ..services.workspace_service import utc_now_iso
 
 logger = logging.getLogger(__name__)
 
-DOCUMENT_COLUMNS = "id,content,file_id,created_at,workspace_id,user_id"
+DOCUMENT_COLUMNS = "id,content,file_id,created_at,workspace_id,user_id,chunk_index"
 FILE_COLUMNS = "id,user_id,workspace_id,conversation_id,file_name,file_type,metadata,created_at"
 MAX_IMMEDIATE_CHUNKS = 250
 _TERM_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:/#-]*")
@@ -94,7 +94,7 @@ async def store_extracted_text_chunks(
     if not normalized_text:
         return StoredDocumentChunks(chunk_count=0, chunk_ids=[])
 
-    chunks = split_text_into_chunks(normalized_text)
+    chunks = chunk_text(normalized_text, metadata={"ingestion_stage": "immediate"})
     if not chunks:
         return StoredDocumentChunks(chunk_count=0, chunk_ids=[])
 
@@ -107,14 +107,15 @@ async def store_extracted_text_chunks(
     timestamp = utc_now_iso()
     payloads: list[dict[str, Any]] = []
     chunk_ids: list[str] = []
-    for chunk in chunks:
+    for index, chunk in enumerate(chunks):
         chunk_id = str(uuid.uuid4())
         chunk_ids.append(chunk_id)
         payload: dict[str, Any] = {
             "id": chunk_id,
             "user_id": user_id,
             "file_id": file_id,
-            "content": chunk,
+            "content": str(chunk["content"]),
+            "chunk_index": index,
             "created_at": timestamp,
         }
         if workspace_id:
@@ -189,6 +190,7 @@ async def build_uploaded_document_context(
                 user_id=str(row.get("user_id")) if row.get("user_id") else None,
                 created_at=str(row.get("created_at")) if row.get("created_at") else None,
                 metadata=file_row.get("metadata") if isinstance(file_row.get("metadata"), dict) else {},
+                chunk_index=int(row["chunk_index"]) if row.get("chunk_index") is not None else None,
                 keyword_score=score,
                 score=score,
                 sources={"uploaded_document"},
@@ -335,4 +337,5 @@ def _assign_chunk_indexes(results: list[RetrievalResult]) -> None:
     for file_results in by_file.values():
         file_results.sort(key=lambda item: (item.created_at or "", item.chunk_id))
         for index, result in enumerate(file_results):
-            result.chunk_index = index
+            if result.chunk_index is None:
+                result.chunk_index = index

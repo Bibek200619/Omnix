@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 
 from ..core.security import get_current_user
+from ..rag.ingestion_service import parse_document_bytes
 from ..services.supabase_service import SupabaseServiceError, insert_one
 from ..services.document_context_service import store_extracted_text_chunks
 from ..services.workspace_service import active_workspace_id_from_request, require_workspace_access
@@ -51,28 +52,6 @@ def _extract_text_from_bytes(filename: str, file_type: str | None, data: bytes) 
     lowered = (file_type or "").lower()
     name_l = filename.lower()
 
-    # PDF
-    if "pdf" in lowered or name_l.endswith(".pdf"):
-        try:
-            from pypdf import PdfReader
-
-            reader = PdfReader(io.BytesIO(data))
-            pages = []
-            for page in reader.pages:
-                try:
-                    pages.append(page.extract_text() or "")
-                except Exception:
-                    # best-effort per page
-                    logger.exception("Failed to extract page text from PDF page.")
-            text = "\n\n".join(pages)
-            return text
-        except ImportError as exc:
-            logger.exception("Missing pypdf dependency: %s", exc)
-            raise
-        except Exception as exc:
-            logger.exception("PDF extraction failed: %s", exc)
-            raise
-
     # DOCX
     if "word" in lowered or name_l.endswith(".docx"):
         try:
@@ -88,16 +67,8 @@ def _extract_text_from_bytes(filename: str, file_type: str | None, data: bytes) 
             logger.exception("DOCX extraction failed: %s", exc)
             raise
 
-    # Plain text / markdown
-    try:
-        text = data.decode("utf-8")
-    except Exception:
-        try:
-            text = data.decode("latin-1")
-        except Exception:
-            logger.exception("Failed to decode text file")
-            raise
-    return text
+    parsed = parse_document_bytes(data, filename=filename, content_type=file_type)
+    return parsed.text
 
 
 @router.post("/upload")

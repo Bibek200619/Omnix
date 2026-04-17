@@ -6,11 +6,11 @@ os.environ.setdefault("SUPABASE_URL", "http://localhost:8001")
 os.environ.setdefault("SUPABASE_ANON_KEY", "anon")
 os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "service")
 
-from app.retrieval.context_builder import ContextBuilder, ContextSupplement
-from app.settings import get_settings
-from app.services.chat_service import OllamaChatService
-from app.services.query_classifier import classify_search_need
-from app.services.web_search import TavilySearchService
+from backend.app.retrieval.context_builder import ContextBuilder, ContextSupplement
+from backend.app.settings import get_settings
+from backend.app.services.chat_service import OllamaChatService
+from backend.app.services.query_classifier import classify_search_need
+from backend.app.services.web_search import TavilySearchService
 
 
 def test_query_classifier_detects_current_web_need() -> None:
