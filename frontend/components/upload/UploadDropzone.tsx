@@ -218,7 +218,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
             className={cn("flex items-center justify-center", compact ? "mt-4" : "mt-6")}
           >
             <input ref={fileInputRef} type="file" multiple onChange={handleChoose} className="hidden" accept=".pdf,.docx,.txt,.md,text/*,application/pdf" />
-            <Button type="button" size={compact ? "sm" : "md"} onClick={triggerFilePicker} className="shadow-sm">Choose files</Button>
+            <Button type="button" size={compact ? "sm" : "md"} onClick={triggerFilePicker} className="omnix-primary-action shadow-[var(--omnix-glow-sm)]">Choose files</Button>
           </motion.div>
         </div>
         
