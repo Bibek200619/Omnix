@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
-import { Bot, Check, Copy, RotateCcw, FileText, ChevronDown, ChevronUp, ExternalLink, Globe2 } from "lucide-react";
+import { Check, Copy, RotateCcw, FileText, ChevronDown, ChevronUp, ExternalLink, Globe2, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "@/components/chat/types";
 import { MarkdownRenderer, StreamingTextRenderer } from "@/components/chat/MarkdownRenderer";
@@ -138,10 +138,10 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         />
       ) : (
         <div
-          className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-300/35 bg-[linear-gradient(135deg,#00ffff,#0055ff)] text-xs font-semibold text-white shadow-[var(--omnix-glow-md)]"
+          className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-cyan-300/35 bg-[linear-gradient(135deg,#00ffff,#0055ff)] text-xs font-semibold text-white shadow-[var(--omnix-glow-md)]"
           title={senderName}
         >
-          <Bot className="h-4 w-4" />
+          <Sparkles className="h-4 w-4" />
         </div>
       )}
       <div
@@ -151,14 +151,11 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
             ? "overflow-hidden rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-rose-50"
           : isUser
             ? "max-w-[680px] overflow-visible border-0 bg-transparent px-0 py-0 text-[var(--omnix-text-2)]"
-            : "max-w-[740px] overflow-hidden rounded-[16px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-5 py-[18px] text-slate-100 shadow-[var(--omnix-glow-sm)]",
+            : "omnix-ai-card max-w-[740px] px-5 py-[18px] text-slate-100",
           sending && "opacity-80",
         )}
       >
-        {!isUser ? (
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--omnix-cyan),transparent)] opacity-55" />
-        ) : null}
-        <div className="mb-2 flex flex-wrap items-center gap-2">
+        <div className="relative z-10 mb-2 flex flex-wrap items-center gap-2">
           <span
             className={cn(
               "truncate text-[13px] font-semibold",
@@ -167,6 +164,9 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
           >
             {senderName}
           </span>
+          {!isUser ? (
+            <span className="h-[5px] w-[5px] rounded-full bg-[var(--omnix-cyan)] shadow-[0_0_12px_rgba(0,255,255,0.85)] [animation:omnix-glow-pulse_2s_ease-in-out_infinite]" />
+          ) : null}
           {isUser && message.senderHandle ? (
             <span className="truncate text-[10px] font-medium text-slate-400">@{message.senderHandle}</span>
           ) : null}
@@ -183,15 +183,15 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         </div>
 
         {isUser ? (
-          <p className="whitespace-pre-wrap text-sm font-light leading-[1.65] text-[var(--omnix-text-2)]">{message.content}</p>
+          <p className="relative z-10 whitespace-pre-wrap text-sm font-light leading-[1.65] text-[var(--omnix-text-2)]">{message.content}</p>
         ) : activelyStreaming ? (
-          <StreamingTextRenderer content={message.content} compact />
+          <div className="relative z-10"><StreamingTextRenderer content={message.content} compact /></div>
         ) : (
-          <MarkdownRenderer content={message.content} compact />
+          <div className="relative z-10"><MarkdownRenderer content={message.content} compact /></div>
         )}
 
         {isUser && message.attachments && message.attachments.length > 0 ? (
-          <div className="mt-3 flex flex-col gap-2">
+          <div className="relative z-10 mt-3 flex flex-col gap-2">
             {message.attachments.map((file) => (
               <button
                 key={file.id}
@@ -226,7 +226,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         ) : null}
 
         {!isUser && activelyStreaming && sources.length > 0 ? (
-          <div className="mt-4 border-t border-[var(--omnix-border)] pt-3">
+          <div className="relative z-10 mt-4 border-t border-[var(--omnix-border)] pt-3">
             <p className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[11px] font-medium text-cyan-100">
               <Globe2 className="h-3.5 w-3.5" />
               Sources ready ({sources.length})
@@ -235,7 +235,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         ) : null}
 
         {!isUser && !activelyStreaming && sources.length > 0 ? (
-          <div className="mt-4 border-t border-[var(--omnix-border)] pt-4">
+          <div className="relative z-10 mt-4 border-t border-[var(--omnix-border)] pt-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="flex items-center gap-2 text-xs font-medium text-[var(--omnix-text-2)]">
                 <Globe2 className="h-3.5 w-3.5 text-cyan-300/80" />
@@ -258,7 +258,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                 return (
                   <div
                     key={sourceId}
-                    className="overflow-hidden rounded-lg border border-[var(--omnix-border)] bg-[rgba(0,0,0,0.22)] transition-colors hover:border-[var(--omnix-border-2)] hover:bg-[var(--omnix-surface)]"
+                    className="omnix-source-card"
                   >
                     <button
                       type="button"
@@ -334,7 +334,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
           </div>
         ) : null}
 
-        <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="relative z-10 mt-2 flex items-center justify-between gap-2">
           <p
             className={cn(
               "text-[11px]",

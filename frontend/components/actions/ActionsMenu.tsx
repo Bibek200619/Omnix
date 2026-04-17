@@ -160,7 +160,7 @@ export function ActionsMenu({ className }: { className?: string }) {
         <div
           role="menu"
           aria-label="Conversation actions"
-          className="absolute right-0 top-full z-[100] mt-2 w-64 overflow-hidden rounded-xl border border-[var(--omnix-border-2)] bg-[#07131f] p-1 shadow-[0_24px_70px_rgba(0,0,0,0.65),var(--omnix-glow-xs)] ring-1 ring-black/40"
+          className="omnix-floating-card absolute right-0 top-full z-[100] mt-2 w-64 overflow-hidden p-1 ring-1 ring-black/40"
         >
           <div className="border-b border-white/8 px-3 py-2">
             <p className="truncate text-sm font-medium text-white">

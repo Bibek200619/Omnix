@@ -50,7 +50,7 @@ export function WorkspaceSettingsPanel() {
 
   if (!activeWorkspace) {
     return (
-      <div className="rounded-xl border border-dashed border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-6 text-sm text-[var(--omnix-text-2)]">
+      <div className="omnix-cinematic-card border-dashed p-6 text-sm text-[var(--omnix-text-2)]">
         Select a workspace from the sidebar before editing workspace settings.
       </div>
     );
@@ -60,8 +60,8 @@ export function WorkspaceSettingsPanel() {
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-      <section className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
-        <div className="flex items-start gap-4">
+      <section className="omnix-cinematic-card p-5">
+        <div className="relative z-10 flex items-start gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-100">
             <Settings className="h-5 w-5" />
           </div>
@@ -73,7 +73,7 @@ export function WorkspaceSettingsPanel() {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-4">
+        <div className="relative z-10 mt-6 grid gap-4">
           <Input
             label="Workspace name"
             value={name}
@@ -115,7 +115,7 @@ export function WorkspaceSettingsPanel() {
           </Alert>
         ) : null}
 
-        <div className="mt-6 flex justify-end">
+        <div className="relative z-10 mt-6 flex justify-end">
           <Button
             type="button"
             leftIcon={saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
@@ -129,7 +129,8 @@ export function WorkspaceSettingsPanel() {
       </section>
 
       <aside className="space-y-4">
-        <div className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5">
+        <div className="omnix-cinematic-card p-5">
+          <div className="relative z-10">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Current workspace</p>
           <h3 className="mt-2 truncate text-lg font-semibold text-white">{activeWorkspace.name}</h3>
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -139,6 +140,7 @@ export function WorkspaceSettingsPanel() {
             <span className="rounded-full border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-2.5 py-1 text-xs text-[var(--omnix-text-2)]">
               {activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "member" : "members"}
             </span>
+          </div>
           </div>
         </div>
       </aside>

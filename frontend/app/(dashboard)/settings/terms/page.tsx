@@ -27,44 +27,46 @@ export default function TermsPage() {
   const router = useRouter();
 
   return (
-    <article className="mx-auto max-w-3xl rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5 sm:p-7">
-      <Button
-        type="button"
-        variant="ghost"
-        leftIcon={<ArrowLeft className="h-4 w-4" />}
-        onClick={() => router.push("/settings/about")}
-      >
-        Back to About
-      </Button>
+    <section className="omnix-page-frame omnix-scrollbar">
+      <article className="omnix-cinematic-card relative z-10 mx-auto max-w-3xl p-5 sm:p-7">
+        <Button
+          type="button"
+          variant="ghost"
+          leftIcon={<ArrowLeft className="h-4 w-4" />}
+          onClick={() => router.push("/settings/about")}
+        >
+          Back to About
+        </Button>
 
-      <div className="mt-6 flex items-start gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200">
-          <FileText className="h-5 w-5" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-white">
-            Terms
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            Terms for the Omnix AI authenticated workspace.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-8 space-y-4">
-        {terms.map((term, index) => (
-          <section
-            key={term.title}
-            className="rounded-lg border border-[var(--omnix-border)] bg-black/20 p-4"
-          >
-            <p className="text-sm font-medium uppercase tracking-[0.16em] text-cyan-200/70">
-              Section {index + 1}
+        <div className="relative z-10 mt-6 flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
+            <FileText className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="omnix-display text-2xl font-semibold text-white">
+              Terms
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              Terms for the Omnix AI authenticated workspace.
             </p>
-            <h3 className="mt-3 font-semibold text-white">{term.title}</h3>
-            <p className="mt-2 text-sm leading-7 text-slate-300">{term.copy}</p>
-          </section>
-        ))}
-      </div>
-    </article>
+          </div>
+        </div>
+
+        <div className="relative z-10 mt-8 space-y-4">
+          {terms.map((term, index) => (
+            <section
+              key={term.title}
+              className="rounded-lg border border-[var(--omnix-border)] bg-black/20 p-4"
+            >
+              <p className="text-sm font-medium uppercase tracking-[0.16em] text-cyan-200/70">
+                Section {index + 1}
+              </p>
+              <h3 className="mt-3 font-semibold text-white">{term.title}</h3>
+              <p className="mt-2 text-sm leading-7 text-slate-300">{term.copy}</p>
+            </section>
+          ))}
+        </div>
+      </article>
+    </section>
   );
 }
