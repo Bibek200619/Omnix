@@ -393,9 +393,9 @@ function WorkspaceSelector() {
             onSubmit={handleInvite}
           />
           {renameOpen ? (
-            <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
-              <div className="w-full max-w-md rounded-xl border border-[var(--omnix-border-2)] bg-[#07131f] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.48),var(--omnix-glow-xs)]">
-                <div className="flex items-start justify-between gap-4">
+            <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
+              <div className="omnix-modal-card w-full max-w-md p-5">
+                <div className="relative z-10 flex items-start justify-between gap-4">
                   <div>
                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
                       <Edit3 className="h-4 w-4" />
@@ -420,7 +420,7 @@ function WorkspaceSelector() {
                 </div>
 
                 <form
-                  className="mt-5 space-y-4"
+                  className="relative z-10 mt-5 space-y-4"
                   onSubmit={(event) => {
                     event.preventDefault();
                     handleRenameWorkspace();
@@ -457,9 +457,9 @@ function WorkspaceSelector() {
             </div>
           ) : null}
           {deleteOpen ? (
-            <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
-              <div className="w-full max-w-md rounded-xl border border-rose-400/25 bg-[#07131f] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.5),0_0_24px_rgba(244,63,94,0.14)]">
-                <div className="flex items-start justify-between gap-4">
+            <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
+              <div className="omnix-modal-card w-full max-w-md border-rose-400/25 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.5),0_0_24px_rgba(244,63,94,0.14)]">
+                <div className="relative z-10 flex items-start justify-between gap-4">
                   <div>
                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-rose-300/30 bg-rose-400/10 text-rose-100">
                       <AlertTriangle className="h-4 w-4" />
@@ -483,7 +483,7 @@ function WorkspaceSelector() {
                   </Button>
                 </div>
 
-                <div className="mt-5 space-y-4">
+                <div className="relative z-10 mt-5 space-y-4">
                   <Input
                     id="workspace-delete-confirm"
                     label={`Type "${active.name}" to confirm`}
@@ -636,12 +636,13 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[var(--omnix-sidebar-w)] flex-col border-r border-[var(--omnix-border)] bg-[rgba(5,12,23,0.98)] backdrop-blur-2xl transition-transform duration-200 ease-out",
+          "fixed inset-y-0 left-0 z-50 flex w-[var(--omnix-sidebar-w)] flex-col overflow-hidden border-r border-[var(--omnix-border)] bg-[rgba(5,12,23,0.98)] shadow-[20px_0_80px_rgba(0,0,0,0.34)] backdrop-blur-2xl transition-transform duration-200 ease-out",
           isOpen ? "translate-x-0" : "-translate-x-full",
           collapsed ? "lg:-translate-x-full" : "lg:translate-x-0",
         )}
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 h-[220px] bg-[radial-gradient(ellipse_at_50%_-10%,rgba(0,255,255,0.09)_0%,transparent_70%)]" />
+        <div className="pointer-events-none absolute inset-0 opacity-[0.03] [background-image:linear-gradient(rgba(0,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,255,0.55)_1px,transparent_1px)] [background-size:64px_64px] [animation:auth-grid_22s_linear_infinite]" />
         <div className="relative flex h-auto items-start justify-between border-b border-[var(--omnix-border)] px-[18px] pb-3.5 pt-[18px]">
           <div className="flex w-full flex-col gap-3">
             <div className="flex items-center justify-between">
@@ -711,7 +712,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                   "relative mb-px flex items-center gap-2.5 rounded-[var(--omnix-radius-sm)] border px-2.5 py-2 text-[13px] transition duration-150",
                   isActive
                     ? "border-cyan-300/20 bg-cyan-300/[0.08] font-medium text-white shadow-[var(--omnix-glow-xs)]"
-                    : "border-transparent font-normal text-[var(--omnix-text-2)] hover:bg-[var(--omnix-surface)] hover:text-white",
+                    : "border-transparent font-normal text-[var(--omnix-text-2)] hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface)] hover:text-white hover:shadow-[var(--omnix-glow-xs)]",
                 )}
               >
                 {isActive ? <span className="omnix-active-rail" /> : null}
