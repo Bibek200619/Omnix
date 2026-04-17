@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 
-from app.retrieval.context_builder import ContextBuilder
-from app.retrieval.hybrid_search import HybridSearchConfig, HybridSearchEngine
-from app.retrieval.scoring import RetrievalResult, analyze_query
+from backend.app.retrieval.context_builder import ContextBuilder
+from backend.app.retrieval.hybrid_search import HybridSearchConfig, HybridSearchEngine
+from backend.app.retrieval.scoring import RetrievalResult, analyze_query
 
 
 def _result(

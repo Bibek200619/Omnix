@@ -12,6 +12,7 @@ from ..services.supabase_service import (
 from ..routers.upload import _extract_text_from_bytes
 from ..rag.startup import get_vector_store
 from ..rag.ingestion import RAGIngestionPipeline
+from ..rag.ingestion_service import DocumentIngestionService
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,29 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
                 ) from e
 
             pipeline = RAGIngestionPipeline(vector_store)
-            num, chunk_ids = await pipeline.ingest_text(normalized, user_id, document_id=file_id, workspace_id=workspace_id)
+            if "word" in (file_type or "").lower() or str(filename).lower().endswith(".docx"):
+                num, chunk_ids = await pipeline.ingest_text(
+                    normalized,
+                    user_id,
+                    document_id=file_id,
+                    workspace_id=workspace_id,
+                    metadata={"filename": filename, "content_type": file_type},
+                    source_type="docx",
+                    replace_existing=True,
+                )
+            else:
+                ingestion_service = DocumentIngestionService(pipeline)
+                result = await ingestion_service.ingest_bytes(
+                    data,
+                    user_id=user_id,
+                    file_id=file_id,
+                    workspace_id=workspace_id,
+                    filename=filename,
+                    content_type=file_type,
+                    metadata={"file_id": file_id},
+                    replace_existing=True,
+                )
+                num, chunk_ids = result.chunk_count, result.chunk_ids
             logger.info("Ingestion produced %d chunks for file %s", num, file_id)
         except Exception:
             logger.exception("Ingestion pipeline failed for file %s", file_id)

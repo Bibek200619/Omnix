@@ -14,7 +14,7 @@ from .scoring import RetrievalResult
 
 logger = logging.getLogger(__name__)
 
-DOCUMENT_COLUMNS = "id,content,file_id,created_at,workspace_id,user_id"
+DOCUMENT_COLUMNS = "id,content,file_id,created_at,workspace_id,user_id,chunk_index"
 FILE_COLUMNS = "id,file_name,metadata,workspace_id,user_id"
 _TERM_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:/#-]*")
 
@@ -188,6 +188,7 @@ class KeywordSearch:
             user_id=str(row.get("user_id")) if row.get("user_id") else None,
             created_at=str(row.get("created_at")) if row.get("created_at") else None,
             metadata=metadata if isinstance(metadata, dict) else {"raw": metadata},
+            chunk_index=int(row["chunk_index"]) if row.get("chunk_index") is not None else None,
             keyword_score=rank,
             rank=rank,
             sources={"keyword"},
@@ -203,7 +204,8 @@ class KeywordSearch:
         for file_results in by_file.values():
             file_results.sort(key=lambda item: (item.created_at or "", item.chunk_id))
             for index, result in enumerate(file_results):
-                result.chunk_index = index
+                if result.chunk_index is None:
+                    result.chunk_index = index
 
 
 def _important_terms(query: str) -> list[str]:
