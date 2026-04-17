@@ -29,7 +29,7 @@ function ConversationSkeleton() {
       {[0, 1, 2].map((item) => (
         <div
           key={item}
-          className={`shimmer rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-4 ${
+          className={`shimmer rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-4 shadow-[var(--omnix-glow-xs)] ${
             item === 1 ? "ml-auto w-[74%]" : "w-[82%] sm:w-[62%]"
           }`}
         >
@@ -72,8 +72,9 @@ export function MessageList({
         transition={{ duration: 0.24, ease: "easeOut" }}
         className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 py-10 text-center sm:p-8"
       >
-        <div className="relative flex h-14 w-14 items-center justify-center rounded-xl border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-md)]">
+        <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-md)]">
           <span className="absolute inset-0 rounded-xl bg-cyan-300/10 blur-xl" />
+          <span className="absolute -inset-4 rounded-full bg-[radial-gradient(circle,rgba(0,255,255,0.2),transparent_70%)] opacity-70 [animation:auth-drift_12s_ease-in-out_infinite]" />
           <MessageSquare className="h-5 w-5" />
         </div>
         <h2 className="omnix-display mt-5 text-xl font-semibold text-white">
@@ -89,7 +90,7 @@ export function MessageList({
               key={prompt}
               type="button"
               variant="secondary"
-              className="omnix-card-hover h-auto min-h-20 whitespace-normal rounded-xl border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 py-3 text-left text-sm leading-5 hover:-translate-y-0.5"
+              className="omnix-card-hover h-auto min-h-20 whitespace-normal rounded-xl border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 py-3 text-left text-sm leading-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] hover:-translate-y-0.5"
               leftIcon={
                 index === 0 ? (
                   <FileText className="h-4 w-4 shrink-0" />
@@ -108,7 +109,7 @@ export function MessageList({
   }
 
   return (
-    <div className="omnix-scrollbar flex min-h-0 flex-1 flex-col gap-[26px] overflow-y-auto px-5 py-6 pb-32 sm:px-7">
+    <div className="omnix-scrollbar flex min-h-0 flex-1 flex-col gap-[26px] overflow-y-auto px-5 py-6 pb-36 sm:px-7">
       <AnimatePresence initial={false}>
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} onRetry={onRetry} onRegenerate={onRegenerate} />

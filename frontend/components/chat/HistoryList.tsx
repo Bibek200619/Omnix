@@ -96,8 +96,8 @@ export function HistoryList() {
   }
 
   return (
-    <section className="omnix-scrollbar h-full w-full overflow-y-auto px-5 py-6 md:px-8">
-      <div className="mx-auto max-w-5xl space-y-5 pb-12">
+    <section className="omnix-page-frame omnix-scrollbar">
+      <div className="omnix-content-max max-w-5xl space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Input
           value={query}
@@ -180,12 +180,13 @@ export function HistoryList() {
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.18, ease: "easeOut" }}
                   className={cn(
-                    "group rounded-xl border p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)]",
+                    "group relative overflow-hidden rounded-xl border p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)]",
                     isActive
                       ? "border-cyan-300/35 bg-cyan-300/10 shadow-[var(--omnix-glow-xs)]"
                       : "border-[var(--omnix-border)] bg-[var(--omnix-surface)]",
                   )}
                 >
+                  <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-[var(--omnix-cyan)] opacity-0 blur-3xl transition-opacity group-hover:opacity-15" />
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     {isEditing ? (
                       <form
@@ -308,7 +309,7 @@ export function HistoryList() {
           </AnimatePresence>
         </div>
       ) : (
-        <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-8 text-center">
+        <div className="omnix-cinematic-card flex min-h-[360px] flex-col items-center justify-center border-dashed p-8 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
             <MessageSquareText className="h-5 w-5" />
           </div>
