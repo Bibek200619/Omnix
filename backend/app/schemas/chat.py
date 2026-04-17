@@ -6,6 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 MAX_INPUT_SIZE = 4000
+WorkspaceType = Literal["workspace", "super", "sub"]
 
 
 class ConversationCreate(BaseModel):
@@ -128,6 +129,9 @@ class FileRead(BaseModel):
 class WorkspaceCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: str | None = None
+    parent_workspace_id: str | None = None
+    workspace_type: WorkspaceType = "workspace"
+    is_global: bool = False
 
 
 class WorkspaceUpdate(BaseModel):
@@ -142,12 +146,33 @@ class WorkspaceRead(BaseModel):
     user_id: str
     name: str
     description: str | None = None
+    parent_workspace_id: str | None = None
+    workspace_type: WorkspaceType = "workspace"
+    is_global: bool = False
     current_user_role: Literal["founder", "co_owner", "member"] = "founder"
     member_count: int = 1
     is_shared: bool = False
     members_preview: list["WorkspaceMemberRead"] = Field(default_factory=list)
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+class WorkspaceSubspaceCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    description: str | None = None
+
+
+class WorkspaceTreeRead(WorkspaceRead):
+    subspaces: list[WorkspaceRead] = Field(default_factory=list)
+
+
+class WorkspaceRelationshipValidation(BaseModel):
+    workspace_id: str
+    workspace_type: WorkspaceType
+    parent_workspace_id: str | None = None
+    is_global: bool = False
+    is_valid: bool
+    errors: list[str] = Field(default_factory=list)
 
 
 class WorkspaceMemberRead(BaseModel):
@@ -210,3 +235,4 @@ class CacheRead(BaseModel):
 
 
 WorkspaceRead.model_rebuild()
+WorkspaceTreeRead.model_rebuild()
