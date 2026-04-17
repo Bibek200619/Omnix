@@ -31,7 +31,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useProfile } from "@/lib/profile-context";
 import { useWorkspace } from "@/lib/workspace-context";
-import { initialsFromText, workspaceRoleLabel } from "@/lib/workspace-roles";
+import { initialsFromText, isWorkspaceFounderRole, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { WorkspaceMember } from "@/lib/workspace-types";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 
@@ -634,7 +634,7 @@ export function ChatInterface() {
       {
         icon: ShieldCheck,
         label: "Access",
-        value: activeWorkspace?.current_user_role === "owner"
+        value: isWorkspaceFounderRole(activeWorkspace?.current_user_role)
           ? "Founder controls"
           : activeWorkspace?.current_user_role
           ? workspaceRoleLabel(activeWorkspace.current_user_role)

@@ -7,7 +7,7 @@ export type Message = {
   senderAvatar?: string;
   senderAvatarUrl?: string | null;
   senderHandle?: string | null;
-  senderRole?: "owner" | "co_owner" | "member" | "assistant";
+  senderRole?: "founder" | "owner" | "co_owner" | "member" | "assistant";
   isOwn?: boolean;
   content: string;
   timestamp: string;

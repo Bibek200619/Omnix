@@ -54,7 +54,7 @@ class KeywordRetriever:
                 return []
                 
             # 2. Fetch all document chunks for these files (include created_at to compute chunk index)
-            docs_query = supabase.table("documents").select("id,content,file_id,created_at").in_("file_id", file_ids)
+            docs_query = supabase.table("documents").select("id,content,file_id,created_at,chunk_index").in_("file_id", file_ids)
             if workspace_id:
                 docs_query = docs_query.eq("workspace_id", workspace_id)
             else:
@@ -109,6 +109,7 @@ class KeywordRetriever:
                         "file_name": files_map.get(doc.get("file_id"), "Unknown File"),
                         "chunk_id": doc.get("id"),
                         "created_at": doc.get("created_at"),
+                        "chunk_index": doc.get("chunk_index"),
                         "score": score
                     })
                     
@@ -125,7 +126,8 @@ class KeywordRetriever:
             for fid, clist in file_chunks.items():
                 clist.sort(key=lambda x: x.get("created_at") or "")
                 for idx, c in enumerate(clist):
-                    c["chunk_index"] = idx
+                    if c.get("chunk_index") is None:
+                        c["chunk_index"] = idx
 
             top_chunks = scored_chunks[:top_k]
             logger.info("Keyword retrieval found %d chunks. Returning top %d.", len(scored_chunks), len(top_chunks))
