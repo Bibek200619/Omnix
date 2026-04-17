@@ -15,6 +15,9 @@ from ..schemas.chat import (
     WorkspaceMemberRead,
     WorkspaceMemberRoleUpdate,
     WorkspaceRead,
+    WorkspaceRelationshipValidation,
+    WorkspaceSubspaceCreate,
+    WorkspaceTreeRead,
     WorkspaceUpdate,
 )
 from ..services.supabase_service import (
@@ -30,11 +33,18 @@ from ..services.profile_service import get_auth_profile_for_user, resolve_profil
 from ..services.workspace_service import (
     WORKSPACE_COLUMNS,
     WORKSPACE_INVITE_COLUMNS,
+    create_subspace_for_user,
+    create_workspace_for_user,
+    get_global_space_for_super_workspace,
     hydrate_invites,
+    is_super_workspace,
+    is_subspace,
     list_pending_invites_for_email,
+    list_subspaces_for_super_workspace,
     list_user_workspaces,
     list_workspace_invites,
     list_workspace_members,
+    normalize_workspace_record,
     normalize_email,
     normalize_workspace_role,
     require_workspace_access,
@@ -42,6 +52,7 @@ from ..services.workspace_service import (
     resolve_workspace_access,
     user_email_from_claims,
     utc_now_iso,
+    validate_workspace_relationship,
 )
 
 logger = logging.getLogger(__name__)
@@ -147,6 +158,22 @@ def _email_log_domain(email: str | None) -> str:
     return email.rsplit("@", 1)[-1] or "unknown"
 
 
+def _membership_workspace(access: Any) -> dict[str, Any]:
+    membership_workspace = getattr(access, "membership_workspace", None)
+    if isinstance(membership_workspace, Mapping):
+        return dict(membership_workspace)
+    workspace = getattr(access, "workspace", {})
+    return dict(workspace) if isinstance(workspace, Mapping) else {}
+
+
+def _membership_workspace_id(access: Any) -> str:
+    membership_workspace_id = getattr(access, "membership_workspace_id", None)
+    if membership_workspace_id:
+        return str(membership_workspace_id)
+    workspace = _membership_workspace(access)
+    return str(workspace.get("id") or "")
+
+
 async def _enriched_workspace_for_user(
     workspace_id: str,
     user_id: str,
@@ -154,12 +181,42 @@ async def _enriched_workspace_for_user(
     access = await require_workspace_access(workspace_id, user_id)
     members = await list_workspace_members(access.workspace)
     return {
-        **access.workspace,
+        **normalize_workspace_record(access.workspace),
         "current_user_role": access.role,
         "member_count": len(members),
         "is_shared": len(members) > 1,
         "members_preview": members[:3],
     }
+
+
+async def _enriched_workspace_from_record(
+    workspace: dict[str, Any],
+    user_id: str,
+) -> dict[str, Any]:
+    return await _enriched_workspace_for_user(str(workspace["id"]), user_id)
+
+
+async def _workspace_tree_for_user(
+    workspace_id: str,
+    user_id: str,
+) -> dict[str, Any]:
+    access = await require_workspace_access(workspace_id, user_id)
+    root_workspace = normalize_workspace_record(access.workspace)
+    if is_subspace(root_workspace) and root_workspace.get("parent_workspace_id"):
+        parent_access = await require_workspace_access(str(root_workspace["parent_workspace_id"]), user_id)
+        root_workspace = normalize_workspace_record(parent_access.workspace)
+
+    root = await _enriched_workspace_from_record(root_workspace, user_id)
+    subspaces = (
+        await list_subspaces_for_super_workspace(str(root_workspace["id"]), user_id)
+        if is_super_workspace(root_workspace)
+        else []
+    )
+    root["subspaces"] = [
+        await _enriched_workspace_from_record(subspace, user_id)
+        for subspace in subspaces
+    ]
+    return root
 
 
 async def _insert_workspace_invite(
@@ -399,24 +456,11 @@ async def create_workspace(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
-    timestamp = utc_now_iso()
-    payload = {
-        "user_id": user_id,
-        "updated_at": timestamp,
-        **workspace_payload.model_dump(exclude_none=True),
-    }
 
     try:
-        workspace = await insert_one("workspaces", payload)
-        await insert_one(
-            "workspace_members",
-            {
-                "workspace_id": workspace["id"],
-                "user_id": user_id,
-                "role": "owner",
-                "created_at": timestamp,
-                "updated_at": timestamp,
-            },
+        workspace = await create_workspace_for_user(
+            user_id=user_id,
+            **workspace_payload.model_dump(),
         )
     except SupabaseServiceError as exc:
         logger.exception("Failed to create workspace")
@@ -460,6 +504,34 @@ async def list_workspaces(
         return []
 
 
+@router.get("/hierarchy", response_model=list[WorkspaceTreeRead])
+async def get_workspace_hierarchy(
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    user_id = _user_id_from_claims(current_user)
+    workspaces = await list_user_workspaces(user_id)
+    workspace_by_id = {str(workspace["id"]): workspace for workspace in workspaces}
+    subspaces_by_parent_id: dict[str, list[dict[str, Any]]] = {}
+    roots: list[dict[str, Any]] = []
+
+    for workspace in workspaces:
+        normalized = normalize_workspace_record(workspace)
+        parent_workspace_id = normalized.get("parent_workspace_id")
+        if parent_workspace_id and parent_workspace_id in workspace_by_id:
+            subspaces_by_parent_id.setdefault(str(parent_workspace_id), []).append(normalized)
+        else:
+            roots.append(normalized)
+
+    hierarchy: list[dict[str, Any]] = []
+    for root in roots:
+        subspaces = subspaces_by_parent_id.get(str(root["id"]), [])
+        subspaces.sort(key=lambda item: (not bool(item.get("is_global")), item.get("created_at") or ""))
+        hierarchy.append({**root, "subspaces": subspaces})
+
+    hierarchy.sort(key=lambda item: item.get("created_at") or "")
+    return hierarchy
+
+
 @router.get("/{workspace_id}", response_model=WorkspaceRead)
 async def get_workspace(
     workspace_id: str,
@@ -467,6 +539,79 @@ async def get_workspace(
 ) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
     return await _enriched_workspace_for_user(workspace_id, user_id)
+
+
+@router.get("/{workspace_id}/hierarchy", response_model=WorkspaceTreeRead)
+async def get_workspace_tree(
+    workspace_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    return await _workspace_tree_for_user(workspace_id, user_id)
+
+
+@router.get("/{workspace_id}/subspaces", response_model=list[WorkspaceRead])
+async def get_workspace_subspaces(
+    workspace_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    user_id = _user_id_from_claims(current_user)
+    subspaces = await list_subspaces_for_super_workspace(workspace_id, user_id)
+    return [
+        await _enriched_workspace_from_record(subspace, user_id)
+        for subspace in subspaces
+    ]
+
+
+@router.post("/{workspace_id}/subspaces", response_model=WorkspaceRead, status_code=status.HTTP_201_CREATED)
+async def create_workspace_subspace(
+    workspace_id: str,
+    subspace_payload: WorkspaceSubspaceCreate,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    try:
+        subspace = await create_subspace_for_user(
+            user_id=user_id,
+            parent_workspace_id=workspace_id,
+            **subspace_payload.model_dump(),
+        )
+    except SupabaseServiceError as exc:
+        logger.exception("Failed to create subspace")
+        raise _database_error() from exc
+    return await _enriched_workspace_for_user(str(subspace["id"]), user_id)
+
+
+@router.get("/{workspace_id}/global", response_model=WorkspaceRead)
+async def get_workspace_global_space(
+    workspace_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    access = await require_workspace_access(workspace_id, user_id)
+    workspace = normalize_workspace_record(access.workspace)
+    if not is_super_workspace(workspace):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Workspace is not a super workspace.",
+        )
+
+    global_space = await get_global_space_for_super_workspace(workspace_id)
+    if global_space is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Global space not found.",
+        )
+    return await _enriched_workspace_for_user(str(global_space["id"]), user_id)
+
+
+@router.get("/{workspace_id}/relationships/validate", response_model=WorkspaceRelationshipValidation)
+async def validate_workspace_relationships(
+    workspace_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    return await validate_workspace_relationship(workspace_id, user_id)
 
 
 @router.patch("/{workspace_id}", response_model=WorkspaceRead)
@@ -541,7 +686,9 @@ async def update_workspace_member_role(
             detail="Only workspace founders and co-owners can manage roles.",
         )
 
-    founder_user_id = str(access.workspace.get("user_id") or "")
+    membership_workspace = _membership_workspace(access)
+    membership_workspace_id = _membership_workspace_id(access)
+    founder_user_id = str(membership_workspace.get("user_id") or access.workspace.get("user_id") or "")
     if founder_user_id == member_user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -552,7 +699,7 @@ async def update_workspace_member_role(
         membership = await select_one_trusted(
             "workspace_members",
             "workspace_id,user_id,role",
-            {"workspace_id": workspace_id, "user_id": member_user_id},
+            {"workspace_id": membership_workspace_id, "user_id": member_user_id},
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
@@ -585,7 +732,7 @@ async def update_workspace_member_role(
     try:
         await update_one_trusted(
             "workspace_members",
-            {"workspace_id": workspace_id, "user_id": member_user_id},
+            {"workspace_id": membership_workspace_id, "user_id": member_user_id},
             {"role": next_role, "updated_at": utc_now_iso()},
         )
     except SupabaseServiceError as exc:
@@ -611,6 +758,8 @@ async def invite_workspace_member(
     user_id = _user_id_from_claims(current_user)
     current_user_email = user_email_from_claims(current_user)
     access = await require_workspace_owner(workspace_id, user_id)
+    membership_workspace = _membership_workspace(access)
+    membership_workspace_id = _membership_workspace_id(access)
 
     raw_invite_target = invite_payload.email.strip()
     requested_role = normalize_workspace_role(invite_payload.role)
@@ -657,7 +806,7 @@ async def invite_workspace_member(
         existing_invite = await select_one_trusted(
             "workspace_invites",
             WORKSPACE_INVITE_COLUMNS,
-            {"workspace_id": workspace_id, "email": normalized_email, "status": "pending"},
+            {"workspace_id": membership_workspace_id, "email": normalized_email, "status": "pending"},
         )
     except SupabaseServiceError as exc:
         logger.exception(
@@ -679,12 +828,12 @@ async def invite_workspace_member(
     try:
         logger.info(
             "Workspace invite create requested | workspace_id=%s | invited_email_domain=%s | inviter_user_id=%s",
-            workspace_id,
+            membership_workspace_id,
             _email_log_domain(normalized_email),
             user_id,
         )
         created = await _insert_workspace_invite(
-            workspace_id=workspace_id,
+            workspace_id=membership_workspace_id,
             email=normalized_email,
             role=requested_role,
             inviter_user_id=user_id,
@@ -693,7 +842,7 @@ async def invite_workspace_member(
     except SupabaseServiceError as exc:
         logger.exception(
             "Failed to create workspace invite | workspace_id=%s | invited_email_domain=%s | invited_by=%s | root_error=%r",
-            workspace_id,
+            membership_workspace_id,
             _email_log_domain(normalized_email),
             user_id,
             exc.__cause__ or exc,
@@ -705,7 +854,7 @@ async def invite_workspace_member(
     if invite_id:
         email_result = await send_workspace_invite_email(
             to_email=normalized_email,
-            workspace_name=str(access.workspace.get("name") or "Omnix workspace"),
+            workspace_name=str(membership_workspace.get("name") or access.workspace.get("name") or "Omnix workspace"),
             inviter_label=_inviter_label(current_user),
             invite_id=invite_id,
         )
@@ -725,8 +874,8 @@ async def get_workspace_invites(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     user_id = _user_id_from_claims(current_user)
-    await require_workspace_owner(workspace_id, user_id)
-    return await list_workspace_invites(workspace_id)
+    access = await require_workspace_owner(workspace_id, user_id)
+    return await list_workspace_invites(_membership_workspace_id(access))
 
 
 @router.delete("/{workspace_id}/members/{member_user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -745,7 +894,9 @@ async def remove_workspace_member(
             detail="Only workspace founders and co-owners can remove members.",
         )
 
-    founder_user_id = str(access.workspace.get("user_id") or "")
+    membership_workspace = _membership_workspace(access)
+    membership_workspace_id = _membership_workspace_id(access)
+    founder_user_id = str(membership_workspace.get("user_id") or access.workspace.get("user_id") or "")
     if founder_user_id == member_user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -756,7 +907,7 @@ async def remove_workspace_member(
         membership = await select_one_trusted(
             "workspace_members",
             "workspace_id,user_id,role",
-            {"workspace_id": workspace_id, "user_id": member_user_id},
+            {"workspace_id": membership_workspace_id, "user_id": member_user_id},
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
@@ -781,7 +932,7 @@ async def remove_workspace_member(
     try:
         await delete_many_trusted(
             "workspace_members",
-            {"workspace_id": workspace_id, "user_id": member_user_id},
+            {"workspace_id": membership_workspace_id, "user_id": member_user_id},
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
@@ -796,13 +947,14 @@ async def revoke_workspace_invite(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> None:
     user_id = _user_id_from_claims(current_user)
-    await require_workspace_owner(workspace_id, user_id)
+    access = await require_workspace_owner(workspace_id, user_id)
+    membership_workspace_id = _membership_workspace_id(access)
 
     try:
         invite = await select_one_trusted(
             "workspace_invites",
             WORKSPACE_INVITE_COLUMNS,
-            {"id": invite_id, "workspace_id": workspace_id},
+            {"id": invite_id, "workspace_id": membership_workspace_id},
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
