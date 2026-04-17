@@ -165,8 +165,8 @@ export function AccountProfileSettings() {
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-      <section className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+      <section className="omnix-cinematic-card p-5">
+        <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-start">
           <ProfileAvatar
             name={displayName}
             email={email}
@@ -273,7 +273,8 @@ export function AccountProfileSettings() {
         </div>
       </section>
 
-      <aside className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5">
+      <aside className="omnix-cinematic-card p-5">
+        <div className="relative z-10">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="font-semibold text-white">Profile picture</h3>
@@ -333,6 +334,7 @@ export function AccountProfileSettings() {
         <Button type="button" variant="ghost" size="sm" className="mt-5" onClick={() => void refreshProfile()}>
           Refresh profile
         </Button>
+        </div>
       </aside>
     </div>
   );

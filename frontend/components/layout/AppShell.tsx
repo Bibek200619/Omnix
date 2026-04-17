@@ -75,6 +75,8 @@ export function AppShell({ children }: AppShellProps) {
       <ProfileProvider>
         <ConversationHistoryProvider>
           <div className="omnix-app-bg relative h-screen overflow-hidden text-white">
+            <div className="omnix-ambient-layer" aria-hidden="true" />
+            <div className="omnix-shell-scanline" aria-hidden="true" />
             <Sidebar
               isOpen={isSidebarOpen}
               collapsed={isSidebarCollapsed}

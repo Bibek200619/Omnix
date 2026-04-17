@@ -33,8 +33,8 @@ export default function AccountSettingsPage() {
       description="Review the authenticated browser session and account identity details."
     >
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <section className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5">
-          <div className="flex items-center gap-3">
+        <section className="omnix-cinematic-card p-5">
+          <div className="relative z-10 flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/10 text-emerald-100">
               <ShieldCheck className="h-5 w-5" />
             </span>
@@ -43,7 +43,7 @@ export default function AccountSettingsPage() {
               <p className="mt-1 text-sm text-[var(--omnix-text-2)]">Supabase session is active in this browser.</p>
             </div>
           </div>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <div className="relative z-10 mt-5 grid gap-4 sm:grid-cols-2">
             <div className="rounded-lg border border-[var(--omnix-border)] bg-black/15 p-4">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Signed in as</p>
               <p className="mt-2 break-all text-sm text-slate-200">{user?.email}</p>
@@ -60,7 +60,8 @@ export default function AccountSettingsPage() {
           ) : null}
         </section>
 
-        <aside className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5">
+        <aside className="omnix-cinematic-card p-5">
+          <div className="relative z-10">
           <KeyRound className="h-5 w-5 text-cyan-200" />
           <h3 className="mt-3 font-semibold text-white">Session control</h3>
           <p className="mt-2 text-sm leading-6 text-[var(--omnix-text-2)]">
@@ -76,6 +77,7 @@ export default function AccountSettingsPage() {
           >
             {signingOut ? "Signing out" : "Sign out"}
           </Button>
+          </div>
         </aside>
       </div>
     </SettingsShell>

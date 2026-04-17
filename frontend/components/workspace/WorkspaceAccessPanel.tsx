@@ -177,9 +177,9 @@ export function WorkspaceAccessPanel() {
 
   return (
     <section className="space-y-6">
-      <div className="relative overflow-hidden rounded-2xl border border-[var(--omnix-border)] bg-[rgba(10,14,26,0.5)] p-5 backdrop-blur-md sm:p-6">
+      <div className="omnix-cinematic-card p-5 sm:p-6">
         <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-[var(--omnix-cyan)] opacity-10 blur-[80px]" />
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="relative z-10 min-w-0">
             <div className="flex items-center gap-5">
               <span className="flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--omnix-grad-primary)] text-white shadow-[var(--omnix-glow-md)]">
@@ -213,7 +213,7 @@ export function WorkspaceAccessPanel() {
                 setInviteError(null);
                 setInviteOpen(true);
               }}
-              className="relative z-10 rounded-full border-[var(--omnix-border)] bg-[var(--omnix-surface)] hover:bg-[var(--omnix-surface-hover)]"
+              className="rounded-full border-[var(--omnix-border)] bg-[var(--omnix-surface)] hover:bg-[var(--omnix-surface-hover)]"
             >
               Invite teammate
             </Button>
@@ -344,7 +344,7 @@ export function WorkspaceAccessPanel() {
         )}
       </div>
 
-      <div className="rounded-2xl border border-[var(--omnix-border)] bg-[rgba(6,8,16,0.6)] p-5 backdrop-blur-xl">
+      <div className="omnix-cinematic-card p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
@@ -362,7 +362,7 @@ export function WorkspaceAccessPanel() {
           ) : null}
         </div>
 
-        <div className="mt-4 space-y-2.5">
+        <div className="relative z-10 mt-4 space-y-2.5">
           {!activeWorkspace ? (
               <div className="rounded-lg border border-dashed border-[var(--omnix-border)] px-4 py-5 text-sm text-[var(--omnix-text-3)]">
               Select a workspace to view invites.
@@ -432,9 +432,9 @@ export function WorkspaceAccessPanel() {
       ) : null}
 
       {confirmAction ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-[var(--omnix-border-2)] bg-[#07131f] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.55),var(--omnix-glow-xs)]">
-            <div className="flex items-start gap-3">
+        <div className="omnix-modal-backdrop fixed inset-0 z-[120] flex items-center justify-center px-4">
+          <div className="omnix-modal-card w-full max-w-md p-5">
+            <div className="relative z-10 flex items-start gap-3">
               <ProfileAvatar
                 name={workspaceMemberName(confirmAction.member)}
                 email={confirmAction.member.email}
@@ -454,7 +454,7 @@ export function WorkspaceAccessPanel() {
               </div>
             </div>
 
-            <div className="mt-5 flex items-center justify-end gap-2">
+            <div className="relative z-10 mt-5 flex items-center justify-end gap-2">
               <Button type="button" variant="ghost" onClick={() => setConfirmAction(null)} disabled={Boolean(busyKey)}>
                 Cancel
               </Button>

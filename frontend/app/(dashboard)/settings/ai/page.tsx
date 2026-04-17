@@ -23,8 +23,8 @@ export default function AISettingsPage() {
       description="Configure how Omnix reasons, uses context, and responds inside your workspace."
     >
       <div className="mx-auto max-w-3xl space-y-5">
-        <section className="rounded-xl border border-[var(--omnix-border-active)] bg-cyan-300/[0.04] p-5 shadow-[var(--omnix-glow-xs)]">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <section className="omnix-cinematic-card border-[var(--omnix-border-active)] bg-cyan-300/[0.04] p-5 shadow-[var(--omnix-glow-xs)]">
+          <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100">
               <Server className="h-5 w-5" />
             </span>
@@ -39,7 +39,7 @@ export default function AISettingsPage() {
               <p className="mt-1 text-sm text-[var(--omnix-text-2)]">Backend model routing is preserved through the existing Omnix API.</p>
             </div>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="relative z-10 mt-4 grid gap-3 sm:grid-cols-3">
             {["Provider: Omnix API", "Context: Workspace + Web", "Streaming: Enabled"].map((item) => (
               <div key={item} className="rounded-lg border border-[var(--omnix-border)] bg-black/20 px-3 py-2 text-xs text-[var(--omnix-text-2)]">
                 {item}
@@ -48,8 +48,8 @@ export default function AISettingsPage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5">
-          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Default Mode</p>
+        <section className="omnix-cinematic-card p-5">
+          <p className="relative z-10 mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Default Mode</p>
           <div className="grid gap-3 sm:grid-cols-3">
             {modes.map((item) => {
               const Icon = item.icon;
@@ -77,7 +77,8 @@ export default function AISettingsPage() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)]">
+        <section className="omnix-cinematic-card overflow-hidden">
+          <div className="relative z-10">
           <Toggle
             label="Web Search"
             description="Allow Omnix to request live web context when a conversation asks for current information."
@@ -114,6 +115,7 @@ export default function AISettingsPage() {
               onChange={(event) => setTemperature(Number(event.target.value))}
               className="w-full accent-cyan-300"
             />
+          </div>
           </div>
         </section>
       </div>
