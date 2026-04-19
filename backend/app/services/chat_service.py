@@ -393,6 +393,7 @@ async def stream_ai_response(
 async def call_llm(
     prompt: str,
     context: list[dict[str, str]] | None = None,
+    system_prompt: str | None = None,
     temperature: float = 0.2,
     model: str | None = None,
     max_tokens: int | None = None,
@@ -400,6 +401,7 @@ async def call_llm(
     generation = await generate_ai_response(
         prompt,
         context=context,
+        system_prompt=system_prompt,
         temperature=temperature,
         model=model,
         max_tokens=max_tokens,
@@ -410,6 +412,7 @@ async def call_llm(
 async def call_llm_stream(
     prompt: str,
     context: list[dict[str, str]] | None = None,
+    system_prompt: str | None = None,
     temperature: float = 0.2,
     model: str | None = None,
     max_tokens: int | None = None,
@@ -417,6 +420,7 @@ async def call_llm_stream(
     async for token in stream_ai_response(
         prompt,
         context=context,
+        system_prompt=system_prompt,
         temperature=temperature,
         model=model,
         max_tokens=max_tokens,
