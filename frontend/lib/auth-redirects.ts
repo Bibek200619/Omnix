@@ -1,4 +1,4 @@
-export const DEFAULT_AUTH_REDIRECT = "/chat";
+export const DEFAULT_AUTH_REDIRECT = "/dashboard";
 
 const AUTH_ROUTES = ["/login", "/register", "/auth/callback"];
 
