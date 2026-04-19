@@ -38,6 +38,7 @@ import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useProfile } from "@/lib/profile-context";
+import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
@@ -107,6 +108,7 @@ function WorkspaceSelector() {
     deleteWorkspace,
     inviteToActiveWorkspace,
   } = useWorkspace();
+  const { presence, statusForWorkspace } = useWorkspaceCollaboration();
   const [open, setOpen] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showCreateSubspaceModal, setShowCreateSubspaceModal] = useState(false);
@@ -293,6 +295,7 @@ function WorkspaceSelector() {
   function renderSubspaceRow(subspace: Workspace, index: number) {
     const Icon = workspaceIcon(subspace);
     const isActive = subspace.id === activeWorkspaceId;
+    const liveStatus = statusForWorkspace(subspace.id);
 
     return (
       <motion.button
@@ -330,6 +333,11 @@ function WorkspaceSelector() {
             </span>
             <WorkspaceTypeBadge workspace={subspace} />
           </span>
+          <span className="mt-0.5 flex items-center gap-1.5 text-[9px] text-[var(--omnix-text-3)]">
+            <span>{liveStatus?.active_count ?? 0} active</span>
+            <span className="h-1 w-1 rounded-full bg-white/15" />
+            <span>{liveStatus?.source_count ?? 0} sources</span>
+          </span>
         </span>
         {isActive ? <Check className="h-3.5 w-3.5 shrink-0 text-cyan-300" /> : null}
       </motion.button>
@@ -344,6 +352,7 @@ function WorkspaceSelector() {
     const subspaces = workspace.subspaces ?? [];
     const subspacesLoading = Boolean(subspaceLoadingByParentId[workspace.id]);
     const subspacesError = subspaceErrorByParentId[workspace.id];
+    const liveStatus = statusForWorkspace(workspace.id);
 
     return (
       <motion.div
@@ -390,7 +399,9 @@ function WorkspaceSelector() {
                 <WorkspaceTypeBadge workspace={workspace} />
               </span>
               <span className="mt-0.5 flex items-center gap-1.5 text-[10px] text-[var(--omnix-text-3)]">
-                <span>{workspace.member_count} {workspace.member_count === 1 ? "member" : "members"}</span>
+                <span>{liveStatus?.active_count ?? 0} active</span>
+                <span className="h-1 w-1 rounded-full bg-white/15" />
+                <span>{liveStatus?.source_count ?? 0} sources</span>
                 <span className="h-1 w-1 rounded-full bg-white/15" />
                 <span className={cn("rounded-full border px-1.5 py-0.5", workspaceRoleBadgeClass(workspace.current_user_role))}>
                   {workspaceRoleLabel(workspace.current_user_role)}
@@ -462,7 +473,7 @@ function WorkspaceSelector() {
               {active ? (
                 <>
                   <span className="h-1 w-1 rounded-full bg-cyan-200/20" />
-                  <span>{active.member_count} {active.member_count === 1 ? "member" : "members"}</span>
+                  <span>{presence?.active_count ?? statusForWorkspace(active.id)?.active_count ?? 0} active</span>
                 </>
               ) : null}
             </div>
