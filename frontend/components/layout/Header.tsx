@@ -1,33 +1,41 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Menu, MessageSquarePlus, PanelLeftOpen, Users } from "lucide-react";
+import {
+  AlertCircle,
+  ChevronRight,
+  Menu,
+  MessageSquarePlus,
+  PanelLeftOpen,
+} from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth-context";
 import { useWorkspace } from "@/lib/workspace-context";
-import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 import { InviteNotificationBar, InviteNotificationBell } from "@/components/workspace/InviteNotifications";
-import { ActionsMenu } from "@/components/actions/ActionsMenu";
 import { ProfileMenu } from "@/components/layout/ProfileMenu";
 
 const routeTitles = [
-  { match: "/dashboard", title: "Dashboard", eyebrow: "Workspace command center" },
-  { match: "/chat", title: "AI Chat", eyebrow: "Collaborative intelligence" },
-  { match: "/files", title: "Sources", eyebrow: "Workspace knowledge" },
-  { match: "/history", title: "History", eyebrow: "Previous conversations" },
-  { match: "/settings/terms", title: "Terms", eyebrow: "Product policies" },
-  { match: "/settings/profile", title: "Profile", eyebrow: "Account identity" },
-  { match: "/settings/account", title: "Account", eyebrow: "Session controls" },
-  { match: "/settings/ai", title: "AI Settings", eyebrow: "Model behavior" },
-  { match: "/settings/appearance", title: "Appearance", eyebrow: "Interface preferences" },
-  { match: "/settings/workspace", title: "Workspace Settings", eyebrow: "Workspace controls" },
-  { match: "/settings/team", title: "Team Members", eyebrow: "Collaboration" },
-  { match: "/settings/notifications", title: "Notifications", eyebrow: "Preferences" },
-  { match: "/settings/security", title: "Security", eyebrow: "Session controls" },
-  { match: "/settings/interface", title: "Interface", eyebrow: "Preferences" },
-  { match: "/settings/about", title: "About", eyebrow: "Product policies" },
-  { match: "/settings", title: "Settings", eyebrow: "Workspace controls" },
+  { match: "/dashboard", title: "Dashboard", subtitle: "Welcome back" },
+  { match: "/chat", title: "AI Chat", subtitle: "Omnix Intelligence" },
+  { match: "/workspace", title: "Workspaces", subtitle: "Manage your super workspaces and sub-spaces" },
+  { match: "/team", title: "Team", subtitle: "Manage workspace members" },
+  { match: "/sources", title: "Sources", subtitle: "Manage your connected data" },
+  { match: "/files", title: "Sources", subtitle: "Manage your connected data" },
+  { match: "/analytics", title: "Analytics", subtitle: "Usage metrics and performance insights" },
+  { match: "/history", title: "History", subtitle: "Previous conversations" },
+  { match: "/settings/terms", title: "Terms", subtitle: "Product policies" },
+  { match: "/settings/profile", title: "Profile", subtitle: "Account identity" },
+  { match: "/settings/account", title: "Account", subtitle: "Session controls" },
+  { match: "/settings/ai", title: "AI Settings", subtitle: "Model behavior" },
+  { match: "/settings/appearance", title: "Appearance", subtitle: "Interface preferences" },
+  { match: "/settings/workspace", title: "Workspace Settings", subtitle: "Workspace controls" },
+  { match: "/settings/team", title: "Team", subtitle: "Manage workspace members" },
+  { match: "/settings/notifications", title: "Notifications", subtitle: "Preferences" },
+  { match: "/settings/security", title: "Security", subtitle: "Session controls" },
+  { match: "/settings/interface", title: "Interface", subtitle: "Preferences" },
+  { match: "/settings/about", title: "About", subtitle: "Product policies" },
+  { match: "/settings", title: "Settings", subtitle: "Manage your account and preferences" },
 ];
 
 type HeaderProps = {
@@ -40,13 +48,13 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
   const pathname = usePathname();
   const router = useRouter();
   const { signOut, user } = useAuth();
-  const { activeWorkspace, activeMembers } = useWorkspace();
+  const { activeWorkspace } = useWorkspace();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const active =
     routeTitles.find((route) => pathname.startsWith(route.match)) ??
     routeTitles[0];
-  const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
+  const workspaceName = activeWorkspace?.name || "Omnix Labs";
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -66,16 +74,16 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
   }
 
   return (
-    <header className="relative z-30 shrink-0 border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.96)] shadow-[0_12px_44px_rgba(0,0,0,0.22)] backdrop-blur-[20px]">
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-[linear-gradient(90deg,transparent,rgba(0,255,255,0.32),transparent)]" />
+    <header className="relative z-30 shrink-0 select-none border-b border-[rgba(0,255,255,0.08)] bg-[var(--omnix-header-glass)] backdrop-blur-[24px]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent_0%,rgba(0,255,255,0.25)_40%,rgba(0,255,255,0.5)_55%,rgba(0,255,255,0.25)_70%,transparent_100%)]" />
       <InviteNotificationBar />
-      <div className="flex h-[var(--omnix-header-h)] w-full items-center justify-between gap-3 px-4 sm:px-5">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="relative flex h-[var(--omnix-header-h)] w-full items-center gap-3 px-5 sm:px-[22px]">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-[34px] w-[34px] rounded-[9px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)] lg:hidden"
+            className="h-9 w-9 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)] lg:hidden"
             aria-label="Open navigation"
             title="Open navigation"
             onClick={onMenuClick}
@@ -87,7 +95,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
               type="button"
               variant="ghost"
               size="icon"
-              className="hidden h-[34px] w-[34px] rounded-[9px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)] lg:inline-flex"
+              className="hidden h-9 w-9 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)] lg:inline-flex"
               aria-label="Expand workspace sidebar"
               title="Expand workspace sidebar"
               onClick={onExpandSidebar}
@@ -96,35 +104,32 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
             </Button>
           ) : null}
           <div className="min-w-0">
-            <h1 className="omnix-display truncate text-[15px] font-semibold tracking-[0.01em] text-white">
-              {active.title}
-            </h1>
-            <p className="mt-0.5 truncate text-[10px] tracking-[0.03em] text-[var(--omnix-text-3)]">
-              {activeWorkspace ? `${activeWorkspace.name} workspace` : active.eyebrow}
+            <div className="flex min-w-0 items-center gap-[5px]">
+              <span className="truncate text-[11px] font-normal text-[rgba(0,255,255,0.45)]">
+                {workspaceName}
+              </span>
+              <ChevronRight className="h-[11px] w-[11px] shrink-0 text-[rgba(0,255,255,0.3)]" strokeWidth={2} />
+              <span className="omnix-display truncate text-sm font-bold tracking-[0.01em] text-[rgba(255,255,255,0.92)]">
+                {active.title}
+              </span>
+            </div>
+            <p className="mt-px truncate text-[10px] tracking-[0.03em] text-[rgba(255,255,255,0.28)]">
+              {active.subtitle}
             </p>
           </div>
         </div>
+
         <div className="flex shrink-0 items-center gap-2">
-          {activeWorkspace ? (
-            <div className="hidden h-[34px] items-center gap-3 rounded-[9px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 text-xs text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-border-2)] xl:flex">
-              <div className="flex items-center gap-2 text-[var(--omnix-text-2)]">
-                <Users className="h-4 w-4 text-[var(--omnix-cyan)]" />
-                <span>{activeWorkspace.member_count}</span>
-              </div>
-              <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} />
-            </div>
-          ) : null}
           <InviteNotificationBell />
-          <ActionsMenu className="inline-flex" />
-          <div className="hidden h-5 w-px bg-[var(--omnix-border)] md:block" />
+          <div className="hidden h-[22px] w-px bg-[rgba(0,255,255,0.1)] sm:block" />
           <Button
             type="button"
             variant="secondary"
-            leftIcon={<MessageSquarePlus className="h-4 w-4" />}
+            leftIcon={<MessageSquarePlus className="h-3.5 w-3.5" />}
             onClick={() => router.push("/chat")}
-            className="hidden h-[34px] rounded-[9px] border-[var(--omnix-cyan)] bg-transparent px-3.5 text-xs font-semibold tracking-[0.02em] text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] hover:-translate-y-0.5 hover:border-[var(--omnix-cyan)] hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] md:inline-flex"
+            className="hidden h-9 rounded-[10px] border-[var(--omnix-cyan)] bg-transparent px-4 text-xs font-bold tracking-[0.03em] text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] hover:-translate-y-px hover:border-[var(--omnix-cyan)] hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] sm:inline-flex"
           >
-            New chat
+            New Chat
           </Button>
           <ProfileMenu user={user} signingOut={signingOut} onSignOut={handleSignOut} />
         </div>
