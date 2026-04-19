@@ -98,18 +98,19 @@ export function HistoryList() {
   return (
     <section className="omnix-page-frame omnix-scrollbar">
       <div className="omnix-content-max max-w-5xl space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search chat history"
-          aria-label="Search chat history"
-          icon={<Search className="h-4 w-4" />}
-          className="sm:w-80"
-          disabled={loading}
-        />
+      <div className="omnix-page-hero">
+        <div>
+          <h1 className="omnix-page-title flex items-center gap-2">
+            <MessageSquareText className="h-5 w-5 text-[var(--omnix-cyan)]" />
+            Conversation History
+          </h1>
+          <p className="omnix-page-subtitle">
+            Search saved threads, rename useful sessions, and reopen team knowledge exactly where it left off.
+          </p>
+        </div>
         <Button
           type="button"
+          className="omnix-primary-action"
           onClick={() => {
             setActiveConversation(null);
             router.push("/chat");
@@ -119,6 +120,18 @@ export function HistoryList() {
         >
           New chat
         </Button>
+      </div>
+
+      <div className="omnix-glass-band p-3">
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search chat history"
+          aria-label="Search chat history"
+          icon={<Search className="h-4 w-4" />}
+          className="relative z-10"
+          disabled={loading}
+        />
       </div>
 
       {error && (

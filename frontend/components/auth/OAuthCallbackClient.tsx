@@ -71,7 +71,7 @@ export function OAuthCallbackClient() {
   const { authError, isConfigured, refreshSession } = useAuth();
   const [state, setState] = useState<CallbackState>("loading");
   const [error, setError] = useState<string | null>(null);
-  const [nextPath, setNextPath] = useState("/chat");
+  const [nextPath, setNextPath] = useState("/dashboard");
   const processedRef = useRef(false);
 
   useEffect(() => {

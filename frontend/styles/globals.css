@@ -10,7 +10,7 @@
   --omnix-cyan: #00ffff;
   --omnix-cyan-dim: #00cccc;
   --omnix-cyan-glow: rgba(0, 255, 255, 0.18);
-  --omnix-blue: #0000ff;
+  --omnix-blue: #3366ff;
   --omnix-blue-bright: #3366ff;
   --omnix-blue-glow: rgba(0, 0, 255, 0.2);
   --omnix-bg: #050c17;
@@ -35,22 +35,38 @@
   --omnix-grad-primary: linear-gradient(135deg, #00ffff 0%, #0088ff 50%, #0000ff 100%);
   --omnix-grad-cyan: linear-gradient(135deg, #00ffff 0%, #00cccc 100%);
   --omnix-grad-glow: linear-gradient(135deg, rgba(0, 255, 255, 0.15) 0%, rgba(0, 0, 255, 0.08) 100%);
+  --omnix-surface-glass: rgba(10, 25, 47, 0.72);
+  --omnix-border-glass: rgba(0, 255, 255, 0.12);
   --omnix-grad-bg:
-    radial-gradient(ellipse 100% 60% at 50% -10%, rgba(0, 255, 255, 0.07) 0%, transparent 70%),
-    radial-gradient(ellipse 60% 40% at 80% 20%, rgba(0, 0, 255, 0.06) 0%, transparent 60%);
+    radial-gradient(ellipse 120% 70% at 50% -10%, rgba(0, 255, 255, 0.09) 0%, transparent 65%),
+    radial-gradient(ellipse 80% 50% at 80% 20%, rgba(0, 0, 255, 0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 10% 80%, rgba(0, 100, 255, 0.04) 0%, transparent 55%);
   --omnix-glow-xs: 0 0 8px rgba(0, 255, 255, 0.25);
   --omnix-glow-sm: 0 0 16px rgba(0, 255, 255, 0.3), 0 0 32px rgba(0, 255, 255, 0.08);
   --omnix-glow-md: 0 0 24px rgba(0, 255, 255, 0.35), 0 0 60px rgba(0, 255, 255, 0.12);
   --omnix-glow-lg: 0 0 40px rgba(0, 255, 255, 0.4), 0 0 100px rgba(0, 255, 255, 0.15);
   --omnix-glow-blue: 0 0 20px rgba(0, 100, 255, 0.4), 0 0 50px rgba(0, 0, 255, 0.15);
-  --omnix-sidebar-w: 240px;
-  --omnix-header-h: 56px;
+  --omnix-shadow-deep: 0 30px 90px rgba(0, 0, 0, 0.42);
+  --omnix-header-glass: rgba(5, 12, 23, 0.85);
+  --omnix-sidebar-glass: rgba(5, 12, 23, 0.97);
+  --omnix-sidebar-w: 248px;
+  --omnix-header-h: 58px;
   --omnix-radius: 12px;
   --omnix-radius-sm: 8px;
   --omnix-radius-lg: 16px;
   --omnix-radius-xl: 20px;
   --omnix-font: var(--font-geist-sans);
   --omnix-font-display: "Space Grotesk", var(--font-geist-sans);
+
+  /* ── Role color system ─────────────────────── */
+  --role-founder: #ff3b5c;
+  --role-coowner: #ffb800;
+  --role-admin: #9b5cff;
+  --role-member: #3366ff;
+
+  /* ── Additional ambient tokens ─────────────── */
+  --omnix-glow-role: 0 0 18px rgba(0, 255, 255, 0.28);
+  --omnix-sidebar-glow: 0 0 40px rgba(0, 255, 255, 0.06);
 }
 
 * {
@@ -64,12 +80,12 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  background:
-    radial-gradient(circle at top left, rgba(0, 255, 255, 0.08), transparent 30rem),
-    linear-gradient(180deg, #061020 0%, #061020 46%, #050b16 100%);
-  color: #f8fafc;
+  background: var(--omnix-bg);
+  color: var(--omnix-text);
   font-family: var(--font-geist-sans);
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
@@ -127,8 +143,9 @@ textarea {
 .omnix-app-bg {
   background-color: var(--omnix-bg);
   background-image:
-    radial-gradient(ellipse 100% 60% at 50% -10%, rgba(0, 255, 255, 0.07) 0%, transparent 70%),
-    radial-gradient(ellipse 60% 40% at 80% 20%, rgba(0, 0, 255, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 130% 80% at 50% -15%, rgba(0, 255, 255, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 90% 60% at 85% 15%, rgba(0, 0, 255, 0.07) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 5% 85%, rgba(0, 80, 255, 0.04) 0%, transparent 50%),
     linear-gradient(180deg, #050c17 0%, #061020 48%, #050b16 100%);
   color: var(--omnix-text);
   font-family: var(--omnix-font);
@@ -140,10 +157,10 @@ textarea {
   z-index: 0;
   pointer-events: none;
   background-image: radial-gradient(circle, rgba(0, 255, 255, 0.08) 1px, transparent 1px);
-  background-size: 32px 32px;
+  background-size: 36px 36px;
   content: "";
   opacity: 0.5;
-  animation: omnix-grid-drift 34s linear infinite;
+  animation: omnix-grid-drift 38s linear infinite;
 }
 
 .omnix-app-bg::after {
@@ -156,6 +173,37 @@ textarea {
   pointer-events: none;
   background: radial-gradient(circle at top right, rgba(0, 0, 255, 0.07) 0%, transparent 65%);
   content: "";
+}
+
+.omnix-auth-shell {
+  isolation: isolate;
+}
+
+.omnix-auth-shell::before {
+  position: fixed;
+  inset: var(--omnix-header-h) 0 0 var(--omnix-sidebar-w);
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 42% 28% at 38% 0%, rgba(0, 255, 255, 0.11), transparent 70%),
+    radial-gradient(ellipse 38% 24% at 82% 4%, rgba(155, 92, 255, 0.08), transparent 68%),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.035), transparent 32%, rgba(0, 0, 255, 0.028));
+  content: "";
+  filter: blur(4px);
+}
+
+.omnix-auth-shell::after {
+  position: fixed;
+  inset: var(--omnix-header-h) 0 0 var(--omnix-sidebar-w);
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(0, 255, 255, 0.034) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.026) 1px, transparent 1px);
+  background-size: 64px 64px;
+  content: "";
+  opacity: 0.34;
+  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.24));
 }
 
 .omnix-ambient-layer {
@@ -293,6 +341,148 @@ textarea {
   box-shadow: var(--omnix-glow-xs), inset 0 1px 0 rgba(255, 255, 255, 0.045);
 }
 
+.omnix-page-hero {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0;
+}
+
+.omnix-page-title {
+  font-family: var(--omnix-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--omnix-text);
+  letter-spacing: 0;
+}
+
+.omnix-page-subtitle {
+  margin-top: 5px;
+  max-width: 56rem;
+  color: var(--omnix-text-3);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.omnix-glass-band {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--omnix-border);
+  border-radius: var(--omnix-radius-lg);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(0, 255, 255, 0.105), transparent 34%),
+    radial-gradient(circle at 0% 100%, rgba(155, 92, 255, 0.07), transparent 38%),
+    rgba(6, 14, 27, 0.66);
+  box-shadow: var(--omnix-shadow-deep), inset 0 1px 0 rgba(255, 255, 255, 0.038);
+  backdrop-filter: blur(24px);
+}
+
+.omnix-glass-band::before {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.55), transparent);
+  content: "";
+}
+
+.omnix-tree-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--omnix-border);
+  border-radius: var(--omnix-radius);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(0, 255, 255, 0.08), transparent 36%),
+    rgba(0, 255, 255, 0.035);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.032);
+  backdrop-filter: blur(18px);
+  transition:
+    transform 170ms ease,
+    border-color 170ms ease,
+    background 170ms ease,
+    box-shadow 170ms ease;
+}
+
+.omnix-tree-card:hover {
+  border-color: var(--omnix-border-2);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(0, 255, 255, 0.12), transparent 40%),
+    rgba(0, 255, 255, 0.052);
+  box-shadow: var(--omnix-glow-xs);
+  transform: translateY(-1px);
+}
+
+.omnix-sidebar-link {
+  position: relative;
+  overflow: hidden;
+}
+
+.omnix-sidebar-link::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 0%, rgba(0, 255, 255, 0.09) 46%, transparent 72%);
+  content: "";
+  opacity: 0;
+  transform: translateX(-70%);
+  transition:
+    opacity 180ms ease,
+    transform 280ms ease;
+}
+
+.omnix-sidebar-link:hover::after {
+  opacity: 1;
+  transform: translateX(70%);
+}
+
+.omnix-role-founder {
+  --role-color: var(--omnix-red);
+}
+
+.omnix-role-co-owner {
+  --role-color: var(--omnix-amber);
+}
+
+.omnix-role-member {
+  --role-color: var(--omnix-blue-bright);
+}
+
+.omnix-human-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--role-color, var(--omnix-blue-bright)) 28%, transparent);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--role-color, var(--omnix-blue-bright)) 12%, transparent), transparent 34%),
+    rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(16px);
+}
+
+.omnix-human-card::before {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--role-color, #3366ff) 62%, transparent), transparent);
+  content: "";
+  opacity: 0.48;
+}
+
+.omnix-presence-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: var(--omnix-green);
+  box-shadow: 0 0 8px rgba(0, 232, 122, 0.8);
+}
+
 .omnix-floating-card {
   border: 1px solid var(--omnix-border-2);
   border-radius: var(--omnix-radius-lg);
@@ -307,7 +497,8 @@ textarea {
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 1.5rem 1.25rem;
+  padding: 22px 26px;
+  animation: omnix-fade-in 0.35s ease;
 }
 
 .omnix-page-frame::before {
@@ -326,9 +517,10 @@ textarea {
 .omnix-content-max {
   position: relative;
   z-index: 1;
-  max-width: 80rem;
-  margin-inline: auto;
-  padding-bottom: 3rem;
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  padding-bottom: 22px;
 }
 
 .omnix-cinematic-card {
@@ -500,6 +692,17 @@ textarea {
   pointer-events: none;
   background: radial-gradient(circle at 100% 0%, rgba(0, 255, 255, 0.11), transparent 38%);
   content: "";
+}
+
+.omnix-modal-card::after {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.72), transparent);
+  content: "";
+  opacity: 0.48;
 }
 
 .omnix-active-rail {
@@ -752,7 +955,7 @@ textarea {
     background-position: 0 0;
   }
   100% {
-    background-position: 32px 32px;
+    background-position: 36px 36px;
   }
 }
 
@@ -775,6 +978,37 @@ textarea {
   }
 }
 
+@media (max-width: 1023px) {
+  .omnix-auth-shell::before,
+  .omnix-auth-shell::after {
+    left: 0;
+  }
+
+  .omnix-page-frame::before {
+    left: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .omnix-page-frame {
+    padding: 16px;
+  }
+
+  .omnix-page-hero {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .omnix-page-title {
+    font-size: 20px;
+  }
+
+  .omnix-page-subtitle {
+    font-size: 12px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -784,4 +1018,150 @@ textarea {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ── Missing keyframes ──────────────────────────────────────── */
+
+@keyframes omnix-dot-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 6px rgba(0, 232, 122, 0.9);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 14px rgba(0, 232, 122, 0.4);
+  }
+}
+
+@keyframes omnix-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes omnix-logo-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 18px rgba(0, 255, 255, 0.75));
+  }
+}
+
+@keyframes omnix-beam-sweep {
+  0% { transform: translateX(-100%); opacity: 0; }
+  40% { opacity: 1; }
+  100% { transform: translateX(400%); opacity: 0; }
+}
+
+/* ── Role avatar / card system ──────────────────────────────── */
+
+.omnix-role-founder { --role-color: var(--role-founder); }
+.omnix-role-coowner { --role-color: var(--role-coowner); }
+.omnix-role-admin   { --role-color: var(--role-admin); }
+.omnix-role-member  { --role-color: var(--role-member); }
+
+.omnix-role-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--role-color, #3366ff) 45%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--role-color, #3366ff) 30%, transparent), color-mix(in srgb, var(--role-color, #3366ff) 10%, transparent));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--role-color, #3366ff) 30%, transparent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.omnix-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--role-color, #3366ff) 35%, transparent);
+  background: color-mix(in srgb, var(--role-color, #3366ff) 12%, transparent);
+  color: var(--role-color, #3366ff);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.omnix-online-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--omnix-green);
+  box-shadow: 0 0 8px rgba(0, 232, 122, 0.9);
+  animation: omnix-dot-pulse 2s ease-in-out infinite;
+}
+
+.omnix-away-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--omnix-amber);
+  box-shadow: 0 0 6px rgba(255, 184, 0, 0.7);
+}
+
+.omnix-offline-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.18);
+}
+
+/* ── Enhanced sidebar active state ──────────────────────────── */
+
+.omnix-nav-active-icon {
+  filter: drop-shadow(0 0 5px rgba(0, 255, 255, 0.65));
+  color: var(--omnix-cyan) !important;
+}
+
+/* ── Cinematic page entrance ────────────────────────────────── */
+
+.omnix-page-enter {
+  animation: omnix-card-enter 0.38s ease both;
+}
+
+.omnix-page-enter-delay-1 { animation-delay: 0.06s; }
+.omnix-page-enter-delay-2 { animation-delay: 0.12s; }
+.omnix-page-enter-delay-3 { animation-delay: 0.18s; }
+.omnix-page-enter-delay-4 { animation-delay: 0.24s; }
+
+/* ── Source card status variants ────────────────────────────── */
+
+.omnix-status-synced {
+  background: rgba(0, 232, 122, 0.1);
+  border-color: rgba(0, 232, 122, 0.28);
+  color: var(--omnix-green);
+}
+
+.omnix-status-syncing {
+  background: rgba(0, 255, 255, 0.1);
+  border-color: rgba(0, 255, 255, 0.28);
+  color: var(--omnix-cyan);
+}
+
+.omnix-status-error {
+  background: rgba(255, 59, 92, 0.1);
+  border-color: rgba(255, 59, 92, 0.28);
+  color: var(--omnix-red);
+}
+
+/* ── Logo animation ─────────────────────────────────────────── */
+
+.omnix-logo-glow {
+  animation: omnix-logo-pulse 3s ease-in-out infinite;
+}
+
+/* ── Input focus glow ring ──────────────────────────────────── */
+.omnix-input-focus:focus-within {
+  border-color: rgba(0, 255, 255, 0.45) !important;
+  box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.08), 0 0 16px rgba(0, 255, 255, 0.18) !important;
 }
