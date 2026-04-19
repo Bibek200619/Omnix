@@ -132,6 +132,7 @@ async def build_uploaded_document_context(
     user_id: str,
     conversation_id: str | None,
     workspace_id: str | None,
+    scope_workspace_ids: list[str] | None = None,
     top_k: int = 3,
     supplemental_contexts: list[ContextSupplement | dict[str, Any]] | None = None,
 ) -> BuiltContext | None:
@@ -140,12 +141,18 @@ async def build_uploaded_document_context(
         user_id=user_id,
         conversation_id=conversation_id,
         workspace_id=workspace_id,
+        scope_workspace_ids=scope_workspace_ids,
     )
     if not files:
         return None
 
     file_ids = [str(file_row["id"]) for file_row in files if file_row.get("id")]
-    documents = await _load_document_chunks(file_ids, user_id=user_id, workspace_id=workspace_id)
+    documents = await _load_document_chunks(
+        file_ids,
+        user_id=user_id,
+        workspace_id=workspace_id,
+        scope_workspace_ids=scope_workspace_ids,
+    )
     if not documents:
         logger.info(
             "Uploaded document retrieval found files but no chunks: conversation_id=%s workspace_id=%s files=%d.",
@@ -242,11 +249,13 @@ async def _load_candidate_files(
     user_id: str,
     conversation_id: str | None,
     workspace_id: str | None,
+    scope_workspace_ids: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     if conversation_id:
         conversation_files = await _select_files(
             user_id=user_id,
             workspace_id=workspace_id,
+            scope_workspace_ids=scope_workspace_ids,
             filters={"conversation_id": conversation_id},
             limit=10,
         )
@@ -256,6 +265,7 @@ async def _load_candidate_files(
     return await _select_files(
         user_id=user_id,
         workspace_id=workspace_id,
+        scope_workspace_ids=scope_workspace_ids,
         filters={},
         limit=10,
     )
@@ -265,12 +275,18 @@ async def _select_files(
     *,
     user_id: str,
     workspace_id: str | None,
+    scope_workspace_ids: list[str] | None,
     filters: dict[str, Any],
     limit: int,
 ) -> list[dict[str, Any]]:
     try:
-        if workspace_id:
-            scoped_filters = {"workspace_id": workspace_id, **filters}
+        workspace_ids = [
+            str(item)
+            for item in (scope_workspace_ids or ([workspace_id] if workspace_id else []))
+            if str(item or "").strip()
+        ]
+        if workspace_ids:
+            scoped_filters = {"workspace_id": workspace_ids, **filters}
             rows = await select_all_trusted(
                 "files",
                 FILE_COLUMNS,
@@ -279,7 +295,8 @@ async def _select_files(
                 desc=True,
                 limit=limit,
             )
-            return [row for row in rows if str(row.get("workspace_id") or "") == workspace_id]
+            scope_set = set(workspace_ids)
+            return [row for row in rows if str(row.get("workspace_id") or "") in scope_set]
 
         scoped_filters = {"user_id": user_id, **filters}
         rows = await select_all(
@@ -301,20 +318,27 @@ async def _load_document_chunks(
     *,
     user_id: str,
     workspace_id: str | None,
+    scope_workspace_ids: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     if not file_ids:
         return []
 
     try:
-        if workspace_id:
+        workspace_ids = [
+            str(item)
+            for item in (scope_workspace_ids or ([workspace_id] if workspace_id else []))
+            if str(item or "").strip()
+        ]
+        if workspace_ids:
             rows = await select_all_trusted(
                 "documents",
                 DOCUMENT_COLUMNS,
-                filters={"file_id": file_ids, "workspace_id": workspace_id},
+                filters={"file_id": file_ids, "workspace_id": workspace_ids},
                 order_by="created_at",
                 limit=500,
             )
-            return [row for row in rows if str(row.get("workspace_id") or "") == workspace_id]
+            scope_set = set(workspace_ids)
+            return [row for row in rows if str(row.get("workspace_id") or "") in scope_set]
 
         rows = await select_all(
             "documents",

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, GitBranch, Layers3, Loader2, Plus, Settings, ShieldCheck, Sparkles, Trash2, Users } from "lucide-react";
+import { BrainCircuit, Check, GitBranch, Layers3, Loader2, Plus, Settings, ShieldCheck, Sparkles, Trash2, Users } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useWorkspace } from "@/lib/workspace-context";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { Workspace } from "@/lib/workspace-types";
+import type { WorkspaceAIMode } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
 
 function flattenWorkspaces(workspaces: Workspace[]) {
@@ -34,16 +35,27 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+const aiModes: Array<{ value: WorkspaceAIMode; label: string; hint: string }> = [
+  { value: "research", label: "Research", hint: "Evidence, synthesis, and source-heavy answers" },
+  { value: "coding", label: "Coding", hint: "Architecture, APIs, deployment, and code context" },
+  { value: "design", label: "Design", hint: "Brand systems, UI language, and creative critique" },
+  { value: "strategy", label: "Strategy", hint: "Planning, positioning, and decision support" },
+  { value: "analytics", label: "Analytics", hint: "Metrics, reporting, and operational analysis" },
+  { value: "general", label: "General", hint: "Collaborative workspace assistant" },
+];
+
 export function WorkspaceSettingsPanel() {
   const {
     activeWorkspace,
     activeRootWorkspace,
     activeMembers,
     activeInvites,
+    activeWorkspaceIntelligence,
     createSubspace,
     deleteWorkspace,
     renameWorkspace,
     setActiveWorkspace,
+    updateWorkspaceIntelligence,
     workspaces,
   } = useWorkspace();
   const [name, setName] = useState("");
@@ -57,6 +69,13 @@ export function WorkspaceSettingsPanel() {
   const [subspaceError, setSubspaceError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [expertiseArea, setExpertiseArea] = useState("");
+  const [aiSpecialization, setAiSpecialization] = useState<WorkspaceAIMode>("general");
+  const [aiInstructions, setAiInstructions] = useState("");
+  const [memoryEnabled, setMemoryEnabled] = useState(true);
+  const [savingIntelligence, setSavingIntelligence] = useState(false);
+  const [intelligenceSaved, setIntelligenceSaved] = useState(false);
+  const [intelligenceError, setIntelligenceError] = useState<string | null>(null);
 
   const parentWorkspace = useMemo(
     () => findWorkspace(workspaces, activeWorkspace?.parent_workspace_id),
@@ -72,6 +91,12 @@ export function WorkspaceSettingsPanel() {
     setSaved(false);
     setSubspaceError(null);
     setDeleteError(null);
+    setExpertiseArea(activeWorkspace?.expertise_area ?? "");
+    setAiSpecialization(activeWorkspace?.ai_specialization ?? "general");
+    setAiInstructions(activeWorkspace?.ai_instructions ?? "");
+    setMemoryEnabled(activeWorkspace?.intelligence_preferences?.memory_enabled !== false);
+    setIntelligenceError(null);
+    setIntelligenceSaved(false);
   }, [activeWorkspace]);
 
   async function saveWorkspace() {
@@ -133,6 +158,31 @@ export function WorkspaceSettingsPanel() {
       setDeleteError(err instanceof Error ? err.message : "Unable to delete workspace.");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function saveIntelligence() {
+    if (!activeWorkspace) return;
+    try {
+      setSavingIntelligence(true);
+      setIntelligenceError(null);
+      await updateWorkspaceIntelligence({
+        expertise_area: expertiseArea.trim() || null,
+        ai_specialization: aiSpecialization,
+        ai_instructions: aiInstructions.trim() || null,
+        intelligence_preferences: {
+          ...(activeWorkspaceIntelligence?.intelligence_preferences ?? activeWorkspace.intelligence_preferences ?? {}),
+          memory_enabled: memoryEnabled,
+          retrieval_scope: activeWorkspace.is_global ? "global" : "workspace",
+          source_permissions: activeWorkspace.is_global ? "organization" : "workspace_only",
+        },
+      });
+      setIntelligenceSaved(true);
+      window.setTimeout(() => setIntelligenceSaved(false), 2200);
+    } catch (err) {
+      setIntelligenceError(err instanceof Error ? err.message : "Unable to update intelligence profile.");
+    } finally {
+      setSavingIntelligence(false);
     }
   }
 
@@ -266,6 +316,127 @@ export function WorkspaceSettingsPanel() {
           </div>
         </aside>
       </div>
+
+      <section className="omnix-cinematic-card p-5">
+        <div className="relative z-10 mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-white">
+              <BrainCircuit className="h-4 w-4 text-cyan-200" />
+              Workspace AI intelligence
+            </div>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--omnix-text-3)]">
+              Define how Omnix should think inside this workspace. These settings are included in chat context and retrieval diagnostics.
+            </p>
+          </div>
+          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+            {activeWorkspaceIntelligence?.source_count ?? 0} sources active
+          </span>
+        </div>
+
+        <div className="relative z-10 grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="space-y-4">
+            <div>
+              <div className="mb-2 text-sm font-medium text-slate-300">AI specialization mode</div>
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {aiModes.map((mode) => (
+                  <button
+                    key={mode.value}
+                    type="button"
+                    disabled={!canEdit || savingIntelligence}
+                    onClick={() => setAiSpecialization(mode.value)}
+                    className={cn(
+                      "rounded-xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60",
+                      aiSpecialization === mode.value
+                        ? "border-cyan-300/35 bg-cyan-300/10 shadow-[var(--omnix-glow-xs)]"
+                        : "border-[var(--omnix-border)] bg-black/15 hover:border-[var(--omnix-border-active)]",
+                    )}
+                  >
+                    <span className="block text-sm font-semibold text-white">{mode.label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-[var(--omnix-text-3)]">{mode.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label className="block">
+              <span className="text-sm font-medium text-slate-300">Expertise area</span>
+              <textarea
+                value={expertiseArea}
+                onChange={(event) => {
+                  setExpertiseArea(event.target.value);
+                  setIntelligenceSaved(false);
+                }}
+                disabled={!canEdit || savingIntelligence}
+                rows={3}
+                className="omnix-input mt-2 w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                placeholder="UI systems, APIs, launch strategy, operations..."
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-slate-300">Workspace instructions</span>
+              <textarea
+                value={aiInstructions}
+                onChange={(event) => {
+                  setAiInstructions(event.target.value);
+                  setIntelligenceSaved(false);
+                }}
+                disabled={!canEdit || savingIntelligence}
+                rows={5}
+                className="omnix-input mt-2 w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                placeholder="Tell Omnix how to answer for this workspace, what standards to follow, and what context matters."
+              />
+            </label>
+          </div>
+
+          <aside className="rounded-xl border border-[var(--omnix-border)] bg-black/15 p-4">
+            <div className="text-sm font-semibold text-white">Memory controls</div>
+            <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">
+              Source retrieval remains workspace-scoped by default. Global spaces can use organization-wide scope.
+            </p>
+            <label className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-[var(--omnix-border)] bg-black/15 px-3 py-3">
+              <span>
+                <span className="block text-sm font-medium text-white">Workspace memory</span>
+                <span className="block text-xs text-[var(--omnix-text-3)]">Include workspace profile in AI prompts.</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={memoryEnabled}
+                disabled={!canEdit || savingIntelligence}
+                onChange={(event) => setMemoryEnabled(event.target.checked)}
+                className="h-4 w-4 accent-cyan-300"
+              />
+            </label>
+            <div className="mt-4 grid gap-2 text-xs text-[var(--omnix-text-2)]">
+              <InfoRow label="Retrieval scope" value={activeWorkspace.is_global ? "Global" : "Workspace"} />
+              <InfoRow label="Detected domains" value={(activeWorkspaceIntelligence?.active_domains ?? []).slice(0, 2).join(", ") || "None yet"} />
+            </div>
+          </aside>
+        </div>
+
+        {intelligenceError ? (
+          <Alert className="mt-5" variant="error" title="Intelligence update failed">
+            {intelligenceError}
+          </Alert>
+        ) : null}
+        {intelligenceSaved ? (
+          <Alert className="mt-5" variant="success" title="Intelligence profile saved">
+            Workspace AI context is updated.
+          </Alert>
+        ) : null}
+
+        <div className="relative z-10 mt-6 flex justify-end">
+          <Button
+            type="button"
+            leftIcon={savingIntelligence ? <Loader2 className="h-4 w-4 animate-spin" /> : <BrainCircuit className="h-4 w-4" />}
+            isLoading={savingIntelligence}
+            disabled={!canEdit}
+            onClick={saveIntelligence}
+          >
+            Save AI intelligence
+          </Button>
+        </div>
+      </section>
 
       <section className="omnix-cinematic-card p-5">
         <div className="relative z-10 mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
