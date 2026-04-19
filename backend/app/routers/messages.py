@@ -33,6 +33,10 @@ from ..services.supabase_service import (
     update_one_trusted,
 )
 from ..services.web_search import WebSearchResponse, get_web_search_service
+from ..services.workspace_intelligence_service import (
+    build_workspace_intelligence_profile,
+    workspace_intelligence_system_prompt,
+)
 from ..services.workspace_service import require_active_workspace_access, utc_now_iso
 from .conversations import (
     build_conversation_title,
@@ -646,8 +650,17 @@ async def _retrieve_prompt_context(
     workspace_id: str | None,
     attachment_ids: list[str] | None = None,
     search_mode: SearchMode = "auto",
+    intelligence_profile: dict[str, Any] | None = None,
 ) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
     prompt_message = message_text
+    scope_workspace_ids = (
+        [
+            str(item)
+            for item in (intelligence_profile or {}).get("scope_workspace_ids", [])
+            if str(item or "").strip()
+        ]
+        or None
+    )
     has_new_attachments = any(str(item).strip() for item in attachment_ids or [])
     web_supplements, web_sources, search_decision, web_diagnostics = await _build_web_supplements(
         message_text,
@@ -665,6 +678,8 @@ async def _retrieve_prompt_context(
             return prompt, _merge_sources(sources, web_sources), debug
         debug = _empty_retrieval_debug("web_unavailable")
         debug["diagnostics"]["web_search"] = web_diagnostics
+        if intelligence_profile:
+            debug["workspace_intelligence"] = _compact_intelligence_debug(intelligence_profile)
         return prompt_message, [], debug
 
     if (
@@ -679,6 +694,8 @@ async def _retrieve_prompt_context(
         )
         debug = _empty_retrieval_debug("lightweight_prompt")
         debug["diagnostics"]["web_search"] = web_diagnostics
+        if intelligence_profile:
+            debug["workspace_intelligence"] = _compact_intelligence_debug(intelligence_profile)
         return prompt_message, [], debug
 
     try:
@@ -687,10 +704,12 @@ async def _retrieve_prompt_context(
             user_id=user_id,
             conversation_id=conversation_id,
             workspace_id=workspace_id,
+            scope_workspace_ids=scope_workspace_ids,
             supplemental_contexts=web_supplements,
         )
         if uploaded_context and uploaded_context.sources:
             uploaded_context.diagnostics["web_search"] = web_diagnostics
+            uploaded_context.diagnostics["workspace_intelligence"] = _compact_intelligence_debug(intelligence_profile)
             return (
                 uploaded_context.prompt,
                 _merge_sources(uploaded_context.sources, web_sources),
@@ -699,7 +718,11 @@ async def _retrieve_prompt_context(
     except Exception as exc:
         logger.exception("Uploaded document context retrieval failed for conversation %s: %s", conversation_id, exc)
 
-    if not await _has_retrievable_documents(user_id=user_id, workspace_id=workspace_id):
+    if not await _has_retrievable_documents(
+        user_id=user_id,
+        workspace_id=workspace_id,
+        scope_workspace_ids=scope_workspace_ids,
+    ):
         logger.info(
             "Skipping hybrid retrieval because no document chunks exist for conversation %s workspace_id=%s.",
             conversation_id,
@@ -715,6 +738,8 @@ async def _retrieve_prompt_context(
             return prompt, _merge_sources(sources, web_sources), debug
         debug = _empty_retrieval_debug("no_documents")
         debug["diagnostics"]["web_search"] = web_diagnostics
+        if intelligence_profile:
+            debug["workspace_intelligence"] = _compact_intelligence_debug(intelligence_profile)
         return prompt_message, [], debug
 
     try:
@@ -752,6 +777,7 @@ async def _retrieve_prompt_context(
         )
         response.diagnostics["context"] = built_context.diagnostics
         built_context.diagnostics["web_search"] = web_diagnostics
+        built_context.diagnostics["workspace_intelligence"] = _compact_intelligence_debug(intelligence_profile)
 
         if built_context.sources:
             return (
@@ -773,19 +799,59 @@ async def _retrieve_prompt_context(
 
     debug = _empty_retrieval_debug()
     debug["diagnostics"]["web_search"] = web_diagnostics
+    if intelligence_profile:
+        debug["workspace_intelligence"] = _compact_intelligence_debug(intelligence_profile)
     return prompt_message, [], debug
 
 
-async def _has_retrievable_documents(*, user_id: str, workspace_id: str | None) -> bool:
+def _compact_intelligence_debug(profile: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not profile:
+        return None
+    return {
+        "workspace_id": profile.get("workspace_id"),
+        "workspace_name": profile.get("workspace_name"),
+        "ai_specialization": profile.get("ai_specialization"),
+        "retrieval_scope": profile.get("retrieval_scope"),
+        "source_count": profile.get("source_count"),
+        "active_domains": profile.get("active_domains", [])[:8],
+        "scope_workspace_ids": profile.get("scope_workspace_ids", [])[:20],
+    }
+
+
+async def _load_workspace_intelligence_for_chat(
+    workspace_id: str | None,
+    user_id: str,
+) -> dict[str, Any] | None:
+    if not workspace_id:
+        return None
     try:
-        if workspace_id:
+        return await build_workspace_intelligence_profile(workspace_id, user_id)
+    except Exception:
+        logger.exception("Failed to load workspace intelligence profile for chat; continuing with generic AI context.")
+        return None
+
+
+async def _has_retrievable_documents(
+    *,
+    user_id: str,
+    workspace_id: str | None,
+    scope_workspace_ids: list[str] | None = None,
+) -> bool:
+    try:
+        workspace_ids = [
+            str(item)
+            for item in (scope_workspace_ids or ([workspace_id] if workspace_id else []))
+            if str(item or "").strip()
+        ]
+        if workspace_ids:
             rows = await select_all_trusted(
                 "documents",
                 "id,workspace_id",
-                filters={"workspace_id": workspace_id},
+                filters={"workspace_id": workspace_ids},
                 limit=1,
             )
-            return any(str(row.get("workspace_id") or "") == workspace_id for row in rows)
+            scope_set = set(workspace_ids)
+            return any(str(row.get("workspace_id") or "") in scope_set for row in rows)
 
         rows = await select_all(
             "documents",
@@ -954,6 +1020,8 @@ async def chat(
         workspace_id=workspace_id,
     )
 
+    intelligence_profile = await _load_workspace_intelligence_for_chat(workspace_id, user_id)
+    workspace_system_prompt = workspace_intelligence_system_prompt(intelligence_profile)
     prompt_message, sources, retrieval_debug = await _retrieve_prompt_context(
         message_text,
         user_id,
@@ -961,6 +1029,7 @@ async def chat(
         workspace_id,
         payload.attachment_ids,
         payload.search_mode,
+        intelligence_profile,
     )
     try:
         await _persist_assistant_payload(
@@ -986,6 +1055,7 @@ async def chat(
         assistant_response = await call_llm(
             prompt_message,
             context=_build_context(recent_messages),
+            system_prompt=workspace_system_prompt or None,
             temperature=payload.temperature,
             model=payload.model,
             max_tokens=payload.max_tokens,
@@ -1127,6 +1197,9 @@ async def chat_stream(
         workspace_id=workspace_id,
     )
 
+    intelligence_profile = await _load_workspace_intelligence_for_chat(workspace_id, user_id)
+    workspace_system_prompt = workspace_intelligence_system_prompt(intelligence_profile)
+
     async def event_generator() -> AsyncIterator[str]:
         assistant_parts: list[str] = []
         prompt_message = message_text
@@ -1153,11 +1226,13 @@ async def chat_stream(
                 workspace_id,
                 payload.attachment_ids,
                 payload.search_mode,
+                intelligence_profile,
             )
             sources_payload = {
                 "type": "sources",
                 "sources": sources,
                 "retrieval": retrieval_debug,
+                "workspace_intelligence": _compact_intelligence_debug(intelligence_profile),
             }
             yield f"data: {json.dumps(sources_payload)}\n\n"
 
@@ -1187,6 +1262,7 @@ async def chat_stream(
             async for token in call_llm_stream(
                 prompt_message,
                 context=_build_context(recent_messages),
+                system_prompt=workspace_system_prompt or None,
                 temperature=payload.temperature,
                 model=payload.model,
                 max_tokens=payload.max_tokens,

@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 MAX_INPUT_SIZE = 4000
 WorkspaceType = Literal["workspace", "super", "sub"]
+WorkspaceAIMode = Literal["research", "coding", "design", "strategy", "analytics", "general"]
 
 
 class ConversationCreate(BaseModel):
@@ -137,6 +138,10 @@ class WorkspaceCreate(BaseModel):
 class WorkspaceUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
+    expertise_area: str | None = Field(default=None, max_length=1000)
+    ai_specialization: WorkspaceAIMode | None = None
+    ai_instructions: str | None = Field(default=None, max_length=4000)
+    intelligence_preferences: dict[str, Any] | None = None
 
 
 class WorkspaceRead(BaseModel):
@@ -149,6 +154,10 @@ class WorkspaceRead(BaseModel):
     parent_workspace_id: str | None = None
     workspace_type: WorkspaceType = "workspace"
     is_global: bool = False
+    expertise_area: str | None = None
+    ai_specialization: WorkspaceAIMode = "general"
+    ai_instructions: str | None = None
+    intelligence_preferences: dict[str, Any] = Field(default_factory=dict)
     current_user_role: Literal["founder", "co_owner", "member"] = "founder"
     member_count: int = 1
     is_shared: bool = False
@@ -173,6 +182,35 @@ class WorkspaceRelationshipValidation(BaseModel):
     is_global: bool = False
     is_valid: bool
     errors: list[str] = Field(default_factory=list)
+
+
+class WorkspaceIntelligenceUpdate(BaseModel):
+    expertise_area: str | None = Field(default=None, max_length=1000)
+    ai_specialization: WorkspaceAIMode = "general"
+    ai_instructions: str | None = Field(default=None, max_length=4000)
+    intelligence_preferences: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkspaceIntelligenceRead(BaseModel):
+    workspace_id: str
+    workspace_name: str
+    workspace_type: WorkspaceType
+    is_global: bool = False
+    parent_workspace_id: str | None = None
+    description: str | None = None
+    expertise_area: str | None = None
+    ai_specialization: WorkspaceAIMode = "general"
+    ai_instructions: str | None = None
+    intelligence_preferences: dict[str, Any] = Field(default_factory=dict)
+    source_count: int = 0
+    conversation_count: int = 0
+    member_count: int = 0
+    active_domains: list[str] = Field(default_factory=list)
+    connected_sources: list[dict[str, Any]] = Field(default_factory=list)
+    recent_insights: list[str] = Field(default_factory=list)
+    retrieval_scope: Literal["workspace", "global", "personal"] = "workspace"
+    scope_workspace_ids: list[str] = Field(default_factory=list)
+    context_summary: str
 
 
 class WorkspaceMemberRead(BaseModel):

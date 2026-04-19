@@ -61,7 +61,7 @@ function formatFileSize(size?: number) {
 }
 
 export default function FilesPage() {
-  const { activeWorkspace, activeMembers, activeWorkspaceId } = useWorkspace();
+  const { activeWorkspace, activeMembers, activeWorkspaceId, activeWorkspaceIntelligence } = useWorkspace();
   const [files, setFiles] = useState<FileData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -165,8 +165,8 @@ export default function FilesPage() {
           </h1>
           <p className="omnix-page-subtitle">
             {activeWorkspace?.is_shared
-              ? "Shared documents are available to every workspace member."
-              : "Upload documents to your workspace. Supported: PDF, DOCX, TXT, Markdown."}
+              ? "Shared documents become part of this workspace AI context for every member."
+              : "Upload documents to this workspace AI context. Supported: PDF, DOCX, TXT, Markdown."}
           </p>
         </div>
         {activeWorkspace ? (
@@ -221,7 +221,7 @@ export default function FilesPage() {
         {[
           { label: "Uploaded sources", value: files.length, icon: FileText, color: "var(--omnix-cyan)" },
           { label: "Workspace access", value: activeWorkspace?.is_shared ? "Shared" : "Private", icon: ShieldCheck, color: "var(--omnix-green)" },
-          { label: "Retrieval state", value: loading ? "Syncing" : files.length ? "Indexed" : "No sources", icon: Database, color: "var(--omnix-purple)" },
+          { label: "AI context", value: activeWorkspaceIntelligence?.retrieval_scope === "global" ? "Global" : "Scoped", icon: Database, color: "var(--omnix-purple)" },
         ].map((stat) => {
           const Icon = stat.icon;
           return (
