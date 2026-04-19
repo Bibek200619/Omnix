@@ -21,6 +21,7 @@ from ..services.workspace_service import (
     can_manage_workspace_resource,
     require_workspace_access,
 )
+from ..services.workspace_collaboration_service import log_workspace_activity
 from .conversations import require_conversation_access
 
 router = APIRouter(prefix="/files", tags=["files"])
@@ -106,9 +107,24 @@ async def create_file_metadata(
         payload["workspace_id"] = effective_workspace_id
 
     try:
-        return await insert_one("files", payload)
+        created = await insert_one("files", payload)
     except SupabaseServiceError as exc:
         raise _database_error() from exc
+
+    if effective_workspace_id:
+        await log_workspace_activity(
+            workspace_id=effective_workspace_id,
+            actor_user_id=user_id,
+            event_type="workspace.source_connected",
+            summary=f"{created.get('file_name') or 'A source'} was connected to the workspace.",
+            metadata={
+                "file_id": str(created.get("id") or ""),
+                "file_type": created.get("file_type"),
+                "size_bytes": created.get("size_bytes"),
+            },
+        )
+
+    return created
 
 
 @router.get("", response_model=list[FileRead])
@@ -198,6 +214,15 @@ async def delete_file(
         await delete_many_trusted("files", {"id": file_id})
     except SupabaseServiceError as exc:
         raise _database_error() from exc
+
+    if file_row.get("workspace_id"):
+        await log_workspace_activity(
+            workspace_id=str(file_row["workspace_id"]),
+            actor_user_id=user_id,
+            event_type="workspace.source_removed",
+            summary=f"{file_row.get('file_name') or 'A source'} was removed from the workspace.",
+            metadata={"file_id": file_id},
+        )
 
     storage_path = file_row.get("storage_path")
     if storage_path:

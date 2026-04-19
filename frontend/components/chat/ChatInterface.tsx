@@ -15,6 +15,7 @@ import {
   Pin,
   Search,
   ShieldCheck,
+  Users,
   WifiOff,
 } from "lucide-react";
 import { ChatInput } from "@/components/chat/ChatInput";
@@ -30,11 +31,13 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useProfile } from "@/lib/profile-context";
+import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import { initialsFromText, isWorkspaceFounderRole, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { WorkspaceMember } from "@/lib/workspace-types";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
+import { WorkspacePresenceCluster } from "@/components/workspace/WorkspacePresenceCluster";
 
 function formatTime(value?: string) {
   const date = value ? new Date(value) : new Date();
@@ -338,6 +341,11 @@ export function ChatInterface() {
     refreshConversations,
     setActiveConversation,
   } = useConversationHistory();
+  const {
+    presence,
+    sendTypingSignal,
+    statusForWorkspace,
+  } = useWorkspaceCollaboration();
   const conversationId = params.get("conversation");
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -356,6 +364,16 @@ export function ChatInterface() {
   const workspaceMembers = useMemo(
     () => (activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? []),
     [activeMembers, activeWorkspace?.members_preview],
+  );
+  const activeLiveStatus = statusForWorkspace(activeWorkspaceId);
+  const conversationTypingMembers = useMemo(
+    () =>
+      (presence?.typing_members ?? []).filter((member) => {
+        if (member.user_id === user?.id) return false;
+        if (!currentConversation) return true;
+        return !member.typing_conversation_id || member.typing_conversation_id === currentConversation;
+      }),
+    [currentConversation, presence?.typing_members, user?.id],
   );
   const senderLookup = useMemo<SenderLookup>(() => {
     const membersById = new Map<string, WorkspaceMember>();
@@ -637,9 +655,9 @@ export function ChatInterface() {
       },
       {
         icon: ShieldCheck,
-        label: "Intelligence",
+        label: "Sources",
         value: activeWorkspaceIntelligence
-          ? `${activeWorkspaceIntelligence.source_count} sources active`
+          ? `Using ${activeWorkspaceIntelligence.source_count} connected ${activeWorkspaceIntelligence.source_count === 1 ? "source" : "sources"}`
           : isWorkspaceFounderRole(activeWorkspace?.current_user_role)
           ? "Founder controls"
           : activeWorkspace?.current_user_role
@@ -647,8 +665,18 @@ export function ChatInterface() {
           : session?.user?.email ?? "Collaborator",
         color: "text-amber-200",
       },
+      {
+        icon: Users,
+        label: "Presence",
+        value: activeLiveStatus
+          ? `${activeLiveStatus.active_count} active now`
+          : presence
+          ? `${presence.active_count} active now`
+          : "Presence syncing",
+        color: "text-emerald-200",
+      },
     ],
-    [activeWorkspace, activeWorkspaceIntelligence, searchMode, session?.user?.email],
+    [activeLiveStatus, activeWorkspace, activeWorkspaceIntelligence, presence, searchMode, session?.user?.email],
   );
 
   const sendMessage = useCallback(
@@ -867,14 +895,26 @@ export function ChatInterface() {
         };
 
         // read loop
+        let streamTimeout: number | undefined;
+        const resetStreamTimeout = () => {
+          if (streamTimeout) window.clearTimeout(streamTimeout);
+          streamTimeout = window.setTimeout(() => {
+            console.warn("[chat] stream timeout reached, aborting");
+            streamAbortController.abort(new Error("Stream timed out after 45 seconds of inactivity."));
+          }, 45000);
+        };
+
+        resetStreamTimeout();
         while (true) {
           const { done, value } = await reader.read();
+          resetStreamTimeout();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
           const parts = buffer.split(/\n\n/);
           buffer = parts.pop() || "";
           for (const part of parts) processEvent(part);
         }
+        if (streamTimeout) window.clearTimeout(streamTimeout);
         if (buffer.trim()) {
           processEvent(buffer);
         }
@@ -1108,13 +1148,19 @@ export function ChatInterface() {
 
           <div className="flex items-center gap-2.5">
             {activeWorkspace ? (
-              <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} size="sm" />
+              <WorkspaceMemberStack
+                members={workspaceMembers}
+                totalCount={activeWorkspace.member_count}
+                size="sm"
+                presenceMembers={presence?.recently_active_members ?? []}
+                showPresence
+              />
             ) : null}
             <div className="hidden items-center gap-1.5 rounded-[7px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-2.5 py-1.5 text-[11px] text-[var(--omnix-text-2)] sm:flex">
               <BookOpen className="h-3 w-3" />
               Sources
               <span className="rounded-full border border-cyan-300/25 bg-cyan-300/15 px-1.5 py-px text-[9px] font-bold text-[var(--omnix-cyan)]">
-                {statusItems.length}
+                {activeWorkspaceIntelligence?.source_count ?? 0}
               </span>
             </div>
             <button type="button" className="flex items-center text-[var(--omnix-text-3)] transition hover:text-white" aria-label="Session actions" title="Session actions">
@@ -1124,7 +1170,7 @@ export function ChatInterface() {
         </div>
 
         <div className="hidden shrink-0 border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.48)] px-[18px] py-2 backdrop-blur-xl lg:block">
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-5 gap-2">
             {statusItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -1149,6 +1195,15 @@ export function ChatInterface() {
           </div>
         </div>
 
+        <div className="hidden shrink-0 border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.34)] px-[18px] py-2 backdrop-blur-xl xl:block">
+          <WorkspacePresenceCluster
+            presence={presence}
+            workspaceName={activeWorkspace?.name}
+            currentUserId={user?.id}
+            compact
+          />
+        </div>
+
       {error ? (
         <div className="px-4 pt-4">
           <Alert
@@ -1169,6 +1224,7 @@ export function ChatInterface() {
           messages={messages}
           loading={responding}
           loadingConversation={loadingConversation}
+          typingMembers={conversationTypingMembers}
           onRetry={handleRetry}
           onRegenerate={handleRegenerate}
         />
@@ -1176,12 +1232,16 @@ export function ChatInterface() {
           <ChatInput
             onSend={sendMessage}
             loading={responding}
+            onCancel={() => activeStreamAbortRef.current?.abort()}
             conversationId={currentConversation || undefined}
             attachments={pendingAttachments}
             searchMode={searchMode}
             onSearchModeChange={setSearchMode}
             onUploadSuccess={handleUploadSuccess}
             onRemoveAttachment={handleRemoveAttachment}
+            onTypingChange={(isTyping) => {
+              void sendTypingSignal(currentConversationRef.current, isTyping);
+            }}
           />
         </div>
       </div>
