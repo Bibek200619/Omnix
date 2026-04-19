@@ -12,6 +12,8 @@ from ..schemas.chat import (
     WorkspaceCreate,
     WorkspaceInviteCreate,
     WorkspaceInviteRead,
+    WorkspaceIntelligenceRead,
+    WorkspaceIntelligenceUpdate,
     WorkspaceMemberRead,
     WorkspaceMemberRoleUpdate,
     WorkspaceRead,
@@ -54,6 +56,7 @@ from ..services.workspace_service import (
     utc_now_iso,
     validate_workspace_relationship,
 )
+from ..services.workspace_intelligence_service import build_workspace_intelligence_profile
 
 logger = logging.getLogger(__name__)
 
@@ -612,6 +615,52 @@ async def validate_workspace_relationships(
 ) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
     return await validate_workspace_relationship(workspace_id, user_id)
+
+
+@router.get("/{workspace_id}/intelligence", response_model=WorkspaceIntelligenceRead)
+async def get_workspace_intelligence(
+    workspace_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    return await build_workspace_intelligence_profile(workspace_id, user_id)
+
+
+@router.patch("/{workspace_id}/intelligence", response_model=WorkspaceIntelligenceRead)
+async def update_workspace_intelligence(
+    workspace_id: str,
+    intelligence_payload: WorkspaceIntelligenceUpdate,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    access = await require_workspace_owner(workspace_id, user_id)
+    normalized_workspace = normalize_workspace_record(access.workspace)
+    payload = intelligence_payload.model_dump()
+    payload["expertise_area"] = str(payload.get("expertise_area") or "").strip() or None
+    payload["ai_instructions"] = str(payload.get("ai_instructions") or "").strip() or None
+    payload["intelligence_preferences"] = {
+        **(payload.get("intelligence_preferences") or {}),
+        "retrieval_scope": "global" if normalized_workspace.get("is_global") else (payload.get("intelligence_preferences") or {}).get("retrieval_scope", "workspace"),
+    }
+    payload["updated_at"] = utc_now_iso()
+
+    try:
+        updated_workspace = await update_one_trusted(
+            "workspaces",
+            {"id": workspace_id},
+            payload,
+        )
+    except SupabaseServiceError as exc:
+        logger.exception("Failed to update workspace intelligence")
+        raise _database_error() from exc
+
+    if updated_workspace is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found.",
+        )
+
+    return await build_workspace_intelligence_profile(workspace_id, user_id)
 
 
 @router.patch("/{workspace_id}", response_model=WorkspaceRead)

@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 WORKSPACE_COLUMNS = (
     "id,user_id,name,description,parent_workspace_id,workspace_type,is_global,"
+    "expertise_area,ai_specialization,ai_instructions,intelligence_preferences,"
     "created_at,updated_at"
 )
 WORKSPACE_MEMBER_COLUMNS = "workspace_id,user_id,role,created_at,updated_at"
@@ -36,7 +37,9 @@ MEMBERS_PREVIEW_LIMIT = 3
 WorkspaceRole = Literal["founder", "co_owner", "member"]
 WorkspaceInviteStatus = Literal["pending", "accepted", "declined", "revoked"]
 WorkspaceType = Literal["workspace", "super", "sub"]
+WorkspaceAIMode = Literal["research", "coding", "design", "strategy", "analytics", "general"]
 WORKSPACE_TYPES: set[str] = {"workspace", "super", "sub"}
+WORKSPACE_AI_MODES: set[str] = {"research", "coding", "design", "strategy", "analytics", "general"}
 GLOBAL_SPACE_NAME = "Global"
 
 
@@ -109,7 +112,51 @@ def normalize_workspace_record(workspace: dict[str, Any]) -> dict[str, Any]:
         parent_workspace_id=parent_workspace_id,
     )
     normalized["is_global"] = bool(normalized.get("is_global"))
+    normalized["expertise_area"] = _clean_optional_text(normalized.get("expertise_area"))
+    normalized["ai_specialization"] = normalize_ai_specialization(normalized.get("ai_specialization"))
+    normalized["ai_instructions"] = _clean_optional_text(normalized.get("ai_instructions"))
+    normalized["intelligence_preferences"] = normalize_intelligence_preferences(
+        normalized.get("intelligence_preferences"),
+        is_global=normalized["is_global"],
+    )
     return normalized
+
+
+def _clean_optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def normalize_ai_specialization(value: Any) -> WorkspaceAIMode:
+    mode = str(value or "").strip().lower().replace("-", "_")
+    if mode in WORKSPACE_AI_MODES:
+        return mode  # type: ignore[return-value]
+    return "general"
+
+
+def normalize_intelligence_preferences(
+    value: Any,
+    *,
+    is_global: bool = False,
+) -> dict[str, Any]:
+    preferences = dict(value) if isinstance(value, Mapping) else {}
+    retrieval_scope = str(preferences.get("retrieval_scope") or "").strip().lower()
+    if retrieval_scope not in {"workspace", "global"}:
+        retrieval_scope = "global" if is_global else "workspace"
+    source_permissions = str(preferences.get("source_permissions") or "").strip().lower()
+    if source_permissions not in {"workspace_only", "inherit_global", "organization"}:
+        source_permissions = "organization" if is_global else "workspace_only"
+    memory_enabled = preferences.get("memory_enabled")
+    if not isinstance(memory_enabled, bool):
+        memory_enabled = True
+    return {
+        **preferences,
+        "retrieval_scope": retrieval_scope,
+        "source_permissions": source_permissions,
+        "memory_enabled": memory_enabled,
+    }
 
 
 def is_super_workspace(workspace: dict[str, Any]) -> bool:
