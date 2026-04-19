@@ -961,10 +961,6 @@ export function ChatInterface() {
     sendMessage(prev.content, undefined, prev.attachments ?? []);
   }, [sendMessage]);
 
-  function handlePromptSelect(prompt: string) {
-    sendMessage(prompt);
-  }
-
   function handleUploadSuccess(file: MessageAttachment) {
     console.debug("[upload] attaching uploaded file to pending chat message", {
       fileId: file.id,
@@ -1065,7 +1061,9 @@ export function ChatInterface() {
                 >
                   <div className="mb-0.5 flex justify-between gap-2">
                     <span className="max-w-[150px] truncate text-xs font-medium text-[var(--omnix-text-2)]">{conversation.title || "Omnix conversation"}</span>
-                    <span className="shrink-0 text-[10px] text-[var(--omnix-text-3)]">Live</span>
+                    <span className="shrink-0 text-[10px] text-[var(--omnix-text-3)]">
+                      {formatTime(conversation.latest_message_at ?? conversation.last_message_at ?? conversation.updated_at ?? conversation.created_at ?? undefined)}
+                    </span>
                   </div>
                   <span className="block truncate text-[11px] text-[var(--omnix-text-3)]">{conversation.preview || "No preview yet"}</span>
                 </button>
@@ -1167,7 +1165,6 @@ export function ChatInterface() {
           loading={responding}
           loadingConversation={loadingConversation}
           onRetry={handleRetry}
-          onPromptSelect={handlePromptSelect}
           onRegenerate={handleRegenerate}
         />
         <div className="shrink-0 bg-gradient-to-t from-[var(--omnix-bg)] via-[rgba(5,12,23,0.94)] to-transparent px-3 pb-[18px] pt-10 sm:px-[22px]">
