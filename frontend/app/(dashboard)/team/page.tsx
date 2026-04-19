@@ -1,24 +1,34 @@
 "use client";
 
-import type { CSSProperties } from "react";
-import { useMemo, useState } from "react";
-import { Crown, Mail, MoreHorizontal, Plus, Search, Shield, User, UserCheck } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Check, Crown, Edit3, Mail, Plus, Search, Shield, Tag, User, UserCheck, Users, X } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModal";
 import { useWorkspace } from "@/lib/workspace-context";
-import { initialsFromText, isWorkspaceFounderRole, workspaceRoleLabel } from "@/lib/workspace-roles";
+import { cn } from "@/lib/utils";
+import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { WorkspaceMember } from "@/lib/workspace-types";
 
-const statusColors = {
-  online: "#00e87a",
-  away: "#ffb800",
-  offline: "rgba(255,255,255,0.2)",
-};
+type MemberLabels = Record<string, string>;
 
-function roleColor(role?: string | null) {
-  if (role === "founder" || role === "owner") return "var(--role-founder)";
-  if (role === "co_owner") return "var(--role-coowner)";
-  if (role === "admin") return "var(--role-admin)";
-  return "var(--role-member)";
+const labelPresets = ["engineer", "design team", "product", "ops", "all"];
+
+function labelStorageKey(workspaceId?: string | null) {
+  return `omnix.memberLabels.${workspaceId ?? "global"}`;
+}
+
+function memberKey(member: WorkspaceMember) {
+  return member.user_id || member.email || member.handle || "member";
+}
+
+function memberName(member: WorkspaceMember) {
+  return member.full_name || member.email || member.handle || "Workspace member";
+}
+
+function displayRole(role?: string | null) {
+  if (role === "co_owner") return "Co-founder";
+  return workspaceRoleLabel(role);
 }
 
 function roleIcon(role?: string | null) {
@@ -26,17 +36,6 @@ function roleIcon(role?: string | null) {
   if (role === "co_owner") return Shield;
   if (role === "admin") return UserCheck;
   return User;
-}
-
-function memberName(member: WorkspaceMember) {
-  return member.full_name || member.email || member.handle || "Workspace member";
-}
-
-function joinedLabel(value?: string | null) {
-  if (!value) return "Recently";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Recently";
-  return new Intl.DateTimeFormat("en", { month: "short", year: "numeric" }).format(date);
 }
 
 export default function TeamPage() {
@@ -51,30 +50,42 @@ export default function TeamPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [labels, setLabels] = useState<MemberLabels>({});
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [labelDraft, setLabelDraft] = useState("");
 
   const members = useMemo(() => {
-    const source = activeMembers.length ? activeMembers : activeWorkspace?.members_preview ?? [];
-    if (source.length) return source;
-    return [
-      {
-        workspace_id: activeWorkspace?.id ?? "local",
-        user_id: "current-user",
-        role: activeWorkspace?.current_user_role ?? "founder",
-        email: null,
-        full_name: "You",
-        handle: null,
-        avatar_label: "Y",
-      },
-    ] satisfies WorkspaceMember[];
+    return activeMembers.length ? activeMembers : activeWorkspace?.members_preview ?? [];
   }, [activeMembers, activeWorkspace]);
 
-  const filters = ["All", "Founder", "Co-owner", "Member"];
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(labelStorageKey(activeWorkspace?.id));
+      const parsed = raw ? JSON.parse(raw) : {};
+      setLabels(parsed && typeof parsed === "object" ? parsed : {});
+    } catch {
+      setLabels({});
+    }
+  }, [activeWorkspace?.id]);
+
+  function saveLabels(nextLabels: MemberLabels) {
+    setLabels(nextLabels);
+    try {
+      window.localStorage.setItem(labelStorageKey(activeWorkspace?.id), JSON.stringify(nextLabels));
+    } catch {
+      // Labels are optional local metadata until backend support exists.
+    }
+  }
+
+  const filters = ["All", "Founder", "Co-founder", "Member"];
   const filteredMembers = members.filter((member) => {
-    const role = workspaceRoleLabel(member.role);
-    const needle = `${memberName(member)} ${member.email ?? ""} ${member.handle ?? ""}`.toLowerCase();
+    const role = displayRole(member.role);
+    const customLabel = labels[memberKey(member)] ?? "";
+    const needle = `${memberName(member)} ${member.email ?? ""} ${member.handle ?? ""} ${customLabel}`.toLowerCase();
     return (filter === "All" || role === filter) && needle.includes(search.toLowerCase());
   });
   const canInvite = isWorkspaceFounderRole(activeWorkspace?.current_user_role);
+  const pendingInviteCount = activeInvites.filter((invite) => invite.status === "pending").length;
 
   async function handleInvite(target: string, role: "co_owner" | "member") {
     try {
@@ -89,30 +100,62 @@ export default function TeamPage() {
     }
   }
 
+  function startEdit(member: WorkspaceMember) {
+    const key = memberKey(member);
+    setEditingKey(key);
+    setLabelDraft(labels[key] ?? "");
+  }
+
+  function commitLabel(member: WorkspaceMember, value = labelDraft) {
+    const key = memberKey(member);
+    const normalized = value.trim().slice(0, 32);
+    const next = { ...labels };
+    if (normalized) next[key] = normalized;
+    else delete next[key];
+    saveLabels(next);
+    setEditingKey(null);
+    setLabelDraft("");
+  }
+
   return (
     <section className="omnix-page-frame omnix-scrollbar">
-      <div className="omnix-content-max flex flex-col gap-[18px]">
+      <div className="omnix-content-max flex flex-col gap-5">
+        <div className="relative overflow-hidden rounded-[26px] border border-[rgba(0,255,255,0.12)] bg-[linear-gradient(145deg,rgba(0,255,255,0.06),rgba(155,92,255,0.035)_45%,rgba(0,0,0,0.18))] p-6 shadow-[0_28px_100px_rgba(0,0,0,0.34)]">
+          <div className="pointer-events-none absolute -right-16 -top-20 h-72 w-72 rounded-full bg-cyan-300/10 blur-[85px]" />
+          <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/18 bg-cyan-300/8 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">
+                <Users className="h-3.5 w-3.5" />
+                Team management
+              </p>
+              <h1 className="omnix-page-title omnix-gradient-text">{activeWorkspace?.name ?? "Workspace"} team</h1>
+              <p className="omnix-page-subtitle">
+                Primary workspace roles stay authoritative. Secondary labels help organize members by function.
+              </p>
+            </div>
+            <Button
+              type="button"
+              leftIcon={<Plus className="h-4 w-4" />}
+              disabled={!canInvite}
+              onClick={() => {
+                setInviteError(null);
+                setInviteOpen(true);
+              }}
+            >
+              Invite member
+            </Button>
+          </div>
+        </div>
+
         <div className="grid gap-3 md:grid-cols-3">
           {[
-            { label: "Total Members", value: activeWorkspace?.member_count ?? members.length, color: "#00FFFF" },
-            { label: "Online Now", value: Math.max(1, Math.min(members.length, 4)), color: "#00e87a" },
-            { label: "Pending Invites", value: activeInvites.filter((invite) => invite.status === "pending").length || "Clear", color: "#9b5cff" },
-          ].map((item, index) => (
-            <div
-              key={item.label}
-              className="flex items-center gap-3 rounded-[var(--omnix-radius-sm)] border border-[rgba(0,255,255,0.08)] bg-[rgba(0,255,255,0.03)] px-[18px] py-3.5 transition hover:shadow-[0_0_16px_rgba(0,255,255,0.08)]"
-              style={{ "--stat-color": item.color } as CSSProperties}
-            >
-              <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{
-                  background: item.color,
-                  boxShadow: `0 0 10px ${item.color}80`,
-                  animation: index === 1 ? "omnix-dot-pulse 2s ease-in-out infinite" : undefined,
-                }}
-              />
-              <span className="text-xs text-white/45">{item.label}</span>
-              <span className="omnix-display ml-auto text-xl font-extrabold text-white">{item.value}</span>
+            { label: "Members", value: activeWorkspace?.member_count ?? members.length, color: "#00FFFF" },
+            { label: "Your role", value: displayRole(activeWorkspace?.current_user_role), color: "#00e87a" },
+            { label: "Pending invites", value: pendingInviteCount || "Clear", color: "#9b5cff" },
+          ].map((item) => (
+            <div key={item.label} className="rounded-xl border border-[rgba(0,255,255,0.08)] bg-[rgba(0,255,255,0.03)] px-4 py-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">{item.label}</div>
+              <div className="omnix-display mt-2 text-xl font-bold text-white" style={{ color: item.color }}>{item.value}</div>
             </div>
           ))}
         </div>
@@ -123,8 +166,8 @@ export default function TeamPage() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search members..."
-              className="omnix-input h-9 w-full rounded-[var(--omnix-radius-sm)] py-2 pl-8 pr-3 text-xs"
+              placeholder="Search members or labels..."
+              className="omnix-input h-10 w-full rounded-[var(--omnix-radius-sm)] py-2 pl-8 pr-3 text-sm"
             />
           </div>
           <div className="flex flex-wrap gap-1">
@@ -133,116 +176,127 @@ export default function TeamPage() {
                 key={item}
                 type="button"
                 onClick={() => setFilter(item)}
-                className="rounded-full border px-3 py-1.5 text-[11px] font-semibold transition"
-                style={{
-                  background: filter === item ? "rgba(0,255,255,0.1)" : "rgba(0,255,255,0.03)",
-                  borderColor: filter === item ? "rgba(0,255,255,0.3)" : "rgba(0,255,255,0.08)",
-                  color: filter === item ? "var(--omnix-cyan)" : "rgba(255,255,255,0.35)",
-                  boxShadow: filter === item ? "var(--omnix-glow-xs)" : "none",
-                }}
+                className={cn(
+                  "rounded-full border px-3 py-1.5 text-[11px] font-semibold transition",
+                  filter === item
+                    ? "border-cyan-300/35 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]"
+                    : "border-[var(--omnix-border)] bg-black/10 text-[var(--omnix-text-3)] hover:text-white",
+                )}
               >
                 {item}
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setInviteError(null);
-              setInviteOpen(true);
-            }}
-            disabled={!canInvite}
-            className="inline-flex h-9 items-center gap-1.5 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-cyan)] bg-transparent px-4 text-xs font-bold text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] transition hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Invite Member
-          </button>
         </div>
 
-        <div className="grid gap-3.5 md:grid-cols-2 xl:grid-cols-3">
-          {filteredMembers.map((member, index) => {
-            const color = roleColor(member.role);
+        <div className="overflow-hidden rounded-[var(--omnix-radius)] border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)]">
+          {filteredMembers.length ? filteredMembers.map((member) => {
+            const key = memberKey(member);
             const RoleIcon = roleIcon(member.role);
-            const displayName = memberName(member);
-            const status: keyof typeof statusColors = index < 3 ? "online" : index === 3 ? "away" : "offline";
-
+            const name = memberName(member);
+            const customLabel = labels[key];
+            const isEditing = editingKey === key;
             return (
-              <article
-                key={member.user_id || `${member.email}-${index}`}
-                className="relative overflow-hidden rounded-[var(--omnix-radius)] border border-[rgba(0,255,255,0.08)] bg-[rgba(0,255,255,0.03)] p-5 transition hover:-translate-y-0.5 hover:bg-[rgba(0,255,255,0.05)] hover:shadow-[0_0_30px_rgba(0,255,255,0.1),0_4px_20px_rgba(0,0,0,0.3)]"
-                style={{ animation: `omnix-card-enter 0.35s ease ${index * 45}ms both` }}
-              >
-                <div
-                  className="absolute inset-x-[20%] top-0 h-px"
-                  style={{ background: `linear-gradient(90deg, transparent, ${color}50, transparent)` }}
-                />
-                <button
-                  type="button"
-                  className="absolute right-3.5 top-3.5 rounded-md p-1 text-white/20 transition hover:bg-white/[0.06] hover:text-white/50"
-                  aria-label="Member options"
-                  title="Member options"
-                >
-                  <MoreHorizontal className="h-[15px] w-[15px]" />
-                </button>
-
-                <div className="mb-3.5 flex items-center gap-[13px]">
-                  <div className="relative shrink-0">
-                    <div
-                      className="flex h-[50px] w-[50px] items-center justify-center rounded-full border-2 text-xl font-extrabold text-white"
-                      style={{
-                        background: `linear-gradient(135deg, ${color} 0%, ${color}70 100%)`,
-                        borderColor: `${color}50`,
-                        boxShadow: `0 0 20px ${color}30`,
-                      }}
-                    >
-                      {member.avatar_label || initialsFromText(displayName)}
-                    </div>
-                    <span
-                      className="absolute bottom-px right-px h-3 w-3 rounded-full border-2 border-[#050c17]"
-                      style={{
-                        background: statusColors[status],
-                        boxShadow: status === "online" ? "0 0 6px rgba(0,232,122,0.8)" : "none",
-                        animation: status === "online" ? "omnix-dot-pulse 2s ease-in-out infinite" : undefined,
-                      }}
-                    />
-                  </div>
+              <article key={key} className="group grid gap-4 border-b border-[var(--omnix-border)] px-4 py-4 transition hover:bg-[var(--omnix-surface)] lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] lg:items-center">
+                <div className="flex min-w-0 items-center gap-3">
+                  <ProfileAvatar
+                    name={name}
+                    email={member.email}
+                    handle={member.handle}
+                    avatarUrl={member.avatar_url}
+                    className="h-11 w-11 border-cyan-300/25 bg-cyan-300/10 text-sm"
+                  />
                   <div className="min-w-0">
-                    <h2 className="omnix-display truncate text-[15px] font-bold text-white">{displayName}</h2>
-                    <div className="mt-1 flex items-center gap-1.5">
-                      <RoleIcon className="h-[11px] w-[11px]" style={{ color }} />
-                      <span className="text-[11px] font-bold tracking-[0.02em]" style={{ color }}>
-                        {workspaceRoleLabel(member.role)}
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <h2 className="truncate text-sm font-semibold text-white">{name}</h2>
+                      <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold", workspaceRoleBadgeClass(member.role))}>
+                        <RoleIcon className="h-3 w-3" />
+                        {displayRole(member.role)}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[10px] text-white/30">{activeWorkspace?.name ?? "Workspace"}</p>
+                    <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-[var(--omnix-text-3)]">
+                      <Mail className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{member.email || member.handle || "No contact set"}</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="mb-3.5 flex items-center gap-1.5 truncate text-[11px] text-white/35">
-                  <Mail className="h-[11px] w-[11px] shrink-0" />
-                  <span className="truncate">{member.email || member.handle || "No contact set"}</span>
-                </div>
-
-                <div className="flex gap-2">
-                  <div className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-2 text-center">
-                    <div className="omnix-display text-[15px] font-bold text-white">{(2841 - index * 237).toLocaleString()}</div>
-                    <div className="text-[10px] text-white/30">Queries</div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                  <div className="min-w-0 flex-1 sm:max-w-[16rem]">
+                    {isEditing ? (
+                      <div className="flex gap-1.5">
+                        <input
+                          value={labelDraft}
+                          onChange={(event) => setLabelDraft(event.target.value)}
+                          className="omnix-input h-9 min-w-0 flex-1 rounded-lg px-3 text-xs"
+                          placeholder="engineer, product, ops..."
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => commitLabel(member)}
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
+                          aria-label="Save label"
+                          title="Save label"
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingKey(null)}
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--omnix-border)] bg-black/15 text-[var(--omnix-text-2)]"
+                          aria-label="Cancel label edit"
+                          title="Cancel label edit"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {customLabel ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-cyan-300/15 bg-cyan-300/8 px-2.5 py-1 text-[11px] text-cyan-100">
+                            <Tag className="h-3 w-3" />
+                            {customLabel}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-[var(--omnix-text-3)]">No secondary label</span>
+                        )}
+                        {labelPresets.slice(0, 3).map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => commitLabel(member, preset)}
+                            className="rounded-full border border-[var(--omnix-border)] bg-black/15 px-2 py-1 text-[10px] text-[var(--omnix-text-3)] transition hover:text-white"
+                          >
+                            {preset}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-2 text-center">
-                    <div className="omnix-display text-[13px] font-bold text-white">{joinedLabel(member.created_at)}</div>
-                    <div className="text-[10px] text-white/30">Joined</div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => startEdit(member)}
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--omnix-border)] bg-black/15 px-3 text-xs font-semibold text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-border-active)] hover:text-white"
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                    Label
+                  </button>
                 </div>
               </article>
             );
-          })}
+          }) : (
+            <div className="p-10 text-center">
+              <Users className="mx-auto h-9 w-9 text-cyan-200/35" />
+              <p className="mt-3 font-semibold text-white">{members.length === 0 ? "No team members loaded yet" : "No members match this filter"}</p>
+              <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-[var(--omnix-text-3)]">
+                {members.length === 0
+                  ? "Workspace membership will appear here after the backend returns members for this workspace."
+                  : "Try another search term, role filter, or secondary label."}
+              </p>
+            </div>
+          )}
         </div>
-
-        {filteredMembers.length === 0 ? (
-          <div className="rounded-[var(--omnix-radius)] border border-dashed border-[var(--omnix-border)] bg-[rgba(0,255,255,0.02)] p-8 text-center text-sm text-[var(--omnix-text-2)]">
-            No members match this filter.
-          </div>
-        ) : null}
       </div>
 
       <WorkspaceInviteModal
