@@ -31,6 +31,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useProfile } from "@/lib/profile-context";
 import { useWorkspace } from "@/lib/workspace-context";
+import { cn } from "@/lib/utils";
 import { initialsFromText, isWorkspaceFounderRole, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { WorkspaceMember } from "@/lib/workspace-types";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
@@ -1116,6 +1117,32 @@ export function ChatInterface() {
             <button type="button" className="flex items-center text-[var(--omnix-text-3)] transition hover:text-white" aria-label="Session actions" title="Session actions">
               <MoreVertical className="h-4 w-4" />
             </button>
+          </div>
+        </div>
+
+        <div className="hidden shrink-0 border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.48)] px-[18px] py-2 backdrop-blur-xl lg:block">
+          <div className="grid grid-cols-4 gap-2">
+            {statusItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.label}
+                  className="flex min-w-0 items-center gap-2 rounded-[8px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-cyan-300/15 bg-cyan-300/10">
+                    <Icon className={cn("h-3.5 w-3.5", item.color)} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--omnix-text-3)]">
+                      {item.label}
+                    </span>
+                    <span className="block truncate text-[11px] text-[var(--omnix-text-2)]">
+                      {item.value}
+                    </span>
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
