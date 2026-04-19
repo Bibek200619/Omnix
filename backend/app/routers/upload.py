@@ -15,6 +15,7 @@ from ..rag.ingestion_service import parse_document_bytes
 from ..services.supabase_service import SupabaseServiceError, insert_one
 from ..services.document_context_service import store_extracted_text_chunks
 from ..services.workspace_service import active_workspace_id_from_request, require_workspace_access
+from ..services.workspace_collaboration_service import log_workspace_activity
 from .conversations import require_conversation_access
 
 logger = logging.getLogger(__name__)
@@ -156,6 +157,20 @@ async def upload_file(
     except SupabaseServiceError as exc:
         logger.exception("Failed to insert file metadata: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to register file")
+
+    if workspace_id:
+        await log_workspace_activity(
+            workspace_id=workspace_id,
+            actor_user_id=user_id,
+            event_type="workspace.source_uploaded",
+            summary=f"{filename} was uploaded as a workspace source.",
+            metadata={
+                "file_id": str(file_row.get("id") or ""),
+                "file_type": file_type or None,
+                "size_bytes": size,
+                "conversation_id": conversation_id,
+            },
+        )
 
     # Persist lightweight chunks immediately so chat can use the upload even if
     # Redis, the worker, or embedding generation is delayed on the EC2 host.

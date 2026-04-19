@@ -6,6 +6,7 @@ import { MessageSquare } from "lucide-react";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import type { Message } from "@/components/chat/types";
+import type { WorkspacePresenceMember } from "@/lib/workspace-types";
 
 type MessageListProps = {
   messages: Message[];
@@ -13,6 +14,7 @@ type MessageListProps = {
   loadingConversation?: boolean;
   onRetry?: (message: Message) => void;
   onRegenerate?: (assistantMessageId: string) => void;
+  typingMembers?: WorkspacePresenceMember[];
 };
 
 function ConversationSkeleton() {
@@ -40,6 +42,7 @@ export function MessageList({
   loadingConversation = false,
   onRetry,
   onRegenerate,
+  typingMembers = [],
 }: MessageListProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -85,6 +88,28 @@ export function MessageList({
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} onRetry={onRetry} onRegenerate={onRegenerate} />
         ))}
+        {typingMembers.length ? (
+          <motion.div
+            key="collaborator-typing"
+            layout
+            className="flex gap-3"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+          >
+            <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/10 text-xs font-bold text-emerald-100 shadow-[0_0_18px_rgba(0,232,122,0.16)]">
+              {typingMembers[0]?.avatar_label || "U"}
+            </div>
+            <TypingIndicator
+              label={
+                typingMembers.length === 1
+                  ? `${typingMembers[0]?.full_name || typingMembers[0]?.email || "A teammate"} is typing`
+                  : `${typingMembers.length} teammates are typing`
+              }
+            />
+          </motion.div>
+        ) : null}
         {loading ? (
           <motion.div
             key="typing"

@@ -23,9 +23,12 @@ import {
 import { Button } from "@/components/ui/Button";
 import { apiClient } from "@/lib/api";
 import { useConversationHistory } from "@/lib/conversation-history-context";
+import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { initialsFromText, workspaceRoleLabel } from "@/lib/workspace-roles";
 import { WorkspaceIntelligencePanel } from "@/components/workspace/WorkspaceIntelligencePanel";
+import { WorkspaceActivityFeed } from "@/components/workspace/WorkspaceActivityFeed";
+import { WorkspacePresenceCluster } from "@/components/workspace/WorkspacePresenceCluster";
 
 type FileData = {
   id: string;
@@ -55,11 +58,13 @@ export default function DashboardPage() {
     activeWorkspaceIntelligence,
     intelligenceLoading,
   } = useWorkspace();
+  const { activity, loadingActivity, presence, statusForWorkspace } = useWorkspaceCollaboration();
   const [files, setFiles] = useState<FileData[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [filesError, setFilesError] = useState<string | null>(null);
   const memberCount = activeWorkspace?.member_count ?? activeMembers.length;
   const sharedState = activeWorkspace?.is_shared ? "Shared" : "Solo";
+  const activeLiveStatus = statusForWorkspace(activeWorkspace?.id);
 
   const loadFiles = useCallback(async () => {
     setFilesLoading(true);
@@ -91,15 +96,15 @@ export default function DashboardPage() {
     {
       label: "Team Members",
       value: memberCount,
-      trend: activeWorkspace ? sharedState : "Loading",
+      trend: activeLiveStatus ? `${activeLiveStatus.active_count} active` : activeWorkspace ? sharedState : "Loading",
       icon: Users,
       color: "var(--omnix-purple)",
       metricColor: "#9b5cff",
     },
     {
       label: "Knowledge Sources",
-      value: filesLoading ? "..." : files.length,
-      trend: filesError ? "Unavailable" : files.length ? "Indexed" : "Empty",
+      value: activeWorkspaceIntelligence?.source_count ?? (filesLoading ? "..." : files.length),
+      trend: filesError ? "Unavailable" : (activeWorkspaceIntelligence?.source_count ?? files.length) ? "Indexed" : "Empty",
       icon: Database,
       color: "var(--omnix-pink)",
       metricColor: "#ff4df4",
@@ -125,29 +130,6 @@ export default function DashboardPage() {
   const recent = conversations.slice(0, 4);
   const workspaceMembers = activeMembers.length ? activeMembers : activeWorkspace?.members_preview ?? [];
   const recentWorkspaces = workspaces.slice(0, 4);
-  const activityItems = [
-    ...recent.slice(0, 2).map((conversation) => ({
-      id: `conversation:${conversation.id}`,
-      icon: MessageSquare,
-      label: conversation.title || "Omnix conversation",
-      detail: conversation.preview || "Conversation saved in history",
-      color: "var(--omnix-cyan)",
-    })),
-    ...files.slice(0, 2).map((file) => ({
-      id: `file:${file.id}`,
-      icon: FileText,
-      label: "Source uploaded",
-      detail: "Workspace knowledge source available",
-      color: "var(--omnix-green)",
-    })),
-    ...pendingInvites.slice(0, 1).map((invite) => ({
-      id: `invite:${invite.id}`,
-      icon: Users,
-      label: "Workspace invite pending",
-      detail: invite.workspace_name || invite.email,
-      color: "var(--omnix-amber)",
-    })),
-  ];
 
   return (
     <section className="omnix-page-frame omnix-scrollbar">
@@ -258,37 +240,17 @@ export default function DashboardPage() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
           <div className="space-y-6">
 
-            <section className="omnix-section-card p-6" style={{ animation: "omnix-card-enter 0.45s ease-out 0.14s both" }}>
-              <div className="omnix-top-line" />
-              <div className="relative z-10 mb-5 flex items-center justify-between">
-                <h2 className="flex items-center gap-2.5 text-lg font-semibold text-white">
-                  <Activity className="h-4 w-4 text-[var(--omnix-cyan)]" />
-                  Recent activity
-                </h2>
-              </div>
-              <div className="relative z-10 grid gap-2">
-                {activityItems.length ? activityItems.map((activity) => {
-                  const Icon = activity.icon;
-                  return (
-                    <div key={activity.id} className="flex items-center gap-3 rounded-xl border border-[var(--omnix-border)] bg-black/15 px-3 py-3">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-lg border" style={{ background: `${activity.color}14`, borderColor: `${activity.color}33`, color: activity.color }}>
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-white">{activity.label}</span>
-                        <span className="block truncate text-xs text-[var(--omnix-text-3)]">{activity.detail}</span>
-                      </span>
-                    </div>
-                  );
-                }) : (
-                  <div className="rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/15 p-6 text-center">
-                    <Activity className="mx-auto h-7 w-7 text-cyan-200/35" />
-                    <p className="mt-3 text-sm font-semibold text-white">No activity yet</p>
-                    <p className="mt-1 text-xs text-[var(--omnix-text-3)]">Chats, source uploads, and invites will appear here as real events happen.</p>
-                  </div>
-                )}
-              </div>
-            </section>
+            <WorkspaceActivityFeed
+              activity={activity}
+              loading={loadingActivity}
+              compact
+              className="omnix-section-card"
+            />
+
+            <WorkspacePresenceCluster
+              presence={presence}
+              workspaceName={activeWorkspace?.name}
+            />
 
             <section className="omnix-section-card p-6" style={{ animation: "omnix-card-enter 0.45s ease-out 0.18s both" }}>
               {/* Top beam */}
@@ -449,6 +411,16 @@ export default function DashboardPage() {
                     label: "Invite Queue",
                     value: activeInvites.length ? `${activeInvites.length} active` : "Clear",
                     color: "var(--omnix-amber)",
+                  },
+                  {
+                    label: "Live Members",
+                    value: activeLiveStatus ? `${activeLiveStatus.active_count} active` : `${presence?.active_count ?? 0} active`,
+                    color: "var(--omnix-green)",
+                  },
+                  {
+                    label: "AI Status",
+                    value: activeLiveStatus?.ai_status ?? "ready",
+                    color: "var(--omnix-purple)",
                   },
                 ].map((item) => (
                   <div key={item.label} className="rounded-xl border border-[var(--omnix-border)] bg-black/15 px-3 py-3">

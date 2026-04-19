@@ -27,6 +27,7 @@ export function WorkspaceIntelligencePanel({
 }) {
   const domains = profile?.active_domains ?? [];
   const sources = profile?.connected_sources ?? [];
+  const insights = profile?.recent_insights ?? [];
   const summary = profile?.context_summary ?? "Workspace intelligence is ready once a workspace is selected.";
   const mode = profile?.ai_specialization ?? "general";
 
@@ -103,6 +104,20 @@ export function WorkspaceIntelligencePanel({
               )) : (
                 <div className="rounded-lg border border-dashed border-[var(--omnix-border)] bg-black/10 px-3 py-3 text-xs text-[var(--omnix-text-3)]">
                   Connect workspace sources to activate retrieval memory.
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="lg:col-span-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Recent AI activity</p>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {insights.length ? insights.slice(0, 4).map((insight) => (
+                <div key={insight} className="rounded-lg border border-white/[0.06] bg-black/15 px-3 py-2 text-xs leading-5 text-[var(--omnix-text-2)]">
+                  {insight}
+                </div>
+              )) : (
+                <div className="rounded-lg border border-dashed border-[var(--omnix-border)] bg-black/10 px-3 py-3 text-xs text-[var(--omnix-text-3)] md:col-span-2">
+                  AI activity will appear after Omnix works with this workspace context.
                 </div>
               )}
             </div>

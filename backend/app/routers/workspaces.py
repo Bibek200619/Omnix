@@ -12,13 +12,18 @@ from ..schemas.chat import (
     WorkspaceCreate,
     WorkspaceInviteCreate,
     WorkspaceInviteRead,
+    WorkspaceActivityRead,
     WorkspaceIntelligenceRead,
     WorkspaceIntelligenceUpdate,
+    WorkspaceLiveStatusRead,
     WorkspaceMemberRead,
     WorkspaceMemberRoleUpdate,
+    WorkspacePresenceHeartbeat,
+    WorkspacePresenceRead,
     WorkspaceRead,
     WorkspaceRelationshipValidation,
     WorkspaceSubspaceCreate,
+    WorkspaceTypingUpdate,
     WorkspaceTreeRead,
     WorkspaceUpdate,
 )
@@ -57,6 +62,14 @@ from ..services.workspace_service import (
     validate_workspace_relationship,
 )
 from ..services.workspace_intelligence_service import build_workspace_intelligence_profile
+from ..services.workspace_collaboration_service import (
+    heartbeat_workspace_presence,
+    list_workspace_activity,
+    list_workspace_live_statuses,
+    list_workspace_presence,
+    log_workspace_activity,
+    update_workspace_typing,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -371,6 +384,13 @@ async def _accept_workspace_invite(invite_id: str, current_user: Any) -> dict[st
         workspace_id,
         membership_created,
     )
+    await log_workspace_activity(
+        workspace_id=workspace_id,
+        actor_user_id=user_id,
+        event_type="workspace.member_joined",
+        summary="A teammate joined the workspace.",
+        metadata={"invite_id": invite_id, "membership_created": membership_created},
+    )
     return await _enriched_workspace_for_user(workspace_id, user_id)
 
 
@@ -469,6 +489,16 @@ async def create_workspace(
         logger.exception("Failed to create workspace")
         raise _database_error() from exc
 
+    await log_workspace_activity(
+        workspace_id=str(workspace["id"]),
+        actor_user_id=user_id,
+        event_type="workspace.created",
+        summary=f"{workspace.get('name') or 'Workspace'} workspace was created.",
+        metadata={
+            "workspace_type": workspace.get("workspace_type"),
+            "is_global": bool(workspace.get("is_global")),
+        },
+    )
     return await _enriched_workspace_for_user(str(workspace["id"]), user_id)
 
 
@@ -535,6 +565,14 @@ async def get_workspace_hierarchy(
     return hierarchy
 
 
+@router.get("/status", response_model=list[WorkspaceLiveStatusRead])
+async def get_workspace_live_statuses(
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    user_id = _user_id_from_claims(current_user)
+    return await list_workspace_live_statuses(user_id)
+
+
 @router.get("/{workspace_id}", response_model=WorkspaceRead)
 async def get_workspace(
     workspace_id: str,
@@ -566,6 +604,61 @@ async def get_workspace_subspaces(
     ]
 
 
+@router.get("/{workspace_id}/presence", response_model=WorkspacePresenceRead)
+async def get_workspace_presence(
+    workspace_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    return await list_workspace_presence(workspace_id=workspace_id, user_id=user_id)
+
+
+@router.post("/{workspace_id}/presence/heartbeat", response_model=WorkspacePresenceRead)
+async def heartbeat_presence(
+    workspace_id: str,
+    presence_payload: WorkspacePresenceHeartbeat,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    return await heartbeat_workspace_presence(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        current_view=presence_payload.current_view,
+        current_label=presence_payload.current_label,
+        metadata=presence_payload.metadata,
+    )
+
+
+@router.post("/{workspace_id}/presence/typing", response_model=WorkspacePresenceRead)
+async def update_typing_presence(
+    workspace_id: str,
+    typing_payload: WorkspaceTypingUpdate,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    return await update_workspace_typing(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        conversation_id=typing_payload.conversation_id,
+        is_typing=typing_payload.is_typing,
+    )
+
+
+@router.get("/{workspace_id}/activity", response_model=list[WorkspaceActivityRead])
+async def get_workspace_activity(
+    workspace_id: str,
+    limit: int = 20,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    user_id = _user_id_from_claims(current_user)
+    bounded_limit = max(1, min(limit, 50))
+    return await list_workspace_activity(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        limit=bounded_limit,
+    )
+
+
 @router.post("/{workspace_id}/subspaces", response_model=WorkspaceRead, status_code=status.HTTP_201_CREATED)
 async def create_workspace_subspace(
     workspace_id: str,
@@ -582,6 +675,20 @@ async def create_workspace_subspace(
     except SupabaseServiceError as exc:
         logger.exception("Failed to create subspace")
         raise _database_error() from exc
+    await log_workspace_activity(
+        workspace_id=str(subspace["id"]),
+        actor_user_id=user_id,
+        event_type="workspace.subspace_created",
+        summary=f"{subspace.get('name') or 'Subworkspace'} subworkspace was created.",
+        metadata={"parent_workspace_id": workspace_id},
+    )
+    await log_workspace_activity(
+        workspace_id=workspace_id,
+        actor_user_id=user_id,
+        event_type="workspace.subspace_created",
+        summary=f"{subspace.get('name') or 'Subworkspace'} was added as a subworkspace.",
+        metadata={"subspace_id": str(subspace.get("id") or "")},
+    )
     return await _enriched_workspace_for_user(str(subspace["id"]), user_id)
 
 
@@ -660,6 +767,16 @@ async def update_workspace_intelligence(
             detail="Workspace not found.",
         )
 
+    await log_workspace_activity(
+        workspace_id=workspace_id,
+        actor_user_id=user_id,
+        event_type="workspace.intelligence_updated",
+        summary="Workspace AI intelligence profile was updated.",
+        metadata={
+            "ai_specialization": payload.get("ai_specialization"),
+            "retrieval_scope": (payload.get("intelligence_preferences") or {}).get("retrieval_scope"),
+        },
+    )
     return await build_workspace_intelligence_profile(workspace_id, user_id)
 
 
@@ -787,6 +904,13 @@ async def update_workspace_member_role(
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
+    await log_workspace_activity(
+        workspace_id=membership_workspace_id,
+        actor_user_id=user_id,
+        event_type="workspace.member_role_updated",
+        summary="A workspace member role was updated.",
+        metadata={"member_user_id": member_user_id, "role": next_role},
+    )
     members = await list_workspace_members(access.workspace)
     for member in members:
         if member.get("user_id") == member_user_id:
@@ -914,6 +1038,13 @@ async def invite_workspace_member(
             email_result.provider_id,
         )
 
+    await log_workspace_activity(
+        workspace_id=membership_workspace_id,
+        actor_user_id=user_id,
+        event_type="workspace.invite_created",
+        summary="A workspace invite was created.",
+        metadata={"role": requested_role, "invite_id": invite_id},
+    )
     return hydrated[0]
 
 
@@ -986,6 +1117,13 @@ async def remove_workspace_member(
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
+    await log_workspace_activity(
+        workspace_id=membership_workspace_id,
+        actor_user_id=user_id,
+        event_type="workspace.member_removed",
+        summary="A workspace member was removed.",
+        metadata={"member_user_id": member_user_id, "role": target_role},
+    )
     return None
 
 
@@ -1029,6 +1167,13 @@ async def revoke_workspace_invite(
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
+    await log_workspace_activity(
+        workspace_id=membership_workspace_id,
+        actor_user_id=user_id,
+        event_type="workspace.invite_revoked",
+        summary="A workspace invite was revoked.",
+        metadata={"invite_id": invite_id},
+    )
     return None
 
 

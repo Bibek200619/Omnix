@@ -974,6 +974,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (error && workspaces.length === 0) {
+      console.debug("[workspace] fetch failed; preserving active workspace id during failure state");
+      return;
+    }
+
     if (workspaces.length === 0) {
       console.debug("[workspace] no workspaces after verified fetch; waiting for explicit create");
       if (activeWorkspaceId) {
@@ -991,7 +996,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       });
       setActiveWorkspace(nextWorkspaceId);
     }
-  }, [activeWorkspaceId, loading, setActiveWorkspace, user, workspaces]);
+  }, [activeWorkspaceId, error, loading, setActiveWorkspace, user, workspaces]);
 
   useEffect(() => {
     lastActiveWorkspaceDataRefreshAtRef.current = 0;

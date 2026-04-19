@@ -114,3 +114,64 @@ export type WorkspaceIntelligenceUpdatePayload = {
   ai_instructions?: string | null;
   intelligence_preferences: WorkspaceIntelligencePreferences;
 };
+
+export type WorkspacePresenceStatus = "online" | "recent" | "offline";
+
+export type WorkspacePresenceMember = {
+  workspace_id: string;
+  user_id: string;
+  status: WorkspacePresenceStatus;
+  current_view?: string | null;
+  current_label?: string | null;
+  is_online: boolean;
+  is_typing: boolean;
+  typing_conversation_id?: string | null;
+  last_seen_at?: string | null;
+  updated_at?: string | null;
+  email?: string | null;
+  full_name?: string | null;
+  handle?: string | null;
+  avatar_url?: string | null;
+  avatar_label: string;
+};
+
+export type WorkspacePresenceSnapshot = {
+  workspace_id: string;
+  online_count: number;
+  active_count: number;
+  recently_active_count: number;
+  typing_count: number;
+  online_members: WorkspacePresenceMember[];
+  active_members: WorkspacePresenceMember[];
+  recently_active_members: WorkspacePresenceMember[];
+  typing_members: WorkspacePresenceMember[];
+  updated_at?: string | null;
+};
+
+export type WorkspaceActivityEvent = {
+  id: string;
+  workspace_id: string;
+  actor_user_id?: string | null;
+  event_type: string;
+  summary: string;
+  metadata: Record<string, unknown>;
+  created_at?: string | null;
+  actor_name?: string | null;
+  actor_email?: string | null;
+  actor_avatar_url?: string | null;
+  actor_avatar_label: string;
+};
+
+export type WorkspaceLiveStatus = {
+  workspace_id: string;
+  online_count: number;
+  active_count: number;
+  recently_active_count: number;
+  typing_count: number;
+  source_count: number;
+  ai_specialization: WorkspaceAIMode;
+  ai_status: "ready" | "learning" | "active";
+  health: "quiet" | "warming" | "alive";
+  recent_activity_at?: string | null;
+  recent_activity_summary?: string | null;
+};
