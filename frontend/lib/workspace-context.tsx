@@ -129,7 +129,7 @@ function normalizeWorkspaceRecord(record: WorkspaceApiRecord, parentFromTree?: s
   const memberCount =
     typeof record.member_count === "number"
       ? record.member_count
-      : Math.max(membersPreview.length, 1);
+      : membersPreview.length;
 
   return {
     id: String(record.id),

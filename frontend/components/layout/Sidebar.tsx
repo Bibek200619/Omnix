@@ -884,26 +884,26 @@ function profileDisplayName(userEmail?: string | null, metadata?: Record<string,
 
 function WorkspaceHierarchyMini({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const { activeWorkspace, activeMembers, activeInvites } = useWorkspace();
+  const { activeWorkspace, activeMembers } = useWorkspace();
   const members = activeMembers.length || activeWorkspace?.member_count || 0;
   const spaces = [
     {
       label: "Global",
       meta: activeWorkspace?.is_shared ? "Shared context" : "Primary context",
       color: "var(--omnix-cyan)",
-      count: activeWorkspace ? "Root" : "Ready",
+      count: activeWorkspace ? "Root" : null,
     },
     {
       label: "Team",
-      meta: `${members || 1} collaborators`,
+      meta: `${members} ${members === 1 ? "collaborator" : "collaborators"}`,
       color: "var(--omnix-amber)",
-      count: String(members || 1),
+      count: String(members),
     },
     {
       label: "Knowledge",
       meta: "Sources and files",
       color: "var(--omnix-green)",
-      count: activeInvites.length ? `${activeInvites.length}` : "Live",
+      count: null,
     },
   ];
 
@@ -938,7 +938,7 @@ function WorkspaceHierarchyMini({ onClose }: { onClose: () => void }) {
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-xs font-semibold text-white">
-              {activeWorkspace?.name || "Omnix HQ"}
+              {activeWorkspace?.name || "No workspace"}
             </span>
             <span className={cn("mt-0.5 inline-flex rounded-full border px-1.5 py-px text-[9px] font-semibold", workspaceRoleBadgeClass(activeWorkspace?.current_user_role))}>
               {workspaceRoleLabel(activeWorkspace?.current_user_role)}
@@ -973,9 +973,11 @@ function WorkspaceHierarchyMini({ onClose }: { onClose: () => void }) {
                   {space.meta}
                 </span>
               </span>
-              <span className="rounded-full border border-white/8 bg-white/[0.035] px-1.5 py-px text-[9px] text-[var(--omnix-text-3)]">
-                {space.count}
-              </span>
+              {space.count ? (
+                <span className="rounded-full border border-white/8 bg-white/[0.035] px-1.5 py-px text-[9px] text-[var(--omnix-text-3)]">
+                  {space.count}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>

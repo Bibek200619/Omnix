@@ -9,7 +9,6 @@ import {
   ChevronRight,
   Crown,
   Database,
-  Globe2,
   Layers3,
   Loader2,
   MessageSquare,
@@ -22,7 +21,6 @@ import {
   Users,
   X,
   Zap,
-  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -36,60 +34,24 @@ import {
 } from "@/lib/workspace-roles";
 import type { Workspace } from "@/lib/workspace-types";
 
-type SpaceKey = "root" | "global" | "team" | "knowledge";
-
-const childSpaces: Array<{
-  key: Exclude<SpaceKey, "root">;
-  label: string;
-  desc: string;
-  color: string;
-  icon: LucideIcon;
-  href: string;
-}> = [
-  {
-    key: "global",
-    label: "Global",
-    desc: "Shared workspace memory and active AI sessions",
-    color: "var(--omnix-cyan)",
-    icon: Globe2,
-    href: "/chat",
-  },
-  {
-    key: "team",
-    label: "Team",
-    desc: "Members, roles, invites, and presence",
-    color: "var(--omnix-amber)",
-    icon: Users,
-    href: "/team",
-  },
-  {
-    key: "knowledge",
-    label: "Knowledge",
-    desc: "Uploaded sources and retrieval context",
-    color: "var(--omnix-green)",
-    icon: Database,
-    href: "/sources",
-  },
-];
-
 function workspaceColor(index: number) {
   return ["var(--omnix-cyan)", "var(--omnix-purple)", "var(--omnix-green)", "var(--omnix-amber)", "var(--omnix-pink)"][index % 5];
 }
 
-function selectionId(workspaceId: string, key: SpaceKey) {
-  return `${workspaceId}:${key}`;
+function selectionId(workspaceId: string) {
+  return workspaceId;
 }
 
 function selectedWorkspace(workspaces: Workspace[], selectedId: string | null, fallback: Workspace | null) {
   if (!selectedId) return fallback;
-  const [workspaceId] = selectedId.split(":");
-  return workspaces.find((workspace) => workspace.id === workspaceId) ?? fallback;
-}
-
-function selectedSpaceKey(selectedId: string | null): SpaceKey {
-  if (!selectedId) return "root";
-  const key = selectedId.split(":")[1];
-  return key === "global" || key === "team" || key === "knowledge" ? key : "root";
+  const stack = [...workspaces];
+  while (stack.length) {
+    const workspace = stack.shift();
+    if (!workspace) continue;
+    if (workspace.id === selectedId) return workspace;
+    stack.push(...(workspace.subspaces ?? []));
+  }
+  return fallback;
 }
 
 export default function WorkspacePage() {
@@ -100,46 +62,60 @@ export default function WorkspacePage() {
     activeMembers,
     activeInvites,
     createWorkspace,
+    createSubspace,
     loading,
     setActiveWorkspace,
     workspaces,
   } = useWorkspace();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [selectedId, setSelectedId] = useState<string | null>(
-    activeWorkspaceId ? selectionId(activeWorkspaceId, "root") : null,
+    activeWorkspaceId ? selectionId(activeWorkspaceId) : null,
   );
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [subspaceOpen, setSubspaceOpen] = useState(false);
+  const [subspaceParentId, setSubspaceParentId] = useState(activeWorkspaceId ?? "");
+  const [subspaceName, setSubspaceName] = useState("");
+  const [subspaceDescription, setSubspaceDescription] = useState("");
+  const [creatingSubspace, setCreatingSubspace] = useState(false);
+  const [subspaceError, setSubspaceError] = useState<string | null>(null);
 
   const selected = selectedWorkspace(workspaces, selectedId, activeWorkspace);
-  const selectedKey = selectedSpaceKey(selectedId);
-  const selectedChild = childSpaces.find((space) => space.key === selectedKey) ?? null;
-  const DetailIcon = selectedChild?.icon ?? Layers3;
+  const DetailIcon = Layers3;
   const selectedIndex = selected ? Math.max(0, workspaces.findIndex((workspace) => workspace.id === selected.id)) : 0;
-  const selectedColor = selectedChild?.color ?? workspaceColor(selectedIndex);
+  const selectedColor = workspaceColor(selectedIndex);
   const members = activeMembers.length > 0 ? activeMembers : selected?.members_preview ?? [];
   const selectedMemberCount = selected?.member_count ?? members.length;
 
   const workspaceMetrics = useMemo(
     () => [
-      { label: "Members", value: selectedMemberCount || 1, icon: Users, color: selectedColor },
-      { label: "Spaces", value: childSpaces.length, icon: Layers3, color: "var(--omnix-purple)" },
-      { label: "Sources", value: "Live", icon: Database, color: "var(--omnix-green)" },
+      { label: "Members", value: selectedMemberCount, icon: Users, color: selectedColor },
+      { label: "Subspaces", value: selected?.subspaces?.length ?? 0, icon: Layers3, color: "var(--omnix-purple)" },
+      { label: "Workspace Type", value: selected?.workspace_type ?? "None", icon: Database, color: "var(--omnix-green)" },
       { label: "Invites", value: activeInvites.length || "Clear", icon: UserPlus, color: "var(--omnix-amber)" },
     ],
-    [activeInvites.length, selectedColor, selectedMemberCount],
+    [activeInvites.length, selected, selectedColor, selectedMemberCount],
   );
 
   function toggle(workspaceId: string) {
     setExpanded((current) => ({ ...current, [workspaceId]: !(current[workspaceId] ?? true) }));
   }
 
-  function choose(workspace: Workspace, key: SpaceKey) {
-    setSelectedId(selectionId(workspace.id, key));
+  function choose(workspace: Workspace) {
+    setSelectedId(selectionId(workspace.id));
     setActiveWorkspace(workspace.id);
+  }
+
+  function openSubspaceCreator(parentId?: string | null) {
+    const fallbackParent = selected?.parent_workspace_id || selected?.id || activeWorkspaceId || workspaces[0]?.id || "";
+    setSubspaceParentId(parentId || fallbackParent);
+    setSubspaceName("");
+    setSubspaceDescription("");
+    setSubspaceError(null);
+    setSubspaceOpen(true);
   }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
@@ -158,7 +134,7 @@ export default function WorkspacePage() {
         description: newDescription.trim() || undefined,
       });
       setActiveWorkspace(created.id);
-      setSelectedId(selectionId(created.id, "root"));
+      setSelectedId(selectionId(created.id));
       setExpanded((current) => ({ ...current, [created.id]: true }));
       setNewName("");
       setNewDescription("");
@@ -167,6 +143,37 @@ export default function WorkspacePage() {
       setCreateError(err instanceof Error ? err.message : "Unable to create workspace.");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleCreateSubspace(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = subspaceName.trim();
+    const parentId = subspaceParentId.trim();
+    if (!parentId) {
+      setSubspaceError("Choose a parent workspace.");
+      return;
+    }
+    if (!name) {
+      setSubspaceError("Subworkspace name is required.");
+      return;
+    }
+
+    try {
+      setCreatingSubspace(true);
+      setSubspaceError(null);
+      const created = await createSubspace(parentId, {
+        name,
+        description: subspaceDescription.trim() || undefined,
+      });
+      setExpanded((current) => ({ ...current, [parentId]: true }));
+      setActiveWorkspace(created.id);
+      setSelectedId(selectionId(created.id));
+      setSubspaceOpen(false);
+    } catch (err) {
+      setSubspaceError(err instanceof Error ? err.message : "Unable to create subworkspace.");
+    } finally {
+      setCreatingSubspace(false);
     }
   }
 
@@ -194,6 +201,16 @@ export default function WorkspacePage() {
           >
             New workspace
           </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-11 rounded-[9px] border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-4"
+            leftIcon={<Layers3 className="h-4 w-4" />}
+            disabled={workspaces.length === 0}
+            onClick={() => openSubspaceCreator()}
+          >
+            New subworkspace
+          </Button>
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[21rem_minmax(0,1fr)]">
@@ -215,7 +232,7 @@ export default function WorkspacePage() {
                 workspaces.map((workspace, index) => {
                   const color = workspaceColor(index);
                   const open = expanded[workspace.id] ?? true;
-                  const rootActive = selected?.id === workspace.id && selectedKey === "root";
+                  const rootActive = selected?.id === workspace.id;
 
                   return (
                     <div key={workspace.id}>
@@ -238,7 +255,7 @@ export default function WorkspacePage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => choose(workspace, "root")}
+                          onClick={() => choose(workspace)}
                           className="flex min-w-0 flex-1 items-center gap-2 text-left"
                         >
                           <span
@@ -258,14 +275,14 @@ export default function WorkspacePage() {
 
                       {open ? (
                         <div className="ml-5 mt-2 space-y-1.5 border-l border-cyan-300/15 pl-3">
-                          {childSpaces.map((space) => {
-                            const active = selected?.id === workspace.id && selectedKey === space.key;
-                            const Icon = space.icon;
+                          {(workspace.subspaces ?? []).length ? (workspace.subspaces ?? []).map((subspace, childIndex) => {
+                            const active = selected?.id === subspace.id;
+                            const color = workspaceColor(index + childIndex + 1);
                             return (
                               <button
-                                key={space.key}
+                                key={subspace.id}
                                 type="button"
-                                onClick={() => choose(workspace, space.key)}
+                                onClick={() => choose(subspace)}
                                 className={cn(
                                   "relative flex w-full items-center gap-2 rounded-[7px] border px-2.5 py-2 text-left transition",
                                   active
@@ -273,28 +290,32 @@ export default function WorkspacePage() {
                                     : "border-transparent hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface)]",
                                 )}
                                 style={{
-                                  background: active ? `${space.color}10` : "transparent",
-                                  borderColor: active ? `${space.color}44` : undefined,
+                                  background: active ? `${color}10` : "transparent",
+                                  borderColor: active ? `${color}44` : undefined,
                                 }}
                               >
                                 <span className="absolute -left-[13px] top-1/2 h-px w-3 -translate-y-1/2 bg-cyan-300/15" />
-                                <span className="flex h-6 w-6 items-center justify-center rounded-md border" style={{ background: `${space.color}13`, borderColor: `${space.color}33` }}>
-                                  <Icon className="h-3.5 w-3.5" style={{ color: space.color }} />
+                                <span className="flex h-6 w-6 items-center justify-center rounded-md border text-[10px] font-bold" style={{ background: `${color}13`, borderColor: `${color}33`, color }}>
+                                  {subspace.name.charAt(0).toUpperCase()}
                                 </span>
                                 <span className="min-w-0 flex-1">
-                                  <span className="block truncate text-xs font-medium text-[var(--omnix-text)]">{space.label}</span>
-                                  <span className="block truncate text-[10px] text-[var(--omnix-text-3)]">{space.desc}</span>
+                                  <span className="block truncate text-xs font-medium text-[var(--omnix-text)]">{subspace.name}</span>
+                                  <span className="block truncate text-[10px] text-[var(--omnix-text-3)]">{subspace.description || "Subspace"}</span>
                                 </span>
                               </button>
                             );
-                          })}
+                          }) : (
+                            <div className="rounded-[7px] border border-dashed border-[var(--omnix-border)] px-2.5 py-2 text-[11px] text-[var(--omnix-text-3)]">
+                              No subspaces yet
+                            </div>
+                          )}
                           <button
                             type="button"
-                            onClick={() => router.push("/settings/workspace")}
+                            onClick={() => openSubspaceCreator(workspace.id)}
                             className="flex w-full items-center gap-1.5 rounded-[7px] border border-dashed border-[var(--omnix-border)] px-2.5 py-1.5 text-left text-[11px] text-[var(--omnix-text-3)] transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-[var(--omnix-cyan)]"
                           >
                             <Plus className="h-3 w-3" />
-                            Configure hierarchy
+                            Add subworkspace
                           </button>
                         </div>
                       ) : null}
@@ -318,22 +339,22 @@ export default function WorkspacePage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="omnix-display text-2xl font-semibold text-white">
-                        {selectedChild ? selectedChild.label : selected?.name ?? "Workspace"}
+                        {selected?.name ?? "Workspace"}
                       </h2>
                       <span
                         className="rounded-full border px-2.5 py-1 text-[11px] font-semibold"
                         style={{ borderColor: `${selectedColor}44`, background: `${selectedColor}14`, color: selectedColor }}
                       >
-                        {selectedChild ? "Subspace" : "Super Workspace"}
+                        {selected?.parent_workspace_id ? "Subspace" : "Workspace"}
                       </span>
-                      {!selectedChild && selected ? (
+                      {selected ? (
                         <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-semibold", workspaceRoleBadgeClass(selected.current_user_role))}>
                           {workspaceRoleLabel(selected.current_user_role)}
                         </span>
                       ) : null}
                     </div>
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--omnix-text-2)]">
-                      {selectedChild?.desc || selected?.description || "Root workspace for shared AI sessions, sources, members, and operational context."}
+                      {selected?.description || "No workspace description set."}
                     </p>
                     {selected ? (
                       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -363,8 +384,8 @@ export default function WorkspacePage() {
                   <Button
                     type="button"
                     className="omnix-primary-action"
-                    leftIcon={selectedChild ? <Globe2 className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
-                    onClick={() => router.push(selectedChild?.href ?? "/chat")}
+                    leftIcon={<MessageSquare className="h-4 w-4" />}
+                    onClick={() => router.push("/chat")}
                   >
                     Open
                   </Button>
@@ -397,29 +418,50 @@ export default function WorkspacePage() {
                 <div className="relative z-10 mb-4 flex items-center justify-between">
                   <h3 className="omnix-display flex items-center gap-2 text-lg font-semibold text-white">
                     <Zap className="h-4 w-4 text-[var(--omnix-cyan)]" />
-                    Subspace Matrix
+                    Real Subspaces
                   </h3>
-                  <span className="text-xs text-[var(--omnix-text-3)]">Inherited from root workspace</span>
+                  <span className="text-xs text-[var(--omnix-text-3)]">Loaded from workspace hierarchy</span>
                 </div>
                 <div className="relative z-10 grid gap-3 md:grid-cols-3">
-                  {childSpaces.map((space) => {
-                    const Icon = space.icon;
+                  {(selected?.subspaces ?? []).length ? (selected?.subspaces ?? []).map((subspace, index) => {
+                    const color = workspaceColor(index + 1);
                     return (
                       <button
-                        key={space.key}
+                        key={subspace.id}
                         type="button"
-                        onClick={() => selected && choose(selected, space.key)}
+                        onClick={() => choose(subspace)}
                         className="omnix-command-button p-4 text-left"
-                        style={{ "--command-color": space.color } as CSSProperties}
+                        style={{ "--command-color": color } as CSSProperties}
                       >
-                        <span className="flex h-9 w-9 items-center justify-center rounded-lg border" style={{ background: `${space.color}14`, borderColor: `${space.color}33` }}>
-                          <Icon className="h-4 w-4" style={{ color: space.color }} />
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold" style={{ background: `${color}14`, borderColor: `${color}33`, color }}>
+                          {subspace.name.charAt(0).toUpperCase()}
                         </span>
-                        <span className="mt-4 block text-sm font-semibold text-white">{space.label}</span>
-                        <span className="mt-1 block text-xs leading-5 text-[var(--omnix-text-3)]">{space.desc}</span>
+                        <span className="mt-4 block text-sm font-semibold text-white">{subspace.name}</span>
+                        <span className="mt-1 block text-xs leading-5 text-[var(--omnix-text-3)]">
+                          {subspace.description || "No description set."}
+                        </span>
                       </button>
                     );
-                  })}
+                  }) : (
+                    <div className="col-span-full flex min-h-[150px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/15 p-6 text-center">
+                      <Layers3 className="h-8 w-8 text-cyan-200/35" />
+                      <p className="mt-3 text-sm font-semibold text-white">No subspaces yet</p>
+                      <p className="mt-1 max-w-sm text-xs leading-5 text-[var(--omnix-text-3)]">
+                        Create a subworkspace to extend this workspace hierarchy.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="mt-4 border-[var(--omnix-border)] bg-[var(--omnix-surface)]"
+                        leftIcon={<Plus className="h-4 w-4" />}
+                        disabled={!selected}
+                        onClick={() => openSubspaceCreator(selected?.parent_workspace_id || selected?.id)}
+                      >
+                        Create subworkspace
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -518,6 +560,93 @@ export default function WorkspacePage() {
                 </Button>
                 <Button type="submit" leftIcon={<Plus className="h-4 w-4" />} isLoading={creating} disabled={!newName.trim()}>
                   Create
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {subspaceOpen ? (
+        <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
+          <div className="omnix-modal-card w-full max-w-lg p-5">
+            <div className="relative z-10 flex items-start justify-between gap-4">
+              <div>
+                <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
+                  <Layers3 className="h-4 w-4" />
+                </div>
+                <h2 className="mt-4 text-lg font-semibold text-white">Create subworkspace</h2>
+                <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">
+                  Add a real child workspace under an existing parent. It will appear in the hierarchy after creation.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                aria-label="Close create subworkspace modal"
+                title="Close create subworkspace modal"
+                onClick={() => setSubspaceOpen(false)}
+                disabled={creatingSubspace}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <form className="relative z-10 mt-5 space-y-4" onSubmit={handleCreateSubspace}>
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-200">Parent workspace</span>
+                <select
+                  value={subspaceParentId}
+                  onChange={(event) => {
+                    setSubspaceParentId(event.target.value);
+                    setSubspaceError(null);
+                  }}
+                  disabled={creatingSubspace}
+                  className="omnix-input h-11 w-full rounded-lg bg-black/20 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">Choose parent</option>
+                  {workspaces.map((workspace) => (
+                    <option key={workspace.id} value={workspace.id}>
+                      {workspace.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Input
+                id="subworkspace-name"
+                label="Subworkspace name"
+                value={subspaceName}
+                onChange={(event) => {
+                  setSubspaceName(event.target.value);
+                  setSubspaceError(null);
+                }}
+                disabled={creatingSubspace}
+                autoFocus
+              />
+              <label className="block">
+                <span className="text-sm font-medium text-slate-200">Description</span>
+                <textarea
+                  value={subspaceDescription}
+                  onChange={(event) => setSubspaceDescription(event.target.value)}
+                  disabled={creatingSubspace}
+                  rows={3}
+                  className="omnix-input mt-2 w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  placeholder="Focused space for a team, project, or knowledge domain."
+                />
+              </label>
+              {subspaceError ? (
+                <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
+                  {subspaceError}
+                </div>
+              ) : null}
+              <div className="flex items-center justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={() => setSubspaceOpen(false)} disabled={creatingSubspace}>
+                  Cancel
+                </Button>
+                <Button type="submit" leftIcon={<Plus className="h-4 w-4" />} isLoading={creatingSubspace} disabled={!subspaceName.trim() || !subspaceParentId}>
+                  Create subworkspace
                 </Button>
               </div>
             </form>
