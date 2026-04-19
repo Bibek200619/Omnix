@@ -25,6 +25,7 @@ import { apiClient } from "@/lib/api";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { initialsFromText, workspaceRoleLabel } from "@/lib/workspace-roles";
+import { WorkspaceIntelligencePanel } from "@/components/workspace/WorkspaceIntelligencePanel";
 
 type FileData = {
   id: string;
@@ -45,7 +46,15 @@ function roleCssClass(role?: string | null) {
 export default function DashboardPage() {
   const router = useRouter();
   const { conversations, loading: conversationsLoading } = useConversationHistory();
-  const { activeWorkspace, activeMembers, activeInvites, pendingInvites, workspaces } = useWorkspace();
+  const {
+    activeWorkspace,
+    activeMembers,
+    activeInvites,
+    pendingInvites,
+    workspaces,
+    activeWorkspaceIntelligence,
+    intelligenceLoading,
+  } = useWorkspace();
   const [files, setFiles] = useState<FileData[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [filesError, setFilesError] = useState<string | null>(null);
@@ -238,6 +247,12 @@ export default function DashboardPage() {
             );
           })}
         </div>
+
+        <WorkspaceIntelligencePanel
+          profile={activeWorkspaceIntelligence}
+          loading={intelligenceLoading}
+          compact
+        />
 
         {/* ── Main grid ── */}
         <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
