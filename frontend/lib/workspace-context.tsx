@@ -8,6 +8,8 @@ import {
   getWorkspaceInviteId,
   type Workspace,
   type WorkspaceCreatePayload,
+  type WorkspaceIntelligenceProfile,
+  type WorkspaceIntelligenceUpdatePayload,
   type WorkspaceInvite,
   type WorkspaceMember,
   type WorkspaceRole,
@@ -30,9 +32,11 @@ type WorkspaceContextType = {
   activeMembers: WorkspaceMember[];
   activeInvites: WorkspaceInvite[];
   pendingInvites: WorkspaceInvite[];
+  activeWorkspaceIntelligence: WorkspaceIntelligenceProfile | null;
   membersLoading: boolean;
   invitesLoading: boolean;
   pendingInvitesLoading: boolean;
+  intelligenceLoading: boolean;
   subspaceLoadingByParentId: Record<string, boolean>;
   subspaceErrorByParentId: Record<string, string | null>;
   setActiveWorkspace: (id: string | null) => void;
@@ -40,6 +44,8 @@ type WorkspaceContextType = {
   refreshWorkspaceTree: (workspaceId: string, options?: RefreshOptions) => Promise<Workspace | null>;
   refreshWorkspaceSubspaces: (workspaceId: string, options?: RefreshOptions) => Promise<Workspace[]>;
   refreshActiveWorkspaceData: (options?: RefreshOptions) => Promise<void>;
+  refreshWorkspaceIntelligence: (options?: RefreshOptions) => Promise<WorkspaceIntelligenceProfile | null>;
+  updateWorkspaceIntelligence: (payload: WorkspaceIntelligenceUpdatePayload) => Promise<WorkspaceIntelligenceProfile>;
   refreshPendingInvites: (options?: RefreshOptions) => Promise<void>;
   createWorkspace: (payload: WorkspaceCreatePayload) => Promise<Workspace>;
   createSubspace: (parentId: string, payload: WorkspaceSubspaceCreatePayload) => Promise<Workspace>;
@@ -139,6 +145,21 @@ function normalizeWorkspaceRecord(record: WorkspaceApiRecord, parentFromTree?: s
     parent_workspace_id: parentWorkspaceId,
     workspace_type: normalizeWorkspaceType(record.workspace_type, parentWorkspaceId),
     is_global: Boolean(record.is_global),
+    expertise_area: record.expertise_area ?? null,
+    ai_specialization:
+      record.ai_specialization === "research" ||
+      record.ai_specialization === "coding" ||
+      record.ai_specialization === "design" ||
+      record.ai_specialization === "strategy" ||
+      record.ai_specialization === "analytics" ||
+      record.ai_specialization === "general"
+        ? record.ai_specialization
+        : "general",
+    ai_instructions: record.ai_instructions ?? null,
+    intelligence_preferences:
+      record.intelligence_preferences && typeof record.intelligence_preferences === "object"
+        ? record.intelligence_preferences
+        : {},
     current_user_role: normalizeWorkspaceRole(record.current_user_role),
     member_count: memberCount,
     is_shared: Boolean(record.is_shared ?? memberCount > 1),
@@ -328,9 +349,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [activeMembers, setActiveMembers] = useState<WorkspaceMember[]>([]);
   const [activeInvites, setActiveInvites] = useState<WorkspaceInvite[]>([]);
   const [pendingInvites, setPendingInvites] = useState<WorkspaceInvite[]>([]);
+  const [activeWorkspaceIntelligence, setActiveWorkspaceIntelligence] = useState<WorkspaceIntelligenceProfile | null>(null);
   const [membersLoading, setMembersLoading] = useState(false);
   const [invitesLoading, setInvitesLoading] = useState(false);
   const [pendingInvitesLoading, setPendingInvitesLoading] = useState(false);
+  const [intelligenceLoading, setIntelligenceLoading] = useState(false);
   const [subspaceLoadingByParentId, setSubspaceLoadingByParentId] = useState<Record<string, boolean>>({});
   const [subspaceErrorByParentId, setSubspaceErrorByParentId] = useState<Record<string, string | null>>({});
   const workspaceFetchIdRef = useRef(0);
@@ -340,6 +363,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const subspaceRefreshInFlightRef = useRef<Map<string, Promise<Workspace[]>>>(new Map());
   const pendingInvitesInFlightRef = useRef<Promise<void> | null>(null);
   const activeWorkspaceDataInFlightRef = useRef<Promise<void> | null>(null);
+  const workspaceIntelligenceInFlightRef = useRef<Promise<WorkspaceIntelligenceProfile | null> | null>(null);
   const lastWorkspaceRefreshAtRef = useRef(0);
   const lastPendingInvitesRefreshAtRef = useRef(0);
   const lastActiveWorkspaceDataRefreshAtRef = useRef(0);
@@ -612,6 +636,63 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     return request;
   }, [activeWorkspace, activeWorkspaceId]);
 
+  const refreshWorkspaceIntelligence = useCallback(async (options?: RefreshOptions) => {
+    if (!activeWorkspaceId) {
+      setActiveWorkspaceIntelligence(null);
+      return null;
+    }
+
+    if (workspaceIntelligenceInFlightRef.current) {
+      return workspaceIntelligenceInFlightRef.current;
+    }
+
+    const request = (async () => {
+      try {
+        if (!options?.silent) {
+          setIntelligenceLoading(true);
+        }
+        const profile = await apiClient.get<WorkspaceIntelligenceProfile>(`/workspaces/${activeWorkspaceId}/intelligence`);
+        setActiveWorkspaceIntelligence(profile);
+        return profile;
+      } catch (err) {
+        console.error("Failed to load workspace intelligence", err);
+        if (!options?.silent) {
+          setActiveWorkspaceIntelligence(null);
+        }
+        return null;
+      } finally {
+        if (!options?.silent) {
+          setIntelligenceLoading(false);
+        }
+        workspaceIntelligenceInFlightRef.current = null;
+      }
+    })();
+
+    workspaceIntelligenceInFlightRef.current = request;
+    return request;
+  }, [activeWorkspaceId]);
+
+  const updateWorkspaceIntelligence = useCallback(async (payload: WorkspaceIntelligenceUpdatePayload) => {
+    if (!activeWorkspaceId) {
+      throw new Error("Select a workspace first.");
+    }
+    const profile = await apiClient.patch<WorkspaceIntelligenceProfile>(
+      `/workspaces/${activeWorkspaceId}/intelligence`,
+      payload,
+    );
+    setActiveWorkspaceIntelligence(profile);
+    setWorkspaces((current) =>
+      patchWorkspaceInTree(current, activeWorkspaceId, (workspace) => ({
+        ...workspace,
+        expertise_area: profile.expertise_area ?? null,
+        ai_specialization: profile.ai_specialization,
+        ai_instructions: profile.ai_instructions ?? null,
+        intelligence_preferences: profile.intelligence_preferences ?? {},
+      })),
+    );
+    return profile;
+  }, [activeWorkspaceId]);
+
   const createWorkspace = useCallback(async (payload: WorkspaceCreatePayload) => {
     const normalizedPayload = {
       ...payload,
@@ -843,6 +924,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setActiveMembers([]);
       setActiveInvites([]);
       setPendingInvites([]);
+      setActiveWorkspaceIntelligence(null);
       setSubspaceLoadingByParentId({});
       setSubspaceErrorByParentId({});
       setLoading(false);
@@ -917,6 +999,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     void refreshActiveWorkspaceData({ force: true });
   }, [refreshActiveWorkspaceData]);
 
+  useEffect(() => {
+    workspaceIntelligenceInFlightRef.current = null;
+    void refreshWorkspaceIntelligence({ force: true });
+  }, [refreshWorkspaceIntelligence]);
+
   const value = useMemo(
     () => ({
       workspaces,
@@ -928,9 +1015,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       activeMembers,
       activeInvites,
       pendingInvites,
+      activeWorkspaceIntelligence,
       membersLoading,
       invitesLoading,
       pendingInvitesLoading,
+      intelligenceLoading,
       subspaceLoadingByParentId,
       subspaceErrorByParentId,
       setActiveWorkspace,
@@ -938,6 +1027,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       refreshWorkspaceTree,
       refreshWorkspaceSubspaces,
       refreshActiveWorkspaceData,
+      refreshWorkspaceIntelligence,
+      updateWorkspaceIntelligence,
       refreshPendingInvites,
       createWorkspace,
       createSubspace,
@@ -960,9 +1051,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       activeMembers,
       activeInvites,
       pendingInvites,
+      activeWorkspaceIntelligence,
       membersLoading,
       invitesLoading,
       pendingInvitesLoading,
+      intelligenceLoading,
       subspaceLoadingByParentId,
       subspaceErrorByParentId,
       setActiveWorkspace,
@@ -970,6 +1063,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       refreshWorkspaceTree,
       refreshWorkspaceSubspaces,
       refreshActiveWorkspaceData,
+      refreshWorkspaceIntelligence,
+      updateWorkspaceIntelligence,
       refreshPendingInvites,
       createWorkspace,
       createSubspace,

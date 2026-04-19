@@ -329,6 +329,7 @@ export function ChatInterface() {
     activeWorkspace,
     activeMembers,
     activeWorkspaceId,
+    activeWorkspaceIntelligence,
     refreshActiveWorkspaceData,
   } = useWorkspace();
   const {
@@ -613,8 +614,10 @@ export function ChatInterface() {
       },
       {
         icon: Database,
-        label: "Memory",
-        value: activeWorkspace?.is_shared
+        label: "AI context",
+        value: activeWorkspaceIntelligence
+          ? `${activeWorkspaceIntelligence.workspace_name} knowledge`
+          : activeWorkspace?.is_shared
           ? `Shared with ${activeWorkspace.member_count} members`
           : "Private to this workspace",
         color: "text-emerald-200",
@@ -634,8 +637,10 @@ export function ChatInterface() {
       },
       {
         icon: ShieldCheck,
-        label: "Access",
-        value: isWorkspaceFounderRole(activeWorkspace?.current_user_role)
+        label: "Intelligence",
+        value: activeWorkspaceIntelligence
+          ? `${activeWorkspaceIntelligence.source_count} sources active`
+          : isWorkspaceFounderRole(activeWorkspace?.current_user_role)
           ? "Founder controls"
           : activeWorkspace?.current_user_role
           ? workspaceRoleLabel(activeWorkspace.current_user_role)
@@ -643,7 +648,7 @@ export function ChatInterface() {
         color: "text-amber-200",
       },
     ],
-    [activeWorkspace, searchMode, session?.user?.email],
+    [activeWorkspace, activeWorkspaceIntelligence, searchMode, session?.user?.email],
   );
 
   const sendMessage = useCallback(
