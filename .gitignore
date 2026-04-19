@@ -20,6 +20,7 @@ Thumbs.db
 
 # Python / Backend
 __pycache__/
+*.pyc
 *.py[cod]
 *$py.class
 venv/
@@ -42,10 +43,3 @@ dist/
 
 # Uploads and User Data
 uploads/
-# Environment files
-.env
-.env.local
-backend/.env
-frontend/.env
-frontend/.env.local
-
