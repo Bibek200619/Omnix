@@ -4,23 +4,19 @@ import dynamic from "next/dynamic";
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useState } from "react";
 import {
-  BookOpen,
-  ClipboardList,
-  Cloud,
   Database,
   Download,
   FileText,
   FileUp,
-  Github,
-  Globe2,
+  GitBranch,
   HardDrive,
   LayoutGrid,
+  Link2,
   List,
-  MessageSquare,
   Plus,
   Search,
+  Server,
   ShieldCheck,
-  Ticket,
   Trash2,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
@@ -42,22 +38,27 @@ interface FileData {
   storage_path?: string;
 }
 
+type SourceType = "file" | "drive" | "database" | "knowledge" | "repository";
+
+const sourceTypes: Array<{
+  id: SourceType;
+  title: string;
+  description: string;
+  icon: typeof FileText;
+  color: string;
+}> = [
+  { id: "file", title: "File upload", description: "PDF, DOCX, TXT, Markdown", icon: FileUp, color: "var(--omnix-cyan)" },
+  { id: "drive", title: "Company drive link", description: "Shared Drive, SharePoint, or folder URL", icon: HardDrive, color: "var(--omnix-purple)" },
+  { id: "database", title: "External database", description: "Connection request for structured data", icon: Server, color: "var(--omnix-green)" },
+  { id: "knowledge", title: "Knowledge link", description: "Internal docs, wiki, or policy URL", icon: Link2, color: "var(--omnix-amber)" },
+  { id: "repository", title: "File repository", description: "Git or company repository path", icon: GitBranch, color: "var(--omnix-pink)" },
+];
+
 function formatFileSize(size?: number) {
   if (!size) return "Unknown size";
   if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
-
-const connectors = [
-  { name: "Notion", Icon: BookOpen, status: "Available", color: "#00FFFF" },
-  { name: "Google Drive", Icon: HardDrive, status: "Available", color: "#9b5cff" },
-  { name: "Confluence", Icon: Globe2, status: "Available", color: "#00e87a" },
-  { name: "Jira", Icon: ClipboardList, status: "Available", color: "#ffb800" },
-  { name: "Slack", Icon: MessageSquare, status: "Available", color: "#3366ff" },
-  { name: "GitHub", Icon: Github, status: "Available", color: "#00FFFF" },
-  { name: "Salesforce", Icon: Cloud, status: "Coming soon", color: "#9b5cff" },
-  { name: "Zendesk", Icon: Ticket, status: "Coming soon", color: "#00e87a" },
-];
 
 export default function FilesPage() {
   const { activeWorkspace, activeMembers, activeWorkspaceId } = useWorkspace();
@@ -66,6 +67,10 @@ export default function FilesPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
+  const [activeType, setActiveType] = useState<SourceType>("file");
+  const [connectorValue, setConnectorValue] = useState("");
+  const [connectorNote, setConnectorNote] = useState("");
+  const [connectorMessage, setConnectorMessage] = useState<string | null>(null);
   const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
   const filteredFiles = files.filter((file) => {
     const name = file.file_name ?? file.filename ?? "";
@@ -119,6 +124,34 @@ export default function FilesPage() {
     }
   }
 
+  function handleConnectorRequest() {
+    const value = connectorValue.trim();
+    if (!value) {
+      setConnectorMessage("Add a link, connection string, or repository path before saving this source request.");
+      return;
+    }
+
+    const request = {
+      id: crypto.randomUUID(),
+      type: activeType,
+      value,
+      note: connectorNote.trim(),
+      workspaceId: activeWorkspaceId,
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      const key = `omnix.sourceRequests.${activeWorkspaceId ?? "global"}`;
+      const existing = JSON.parse(window.localStorage.getItem(key) || "[]");
+      const next = Array.isArray(existing) ? [request, ...existing] : [request];
+      window.localStorage.setItem(key, JSON.stringify(next));
+    } catch {
+      // Non-file connector requests are UI-only until backend ingestion endpoints exist.
+    }
+    setConnectorValue("");
+    setConnectorNote("");
+    setConnectorMessage("Connector request saved locally. Backend ingestion for this source type is not configured yet.");
+  }
+
   return (
     <section className="omnix-page-frame omnix-scrollbar">
       <div className="omnix-content-max flex flex-col gap-[18px]">
@@ -147,11 +180,48 @@ export default function FilesPage() {
         ) : null}
       </div>
 
+      <div className="omnix-cinematic-card p-5">
+        <div className="relative z-10 mb-4">
+          <h2 className="omnix-display text-[16px] font-bold text-white">Knowledge connector hub</h2>
+          <p className="mt-1 text-sm text-[var(--omnix-text-3)]">
+            Choose how this workspace should receive knowledge. File upload is live; other connectors are captured as setup requests until backend ingestion is enabled.
+          </p>
+        </div>
+        <div className="relative z-10 grid gap-2 md:grid-cols-5">
+          {sourceTypes.map((type) => {
+            const Icon = type.icon;
+            const active = activeType === type.id;
+            return (
+              <button
+                key={type.id}
+                type="button"
+                onClick={() => {
+                  setActiveType(type.id);
+                  setConnectorMessage(null);
+                }}
+                className="group rounded-xl border p-3 text-left transition hover:-translate-y-0.5"
+                style={{
+                  background: active ? `${type.color}12` : "rgba(255,255,255,0.025)",
+                  borderColor: active ? `${type.color}55` : "rgba(255,255,255,0.07)",
+                  boxShadow: active ? `0 0 22px ${type.color}18` : "none",
+                }}
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg border" style={{ background: `${type.color}14`, borderColor: `${type.color}33`, color: type.color }}>
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="mt-3 block text-sm font-semibold text-white">{type.title}</span>
+                <span className="mt-1 block text-[11px] leading-5 text-[var(--omnix-text-3)]">{type.description}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid gap-3 md:grid-cols-3">
         {[
-          { label: "Uploaded sources", value: files.length || "Ready", icon: FileText, color: "var(--omnix-cyan)" },
+          { label: "Uploaded sources", value: files.length, icon: FileText, color: "var(--omnix-cyan)" },
           { label: "Workspace access", value: activeWorkspace?.is_shared ? "Shared" : "Private", icon: ShieldCheck, color: "var(--omnix-green)" },
-          { label: "Retrieval state", value: loading ? "Syncing" : "Live", icon: Database, color: "var(--omnix-purple)" },
+          { label: "Retrieval state", value: loading ? "Syncing" : files.length ? "Indexed" : "No sources", icon: Database, color: "var(--omnix-purple)" },
         ].map((stat) => {
           const Icon = stat.icon;
           return (
@@ -200,6 +270,7 @@ export default function FilesPage() {
         </div>
         <button
           type="button"
+          onClick={() => document.getElementById("workspace-upload-dropzone")?.scrollIntoView({ behavior: "smooth", block: "center" })}
           className="inline-flex h-9 items-center gap-1.5 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-cyan)] bg-transparent px-4 text-xs font-bold text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] transition hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)]"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -207,9 +278,62 @@ export default function FilesPage() {
         </button>
       </div>
 
-      <div className="omnix-cinematic-card p-4">
-        <UploadDropzone />
-      </div>
+      {activeType === "file" ? (
+        <div id="workspace-upload-dropzone" className="omnix-cinematic-card p-4">
+          <UploadDropzone />
+        </div>
+      ) : (
+        <div className="omnix-cinematic-card p-5">
+          <div className="relative z-10 grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <div>
+              <h2 className="omnix-display text-[15px] font-bold text-white">
+                {sourceTypes.find((type) => type.id === activeType)?.title}
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-3)]">
+                Add the source location or connection detail. Omnix will keep the request available in this browser until a production connector endpoint is added.
+              </p>
+              <div className="mt-4 grid gap-3">
+                <input
+                  value={connectorValue}
+                  onChange={(event) => {
+                    setConnectorValue(event.target.value);
+                    setConnectorMessage(null);
+                  }}
+                  placeholder={
+                    activeType === "database"
+                      ? "Database host, connection alias, or secure setup reference"
+                      : activeType === "repository"
+                      ? "Repository URL or internal repo path"
+                      : "https://company.example.com/source"
+                  }
+                  className="omnix-input h-10 w-full rounded-lg px-3 text-sm"
+                />
+                <textarea
+                  value={connectorNote}
+                  onChange={(event) => setConnectorNote(event.target.value)}
+                  rows={3}
+                  placeholder="Access notes, schema scope, folder path, or ingestion instructions"
+                  className="omnix-input w-full resize-none rounded-lg px-3 py-2 text-sm"
+                />
+                {connectorMessage ? (
+                  <div className="rounded-lg border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-sm text-cyan-100">
+                    {connectorMessage}
+                  </div>
+                ) : null}
+                <Button type="button" leftIcon={<Plus className="h-4 w-4" />} onClick={handleConnectorRequest}>
+                  Save connector request
+                </Button>
+              </div>
+            </div>
+            <div className="rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/15 p-4">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Backend status</div>
+              <p className="mt-3 text-sm leading-6 text-[var(--omnix-text-2)]">
+                This connector type is not connected to an ingestion API yet. Existing file upload remains the production ingestion path.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="omnix-cinematic-card p-5">
         <h2 className="relative z-10 flex items-center gap-2 text-sm font-semibold text-white">
@@ -232,6 +356,14 @@ export default function FilesPage() {
             <p className="mt-4 text-sm font-semibold text-white">No files uploaded yet.</p>
             <p className="mt-1 max-w-sm text-sm leading-6 text-[var(--omnix-text-2)]">
               Drop a document above to make it available to Omnix retrieval.
+            </p>
+          </div>
+        ) : filteredFiles.length === 0 ? (
+          <div className="relative z-10 mt-4 flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 p-6 text-center">
+            <Search className="h-7 w-7 text-cyan-200/35" />
+            <p className="mt-3 text-sm font-semibold text-white">No sources match this search.</p>
+            <p className="mt-1 max-w-sm text-sm leading-6 text-[var(--omnix-text-2)]">
+              Clear the search field to view all uploaded workspace files.
             </p>
           </div>
         ) : (
@@ -257,41 +389,6 @@ export default function FilesPage() {
         )}
       </div>
 
-      <div className="omnix-cinematic-card p-5">
-        <div className="relative z-10 mb-4">
-          <h2 className="omnix-display text-[15px] font-bold text-white">Add Connector</h2>
-          <p className="mt-1 text-[11px] text-white/35">Connect your tools and sync data automatically</p>
-        </div>
-        <div className="relative z-10 grid gap-2.5 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
-          {connectors.map((connector) => {
-            const Icon = connector.Icon;
-            return (
-              <button
-                key={connector.name}
-                type="button"
-                disabled={connector.status !== "Available"}
-                className="flex flex-col items-center gap-2 rounded-[var(--omnix-radius-sm)] border border-white/[0.06] bg-white/[0.02] px-2 py-3.5 text-center transition hover:-translate-y-0.5 disabled:cursor-default disabled:opacity-40"
-                style={{ "--connector-color": connector.color } as CSSProperties}
-              >
-                <span
-                  className="flex h-8 w-8 items-center justify-center rounded-[9px] border"
-                  style={{
-                    background: `${connector.color}12`,
-                    borderColor: `${connector.color}22`,
-                    boxShadow: `0 0 8px ${connector.color}15`,
-                  }}
-                >
-                  <Icon className="h-4 w-4" style={{ color: connector.color }} />
-                </span>
-                <span className="text-[10px] text-white/45">{connector.name}</span>
-                {connector.status === "Coming soon" ? (
-                  <span className="text-[8px] font-semibold text-white/25">SOON</span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      </div>
       </div>
     </section>
   );

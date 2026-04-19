@@ -2,8 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { FileText, MessageSquare, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { MessageSquare } from "lucide-react";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import type { Message } from "@/components/chat/types";
@@ -13,15 +12,8 @@ type MessageListProps = {
   loading: boolean;
   loadingConversation?: boolean;
   onRetry?: (message: Message) => void;
-  onPromptSelect?: (prompt: string) => void;
   onRegenerate?: (assistantMessageId: string) => void;
 };
-
-const suggestedPrompts = [
-  "Summarize the onboarding notes in plain English.",
-  "Turn this customer question into a source-backed answer.",
-  "Create a concise implementation checklist.",
-];
 
 function ConversationSkeleton() {
   return (
@@ -47,7 +39,6 @@ export function MessageList({
   loading,
   loadingConversation = false,
   onRetry,
-  onPromptSelect,
   onRegenerate,
 }: MessageListProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -84,26 +75,6 @@ export function MessageList({
           Start from a document, a customer question, or a knowledge gap. Omnix
           will save the thread and return a backend response.
         </p>
-        <div className="mt-6 grid w-full max-w-2xl gap-2 sm:grid-cols-3">
-          {suggestedPrompts.map((prompt, index) => (
-            <Button
-              key={prompt}
-              type="button"
-              variant="secondary"
-              className="omnix-card-hover h-auto min-h-20 whitespace-normal rounded-xl border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 py-3 text-left text-sm leading-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] hover:-translate-y-0.5"
-              leftIcon={
-                index === 0 ? (
-                  <FileText className="h-4 w-4 shrink-0" />
-                ) : (
-                  <Sparkles className="h-4 w-4 shrink-0" />
-                )
-              }
-              onClick={() => onPromptSelect?.(prompt)}
-            >
-              {prompt}
-            </Button>
-          ))}
-        </div>
       </motion.div>
     );
   }
