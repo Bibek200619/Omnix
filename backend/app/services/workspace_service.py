@@ -36,9 +36,9 @@ MEMBERS_PREVIEW_LIMIT = 3
 
 WorkspaceRole = Literal["founder", "co_owner", "member"]
 WorkspaceInviteStatus = Literal["pending", "accepted", "declined", "revoked"]
-WorkspaceType = Literal["workspace", "super", "sub"]
+WorkspaceType = Literal["workspace", "super_workspace", "subworkspace", "global_workspace"]
 WorkspaceAIMode = Literal["research", "coding", "design", "strategy", "analytics", "general"]
-WORKSPACE_TYPES: set[str] = {"workspace", "super", "sub"}
+WORKSPACE_TYPES: set[str] = {"workspace", "super_workspace", "subworkspace", "global_workspace", "super", "sub"}
 WORKSPACE_AI_MODES: set[str] = {"research", "coding", "design", "strategy", "analytics", "general"}
 GLOBAL_SPACE_NAME = "Global"
 
@@ -96,11 +96,21 @@ def normalize_email(email: str) -> str:
 
 def normalize_workspace_type(value: Any, *, parent_workspace_id: str | None = None) -> WorkspaceType:
     workspace_type = str(value or "").strip().lower().replace("-", "_")
+    if workspace_type == "super":
+        return "super_workspace"
+    if workspace_type == "sub":
+        return "subworkspace"
+    if workspace_type == "global":
+        return "global_workspace"
+    if workspace_type == "workspace":
+        return "workspace"
+
     if workspace_type in WORKSPACE_TYPES:
         return workspace_type  # type: ignore[return-value]
+
     if parent_workspace_id:
-        return "sub"
-    return "workspace"
+        return "subworkspace"
+    return "super_workspace"
 
 
 def normalize_workspace_record(workspace: dict[str, Any]) -> dict[str, Any]:
@@ -161,12 +171,12 @@ def normalize_intelligence_preferences(
 
 def is_super_workspace(workspace: dict[str, Any]) -> bool:
     normalized = normalize_workspace_record(workspace)
-    return normalized["workspace_type"] == "super" and normalized.get("parent_workspace_id") is None
+    return normalized["workspace_type"] == "super_workspace" and normalized.get("parent_workspace_id") is None
 
 
 def is_subspace(workspace: dict[str, Any]) -> bool:
     normalized = normalize_workspace_record(workspace)
-    return normalized["workspace_type"] == "sub" or normalized.get("parent_workspace_id") is not None
+    return normalized["workspace_type"] in {"subworkspace", "global_workspace"} or normalized.get("parent_workspace_id") is not None
 
 
 def _workspace_validation_error(detail: str) -> HTTPException:
@@ -800,7 +810,7 @@ async def ensure_global_space_for_super_workspace(
             user_id=str(super_workspace["user_id"]),
             name=GLOBAL_SPACE_NAME,
             description="Company-wide collaboration and announcements.",
-            workspace_type="sub",
+            workspace_type="global_workspace",
             parent_workspace_id=str(super_workspace["id"]),
             is_global=True,
             timestamp=timestamp or utc_now_iso(),
@@ -840,9 +850,9 @@ async def create_subspace_for_user(
             user_id=user_id,
             name=name,
             description=description,
-            workspace_type="sub",
+            workspace_type="global_workspace" if is_global else "subworkspace",
             parent_workspace_id=parent_workspace_id,
-            is_global=False,
+            is_global=is_global,
             timestamp=timestamp or utc_now_iso(),
         ),
     )
@@ -863,7 +873,7 @@ async def create_workspace_for_user(
     user_id: str,
     name: str,
     description: str | None = None,
-    workspace_type: Any = "workspace",
+    workspace_type: Any = "super_workspace",
     parent_workspace_id: str | None = None,
     is_global: bool = False,
 ) -> dict[str, Any]:
@@ -877,7 +887,7 @@ async def create_workspace_for_user(
     )
     timestamp = utc_now_iso()
 
-    if normalized_type == "sub":
+    if normalized_type in {"subworkspace", "global_workspace"}:
         return await create_subspace_for_user(
             user_id=user_id,
             parent_workspace_id=parent_workspace_id,
@@ -914,7 +924,7 @@ async def create_workspace_for_user(
             timestamp=timestamp,
         )
 
-        if normalized_type == "super":
+        if normalized_type == "super_workspace":
             global_space = await ensure_global_space_for_super_workspace(
                 workspace,
                 timestamp=timestamp,
@@ -967,16 +977,14 @@ async def validate_workspace_relationship(
     parent_workspace_id = workspace.get("parent_workspace_id")
     errors: list[str] = []
 
-    if workspace_type == "super" and parent_workspace_id:
+    if workspace_type == "super_workspace" and parent_workspace_id:
         errors.append("Super workspaces cannot have a parent workspace.")
-    if workspace_type == "workspace" and parent_workspace_id:
-        errors.append("Flat workspaces cannot have a parent workspace.")
-    if workspace.get("is_global") and workspace_type != "sub":
+    if workspace.get("is_global") and workspace_type not in {"subworkspace", "global_workspace"}:
         errors.append("Only subspaces can be marked global.")
     if parent_workspace_id and str(parent_workspace_id) == str(workspace["id"]):
         errors.append("A workspace cannot be its own parent.")
 
-    if workspace_type == "sub":
+    if workspace_type in {"subworkspace", "global_workspace"}:
         if not parent_workspace_id:
             errors.append("Subspaces require a parent workspace.")
         else:
