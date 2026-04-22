@@ -29,13 +29,14 @@ type CollaborationContextType = {
   refreshPresence: () => Promise<WorkspacePresenceSnapshot | null>;
   refreshActivity: () => Promise<WorkspaceActivityEvent[]>;
   refreshLiveStatuses: () => Promise<Record<string, WorkspaceLiveStatus>>;
+  leaveWorkspace: (workspaceId?: string | null) => Promise<void>;
   sendTypingSignal: (conversationId?: string | null, isTyping?: boolean) => Promise<void>;
   statusForWorkspace: (workspaceId?: string | null) => WorkspaceLiveStatus | null;
 };
 
 const CollaborationContext = createContext<CollaborationContextType | undefined>(undefined);
 
-const PRESENCE_INTERVAL_MS = 18_000;
+const PRESENCE_INTERVAL_MS = 22_000; // Increased slightly for better efficiency
 const ACTIVITY_INTERVAL_MS = 28_000;
 const STATUS_INTERVAL_MS = 30_000;
 const TYPING_THROTTLE_MS = 2_500;
@@ -136,6 +137,21 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     }
   }, [session]);
 
+  const leaveWorkspace = useCallback(async (wid?: string | null) => {
+    const targetId = wid || activeWorkspaceId;
+    if (!session || !targetId) return;
+
+    try {
+      // Use DELETE endpoint we added in backend
+      await apiClient.delete(`/workspaces/${targetId}/presence`);
+      if (targetId === activeWorkspaceId) {
+        setPresence(null);
+      }
+    } catch (err) {
+      console.warn("Unable to leave workspace presence", err);
+    }
+  }, [activeWorkspaceId, session]);
+
   const sendTypingSignal = useCallback(
     async (conversationId?: string | null, isTyping = true) => {
       if (!session || !activeWorkspaceId) return;
@@ -173,7 +189,13 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     void refreshPresence();
     void refreshActivity();
     void refreshLiveStatuses();
-  }, [refreshActivity, refreshLiveStatuses, refreshPresence]);
+
+    return () => {
+      if (activeWorkspaceId) {
+        void leaveWorkspace(activeWorkspaceId);
+      }
+    };
+  }, [activeWorkspaceId, leaveWorkspace, refreshActivity, refreshLiveStatuses, refreshPresence]);
 
   useEffect(() => {
     if (!session) return;
@@ -228,6 +250,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       refreshPresence,
       refreshActivity,
       refreshLiveStatuses,
+      leaveWorkspace,
       sendTypingSignal,
       statusForWorkspace: (workspaceId?: string | null) =>
         workspaceId ? liveStatuses[workspaceId] ?? null : null,
@@ -241,6 +264,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       refreshActivity,
       refreshLiveStatuses,
       refreshPresence,
+      leaveWorkspace,
       sendTypingSignal,
     ],
   );

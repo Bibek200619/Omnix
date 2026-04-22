@@ -37,6 +37,11 @@ async def run_automation_job(automation: dict[str, Any]) -> dict[str, Any]:
             logger.exception("Failed to persist automation artifact")
             results["artifact"] = None
 
+    elif job_type == "cleanup_stale_presence":
+        from ..services.workspace_collaboration_service import cleanup_stale_presence
+        count = await cleanup_stale_presence()
+        results["cleaned_count"] = count
+
     else:
         logger.warning("Unknown automation job_type: %s", job_type)
         results["error"] = "unknown job_type"

@@ -133,6 +133,24 @@ def _apply_filters(
     for column, value in filters.items():
         if isinstance(value, (list, tuple, set)):
             query = query.in_(column, list(value))
+        elif isinstance(value, dict):
+            # Support operator filters like {"lt": "..."}
+            for op, val in value.items():
+                if op == "lt":
+                    query = query.lt(column, val)
+                elif op == "gt":
+                    query = query.gt(column, val)
+                elif op == "lte":
+                    query = query.lte(column, val)
+                elif op == "gte":
+                    query = query.gte(column, val)
+                elif op == "eq":
+                    query = query.eq(column, val)
+                elif op == "neq":
+                    query = query.neq(column, val)
+                else:
+                    logger.warning("Unsupported filter operator: %s", op)
+                    query = query.eq(column, val)
         else:
             query = query.eq(column, value)
     return query
