@@ -1,6 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import { BrainCircuit, Database, FileText, Globe2, Layers3, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WorkspaceIntelligenceProfile } from "@/lib/workspace-types";
