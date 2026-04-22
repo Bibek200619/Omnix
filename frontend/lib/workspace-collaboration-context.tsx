@@ -198,7 +198,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     setRealtimeStatus("connecting");
 
     // Presence Subscription
-    const presenceChannel = realtimeRegistry.subscribe(
+    realtimeRegistry.subscribe(
       { type: "presence", workspaceId: activeWorkspaceId },
       (channel) =>
         channel
