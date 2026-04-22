@@ -109,7 +109,7 @@ function WorkspaceSelector() {
     deleteWorkspace,
     inviteToActiveWorkspace,
   } = useWorkspace();
-  const { presence, statusForWorkspace } = useWorkspaceCollaboration();
+  const { presence, statusForWorkspace, realtimeStatus } = useWorkspaceCollaboration();
   const [open, setOpen] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showCreateSubspaceModal, setShowCreateSubspaceModal] = useState(false);
@@ -400,6 +400,7 @@ function WorkspaceSelector() {
               isActive
                 ? "bg-cyan-300/[0.1] shadow-[var(--omnix-glow-xs),inset_0_1px_0_rgba(255,255,255,0.06)]"
                 : "hover:bg-white/[0.04]",
+              isActive && aiState === "active" && "omnix-intel-glow"
             )}
           >
             {isActive ? (
@@ -415,8 +416,8 @@ function WorkspaceSelector() {
               </span>
               {health !== "quiet" && (
                 <span className={cn(
-                  "absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-slate-900 animate-pulse",
-                  health === "alive" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-cyan-500 shadow-[0_0_6px_rgba(34,211,238,0.6)]"
+                  "absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-slate-900 omnix-streaming-dot",
+                  health === "alive" ? "bg-emerald-500" : "bg-cyan-500"
                 )} />
               )}
             </div>
@@ -490,12 +491,20 @@ function WorkspaceSelector() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="group flex w-full items-center justify-between gap-2 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-[11px] py-[9px] text-left transition duration-200 hover:border-[var(--omnix-border-2)] hover:bg-[var(--omnix-surface-hover)]"
+        className={cn(
+          "group flex w-full items-center justify-between gap-2 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-[11px] py-[9px] text-left transition duration-200 hover:border-[var(--omnix-border-2)] hover:bg-[var(--omnix-surface-hover)]",
+          realtimeStatus === "connected" && "border-cyan-300/20"
+        )}
         aria-expanded={open}
       >
         <div className="flex min-w-0 items-center gap-[9px]">
-          <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-[5px] border border-cyan-300/35 bg-cyan-300/15 text-[var(--omnix-cyan)] shadow-[0_0_8px_rgba(0,255,255,0.2)]">
-            <ActiveWorkspaceIcon className="h-3.5 w-3.5" />
+          <div className="relative">
+            <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-[5px] border border-cyan-300/35 bg-cyan-300/15 text-[var(--omnix-cyan)] shadow-[0_0_8px_rgba(0,255,255,0.2)]">
+              <ActiveWorkspaceIcon className="h-3.5 w-3.5" />
+            </div>
+            {realtimeStatus === "connected" && (
+              <span className="absolute -bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-cyan-400" />
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5 text-xs font-medium leading-tight text-[var(--omnix-text)]">
@@ -507,7 +516,9 @@ function WorkspaceSelector() {
               {active ? (
                 <>
                   <span className="h-1 w-1 rounded-full bg-cyan-200/20" />
-                  <span>{presence?.active_count ?? statusForWorkspace(active.id)?.active_count ?? 0} active</span>
+                  <span className={cn(realtimeStatus === "connected" && "text-cyan-300/80")}>
+                    {presence?.active_count ?? statusForWorkspace(active.id)?.active_count ?? 0} active
+                  </span>
                 </>
               ) : null}
             </div>
