@@ -36,7 +36,7 @@ export function getWorkspaceInviteId(invite: Pick<WorkspaceInvite, "id" | "invit
   return invite.invite_id || invite.id;
 }
 
-export type WorkspaceType = "workspace" | "super" | "sub";
+export type WorkspaceType = "workspace" | "super" | "sub" | "super_workspace" | "subworkspace" | "global_workspace";
 export type WorkspaceAIMode = "research" | "coding" | "design" | "strategy" | "analytics" | "general";
 
 export type WorkspaceIntelligencePreferences = {

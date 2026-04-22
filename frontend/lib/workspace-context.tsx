@@ -120,10 +120,11 @@ function normalizeWorkspaceRole(role: unknown): WorkspaceRole {
 }
 
 function normalizeWorkspaceType(value: unknown, parentWorkspaceId?: string | null): WorkspaceType {
-  if (value === "workspace" || value === "super" || value === "sub") {
-    return value;
-  }
-  return parentWorkspaceId ? "sub" : "workspace";
+  if (value === "super_workspace" || value === "super") return "super_workspace";
+  if (value === "subworkspace" || value === "sub") return "subworkspace";
+  if (value === "global_workspace") return "global_workspace";
+  if (value === "workspace") return "super_workspace";
+  return parentWorkspaceId ? "subworkspace" : "super_workspace";
 }
 
 function normalizeWorkspaceRecord(record: WorkspaceApiRecord, parentFromTree?: string | null): Workspace {
@@ -715,7 +716,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         }
         console.debug("[workspace] create success", { id: workspace.id, name: workspace.name });
         setWorkspaces((current) => [workspace, ...current.filter((item) => item.id !== workspace.id)]);
-        if (workspace.workspace_type === "super") {
+        if (workspace.workspace_type === "super_workspace") {
           void refreshWorkspaceTree(workspace.id, { silent: true });
         }
         return workspace;
