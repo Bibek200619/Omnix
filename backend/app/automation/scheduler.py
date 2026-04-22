@@ -28,6 +28,17 @@ class AutomationScheduler:
     async def start(self) -> None:
         """Start the scheduler: load scheduled automations from DB and schedule them."""
         logger.info("Starting AutomationScheduler...")
+        
+        # Schedule built-in system tasks
+        if "system_presence_cleanup" not in self._tasks:
+            logger.info("Scheduling built-in presence cleanup every 300 seconds")
+            t = asyncio.create_task(self._run_periodic(
+                "system_presence_cleanup", 
+                300, 
+                {"job_type": "cleanup_stale_presence", "workspace_id": None, "name": "System Presence Cleanup"}
+            ))
+            self._tasks["system_presence_cleanup"] = t
+
         automations = []
         try:
             automations = await select_all_trusted(

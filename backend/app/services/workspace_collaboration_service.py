@@ -175,6 +175,25 @@ async def leave_workspace_presence(
         logger.exception("Failed to remove workspace presence on leave | workspace_id=%s", workspace_id)
 
 
+async def cleanup_stale_presence() -> int:
+    """Purge presence records that haven't been updated recently."""
+    from ..services.supabase_service import delete_many_trusted
+    # Records older than 10 minutes are considered long gone
+    stale_threshold = (_now() - timedelta(minutes=10)).isoformat()
+    try:
+        deleted = await delete_many_trusted(
+            "workspace_presence",
+            {"last_seen_at": {"lt": stale_threshold}}
+        )
+        count = len(deleted)
+        if count > 0:
+            logger.info("Cleaned up %d stale presence records.", count)
+        return count
+    except SupabaseServiceError:
+        logger.exception("Failed to cleanup stale presence")
+        return 0
+
+
 async def update_workspace_typing(
     *,
     workspace_id: str,
