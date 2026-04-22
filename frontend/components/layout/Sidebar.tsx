@@ -60,8 +60,8 @@ const navItems = [
 function workspaceTypeLabel(workspace?: Workspace | null) {
   if (!workspace) return null;
   if (workspace.is_global) return "Global";
-  if (workspace.workspace_type === "super") return "Super";
-  if (workspace.workspace_type === "sub") return "Team";
+  if (workspace.workspace_type === "super_workspace" || workspace.workspace_type === "super") return "Super";
+  if (workspace.workspace_type === "subworkspace" || workspace.workspace_type === "sub" || workspace.workspace_type === "global_workspace") return "Team";
   return null;
 }
 
@@ -85,7 +85,7 @@ function WorkspaceTypeBadge({ workspace }: { workspace?: Workspace | null }) {
 
 function workspaceIcon(workspace: Workspace) {
   if (workspace.is_global) return Globe2;
-  if (workspace.workspace_type === "super") return Layers3;
+  if (workspace.workspace_type === "super_workspace") return Layers3;
   return Users;
 }
 
@@ -135,13 +135,13 @@ function WorkspaceSelector() {
 
   const active = activeWorkspace;
   const activeSuperWorkspace =
-    activeRootWorkspace?.workspace_type === "super" ? activeRootWorkspace : null;
+    activeRootWorkspace?.workspace_type === "super_workspace" ? activeRootWorkspace : null;
   const canCreateSubspace = Boolean(
     activeSuperWorkspace && isWorkspaceFounderRole(activeSuperWorkspace.current_user_role),
   );
 
   useEffect(() => {
-    if (!activeRootWorkspace?.id || activeRootWorkspace.workspace_type !== "super") {
+    if (!activeRootWorkspace?.id || (activeRootWorkspace.workspace_type !== "super" && activeRootWorkspace.workspace_type !== "super_workspace")) {
       return;
     }
 
@@ -160,7 +160,7 @@ function WorkspaceSelector() {
   }
 
   function toggleExpanded(workspace: Workspace) {
-    const shouldRefresh = !expandedWorkspaceIds.has(workspace.id) && workspace.workspace_type === "super";
+    const shouldRefresh = !expandedWorkspaceIds.has(workspace.id) && workspace.workspace_type === "super_workspace";
     setExpandedWorkspaceIds((current) => {
       const next = new Set(current);
       if (next.has(workspace.id)) {
@@ -180,7 +180,7 @@ function WorkspaceSelector() {
     try {
       setCreatingWorkspace(true);
       setCreateError(null);
-      const created = await createWorkspace({ name: newWorkspaceName.trim(), workspace_type: "super" });
+      const created = await createWorkspace({ name: newWorkspaceName.trim(), workspace_type: "super_workspace" });
       setActiveWorkspace(created.id);
       setNewWorkspaceName("");
       setShowCreateForm(false);
@@ -361,7 +361,7 @@ function WorkspaceSelector() {
     const Icon = workspaceIcon(workspace);
     const expanded = isExpanded(workspace.id);
     const isActive = workspace.id === activeWorkspaceId;
-    const hasHierarchy = workspace.workspace_type === "super";
+    const hasHierarchy = workspace.workspace_type === "super_workspace";
     const subspaces = workspace.subspaces ?? [];
     const subspacesLoading = Boolean(subspaceLoadingByParentId[workspace.id]);
     const subspacesError = subspaceErrorByParentId[workspace.id];
