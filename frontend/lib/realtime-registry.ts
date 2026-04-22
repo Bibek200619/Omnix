@@ -19,7 +19,12 @@ class RealtimeSubscriptionRegistry {
   subscribe(
     key: SubscriptionKey,
     setup: (channel: RealtimeChannel) => RealtimeChannel
-  ): RealtimeChannel {
+  ): RealtimeChannel | null {
+    if (!supabase) {
+      console.warn("[realtime] subscription attempted but supabase is not configured");
+      return null;
+    }
+
     const stringKey = this.generateKey(key);
     
     // Cleanup existing if any
