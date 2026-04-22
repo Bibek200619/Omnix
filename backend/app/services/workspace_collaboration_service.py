@@ -158,6 +158,23 @@ async def heartbeat_workspace_presence(
     return await list_workspace_presence(workspace_id=workspace_id, user_id=user_id)
 
 
+async def leave_workspace_presence(
+    *,
+    workspace_id: str,
+    user_id: str,
+) -> None:
+    """Explicitly mark a user as offline/gone from a workspace presence tracking."""
+    # We use a trusted delete because we already validated workspace_id/user_id via router
+    from ..services.supabase_service import delete_many_trusted
+    try:
+        await delete_many_trusted(
+            "workspace_presence",
+            {"workspace_id": workspace_id, "user_id": user_id}
+        )
+    except SupabaseServiceError:
+        logger.exception("Failed to remove workspace presence on leave | workspace_id=%s", workspace_id)
+
+
 async def update_workspace_typing(
     *,
     workspace_id: str,
