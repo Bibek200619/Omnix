@@ -39,9 +39,9 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
   const sources = message.sources ?? [];
   const senderRoleKey = String(senderRole);
   const roleColor =
-    senderRoleKey === "owner" || senderRoleKey === "founder"
+    senderRoleKey === "owner" || senderRoleKey === "founder" || senderRoleKey === "super_founder"
       ? "var(--role-founder)"
-      : senderRoleKey === "co_owner"
+      : senderRoleKey === "co_owner" || senderRoleKey === "sub_leader"
       ? "var(--role-coowner)"
       : "var(--role-member)";
 

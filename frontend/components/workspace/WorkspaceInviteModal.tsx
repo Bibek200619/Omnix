@@ -15,7 +15,7 @@ type WorkspaceInviteModalProps = {
   error?: string | null;
   onClose: () => void;
   allowRoleSelection?: boolean;
-  onSubmit: (target: string, role: "co_owner" | "member") => Promise<void>;
+  onSubmit: (target: string, role: WorkspaceRole) => Promise<void>;
 };
 
 export function WorkspaceInviteModal({
@@ -28,7 +28,7 @@ export function WorkspaceInviteModal({
   onSubmit,
 }: WorkspaceInviteModalProps) {
   const [target, setTarget] = useState("");
-  const [role, setRole] = useState<"co_owner" | "member">("member");
+  const [role, setRole] = useState<WorkspaceRole>("member");
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -102,7 +102,7 @@ export function WorkspaceInviteModal({
                 Invite role
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {(["member", "co_owner"] as Array<Extract<WorkspaceRole, "member" | "co_owner">>).map((option) => (
+                {(["member", "co_owner"] as WorkspaceRole[]).map((option) => (
                   <button
                     key={option}
                     type="button"

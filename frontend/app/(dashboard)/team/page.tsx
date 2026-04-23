@@ -8,7 +8,7 @@ import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModa
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
-import type { WorkspaceMember } from "@/lib/workspace-types";
+import type { WorkspaceMember, WorkspaceRole } from "@/lib/workspace-types";
 
 type MemberLabels = Record<string, string>;
 
@@ -87,7 +87,7 @@ export default function TeamPage() {
   const canInvite = isWorkspaceFounderRole(activeWorkspace?.current_user_role);
   const pendingInviteCount = activeInvites.filter((invite) => invite.status === "pending").length;
 
-  async function handleInvite(target: string, role: "co_owner" | "member") {
+  async function handleInvite(target: string, role: WorkspaceRole) {
     try {
       setInviting(true);
       setInviteError(null);

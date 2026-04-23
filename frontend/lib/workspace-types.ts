@@ -1,4 +1,4 @@
-export type WorkspaceRole = "founder" | "owner" | "co_owner" | "member";
+export type WorkspaceRole = "founder" | "owner" | "co_owner" | "member" | "super_founder" | "sub_leader" | "sub_member";
 
 export type WorkspaceMember = {
   workspace_id: string;
@@ -20,7 +20,7 @@ export type WorkspaceInvite = {
   invite_id: string;
   workspace_id: string;
   email: string;
-  role: "co_owner" | "member";
+  role: "co_owner" | "member" | "sub_leader" | "sub_member";
   status: WorkspaceInviteStatus;
   invited_by?: string | null;
   accepted_by_user_id?: string | null;

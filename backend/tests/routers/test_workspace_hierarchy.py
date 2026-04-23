@@ -57,7 +57,7 @@ async def test_super_workspace_creation_auto_creates_global_space(monkeypatch: p
 
 @pytest.mark.asyncio
 async def test_subspace_creation_rejects_non_super_parent(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_require_workspace_owner(workspace_id: str, user_id: str):
+    async def fake_require_workspace_management_access(workspace_id: str, user_id: str):
         return workspace_service.WorkspaceAccess(
             workspace={
                 "id": workspace_id,
@@ -70,7 +70,7 @@ async def test_subspace_creation_rejects_non_super_parent(monkeypatch: pytest.Mo
             role="founder",
         )
 
-    monkeypatch.setattr(workspace_service, "require_workspace_owner", fake_require_workspace_owner)
+    monkeypatch.setattr(workspace_service, "require_workspace_management_access", fake_require_workspace_management_access)
 
     with pytest.raises(HTTPException) as exc_info:
         await workspace_service.create_subspace_for_user(
@@ -84,7 +84,7 @@ async def test_subspace_creation_rejects_non_super_parent(monkeypatch: pytest.Mo
 
 
 @pytest.mark.asyncio
-async def test_subspace_access_inherits_parent_membership(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_subspace_access_requires_explicit_membership(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
         if table == "workspaces" and filters == {"id": "sub-1"}:
             return {
@@ -114,6 +114,40 @@ async def test_subspace_access_inherits_parent_membership(monkeypatch: pytest.Mo
 
     access = await workspace_service.resolve_workspace_access("sub-1", "member-1")
 
+    # Access should be None because implicit inheritance is removed for private subspaces
+    assert access is None
+
+@pytest.mark.asyncio
+async def test_global_subspace_access_inherits_parent_membership(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
+        if table == "workspaces" and filters == {"id": "sub-1"}:
+            return {
+                "id": "sub-1",
+                "user_id": "owner-1",
+                "name": "Global Team",
+                "workspace_type": "global_workspace",
+                "parent_workspace_id": "super-1",
+                "is_global": True,
+            }
+        if table == "workspaces" and filters == {"id": "super-1"}:
+            return {
+                "id": "super-1",
+                "user_id": "owner-1",
+                "name": "Omnix HQ",
+                "workspace_type": "super_workspace",
+                "parent_workspace_id": None,
+                "is_global": False,
+            }
+        if table == "workspace_members" and filters == {"workspace_id": "sub-1", "user_id": "member-1"}:
+            return None
+        if table == "workspace_members" and filters == {"workspace_id": "super-1", "user_id": "member-1"}:
+            return {"workspace_id": "super-1", "user_id": "member-1", "role": "member"}
+        raise AssertionError((table, filters))
+
+    monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
+
+    access = await workspace_service.resolve_workspace_access("sub-1", "member-1")
+
     assert access is not None
     assert access.workspace_id == "sub-1"
     assert access.membership_workspace_id == "super-1"
@@ -122,7 +156,7 @@ async def test_subspace_access_inherits_parent_membership(monkeypatch: pytest.Mo
 
 @pytest.mark.asyncio
 async def test_nested_subspace_creation_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_require_workspace_owner(workspace_id: str, user_id: str):
+    async def fake_require_workspace_management_access(workspace_id: str, user_id: str):
         return workspace_service.WorkspaceAccess(
             workspace={
                 "id": workspace_id,
@@ -135,7 +169,7 @@ async def test_nested_subspace_creation_is_rejected(monkeypatch: pytest.MonkeyPa
             role="founder",
         )
 
-    monkeypatch.setattr(workspace_service, "require_workspace_owner", fake_require_workspace_owner)
+    monkeypatch.setattr(workspace_service, "require_workspace_management_access", fake_require_workspace_management_access)
 
     with pytest.raises(HTTPException) as exc_info:
         await workspace_service.create_subspace_for_user(

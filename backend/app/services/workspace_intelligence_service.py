@@ -6,7 +6,6 @@ from typing import Any
 
 from ..services.supabase_service import select_all_trusted
 from .workspace_service import (
-    list_subspaces_for_super_workspace,
     list_workspace_members,
     normalize_ai_specialization,
     normalize_intelligence_preferences,
@@ -124,16 +123,11 @@ async def workspace_retrieval_scope_ids(
     Future agents will utilize these scope IDs to navigate the organizational 
     intelligence graph safely.
     """
+    from app.services.workspace_service import resolve_workspace_access, list_user_workspaces
+    
     normalized = normalize_workspace_record(workspace)
     workspace_id = str(normalized["id"])
     preferences = normalized.get("intelligence_preferences") or {}
-    source_perms = preferences.get("source_permissions")
-
-    # If organization-wide access is enabled, we could return all accessible workspaces.
-    # For now, we strictly follow the hierarchy.
-    if source_perms == "organization":
-        # Placeholder for future global cross-team discovery
-        pass
 
     if not normalized.get("is_global") and preferences.get("retrieval_scope") != "global":
         return [workspace_id]
@@ -142,9 +136,18 @@ async def workspace_retrieval_scope_ids(
     if not parent_id:
         return [workspace_id]
 
-    subspaces = await list_subspaces_for_super_workspace(parent_id, user_id)
-    ids = [parent_id]
-    ids.extend(str(subspace["id"]) for subspace in subspaces if subspace.get("id"))
+    # Scope retrieval to ONLY the workspaces the user is explicitly authorized to view within the organization.
+    user_workspaces = await list_user_workspaces(user_id)
+    
+    ids = []
+    # If the user has access to the parent, include it
+    if any(str(w.get("id")) == parent_id for w in user_workspaces):
+        ids.append(parent_id)
+        
+    # Include any visible subspaces that belong to this super workspace
+    for w in user_workspaces:
+        if str(w.get("parent_workspace_id") or "") == parent_id:
+            ids.append(str(w["id"]))
     
     # Ensure the requested workspace is always included even if it's not in the subspace list (race condition safety)
     if workspace_id not in ids:
