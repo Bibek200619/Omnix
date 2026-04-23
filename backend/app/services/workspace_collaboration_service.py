@@ -8,6 +8,7 @@ from typing import Any
 
 from ..services.supabase_service import (
     SupabaseServiceError,
+    check_infrastructure_pressure,
     insert_one_trusted,
     select_all_trusted,
     upsert_one,
@@ -23,6 +24,21 @@ from .workspace_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+import time
+
+# In-memory caches for high-frequency infrastructure optimizations
+# Structure: {(workspace_id, user_id, 'heartbeat'): last_time}
+_presence_write_cooldowns: dict[tuple[str, str, str], float] = {}
+# Structure: {workspace_id: (timestamp, presence_snapshot)}
+_presence_snapshot_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+# Structure: {user_id: (timestamp, live_statuses_list)}
+_live_status_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+
+HEARTBEAT_COOLDOWN = 60.0  # Seconds between actual DB writes for heartbeats
+TYPING_COOLDOWN = 5.0      # Seconds between actual DB writes for typing
+SNAPSHOT_CACHE_TTL = 10.0  # Seconds to cache presence snapshots
+STATUS_CACHE_TTL = 30.0    # Seconds to cache live status results
 
 PRESENCE_COLUMNS = (
     "workspace_id,user_id,status,current_view,current_label,typing_until,"
@@ -137,6 +153,21 @@ async def heartbeat_workspace_presence(
     metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     await require_workspace_access(workspace_id, user_id)
+    
+    now_ts = time.perf_counter()
+    cache_key = (workspace_id, user_id, "heartbeat")
+    last_write = _presence_write_cooldowns.get(cache_key, 0)
+    
+    # Graceful degradation: increase cooldown if infrastructure is under pressure
+    effective_cooldown = HEARTBEAT_COOLDOWN * 2 if check_infrastructure_pressure() else HEARTBEAT_COOLDOWN
+    
+    # If within cooldown, check if we have a recent snapshot to return immediately
+    if now_ts - last_write < effective_cooldown:
+        cached = _presence_snapshot_cache.get(workspace_id)
+        if cached and (now_ts - cached[0] < SNAPSHOT_CACHE_TTL):
+            return cached[1]
+        return await list_workspace_presence(workspace_id=workspace_id, user_id=user_id)
+
     timestamp = utc_now_iso()
     payload = {
         "workspace_id": workspace_id,
@@ -151,9 +182,13 @@ async def heartbeat_workspace_presence(
 
     try:
         await upsert_one("workspace_presence", payload, on_conflict="workspace_id,user_id")
+        _presence_write_cooldowns[cache_key] = now_ts
+        # Force cache invalidation on write to ensure subsequent reads get fresh data
+        _presence_snapshot_cache.pop(workspace_id, None)
     except SupabaseServiceError:
         logger.exception("Failed to persist workspace presence heartbeat | workspace_id=%s", workspace_id)
-        raise
+        # Non-fatal for the heartbeating user, list_workspace_presence might still work or return stale data
+        pass
 
     return await list_workspace_presence(workspace_id=workspace_id, user_id=user_id)
 
@@ -202,6 +237,19 @@ async def update_workspace_typing(
     is_typing: bool,
 ) -> dict[str, Any]:
     await require_workspace_access(workspace_id, user_id)
+    
+    now_ts = time.perf_counter()
+    cache_key = (workspace_id, user_id, "typing")
+    last_write = _presence_write_cooldowns.get(cache_key, 0)
+    
+    # Typing is even higher frequency. We only update if state changes (stopping typing)
+    # or if the cooldown has passed to renew the typing_until TTL.
+    if is_typing and now_ts - last_write < TYPING_COOLDOWN:
+        cached = _presence_snapshot_cache.get(workspace_id)
+        if cached and (now_ts - cached[0] < SNAPSHOT_CACHE_TTL):
+            return cached[1]
+        return await list_workspace_presence(workspace_id=workspace_id, user_id=user_id)
+
     timestamp = utc_now_iso()
     typing_until = (_now() + TYPING_WINDOW).isoformat() if is_typing else None
     payload = {
@@ -215,15 +263,24 @@ async def update_workspace_typing(
     }
     try:
         await upsert_one("workspace_presence", payload, on_conflict="workspace_id,user_id")
+        _presence_write_cooldowns[cache_key] = now_ts
+        _presence_snapshot_cache.pop(workspace_id, None)
     except SupabaseServiceError:
         logger.exception("Failed to persist typing state | workspace_id=%s", workspace_id)
-        raise
+        # Non-fatal for UI
+        pass
 
     return await list_workspace_presence(workspace_id=workspace_id, user_id=user_id)
 
 
 async def list_workspace_presence(*, workspace_id: str, user_id: str) -> dict[str, Any]:
     await require_workspace_access(workspace_id, user_id)
+    
+    now_ts = time.perf_counter()
+    cached = _presence_snapshot_cache.get(workspace_id)
+    if cached and (now_ts - cached[0] < SNAPSHOT_CACHE_TTL):
+        return cached[1]
+
     now = _now()
     try:
         rows = await select_all_trusted(
@@ -250,7 +307,7 @@ async def list_workspace_presence(*, workspace_id: str, user_id: str) -> dict[st
     recently_active_members = [member for member in members if member["status"] in {"online", "recent"}]
     typing_members = [member for member in online_members if member.get("is_typing")]
 
-    return {
+    result = {
         "workspace_id": workspace_id,
         "online_count": len(online_members),
         "active_count": len(online_members),
@@ -262,6 +319,8 @@ async def list_workspace_presence(*, workspace_id: str, user_id: str) -> dict[st
         "typing_members": typing_members,
         "updated_at": now.isoformat(),
     }
+    _presence_snapshot_cache[workspace_id] = (now_ts, result)
+    return result
 
 
 async def log_workspace_activity(
@@ -361,6 +420,11 @@ def _status_from_counts(
 
 
 async def list_workspace_live_statuses(user_id: str) -> list[dict[str, Any]]:
+    now_ts = time.perf_counter()
+    cached = _live_status_cache.get(user_id)
+    if cached and (now_ts - cached[0] < STATUS_CACHE_TTL):
+        return cached[1]
+
     workspaces = await list_user_workspaces(user_id)
     normalized_workspaces = [normalize_workspace_record(workspace) for workspace in workspaces]
     workspace_ids = [str(workspace["id"]) for workspace in normalized_workspaces if workspace.get("id")]
@@ -463,4 +527,5 @@ async def list_workspace_live_statuses(user_id: str) -> list[dict[str, Any]]:
             }
         )
 
+    _live_status_cache[user_id] = (now_ts, statuses)
     return statuses

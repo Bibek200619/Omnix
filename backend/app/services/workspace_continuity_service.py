@@ -3,7 +3,12 @@ import logging
 from uuid import UUID
 from datetime import datetime
 
-from .supabase_service import select_all_trusted
+from .supabase_service import (
+    select_all_trusted, 
+    insert_one_trusted, 
+    update_one_trusted,
+    SupabaseServiceError
+)
 from .workspace_service import require_workspace_access
 
 logger = logging.getLogger(__name__)
@@ -16,11 +21,9 @@ async def create_initiative(
     metadata: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Create a new operational initiative, tracking continuity in a workspace."""
-    access = await require_workspace_access(user_id, workspace_id, ["founder", "super_founder", "owner", "co_owner", "sub_leader", "member", "sub_member"])
-    if not access:
-        raise ValueError("Workspace access denied.")
+    # Validate access
+    await require_workspace_access(user_id, workspace_id, ["founder", "super_founder", "owner", "co_owner", "sub_leader", "member", "sub_member"])
 
-    client = select_all_trusted()
     data = {
         "workspace_id": str(workspace_id),
         "name": name,
@@ -29,23 +32,24 @@ async def create_initiative(
         "momentum_score": 1.0,
         "metadata": metadata or {},
     }
-    result = client.table("workspace_initiatives").insert(data).execute()
-    if not result.data:
-        raise ValueError("Failed to create initiative.")
     
-    initiative = result.data[0]
-    
-    # Log to operational timeline
-    timeline_data = {
-        "workspace_id": str(workspace_id),
-        "initiative_id": initiative["id"],
-        "event_type": "initiative_started",
-        "summary": f"Initiative '{name}' started.",
-        "metadata": {"actor_user_id": str(user_id)}
-    }
-    client.table("workspace_operational_timeline").insert(timeline_data).execute()
-    
-    return initiative
+    try:
+        initiative = await insert_one_trusted("workspace_initiatives", data)
+        
+        # Log to operational timeline
+        timeline_data = {
+            "workspace_id": str(workspace_id),
+            "initiative_id": initiative["id"],
+            "event_type": "initiative_started",
+            "summary": f"Initiative '{name}' started.",
+            "metadata": {"actor_user_id": str(user_id)}
+        }
+        await insert_one_trusted("workspace_operational_timeline", timeline_data)
+        
+        return initiative
+    except SupabaseServiceError as exc:
+        logger.error("Failed to create initiative: %s", exc)
+        raise ValueError(f"Failed to create initiative: {exc}")
 
 async def list_initiatives(
     user_id: UUID,
@@ -53,17 +57,23 @@ async def list_initiatives(
     status: Optional[str] = None
 ) -> list[dict[str, Any]]:
     """List initiatives for a workspace."""
-    access = await require_workspace_access(user_id, workspace_id)
-    if not access:
-        raise ValueError("Workspace access denied.")
+    await require_workspace_access(user_id, workspace_id)
 
-    client = select_all_trusted()
-    query = client.table("workspace_initiatives").select("*").eq("workspace_id", str(workspace_id))
+    filters = {"workspace_id": str(workspace_id)}
     if status:
-        query = query.eq("status", status)
+        filters["status"] = status
     
-    result = query.order("updated_at", desc=True).execute()
-    return result.data or []
+    try:
+        return await select_all_trusted(
+            "workspace_initiatives",
+            "*",
+            filters=filters,
+            order_by="updated_at",
+            desc=True
+        )
+    except SupabaseServiceError as exc:
+        logger.error("Failed to list initiatives: %s", exc)
+        return []
 
 async def get_continuity_timeline(
     user_id: UUID,
@@ -72,17 +82,24 @@ async def get_continuity_timeline(
     limit: int = 50
 ) -> list[dict[str, Any]]:
     """Retrieve operational timeline events for a workspace or initiative."""
-    access = await require_workspace_access(user_id, workspace_id)
-    if not access:
-        raise ValueError("Workspace access denied.")
+    await require_workspace_access(user_id, workspace_id)
 
-    client = select_all_trusted()
-    query = client.table("workspace_operational_timeline").select("*").eq("workspace_id", str(workspace_id))
+    filters = {"workspace_id": str(workspace_id)}
     if initiative_id:
-        query = query.eq("initiative_id", str(initiative_id))
+        filters["initiative_id"] = str(initiative_id)
     
-    result = query.order("created_at", desc=True).limit(limit).execute()
-    return result.data or []
+    try:
+        return await select_all_trusted(
+            "workspace_operational_timeline",
+            "*",
+            filters=filters,
+            order_by="created_at",
+            desc=True,
+            limit=limit
+        )
+    except SupabaseServiceError as exc:
+        logger.error("Failed to get continuity timeline: %s", exc)
+        return []
 
 async def record_momentum_snapshot(
     workspace_id: UUID,
@@ -94,7 +111,6 @@ async def record_momentum_snapshot(
     metadata: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     """Record an operational momentum snapshot (system level)."""
-    client = select_all_trusted()
     data = {
         "workspace_id": str(workspace_id),
         "score": score,
@@ -106,10 +122,11 @@ async def record_momentum_snapshot(
     if initiative_id:
         data["initiative_id"] = str(initiative_id)
         
-    result = client.table("workspace_momentum_snapshots").insert(data).execute()
-    if not result.data:
-        raise ValueError("Failed to record momentum.")
-    return result.data[0]
+    try:
+        return await insert_one_trusted("workspace_momentum_snapshots", data)
+    except SupabaseServiceError as exc:
+        logger.error("Failed to record momentum snapshot: %s", exc)
+        raise ValueError(f"Failed to record momentum: {exc}")
 
 async def add_continuity_memory(
     workspace_id: UUID,
@@ -119,7 +136,6 @@ async def add_continuity_memory(
     metadata: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     """Add an operational continuity memory (e.g. pending thread, blocked dependency)."""
-    client = select_all_trusted()
     data = {
         "workspace_id": str(workspace_id),
         "memory_type": "continuity",
@@ -131,25 +147,32 @@ async def add_continuity_memory(
     if initiative_id:
         data["initiative_id"] = str(initiative_id)
 
-    result = client.table("workspace_intelligence_memory").insert(data).execute()
-    if not result.data:
-        raise ValueError("Failed to save continuity memory.")
-    return result.data[0]
+    try:
+        return await insert_one_trusted("workspace_intelligence_memory", data)
+    except SupabaseServiceError as exc:
+        logger.error("Failed to add continuity memory: %s", exc)
+        raise ValueError(f"Failed to save continuity memory: {exc}")
 
 async def list_unresolved_continuity(
     user_id: UUID,
     workspace_id: UUID
 ) -> list[dict[str, Any]]:
     """List unresolved continuity memory for a workspace."""
-    access = await require_workspace_access(user_id, workspace_id)
-    if not access:
-        raise ValueError("Workspace access denied.")
+    await require_workspace_access(user_id, workspace_id)
 
-    client = select_all_trusted()
-    result = (client.table("workspace_intelligence_memory")
-              .select("*")
-              .eq("workspace_id", str(workspace_id))
-              .in_("resolution_status", ["unresolved", "pending_collaboration", "blocked"])
-              .order("created_at", desc=True)
-              .execute())
-    return result.data or []
+    filters = {
+        "workspace_id": str(workspace_id),
+        "resolution_status": {"in": ["unresolved", "pending_collaboration", "blocked"]}
+    }
+
+    try:
+        return await select_all_trusted(
+            "workspace_intelligence_memory",
+            "*",
+            filters=filters,
+            order_by="created_at",
+            desc=True
+        )
+    except SupabaseServiceError as exc:
+        logger.error("Failed to list unresolved continuity: %s", exc)
+        return []
