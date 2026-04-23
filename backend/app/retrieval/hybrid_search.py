@@ -110,7 +110,7 @@ class HybridSearchEngine:
         query: str,
         *,
         user_id: str,
-        workspace_id: str | None = None,
+        workspace_id: str | list[str] | None = None,
         top_k: int | None = None,
     ) -> HybridSearchResponse:
         started_at = time.perf_counter()
@@ -187,7 +187,7 @@ class HybridSearchEngine:
         query: str,
         *,
         user_id: str,
-        workspace_id: str | None = None,
+        workspace_id: str | list[str] | None = None,
         top_k: int | None = None,
     ) -> tuple[HybridSearchResponse, BuiltContext]:
         response = await self.search(query, user_id=user_id, workspace_id=workspace_id, top_k=top_k)

@@ -44,6 +44,7 @@ class ContextEngine:
         """
         started_at = time.perf_counter()
         raw_citations = []
+        specialization = None
 
         # 1. Gather Context Sources
         try:
@@ -58,16 +59,23 @@ class ContextEngine:
                 c.score = 1.0
             raw_citations.extend(auto_cites)
 
-            # Workspace Summary & Top Artifacts
+            # Workspace Intelligence & Hierarchy
+            # Refactored to use build_workspace_intelligence_profile internally
             ws_cites = await self.workspace_manager.fetch_workspace_context(payload)
-            for c in ws_cites:
-                c.score = 0.8
             raw_citations.extend(ws_cites)
 
+            # Optimization: Fetch specialization for PromptBuilder
+            if payload.workspace_id:
+                from ..services import workspace_service
+                ws = await workspace_service.select_one_trusted(
+                    "workspaces", "ai_specialization", {"id": payload.workspace_id}
+                )
+                if ws:
+                    specialization = ws.get("ai_specialization")
+
             # Memory (recent convos & current convo history)
+            # Refactored to include Synthesized Workspace Memory
             mem_cites = await self.memory_manager.fetch_memory(payload)
-            for c in mem_cites:
-                c.score = 0.7
             raw_citations.extend(mem_cites)
 
             # Semantic / Keyword Hybrid Retrieval
@@ -89,9 +97,12 @@ class ContextEngine:
         # 5. Token Budget Enforcement
         budgeted_citations = self.budget_engine.enforce_budget(compressed_citations)
 
-        # 6. Prompt Assembly
+        # 6. Prompt Assembly (with Operational Persona)
         assembled_context = self.prompt_builder.build_prompt(
-            payload.query, budgeted_citations, system_instructions
+            payload.query, 
+            budgeted_citations, 
+            system_instructions,
+            specialization=specialization
         )
 
         latency_ms = (time.perf_counter() - started_at) * 1000
