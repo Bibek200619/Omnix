@@ -90,3 +90,19 @@ class AutomationScheduler:
 
 async def run_job_now(automation: dict[str, Any]) -> None:
     await AutomationScheduler.get().run_now(automation)
+
+
+async def main():
+    """Standalone entry point for the automation scheduler."""
+    logging.basicConfig(level=logging.INFO)
+    scheduler = AutomationScheduler.get()
+    await scheduler.start()
+    try:
+        # Keep the process alive
+        while True:
+            await asyncio.sleep(3600)
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        await scheduler.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
