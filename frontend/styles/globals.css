@@ -1044,20 +1044,53 @@ textarea {
   }
 }
 
-@keyframes omnix-logo-pulse {
+@keyframes omnix-intel-glow {
   0%, 100% {
-    filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.4));
+    box-shadow: 0 0 12px rgba(155, 92, 255, 0.3), 0 0 24px rgba(155, 92, 255, 0.08);
+    border-color: rgba(155, 92, 255, 0.35);
   }
   50% {
-    filter: drop-shadow(0 0 18px rgba(0, 255, 255, 0.75));
+    box-shadow: 0 0 20px rgba(155, 92, 255, 0.65), 0 0 50px rgba(155, 92, 255, 0.2);
+    border-color: rgba(155, 92, 255, 0.65);
   }
 }
 
-@keyframes omnix-beam-sweep {
-  0% { transform: translateX(-100%); opacity: 0; }
-  40% { opacity: 1; }
-  100% { transform: translateX(400%); opacity: 0; }
+.omnix-intel-glow {
+  animation: omnix-intel-glow 3.5s ease-in-out infinite;
 }
+
+@keyframes omnix-sidebar-pulse {
+  0%, 100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+    background: rgba(0, 255, 255, 0.06);
+  }
+}
+
+.omnix-sidebar-pulse {
+  animation: omnix-sidebar-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes omnix-streaming-dot {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+.omnix-streaming-dot {
+  position: relative;
+}
+
+.omnix-streaming-dot::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 999px;
+  background: inherit;
+  animation: omnix-streaming-dot 1.5s ease-out infinite;
+}
+
 
 /* ── Role avatar / card system ──────────────────────────────── */
 

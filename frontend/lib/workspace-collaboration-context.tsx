@@ -14,30 +14,34 @@ import { usePathname } from "next/navigation";
 import { apiClient } from "./api";
 import { useAuth } from "./auth-context";
 import { useWorkspace } from "./workspace-context";
+import { realtimeRegistry } from "./realtime-registry";
 import type {
   WorkspaceActivityEvent,
   WorkspaceLiveStatus,
   WorkspacePresenceSnapshot,
 } from "./workspace-types";
 
+type RealtimeStatus = "connecting" | "connected" | "disconnected" | "error";
+
 type CollaborationContextType = {
   presence: WorkspacePresenceSnapshot | null;
   activity: WorkspaceActivityEvent[];
   liveStatuses: Record<string, WorkspaceLiveStatus>;
+  realtimeStatus: RealtimeStatus;
   loadingPresence: boolean;
   loadingActivity: boolean;
   refreshPresence: () => Promise<WorkspacePresenceSnapshot | null>;
   refreshActivity: () => Promise<WorkspaceActivityEvent[]>;
   refreshLiveStatuses: () => Promise<Record<string, WorkspaceLiveStatus>>;
+  leaveWorkspace: (workspaceId?: string | null) => Promise<void>;
   sendTypingSignal: (conversationId?: string | null, isTyping?: boolean) => Promise<void>;
   statusForWorkspace: (workspaceId?: string | null) => WorkspaceLiveStatus | null;
 };
 
 const CollaborationContext = createContext<CollaborationContextType | undefined>(undefined);
 
-const PRESENCE_INTERVAL_MS = 18_000;
-const ACTIVITY_INTERVAL_MS = 28_000;
-const STATUS_INTERVAL_MS = 30_000;
+const HEARTBEAT_INTERVAL_MS = 45_000; // Slower heartbeat since we have realtime updates
+const STATUS_INTERVAL_MS = 60_000;
 const TYPING_THROTTLE_MS = 2_500;
 
 function currentViewFromPath(pathname: string | null) {
@@ -66,6 +70,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
   const [presence, setPresence] = useState<WorkspacePresenceSnapshot | null>(null);
   const [activity, setActivity] = useState<WorkspaceActivityEvent[]>([]);
   const [liveStatuses, setLiveStatuses] = useState<Record<string, WorkspaceLiveStatus>>({});
+  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
   const [loadingPresence, setLoadingPresence] = useState(false);
   const [loadingActivity, setLoadingActivity] = useState(false);
   const typingSentAtRef = useRef(0);
@@ -136,6 +141,20 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     }
   }, [session]);
 
+  const leaveWorkspace = useCallback(async (wid?: string | null) => {
+    const targetId = wid || activeWorkspaceId;
+    if (!session || !targetId) return;
+
+    try {
+      await apiClient.delete(`/workspaces/${targetId}/presence`);
+      if (targetId === activeWorkspaceId) {
+        setPresence(null);
+      }
+    } catch (err) {
+      console.warn("Unable to leave workspace presence", err);
+    }
+  }, [activeWorkspaceId, session]);
+
   const sendTypingSignal = useCallback(
     async (conversationId?: string | null, isTyping = true) => {
       if (!session || !activeWorkspaceId) return;
@@ -169,25 +188,87 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     [activeWorkspaceId, session],
   );
 
+  // Realtime Subscriptions
+  useEffect(() => {
+    if (!session || !activeWorkspaceId) {
+      setRealtimeStatus("disconnected");
+      return;
+    }
+
+    setRealtimeStatus("connecting");
+
+    // Presence Subscription
+    realtimeRegistry.subscribe(
+      { type: "presence", workspaceId: activeWorkspaceId },
+      (channel) =>
+        channel
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "workspace_presence",
+              filter: `workspace_id=eq.${activeWorkspaceId}`,
+            },
+            () => {
+              console.debug("[realtime] presence change detected, refreshing...");
+              void refreshPresence();
+            }
+          )
+          .subscribe((status) => {
+            if (status === "SUBSCRIBED") setRealtimeStatus("connected");
+            if (status === "CHANNEL_ERROR") setRealtimeStatus("error");
+          })
+    );
+
+    // Activity Subscription
+    realtimeRegistry.subscribe(
+      { type: "activity", workspaceId: activeWorkspaceId },
+      (channel) =>
+        channel
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "workspace_activity_events",
+              filter: `workspace_id=eq.${activeWorkspaceId}`,
+            },
+            (payload) => {
+              console.debug("[realtime] activity insert detected", payload);
+              void refreshActivity();
+            }
+          )
+    );
+
+    return () => {
+      realtimeRegistry.unsubscribe({ type: "presence", workspaceId: activeWorkspaceId });
+      realtimeRegistry.unsubscribe({ type: "activity", workspaceId: activeWorkspaceId });
+    };
+  }, [activeWorkspaceId, refreshActivity, refreshPresence, session]);
+
+  // Periodic Refresh / Heartbeat
   useEffect(() => {
     void refreshPresence();
     void refreshActivity();
     void refreshLiveStatuses();
-  }, [refreshActivity, refreshLiveStatuses, refreshPresence]);
+
+    return () => {
+      if (activeWorkspaceId) {
+        void leaveWorkspace(activeWorkspaceId);
+      }
+    };
+  }, [activeWorkspaceId, leaveWorkspace, refreshActivity, refreshLiveStatuses, refreshPresence]);
 
   useEffect(() => {
     if (!session) return;
 
-    const presenceId = window.setInterval(() => {
+    const heartbeatId = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         void refreshPresence();
       }
-    }, PRESENCE_INTERVAL_MS);
-    const activityId = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void refreshActivity();
-      }
-    }, ACTIVITY_INTERVAL_MS);
+    }, HEARTBEAT_INTERVAL_MS);
+    
     const statusId = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         void refreshLiveStatuses();
@@ -200,21 +281,14 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       void refreshLiveStatuses();
     };
 
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        handleFocus();
-      }
-    };
-
     window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibility);
+    document.addEventListener("visibilitychange", handleFocus);
 
     return () => {
-      window.clearInterval(presenceId);
-      window.clearInterval(activityId);
+      window.clearInterval(heartbeatId);
       window.clearInterval(statusId);
       window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibility);
+      document.removeEventListener("visibilitychange", handleFocus);
     };
   }, [refreshActivity, refreshLiveStatuses, refreshPresence, session]);
 
@@ -223,11 +297,13 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       presence,
       activity,
       liveStatuses,
+      realtimeStatus,
       loadingPresence,
       loadingActivity,
       refreshPresence,
       refreshActivity,
       refreshLiveStatuses,
+      leaveWorkspace,
       sendTypingSignal,
       statusForWorkspace: (workspaceId?: string | null) =>
         workspaceId ? liveStatuses[workspaceId] ?? null : null,
@@ -235,12 +311,14 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     [
       activity,
       liveStatuses,
+      realtimeStatus,
       loadingActivity,
       loadingPresence,
       presence,
       refreshActivity,
       refreshLiveStatuses,
       refreshPresence,
+      leaveWorkspace,
       sendTypingSignal,
     ],
   );
@@ -259,3 +337,4 @@ export function useWorkspaceCollaboration() {
   }
   return context;
 }
+

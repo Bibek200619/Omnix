@@ -4,43 +4,70 @@ import logging
 from typing import List, Optional
 
 from .schemas import ContextPayload, Citation, ContextSourceType
-from ..services import workspace_service, supabase_service
+from ..services import workspace_service, supabase_service, workspace_intelligence_service
 
 logger = logging.getLogger(__name__)
 
 
 class WorkspaceContextManager:
-    """Workspace intelligence layer."""
+    """
+    Unified Workspace Intelligence Layer.
+    Orchestrates workspace profile, specialization, and source awareness.
+    """
 
     async def fetch_workspace_context(self, payload: ContextPayload) -> List[Citation]:
         citations = []
         
-        # 1. Workspace Summary
-        if payload.workspace_id:
-            try:
-                ws = await workspace_service._enriched_workspace_for_user(
-                    payload.workspace_id, payload.user_id
+        if not payload.workspace_id:
+            return citations
+
+        # 1. High-Fidelity Workspace Intelligence Profile
+        try:
+            profile = await workspace_intelligence_service.build_workspace_intelligence_profile(
+                payload.workspace_id, payload.user_id
+            )
+            
+            # Convert profile to a structured system prompt fragment
+            intelligence_context = workspace_intelligence_service.workspace_intelligence_system_prompt(profile)
+            
+            citations.append(
+                Citation(
+                    source_id=f"ws_profile_{payload.workspace_id}",
+                    source_type=ContextSourceType.WORKSPACE,
+                    content=intelligence_context,
+                    score=1.0 # Intelligence profile is foundational
                 )
+            )
+            
+            # 2. Workspace Atmosphere / Recent Insights
+            insights = profile.get("recent_insights", [])
+            if insights:
                 citations.append(
                     Citation(
-                        source_id=f"ws_{payload.workspace_id}",
+                        source_id=f"ws_insights_{payload.workspace_id}",
                         source_type=ContextSourceType.WORKSPACE,
-                        content=f"Workspace Context: {ws}",
+                        content=f"Current Workspace Atmosphere: {' '.join(insights)}",
+                        score=0.9
                     )
                 )
-            except Exception:
-                logger.exception("Failed to fetch workspace summary.")
+
+        except Exception:
+            logger.exception("Failed to build workspace intelligence profile for context.")
                 
-        # 2. Top shared artifacts
+        # 3. Top contextual artifacts
         try:
-            filters = {"workspace_id": payload.workspace_id} if payload.workspace_id else {"user_id": payload.user_id}
+            # We look for artifacts in the same scope as the intelligence profile
+            scope_ids = [payload.workspace_id]
+            if profile and profile.get("scope_workspace_ids"):
+                scope_ids = profile["scope_workspace_ids"]
+
             rows = await supabase_service.select_all_trusted(
                 "artifacts",
                 "id,title,type,content,metadata",
-                filters=filters,
+                filters={"workspace_id": scope_ids},
                 order_by="created_at",
                 desc=True,
-                limit=3,
+                limit=5,
             )
             for row in rows:
                 content = row.get("content")
@@ -49,11 +76,12 @@ class WorkspaceContextManager:
                         Citation(
                             source_id=str(row.get("id")),
                             source_type=ContextSourceType.WORKSPACE,
-                            content=f"Artifact ({row.get("title", "Omnix")}): {content[:500]}",
+                            content=f"Artifact ({row.get('title', 'Omnix')}): {content[:800]}",
                             metadata=row.get("metadata") or {},
+                            score=0.8
                         )
                     )
         except Exception:
-            logger.exception("Failed to fetch artifacts for context.")
+            logger.exception("Failed to fetch artifacts for workspace context.")
 
         return citations
