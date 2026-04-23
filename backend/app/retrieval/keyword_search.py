@@ -27,7 +27,7 @@ class KeywordSearch:
         query: str,
         *,
         user_id: str,
-        workspace_id: str | None = None,
+        workspace_id: str | list[str] | None = None,
         top_k: int = 3,
     ) -> list[RetrievalResult]:
         started_at = time.perf_counter()
@@ -37,11 +37,18 @@ class KeywordSearch:
             raise ValueError("user_id is required for keyword retrieval.")
 
         try:
+            # Normalize workspace_id to an array for the federated RPC
+            workspace_ids = None
+            if isinstance(workspace_id, list):
+                workspace_ids = workspace_id
+            elif isinstance(workspace_id, str):
+                workspace_ids = [workspace_id]
+
             rows = await run_in_threadpool(
                 self._keyword_rpc_sync,
                 query.strip(),
                 user_id,
-                workspace_id,
+                workspace_ids,
                 top_k,
             )
         except Exception:
@@ -64,7 +71,7 @@ class KeywordSearch:
     def _keyword_rpc_sync(
         query: str,
         user_id: str,
-        workspace_id: str | None,
+        workspace_ids: list[str] | None,
         top_k: int,
     ) -> list[dict[str, Any]]:
         response = execute_query_sync(
@@ -74,7 +81,7 @@ class KeywordSearch:
                     "q": query,
                     "p_top_k": top_k,
                     "p_user": user_id,
-                    "p_workspace": workspace_id,
+                    "p_workspace_ids": workspace_ids,
                 },
             ),
             operation="keyword retrieval rpc",
@@ -91,7 +98,10 @@ class KeywordSearch:
         supabase = get_supabase()
         doc_query = supabase.table("documents").select(DOCUMENT_COLUMNS)
         if workspace_id:
-            doc_query = doc_query.eq("workspace_id", workspace_id)
+            if isinstance(workspace_id, list):
+                doc_query = doc_query.in_("workspace_id", workspace_id)
+            else:
+                doc_query = doc_query.eq("workspace_id", workspace_id)
         else:
             doc_query = doc_query.eq("user_id", user_id)
 
@@ -100,8 +110,11 @@ class KeywordSearch:
             operation="keyword retrieval fallback documents",
         )
         docs = list(getattr(response, "data", None) or [])
+        
+        w_ids = set(workspace_id) if isinstance(workspace_id, list) else {workspace_id} if workspace_id else set()
+        
         if workspace_id:
-            docs = [row for row in docs if str(row.get("workspace_id") or "") == workspace_id]
+            docs = [row for row in docs if str(row.get("workspace_id") or "") in w_ids]
         else:
             docs = [row for row in docs if not row.get("workspace_id")]
 
@@ -132,21 +145,27 @@ class KeywordSearch:
         file_ids: list[str],
         *,
         user_id: str,
-        workspace_id: str | None,
+        workspace_id: str | list[str] | None,
     ) -> dict[str, dict[str, Any]]:
         if not file_ids:
             return {}
 
         query = get_supabase().table("files").select(FILE_COLUMNS).in_("id", file_ids)
         if workspace_id:
-            query = query.eq("workspace_id", workspace_id)
+            if isinstance(workspace_id, list):
+                query = query.in_("workspace_id", workspace_id)
+            else:
+                query = query.eq("workspace_id", workspace_id)
         else:
             query = query.eq("user_id", user_id)
 
         response = execute_query_sync(query, operation="keyword retrieval fallback files")
         rows = list(getattr(response, "data", None) or [])
+        
+        w_ids = set(workspace_id) if isinstance(workspace_id, list) else {workspace_id} if workspace_id else set()
+        
         if workspace_id:
-            rows = [row for row in rows if str(row.get("workspace_id") or "") == workspace_id]
+            rows = [row for row in rows if str(row.get("workspace_id") or "") in w_ids]
         else:
             rows = [row for row in rows if not row.get("workspace_id")]
         return {str(row["id"]): row for row in rows if row.get("id")}

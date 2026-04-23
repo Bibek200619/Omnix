@@ -64,62 +64,115 @@ export function WorkspaceActivityFeed({
   const visibleActivity = compact ? activity.slice(0, 5) : activity;
 
   return (
-    <section className={cn("relative overflow-hidden rounded-[14px] border border-[var(--omnix-border)] bg-black/15", compact ? "p-4" : "p-5", className)}>
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(155,92,255,0.62),rgba(0,255,255,0.56),transparent)]" />
-      <div className="relative z-10 mb-4 flex items-center justify-between gap-3">
+    <section className={cn(
+      "relative overflow-hidden rounded-[16px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(0,0,0,0.4))] shadow-2xl backdrop-blur-xl", 
+      compact ? "p-4" : "p-5", 
+      className
+    )}>
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(155,92,255,0.4),rgba(0,255,255,0.3),transparent)]" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-white/5 to-transparent" />
+
+      <div className="relative z-10 mb-6 flex items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">
-            <Activity className="h-3.5 w-3.5 text-[var(--omnix-cyan)]" />
-            Live activity
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200/50">
+            <Activity className={cn("h-3.5 w-3.5", !loading && "animate-pulse text-cyan-400")} />
+            Activity Log
           </div>
-          <h3 className="mt-1 text-base font-semibold text-white">Workspace pulse</h3>
+          <h3 className="mt-1.5 text-lg font-bold tracking-tight text-white/90">Workspace Pulse</h3>
         </div>
-        {loading ? (
-          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[10px] font-semibold text-cyan-100">
-            Syncing
+        <div className="flex items-center gap-2">
+          {loading && (
+            <span className="flex h-1.5 w-1.5 animate-ping rounded-full bg-cyan-400" />
+          )}
+          <span className={cn(
+            "rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider",
+            loading 
+              ? "border-cyan-500/20 bg-cyan-500/10 text-cyan-300" 
+              : "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+          )}>
+            {loading ? "Syncing" : "Verified"}
           </span>
-        ) : (
-          <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-100">
-            Real events
-          </span>
-        )}
+        </div>
       </div>
 
-      <div className="relative z-10 space-y-2">
-        {visibleActivity.length ? visibleActivity.map((item) => {
-          const Icon = eventIcon[item.event_type as keyof typeof eventIcon] ?? Activity;
-          return (
-            <div
-              key={item.id}
-              className="group flex items-center gap-3 rounded-[10px] border border-white/[0.06] bg-[rgba(255,255,255,0.025)] px-3 py-3 transition hover:border-cyan-300/18 hover:bg-cyan-300/[0.045]"
-            >
-              <ProfileAvatar
-                name={actorName(item)}
-                email={item.actor_email}
-                avatarUrl={item.actor_avatar_url}
-                className="h-8 w-8 rounded-lg border border-cyan-200/18 bg-cyan-300/10 text-xs font-bold"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <Icon className="h-3.5 w-3.5 shrink-0 text-cyan-200" />
-                  <p className="truncate text-sm font-semibold text-white">{item.summary}</p>
+      <div className="relative z-10 space-y-4">
+        {visibleActivity.length ? (
+          <div className="relative space-y-3 before:absolute before:left-[1.35rem] before:top-2 before:h-[calc(100%-16px)] before:w-px before:bg-gradient-to-b before:from-white/10 before:via-white/5 before:to-transparent">
+            {visibleActivity.map((item) => {
+              const Icon = eventIcon[item.event_type as keyof typeof eventIcon] ?? Activity;
+              const isAI = item.event_type.includes("ai_") || item.actor_user_id === "system";
+              
+              return (
+                <div
+                  key={item.id}
+                  className="group relative flex gap-4 pl-0 transition-all duration-300"
+                >
+                  <div className="relative z-10 shrink-0">
+                    <ProfileAvatar
+                      name={actorName(item)}
+                      email={item.actor_email}
+                      avatarUrl={item.actor_avatar_url}
+                      className={cn(
+                        "h-11 w-11 rounded-xl border bg-black/40 text-sm font-bold shadow-xl transition-all duration-300 group-hover:scale-105",
+                        isAI 
+                          ? "border-purple-500/30 ring-1 ring-purple-500/10" 
+                          : "border-cyan-500/20 ring-1 ring-cyan-500/5"
+                      )}
+                    />
+                    <div className={cn(
+                      "absolute -right-1 -top-1 rounded-full border border-white/10 p-1 shadow-lg backdrop-blur-md",
+                      isAI ? "bg-purple-600/80" : "bg-cyan-600/80"
+                    )}>
+                      <Icon className="h-2.5 w-2.5 text-white" />
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-[13px] font-bold text-white/90 group-hover:text-cyan-200 transition-colors">
+                        {item.summary}
+                      </p>
+                      <span className="shrink-0 text-[10px] font-medium text-white/30">
+                        {formatRelativeTime(item.created_at)}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className={cn(
+                        "text-[10px] font-bold tracking-wide",
+                        isAI ? "text-purple-400/80" : "text-cyan-400/80"
+                      )}>
+                        {actorName(item)}
+                      </span>
+                      <span className="h-0.5 w-0.5 rounded-full bg-white/10" />
+                      <span className="text-[10px] font-medium text-white/20 uppercase tracking-tight">
+                        {item.event_type.split('.').pop()?.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <p className="mt-1 truncate text-xs text-[var(--omnix-text-3)]">
-                  {actorName(item)} - {formatRelativeTime(item.created_at)}
-                </p>
-              </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/5 bg-white/[0.01] p-10 text-center">
+            <div className="relative">
+              <Activity className="h-10 w-10 text-white/10" />
+              <div className="absolute inset-0 animate-pulse bg-cyan-400/10 blur-xl rounded-full" />
             </div>
-          );
-        }) : (
-          <div className="rounded-[12px] border border-dashed border-[var(--omnix-border)] bg-black/15 p-5 text-center">
-            <Activity className="mx-auto h-7 w-7 text-cyan-200/35" />
-            <p className="mt-3 text-sm font-semibold text-white">No activity yet</p>
-            <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">
-              Real workspace events will appear here after teammates, sources, and AI runs change this space.
+            <p className="mt-4 text-sm font-bold text-white/60">Quiescent State</p>
+            <p className="mt-2 max-w-[200px] text-[11px] leading-relaxed text-white/30">
+              Awaiting operational events. Teammate actions and AI insights will materialize here.
             </p>
           </div>
         )}
       </div>
+      
+      {!compact && visibleActivity.length > 0 && (
+        <div className="mt-6 flex justify-center">
+          <button className="text-[10px] font-bold uppercase tracking-widest text-white/20 hover:text-cyan-300 transition-colors">
+            View full audit trail
+          </button>
+        </div>
+      )}
     </section>
   );
 }

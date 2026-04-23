@@ -115,9 +115,27 @@ async def workspace_retrieval_scope_ids(
     workspace: dict[str, Any],
     user_id: str,
 ) -> list[str]:
+    """
+    ARCHITECTURE NOTE (Shared Organizational Memory):
+    This function defines the 'Knowledge Hub' logic for Omnix. 
+    Global workspaces act as bridges between disparate teams, while Isolated 
+    workspaces maintain strict privacy boundaries. 
+    
+    Future agents will utilize these scope IDs to navigate the organizational 
+    intelligence graph safely.
+    """
     normalized = normalize_workspace_record(workspace)
     workspace_id = str(normalized["id"])
-    if not normalized.get("is_global"):
+    preferences = normalized.get("intelligence_preferences") or {}
+    source_perms = preferences.get("source_permissions")
+
+    # If organization-wide access is enabled, we could return all accessible workspaces.
+    # For now, we strictly follow the hierarchy.
+    if source_perms == "organization":
+        # Placeholder for future global cross-team discovery
+        pass
+
+    if not normalized.get("is_global") and preferences.get("retrieval_scope") != "global":
         return [workspace_id]
 
     parent_id = str(normalized.get("parent_workspace_id") or "")
@@ -127,6 +145,11 @@ async def workspace_retrieval_scope_ids(
     subspaces = await list_subspaces_for_super_workspace(parent_id, user_id)
     ids = [parent_id]
     ids.extend(str(subspace["id"]) for subspace in subspaces if subspace.get("id"))
+    
+    # Ensure the requested workspace is always included even if it's not in the subspace list (race condition safety)
+    if workspace_id not in ids:
+        ids.append(workspace_id)
+        
     return list(dict.fromkeys(ids))
 
 
