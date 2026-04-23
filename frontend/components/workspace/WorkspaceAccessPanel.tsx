@@ -23,6 +23,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 import {
   getWorkspaceInviteId,
   type WorkspaceMember,
+  type WorkspaceRole,
 } from "@/lib/workspace-types";
 import {
   isWorkspaceFounderRole,
@@ -35,7 +36,7 @@ import { WorkspaceInviteModal } from "./WorkspaceInviteModal";
 import { WorkspaceMemberStack, workspaceMemberName } from "./WorkspaceMemberStack";
 
 type ConfirmAction =
-  | { type: "role"; member: WorkspaceMember; role: "co_owner" | "member" }
+  | { type: "role"; member: WorkspaceMember; role: WorkspaceRole }
   | { type: "remove"; member: WorkspaceMember };
 
 function memberEmailLabel(member: WorkspaceMember) {
@@ -124,7 +125,7 @@ export function WorkspaceAccessPanel() {
   const activeRole = activeWorkspace?.current_user_role;
   const canManageRoles = isWorkspaceFounderRole(activeRole);
 
-  async function handleInvite(target: string, role: "co_owner" | "member") {
+  async function handleInvite(target: string, role: WorkspaceRole) {
     try {
       setInviteLoading(true);
       setInviteError(null);
