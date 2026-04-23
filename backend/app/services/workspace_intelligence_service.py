@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
 
+from ..db.supabase_client import get_async_supabase
 from ..services.supabase_service import select_all_trusted
 from .workspace_continuity_service import list_initiatives, list_unresolved_continuity
 from .workspace_service import (
@@ -18,6 +20,11 @@ from .workspace_service import (
 FILE_COLUMNS = "id,file_name,file_type,workspace_id,metadata,created_at"
 CONVERSATION_COLUMNS = "id,title,workspace_id,last_message_at,updated_at,created_at"
 DOMAIN_RE = re.compile(r"[A-Za-z][A-Za-z0-9+#-]{2,}")
+
+# Cache for intelligence profiles to reduce massive read amplification
+# Structure: {(workspace_id, user_id): (timestamp, profile_dict)}
+_intelligence_profile_cache: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
+INTELLIGENCE_CACHE_TTL = 15.0  # Seconds
 
 
 def _text(value: Any) -> str | None:
@@ -162,6 +169,12 @@ async def build_workspace_intelligence_profile(
     workspace_id: str,
     user_id: str,
 ) -> dict[str, Any]:
+    now_ts = time.perf_counter()
+    cache_key = (workspace_id, user_id)
+    cached = _intelligence_profile_cache.get(cache_key)
+    if cached and (now_ts - cached[0] < INTELLIGENCE_CACHE_TTL):
+        return cached[1]
+
     access = await require_workspace_access(workspace_id, user_id)
     workspace = normalize_workspace_record(access.workspace)
     scope_ids = await workspace_retrieval_scope_ids(workspace, user_id)
@@ -193,24 +206,33 @@ async def build_workspace_intelligence_profile(
     members = await list_workspace_members(workspace)
     
     # Operational Continuity (Phases 2, 3, 6)
-    client = select_all_trusted()
-    init_res = (client.table("workspace_initiatives")
-                .select("*")
-                .in_("workspace_id", scope_ids)
-                .eq("status", "active")
-                .order("momentum_score", desc=True)
-                .limit(5)
-                .execute())
-    initiatives = init_res.data or []
+    client = get_async_supabase()
+    
+    try:
+        init_res = await (client.table("workspace_initiatives")
+                    .select("*")
+                    .in_("workspace_id", scope_ids)
+                    .eq("status", "active")
+                    .order("momentum_score", desc=True)
+                    .limit(5)
+                    .execute())
+        initiatives = init_res.data or []
+    except Exception:
+        logger.warning("Failed to fetch initiatives for intelligence profile")
+        initiatives = []
 
-    memory_res = (client.table("workspace_intelligence_memory")
-                  .select("*")
-                  .in_("workspace_id", scope_ids)
-                  .in_("resolution_status", ["unresolved", "pending_collaboration", "blocked"])
-                  .order("importance_score", desc=True)
-                  .limit(5)
-                  .execute())
-    unresolved_continuity = memory_res.data or []
+    try:
+        memory_res = await (client.table("workspace_intelligence_memory")
+                      .select("*")
+                      .in_("workspace_id", scope_ids)
+                      .in_("resolution_status", ["unresolved", "pending_collaboration", "blocked"])
+                      .order("importance_score", desc=True)
+                      .limit(5)
+                      .execute())
+        unresolved_continuity = memory_res.data or []
+    except Exception:
+        logger.warning("Failed to fetch continuity memory for intelligence profile")
+        unresolved_continuity = []
     
     domains = _domain_candidates(workspace, scoped_files)
     preferences = normalize_intelligence_preferences(
@@ -254,6 +276,8 @@ async def build_workspace_intelligence_profile(
         member_count=len(members),
         domains=domains,
     )
+    
+    _intelligence_profile_cache[cache_key] = (now_ts, profile)
     return profile
 
 
@@ -302,3 +326,6 @@ def workspace_intelligence_system_prompt(profile: dict[str, Any] | None) -> str:
         ]
     )
     return "\n".join(line for line in lines if line is not None)
+
+import logging
+logger = logging.getLogger(__name__)
