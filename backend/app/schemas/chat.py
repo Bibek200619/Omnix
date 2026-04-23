@@ -6,7 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 MAX_INPUT_SIZE = 4000
-WorkspaceType = Literal["workspace", "super", "sub"]
+WorkspaceType = Literal["workspace", "super_workspace", "subworkspace", "global_workspace"]
 WorkspaceAIMode = Literal["research", "coding", "design", "strategy", "analytics", "general"]
 
 
@@ -131,7 +131,7 @@ class WorkspaceCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: str | None = None
     parent_workspace_id: str | None = None
-    workspace_type: WorkspaceType = "workspace"
+    workspace_type: WorkspaceType = "super_workspace"
     is_global: bool = False
 
 
@@ -152,7 +152,7 @@ class WorkspaceRead(BaseModel):
     name: str
     description: str | None = None
     parent_workspace_id: str | None = None
-    workspace_type: WorkspaceType = "workspace"
+    workspace_type: WorkspaceType = "super_workspace"
     is_global: bool = False
     expertise_area: str | None = None
     ai_specialization: WorkspaceAIMode = "general"

@@ -296,7 +296,15 @@ export function WorkspaceSettingsPanel() {
               Hierarchy
             </div>
             <div className="relative z-10 grid gap-3">
-              <InfoRow label="Workspace type" value={activeWorkspace.workspace_type} />
+              <InfoRow 
+                label="Workspace type" 
+                value={
+                  activeWorkspace.workspace_type === "super_workspace" || activeWorkspace.workspace_type === "super" ? "Super Workspace" :
+                  activeWorkspace.workspace_type === "subworkspace" || activeWorkspace.workspace_type === "sub" ? "Subworkspace" :
+                  activeWorkspace.workspace_type === "global_workspace" ? "Global Space" :
+                  activeWorkspace.workspace_type
+                } 
+              />
               <InfoRow label="Parent workspace" value={parentWorkspace?.name ?? "Root workspace"} />
               <InfoRow label="Root workspace" value={activeRootWorkspace?.name ?? activeWorkspace.name} />
               <InfoRow label="Global space" value={activeWorkspace.is_global ? "Global" : "Standard"} />
