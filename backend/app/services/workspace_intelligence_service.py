@@ -3,8 +3,10 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from typing import Any
+from uuid import UUID
 
 from ..services.supabase_service import select_all_trusted
+from .workspace_continuity_service import list_initiatives, list_unresolved_continuity
 from .workspace_service import (
     list_workspace_members,
     normalize_ai_specialization,
@@ -189,6 +191,27 @@ async def build_workspace_intelligence_profile(
     ]
 
     members = await list_workspace_members(workspace)
+    
+    # Operational Continuity (Phases 2, 3, 6)
+    client = select_all_trusted()
+    init_res = (client.table("workspace_initiatives")
+                .select("*")
+                .in_("workspace_id", scope_ids)
+                .eq("status", "active")
+                .order("momentum_score", desc=True)
+                .limit(5)
+                .execute())
+    initiatives = init_res.data or []
+
+    memory_res = (client.table("workspace_intelligence_memory")
+                  .select("*")
+                  .in_("workspace_id", scope_ids)
+                  .in_("resolution_status", ["unresolved", "pending_collaboration", "blocked"])
+                  .order("importance_score", desc=True)
+                  .limit(5)
+                  .execute())
+    unresolved_continuity = memory_res.data or []
+    
     domains = _domain_candidates(workspace, scoped_files)
     preferences = normalize_intelligence_preferences(
         workspace.get("intelligence_preferences"),
@@ -214,6 +237,14 @@ async def build_workspace_intelligence_profile(
         "connected_sources": [_source_payload(row) for row in scoped_files[:8]],
         "retrieval_scope": retrieval_scope,
         "scope_workspace_ids": scope_ids,
+        "active_initiatives": [
+            {"id": str(i["id"]), "name": i["name"], "status": i["status"]}
+            for i in initiatives
+        ],
+        "unresolved_continuity": [
+            {"content": c["content"], "status": c["resolution_status"]}
+            for c in unresolved_continuity
+        ],
     }
     profile["context_summary"] = _summary(workspace, domains, len(scoped_files))
     profile["recent_insights"] = _insights(
@@ -248,6 +279,17 @@ def workspace_intelligence_system_prompt(profile: dict[str, Any] | None) -> str:
         lines.append(f"- Active knowledge domains: {', '.join(profile['active_domains'][:8])}")
     if profile.get("source_count") is not None:
         lines.append(f"- Connected sources in scope: {profile.get('source_count')}")
+
+    # Inject Continuity Intelligence (Phase 8)
+    if profile.get("active_initiatives"):
+        initiatives_str = ", ".join(i["name"] for i in profile["active_initiatives"])
+        lines.append(f"- Active initiatives: {initiatives_str}")
+    
+    if profile.get("unresolved_continuity"):
+        lines.append("- Unresolved continuity memory:")
+        for c in profile["unresolved_continuity"]:
+            lines.append(f"  * {c['content']} ({c['status']})")
+
     if profile.get("ai_instructions"):
         lines.append(f"- Workspace instructions: {profile['ai_instructions']}")
 
