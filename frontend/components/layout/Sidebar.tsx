@@ -45,7 +45,7 @@ import { cn } from "@/lib/utils";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import { PendingWorkspaceInvites } from "@/components/workspace/PendingWorkspaceInvites";
 import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModal";
-import type { Workspace } from "@/lib/workspace-types";
+import type { Workspace, WorkspaceRole } from "@/lib/workspace-types";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
