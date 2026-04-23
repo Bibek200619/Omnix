@@ -41,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(automations.router)
     app.include_router(google_drive.router)
     app.include_router(admin.router)
+    app.include_router(continuity.router)
     
     @app.on_event("startup")
     async def startup_event():

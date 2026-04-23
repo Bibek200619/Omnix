@@ -162,6 +162,30 @@ export type WorkspaceActivityEvent = {
   actor_avatar_label: string;
 };
 
+export type WorkspaceInitiativeStatus = "active" | "paused" | "completed";
+
+export type WorkspaceInitiative = {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description?: string | null;
+  status: WorkspaceInitiativeStatus;
+  momentum_score: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkspaceOperationalTimelineEvent = {
+  id: string;
+  workspace_id: string;
+  initiative_id?: string | null;
+  event_type: string;
+  summary: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
 export type WorkspaceLiveStatus = {
   workspace_id: string;
   online_count: number;
