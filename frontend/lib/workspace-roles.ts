@@ -2,11 +2,14 @@ import type { WorkspaceRole } from "@/lib/workspace-types";
 
 export function workspaceRoleLabel(role?: WorkspaceRole | string | null) {
   switch (role) {
+    case "super_founder":
     case "founder":
     case "owner":
       return "Founder";
+    case "sub_leader":
     case "co_owner":
-      return "Co-owner";
+      return "Leader";
+    case "sub_member":
     case "member":
       return "Member";
     default:
@@ -16,11 +19,14 @@ export function workspaceRoleLabel(role?: WorkspaceRole | string | null) {
 
 export function workspaceRoleBadgeClass(role?: WorkspaceRole | string | null) {
   switch (role) {
+    case "super_founder":
     case "founder":
     case "owner":
       return "border-red-300/35 bg-red-400/12 text-red-100";
+    case "sub_leader":
     case "co_owner":
       return "border-amber-300/40 bg-amber-300/12 text-amber-100";
+    case "sub_member":
     case "member":
       return "border-sky-300/30 bg-sky-300/12 text-sky-100";
     default:
@@ -30,11 +36,14 @@ export function workspaceRoleBadgeClass(role?: WorkspaceRole | string | null) {
 
 export function workspaceRoleAvatarClass(role?: WorkspaceRole | string | null) {
   switch (role) {
+    case "super_founder":
     case "founder":
     case "owner":
       return "border-red-300/35 bg-red-400/15 text-red-100";
+    case "sub_leader":
     case "co_owner":
       return "border-amber-300/35 bg-amber-300/15 text-amber-100";
+    case "sub_member":
     case "member":
       return "border-sky-300/35 bg-sky-300/15 text-sky-100";
     default:
@@ -43,7 +52,7 @@ export function workspaceRoleAvatarClass(role?: WorkspaceRole | string | null) {
 }
 
 export function isWorkspaceFounderRole(role?: WorkspaceRole | string | null) {
-  return role === "founder" || role === "owner";
+  return role === "super_founder" || role === "founder" || role === "owner";
 }
 
 export function initialsFromText(value?: string | null) {
