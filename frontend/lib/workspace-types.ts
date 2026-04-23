@@ -186,6 +186,19 @@ export type WorkspaceOperationalTimelineEvent = {
   created_at: string;
 };
 
+export type WorkspaceContinuityMemory = {
+  id: string;
+  workspace_id: string;
+  initiative_id?: string | null;
+  memory_type: string;
+  content: string;
+  resolution_status?: string | null;
+  structured_data: Record<string, unknown>;
+  importance_score: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type WorkspaceLiveStatus = {
   workspace_id: string;
   online_count: number;

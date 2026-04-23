@@ -1,9 +1,8 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { 
   Activity, 
-  ChevronRight, 
   CircleDot, 
   Clock, 
   Compass, 
@@ -25,7 +24,7 @@ type OperationalTimelineProps = {
   className?: string;
 };
 
-const EVENT_ICONS: Record<string, any> = {
+const EVENT_ICONS: Record<string, React.ElementType> = {
   initiative_started: Flag,
   momentum_spike: Zap,
   decision_made: CircleDot,
@@ -140,10 +139,10 @@ export function WorkspaceOperationalTimeline({
                       <p className="text-sm font-medium leading-relaxed text-slate-300">
                         {event.summary}
                       </p>
-                      {event.metadata?.initiative_name && (
+                      {typeof event.metadata?.initiative_name === "string" && (
                         <div className="mt-3 flex items-center gap-2 text-[10px] font-bold text-white/30">
                           <Milestone className="h-3 w-3" />
-                          <span>Part of <span className="text-white/60">{event.metadata.initiative_name as string}</span></span>
+                          <span>Part of <span className="text-white/60">{event.metadata.initiative_name}</span></span>
                         </div>
                       )}
                     </div>

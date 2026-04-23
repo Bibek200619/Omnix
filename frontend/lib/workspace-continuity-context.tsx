@@ -5,13 +5,14 @@ import { apiClient } from "./api";
 import { useWorkspace } from "./workspace-context";
 import type { 
   WorkspaceInitiative, 
-  WorkspaceOperationalTimelineEvent 
+  WorkspaceOperationalTimelineEvent,
+  WorkspaceContinuityMemory
 } from "./workspace-types";
 
 type ContinuityContextType = {
   initiatives: WorkspaceInitiative[];
   timeline: WorkspaceOperationalTimelineEvent[];
-  unresolvedContinuity: any[];
+  unresolvedContinuity: WorkspaceContinuityMemory[];
   loading: boolean;
   error: string | null;
   refreshContinuity: () => Promise<void>;
@@ -24,7 +25,7 @@ export function WorkspaceContinuityProvider({ children }: { children: ReactNode 
   const { activeWorkspaceId } = useWorkspace();
   const [initiatives, setInitiatives] = useState<WorkspaceInitiative[]>([]);
   const [timeline, setTimeline] = useState<WorkspaceOperationalTimelineEvent[]>([]);
-  const [unresolvedContinuity, setUnresolvedContinuity] = useState<any[]>([]);
+  const [unresolvedContinuity, setUnresolvedContinuity] = useState<WorkspaceContinuityMemory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +38,7 @@ export function WorkspaceContinuityProvider({ children }: { children: ReactNode 
       const [initData, timelineData, unresolvedData] = await Promise.all([
         apiClient.get<WorkspaceInitiative[]>(`/workspaces/${activeWorkspaceId}/initiatives`),
         apiClient.get<WorkspaceOperationalTimelineEvent[]>(`/workspaces/${activeWorkspaceId}/timeline`),
-        apiClient.get<any[]>(`/workspaces/${activeWorkspaceId}/continuity/unresolved`)
+        apiClient.get<WorkspaceContinuityMemory[]>(`/workspaces/${activeWorkspaceId}/continuity/unresolved`)
       ]);
       
       setInitiatives(initData);
