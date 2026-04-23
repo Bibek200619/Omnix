@@ -99,7 +99,7 @@ export function WorkspaceInviteModal({
             <div>
               <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-300">
                 <ShieldCheck className="h-4 w-4 text-amber-200" />
-                Invite role
+                Visibility scope
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {(["member", "co_owner"] as WorkspaceRole[]).map((option) => (
@@ -133,7 +133,7 @@ export function WorkspaceInviteModal({
               Cancel
             </Button>
             <Button type="submit" leftIcon={<UserPlus className="h-4 w-4" />} isLoading={loading}>
-              Invite
+              Assign Scope
             </Button>
           </div>
         </form>

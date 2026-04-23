@@ -5,15 +5,15 @@ export function workspaceRoleLabel(role?: WorkspaceRole | string | null) {
     case "super_founder":
     case "founder":
     case "owner":
-      return "Founder";
+      return "Org Founder";
     case "sub_leader":
     case "co_owner":
-      return "Leader";
+      return "Operational Lead";
     case "sub_member":
     case "member":
-      return "Member";
+      return "Workspace Member";
     default:
-      return "Member";
+      return "Workspace Member";
   }
 }
 
@@ -22,13 +22,13 @@ export function workspaceRoleBadgeClass(role?: WorkspaceRole | string | null) {
     case "super_founder":
     case "founder":
     case "owner":
-      return "border-red-300/35 bg-red-400/12 text-red-100";
+      return "border-purple-300/25 bg-purple-400/10 text-purple-200 shadow-[var(--omnix-glow-xs)]";
     case "sub_leader":
     case "co_owner":
-      return "border-amber-300/40 bg-amber-300/12 text-amber-100";
+      return "border-amber-300/25 bg-amber-400/10 text-amber-200 shadow-[var(--omnix-glow-xs)]";
     case "sub_member":
     case "member":
-      return "border-sky-300/30 bg-sky-300/12 text-sky-100";
+      return "border-cyan-300/20 bg-cyan-400/5 text-cyan-100";
     default:
       return "border-slate-300/20 bg-white/[0.05] text-slate-300";
   }
@@ -39,13 +39,13 @@ export function workspaceRoleAvatarClass(role?: WorkspaceRole | string | null) {
     case "super_founder":
     case "founder":
     case "owner":
-      return "border-red-300/35 bg-red-400/15 text-red-100";
+      return "border-purple-300/35 bg-purple-400/15 text-purple-100";
     case "sub_leader":
     case "co_owner":
-      return "border-amber-300/35 bg-amber-300/15 text-amber-100";
+      return "border-amber-300/35 bg-amber-400/15 text-amber-100";
     case "sub_member":
     case "member":
-      return "border-sky-300/35 bg-sky-300/15 text-sky-100";
+      return "border-cyan-300/30 bg-cyan-400/10 text-cyan-100";
     default:
       return "border-white/15 bg-white/[0.06] text-slate-200";
   }
