@@ -18,7 +18,7 @@ def _patch_successful_invite_dependencies(
     inserted_payloads: list[dict[str, object]],
     expected_user_id: str,
 ) -> None:
-    async def fake_require_workspace_owner(workspace_id: str, user_id: str):
+    async def fake_require_workspace_management_access(workspace_id: str, user_id: str):
         assert workspace_id == "workspace-1"
         assert user_id == expected_user_id
         return SimpleNamespace(workspace={"id": workspace_id, "user_id": expected_user_id})
@@ -46,7 +46,7 @@ def _patch_successful_invite_dependencies(
     async def fake_send_workspace_invite_email(**kwargs):
         return SimpleNamespace(status="skipped", provider_id=None)
 
-    monkeypatch.setattr(workspaces, "require_workspace_owner", fake_require_workspace_owner)
+    monkeypatch.setattr(workspaces, "require_workspace_management_access", fake_require_workspace_management_access)
     monkeypatch.setattr(workspaces, "list_workspace_members", fake_list_workspace_members)
     monkeypatch.setattr(workspaces, "select_one_trusted", fake_select_one_trusted)
     monkeypatch.setattr(workspaces, "insert_one_trusted", fake_insert_one_trusted)
