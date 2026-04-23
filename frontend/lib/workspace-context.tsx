@@ -51,8 +51,8 @@ type WorkspaceContextType = {
   createSubspace: (parentId: string, payload: WorkspaceSubspaceCreatePayload) => Promise<Workspace>;
   renameWorkspace: (workspaceId: string, payload: { name: string; description?: string | null }) => Promise<Workspace>;
   deleteWorkspace: (workspaceId: string) => Promise<void>;
-  inviteToActiveWorkspace: (target: string, role?: "co_owner" | "member") => Promise<void>;
-  updateWorkspaceMemberRole: (userId: string, role: "co_owner" | "member") => Promise<WorkspaceMember>;
+  inviteToActiveWorkspace: (target: string, role?: WorkspaceRole) => Promise<void>;
+  updateWorkspaceMemberRole: (userId: string, role: WorkspaceRole) => Promise<WorkspaceMember>;
   removeWorkspaceMember: (userId: string) => Promise<void>;
   revokeInvite: (inviteId: string) => Promise<void>;
   acceptInvite: (inviteId: string) => Promise<Workspace>;
@@ -812,7 +812,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [activeWorkspaceId, refreshWorkspaces, setActiveWorkspace, workspaces]);
 
   const inviteToActiveWorkspace = useCallback(
-    async (target: string, role: "co_owner" | "member" = "member") => {
+    async (target: string, role: WorkspaceRole = "member") => {
       if (!activeWorkspaceId) {
         throw new Error("Select a workspace first.");
       }
@@ -846,7 +846,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   );
 
   const updateWorkspaceMemberRole = useCallback(
-    async (userId: string, role: "co_owner" | "member") => {
+    async (userId: string, role: WorkspaceRole) => {
       if (!activeWorkspaceId) {
         throw new Error("Select a workspace first.");
       }

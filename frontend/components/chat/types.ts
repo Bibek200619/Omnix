@@ -1,3 +1,5 @@
+import type { WorkspaceRole } from "@/lib/workspace-types";
+
 export type Message = {
   id: string;
   role: "user" | "assistant";
@@ -7,7 +9,7 @@ export type Message = {
   senderAvatar?: string;
   senderAvatarUrl?: string | null;
   senderHandle?: string | null;
-  senderRole?: "founder" | "owner" | "co_owner" | "member" | "assistant";
+  senderRole?: WorkspaceRole | "assistant";
   isOwn?: boolean;
   content: string;
   timestamp: string;
