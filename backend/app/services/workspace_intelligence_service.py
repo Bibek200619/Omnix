@@ -196,7 +196,7 @@ async def build_workspace_intelligence_profile(
     profile = {
         "workspace_id": str(workspace["id"]),
         "workspace_name": str(workspace.get("name") or "Workspace"),
-        "workspace_type": workspace.get("workspace_type") or "workspace",
+        "workspace_type": workspace.get("workspace_type") or "super_workspace",
         "is_global": bool(workspace.get("is_global")),
         "parent_workspace_id": workspace.get("parent_workspace_id"),
         "description": workspace.get("description"),
