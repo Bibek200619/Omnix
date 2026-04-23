@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from ..context.engine import ContextEngine
 from ..insights import workspace_summary, topic_detection
-from ..services.supabase_service import insert_one_trusted
+from ..services.supabase_service import insert_one_trusted, check_infrastructure_pressure
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +14,11 @@ async def run_automation_job(automation: dict[str, Any]) -> dict[str, Any]:
     job_type = automation.get("job_type")
     workspace_id = automation.get("workspace_id")
     user_id = automation.get("user_id") or "system"
+
+    # Graceful degradation: Defer heavy insight jobs if infrastructure is under pressure
+    if job_type in ("daily_summary", "workspace_insight") and check_infrastructure_pressure():
+        logger.warning("Deferring heavy automation job due to infrastructure pressure")
+        return {"status": "deferred", "reason": "infrastructure_pressure"}
 
     engine = ContextEngine()
     results: dict[str, Any] = {}
@@ -43,7 +48,7 @@ async def run_automation_job(automation: dict[str, Any]) -> dict[str, Any]:
         results["cleaned_count"] = count
 
     else:
-        logger.warning("Unknown automation job_type: %s", job_type)
+        logger.warning("Unknown automation job_type received")
         results["error"] = "unknown job_type"
 
     return results
