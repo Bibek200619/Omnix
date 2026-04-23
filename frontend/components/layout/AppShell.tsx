@@ -75,7 +75,8 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <WorkspaceProvider>
       <WorkspaceCollaborationProvider>
-        <ProfileProvider>
+        <WorkspaceContinuityProvider>
+          <ProfileProvider>
           <ConversationHistoryProvider>
             <WorkspaceOnboardingGate>
             <div className="omnix-app-bg omnix-auth-shell relative h-screen overflow-hidden text-white">
@@ -111,6 +112,10 @@ export function AppShell({ children }: AppShellProps) {
           </ConversationHistoryProvider>
         </ProfileProvider>
       </WorkspaceCollaborationProvider>
+    </WorkspaceProvider>
+  );
+}
+Provider>
     </WorkspaceProvider>
   );
 }
