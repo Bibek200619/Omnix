@@ -1,10 +1,6 @@
-from backend.app.rag.chunking import split_text_into_chunks
+from backend.app.rag.embedding import get_embedding
 
-text = "Artificial Intelligence is transforming the world. " * 100
+vec = get_embedding("Artificial Intelligence is powerful")
 
-chunks = split_text_into_chunks(text)
-
-for i, chunk in enumerate(chunks):
-    print(f"\n--- Chunk {i+1} ---\n")
-    print(chunk)
-    print(f"\nLength: {len(chunk)}")
+print(len(vec))
+print(vec[:5])
