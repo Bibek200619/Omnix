@@ -1,13 +1,27 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 # Lazy-loaded singleton model instance
 _MODEL = None
+_EMBEDDING_EXECUTOR: ThreadPoolExecutor | None = None
 MODEL_NAME = "all-MiniLM-L6-v2"
 
 logger = logging.getLogger(__name__)
+
+
+def _get_executor() -> ThreadPoolExecutor:
+    """
+    Returns a singleton ThreadPoolExecutor for embedding operations.
+    Embeddings are CPU-bound and this executor prevents them from blocking the event loop.
+    """
+    global _EMBEDDING_EXECUTOR
+    if _EMBEDDING_EXECUTOR is None:
+        _EMBEDDING_EXECUTOR = ThreadPoolExecutor(max_workers=3, thread_name_prefix="embedding_worker")
+    return _EMBEDDING_EXECUTOR
 
 
 def _get_model() -> Any:
@@ -81,3 +95,26 @@ def get_embeddings(texts: list[str]) -> list[list[float]]:
     except Exception as exc:
         logger.exception("Failed to generate batch embeddings.")
         raise RuntimeError("Batch embedding generation failed.") from exc
+
+
+async def get_embeddings_async(texts: list[str]) -> list[list[float]]:
+    """
+    Async wrapper for batch embedding generation.
+    Runs embedding in a threadpool to prevent blocking the event loop.
+    
+    Args:
+        texts (list[str]): The list of input strings to embed.
+    
+    Returns:
+        list[list[float]]: A list of embedding vectors corresponding to the input texts.
+    """
+    if not texts:
+        return []
+    
+    try:
+        loop = asyncio.get_running_loop()
+        executor = _get_executor()
+        return await loop.run_in_executor(executor, get_embeddings, texts)
+    except Exception as exc:
+        logger.exception("Failed to generate async embeddings.")
+        raise RuntimeError("Async batch embedding generation failed.") from exc
