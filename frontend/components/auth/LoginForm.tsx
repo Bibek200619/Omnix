@@ -1,18 +1,33 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
 export function LoginForm() {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError("");
+    console.log("[LoginForm] Submitting auth credentials...");
+    
     // Simulate API call
     setTimeout(() => {
-      setLoading(false);
-      window.location.href = "/chat";
+      // Simulate fake error occasionally or just redirect
+      if (Math.random() < 0.1) {
+        setLoading(false);
+        setError("Invalid email or password. Please try again.");
+        console.error("[LoginForm] Authentication failed");
+      } else {
+        setLoading(false);
+        console.log("[LoginForm] Authentication successful. Redirecting to /chat...");
+        router.push("/chat");
+      }
     }, 1500);
   };
 
@@ -26,32 +41,37 @@ export function LoginForm() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Email Address</label>
-          <input 
+          <Input 
             type="email" 
             required
-            className="w-full bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
             placeholder="you@example.com"
           />
         </div>
         
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
-          <input 
+          <Input 
             type="password" 
             required
-            className="w-full bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
             placeholder="••••••••"
           />
         </div>
 
-        <button 
+        <Button 
           type="submit" 
-          disabled={loading}
-          className="w-full bg-white text-black font-semibold rounded-xl px-4 py-3 hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+          variant="primary" 
+          className="w-full mt-2" 
+          isLoading={loading}
         >
-          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sign In"}
-        </button>
+          Sign In
+        </Button>
       </form>
+
+      {error && (
+        <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center">
+          {error}
+        </div>
+      )}
 
       <div className="mt-6 text-center text-gray-400 text-sm">
         Don't have an account?{" "}

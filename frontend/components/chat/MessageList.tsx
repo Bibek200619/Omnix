@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { MessageBubble } from "./MessageBubble";
+import { TypingIndicator } from "./TypingIndicator";
 
 interface Message {
   id: string;
@@ -8,16 +9,21 @@ interface Message {
   content: string;
 }
 
-export function MessageList({ messages }: { messages: Message[] }) {
+interface MessageListProps {
+  messages: Message[];
+  isTyping: boolean;
+}
+
+export function MessageList({ messages, isTyping }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isTyping]);
 
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-      {messages.length === 0 ? (
+      {messages.length === 0 && !isTyping ? (
         <div className="h-full flex flex-col items-center justify-center text-center max-w-lg mx-auto">
           <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mb-8 border border-white/10 shadow-2xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-blue-500/20" />
@@ -33,9 +39,10 @@ export function MessageList({ messages }: { messages: Message[] }) {
           {messages.map((msg) => (
             <MessageBubble key={msg.id} role={msg.role} content={msg.content} />
           ))}
+          {isTyping && <TypingIndicator />}
         </div>
       )}
-      <div ref={bottomRef} className="h-4" />
+      <div ref={bottomRef} className="h-20" />
     </div>
   );
 }

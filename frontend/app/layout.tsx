@@ -17,6 +17,8 @@ export const metadata: Metadata = {
   description: "A backend-powered RAG system with no limits.",
 };
 
+import { PageTransition } from "@/components/layout/PageTransition";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,7 +29,9 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
-      <body className="min-h-full flex flex-col bg-gray-950 text-gray-50">{children}</body>
+      <body className="min-h-full flex flex-col bg-[#030712] text-gray-50">
+        <PageTransition>{children}</PageTransition>
+      </body>
     </html>
   );
 }
