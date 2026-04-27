@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { ChatLayout } from "@/components/chat/ChatLayout";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { MessageList } from "@/components/chat/MessageList";
 import { ChatInput } from "@/components/chat/ChatInput";
 
@@ -38,9 +38,11 @@ export default function ChatPage() {
   };
 
   return (
-    <ChatLayout>
-      <MessageList messages={messages} isTyping={isTyping} />
-      <ChatInput onSend={handleSend} disabled={isTyping} />
-    </ChatLayout>
+    <AppLayout>
+      <div className="flex flex-col h-full w-full">
+        <MessageList messages={messages} isTyping={isTyping} />
+        <ChatInput onSend={handleSend} disabled={isTyping} />
+      </div>
+    </AppLayout>
   );
 }
