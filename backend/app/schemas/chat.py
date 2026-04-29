@@ -288,7 +288,7 @@ class WorkspaceMemberRead(BaseModel):
 
     workspace_id: str
     user_id: str
-    role: Literal["founder", "co_owner", "member"]
+    role: Literal["founder", "co_owner", "member", "team_lead", "sub_leader", "sub_member"]
     email: str | None = None
     full_name: str | None = None
     handle: str | None = None
@@ -299,12 +299,12 @@ class WorkspaceMemberRead(BaseModel):
 
 
 class WorkspaceMemberRoleUpdate(BaseModel):
-    role: Literal["founder", "co_owner", "member"]
+    role: Literal["founder", "co_owner", "member", "team_lead", "sub_leader", "sub_member"]
 
 
 class WorkspaceMemberAssign(BaseModel):
     user_id: str
-    role: Literal["co_owner", "member"] = "member"
+    role: Literal["co_owner", "member", "team_lead", "sub_leader", "sub_member"] = "member"
 
 
 class WorkspacePotentialMemberRead(BaseModel):
@@ -318,7 +318,7 @@ class WorkspacePotentialMemberRead(BaseModel):
 
 class WorkspaceInviteCreate(BaseModel):
     email: str = Field(..., min_length=3, max_length=320)
-    role: Literal["co_owner", "member"] = "member"
+    role: Literal["co_owner", "member", "team_lead", "sub_leader", "sub_member"] = "member"
 
 
 class WorkspaceInviteRead(BaseModel):
@@ -328,7 +328,7 @@ class WorkspaceInviteRead(BaseModel):
     invite_id: str
     workspace_id: str
     email: str
-    role: Literal["co_owner", "member"]
+    role: Literal["co_owner", "member", "team_lead", "sub_leader", "sub_member"]
     status: Literal["pending", "accepted", "declined", "revoked"]
     invited_by: str | None = None
     accepted_by_user_id: str | None = None
