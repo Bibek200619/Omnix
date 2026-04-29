@@ -1,4 +1,11 @@
-export type WorkspaceRole = "founder" | "owner" | "co_owner" | "member" | "super_founder" | "sub_leader" | "sub_member";
+export type WorkspaceRole =
+  | "founder"
+  | "owner"
+  | "co_owner"
+  | "member"
+  | "super_founder"
+  | "sub_leader"
+  | "sub_member";
 
 export type WorkspaceMember = {
   workspace_id: string;
@@ -11,6 +18,21 @@ export type WorkspaceMember = {
   avatar_label: string;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+export type WorkspacePotentialMember = {
+  user_id: string;
+  email: string;
+  full_name?: string | null;
+  handle?: string | null;
+  avatar_url?: string | null;
+  avatar_label: string;
+  org_role: WorkspaceRole;
+};
+
+export type WorkspaceMemberAssign = {
+  user_id: string;
+  role: WorkspaceRole;
 };
 
 export type WorkspaceInviteStatus = "pending" | "accepted" | "declined" | "revoked";

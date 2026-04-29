@@ -33,6 +33,7 @@ import {
 } from "@/lib/workspace-roles";
 import { cn } from "@/lib/utils";
 import { WorkspaceInviteModal } from "./WorkspaceInviteModal";
+import { WorkspaceAssignmentModal } from "./WorkspaceAssignmentModal";
 import { WorkspaceMemberStack, workspaceMemberName } from "./WorkspaceMemberStack";
 
 type ConfirmAction =
@@ -96,9 +97,11 @@ export function WorkspaceAccessPanel() {
     removeWorkspaceMember,
     revokeInvite,
     updateWorkspaceMemberRole,
+    assignWorkspaceMember,
   } = useWorkspace();
 
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -123,7 +126,9 @@ export function WorkspaceAccessPanel() {
     [activeInvites],
   );
   const activeRole = activeWorkspace?.current_user_role;
+  const isSubspace = activeWorkspace?.workspace_type === "subworkspace" || activeWorkspace?.parent_workspace_id;
   const canManageRoles = isWorkspaceFounderRole(activeRole);
+  const canAssign = canManageRoles || activeRole === "sub_leader" || activeRole === "co_owner";
 
   async function handleInvite(target: string, role: WorkspaceRole) {
     try {
@@ -136,6 +141,10 @@ export function WorkspaceAccessPanel() {
     } finally {
       setInviteLoading(false);
     }
+  }
+
+  async function handleAssign(userId: string, role: WorkspaceRole) {
+    return await assignWorkspaceMember({ user_id: userId, role });
   }
 
   async function handleRevokeInvite(inviteId: string) {
@@ -187,9 +196,13 @@ export function WorkspaceAccessPanel() {
                 <Users className="h-5 w-5" />
               </span>
               <div className="min-w-0">
-                <h2 className="omnix-display text-2xl font-semibold text-white">Team Members</h2>
+                <h2 className="omnix-display text-2xl font-semibold text-white">
+                  {isSubspace ? "Operational Scope" : "Team Members"}
+                </h2>
                 <p className="mt-1 text-sm text-[var(--omnix-text-2)]">
-                  Manage workspace access, ownership level, and collaborator visibility.
+                  {isSubspace 
+                    ? "Manage assigned organizational members for this workspace scope."
+                    : "Manage workspace access, ownership level, and collaborator visibility."}
                 </p>
               </div>
             </div>
@@ -205,18 +218,22 @@ export function WorkspaceAccessPanel() {
               </div>
             ) : null}
           </div>
-          {canManageRoles ? (
+          {canAssign ? (
             <Button
               type="button"
               variant="secondary"
               leftIcon={<UserPlus className="h-4 w-4" />}
               onClick={() => {
-                setInviteError(null);
-                setInviteOpen(true);
+                if (isSubspace) {
+                  setAssignOpen(true);
+                } else {
+                  setInviteError(null);
+                  setInviteOpen(true);
+                }
               }}
               className="rounded-full border-[var(--omnix-border)] bg-[var(--omnix-surface)] hover:bg-[var(--omnix-surface-hover)]"
             >
-              Assign member
+              {isSubspace ? "Assign member" : "Invite teammate"}
             </Button>
           ) : null}
         </div>
@@ -238,6 +255,32 @@ export function WorkspaceAccessPanel() {
                 {[0, 1, 2].map((item) => (
                   <div key={item} className="shimmer h-16 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)]" />
                 ))}
+              </div>
+            ) : workspaceMembers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.03] text-slate-600">
+                  <UserRound className="h-8 w-8" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">
+                    {isSubspace ? "No operational members assigned yet" : "No members found"}
+                  </h3>
+                  <p className="mt-1 max-w-[280px] text-xs leading-relaxed text-slate-500">
+                    {isSubspace 
+                      ? "Assign organizational collaborators into this workspace scope to begin."
+                      : "Start building your team by inviting teammates to this workspace."}
+                  </p>
+                  {canAssign && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="mt-4 text-[var(--omnix-cyan)] hover:bg-[var(--omnix-cyan)]/10"
+                      onClick={() => isSubspace ? setAssignOpen(true) : setInviteOpen(true)}
+                    >
+                      {isSubspace ? "Assign first member" : "Invite first teammate"}
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : (
               workspaceMembers.map((member) => {
@@ -429,6 +472,17 @@ export function WorkspaceAccessPanel() {
           allowRoleSelection={canManageRoles}
           onClose={() => setInviteOpen(false)}
           onSubmit={handleInvite}
+        />
+      ) : null}
+
+      {activeWorkspace ? (
+        <WorkspaceAssignmentModal
+          open={assignOpen}
+          workspaceId={activeWorkspace.id}
+          workspaceName={activeWorkspace.name}
+          currentUserRole={activeWorkspace.current_user_role}
+          onClose={() => setAssignOpen(false)}
+          onAssign={handleAssign}
         />
       ) : null}
 
