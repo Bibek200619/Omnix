@@ -193,24 +193,26 @@ async def build_workspace_intelligence_profile(
     members = await list_workspace_members(workspace)
     
     # Operational Continuity (Phases 2, 3, 6)
-    client = select_all_trusted()
-    init_res = (client.table("workspace_initiatives")
-                .select("*")
-                .in_("workspace_id", scope_ids)
-                .eq("status", "active")
-                .order("momentum_score", desc=True)
-                .limit(5)
-                .execute())
-    initiatives = init_res.data or []
+    initiatives = await select_all_trusted(
+        "workspace_initiatives",
+        "*",
+        filters={"workspace_id": scope_ids, "status": "active"},
+        order_by="momentum_score",
+        desc=True,
+        limit=5,
+    )
 
-    memory_res = (client.table("workspace_intelligence_memory")
-                  .select("*")
-                  .in_("workspace_id", scope_ids)
-                  .in_("resolution_status", ["unresolved", "pending_collaboration", "blocked"])
-                  .order("importance_score", desc=True)
-                  .limit(5)
-                  .execute())
-    unresolved_continuity = memory_res.data or []
+    unresolved_continuity = await select_all_trusted(
+        "workspace_intelligence_memory",
+        "*",
+        filters={
+            "workspace_id": scope_ids,
+            "resolution_status": ["unresolved", "pending_collaboration", "blocked"],
+        },
+        order_by="importance_score",
+        desc=True,
+        limit=5,
+    )
     
     domains = _domain_candidates(workspace, scoped_files)
     preferences = normalize_intelligence_preferences(
