@@ -509,6 +509,11 @@ async def membership_source_workspace(workspace: dict[str, Any]) -> dict[str, An
     if not parent_workspace_id:
         return normalized
 
+    # Global workspaces inherit membership from the parent super workspace.
+    # Private subspaces return ONLY explicitly assigned members.
+    if not normalized.get("is_global"):
+        return normalized
+
     try:
         parent_workspace = await select_one_trusted(
             "workspaces",
@@ -552,6 +557,177 @@ async def list_workspace_members(
         profiles,
         response_workspace_id=str(requested_workspace["id"]),
     )
+
+
+async def list_potential_subspace_members(
+    workspace_id: str,
+    user_id: str,
+) -> list[dict[str, Any]]:
+    """
+    Returns organizational members (from parent super workspace) 
+    eligible for assignment into the target subspace.
+    """
+    access = await require_workspace_management_access(workspace_id, user_id)
+    workspace = normalize_workspace_record(access.workspace)
+    
+    if not is_subspace(workspace) or not workspace.get("parent_workspace_id"):
+        raise _workspace_validation_error("Potential members can only be listed for subspaces.")
+        
+    parent_workspace_id = str(workspace["parent_workspace_id"])
+    
+    # 1. Get all members of the parent super workspace
+    try:
+        parent_members = await select_all_trusted(
+            "workspace_members",
+            WORKSPACE_MEMBER_COLUMNS,
+            filters={"workspace_id": parent_workspace_id},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+        
+    # 2. Get current members of this subspace to exclude them
+    try:
+        current_members = await select_all_trusted(
+            "workspace_members",
+            WORKSPACE_MEMBER_COLUMNS,
+            filters={"workspace_id": workspace_id},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+        
+    current_user_ids = {str(m["user_id"]) for m in current_members}
+    
+    # 3. Filter out already assigned members
+    potential_user_ids = [
+        str(m["user_id"]) for m in parent_members 
+        if str(m["user_id"]) not in current_user_ids
+    ]
+    
+    # Also include the parent owner if not already a member
+    parent_workspace = await select_one_trusted("workspaces", WORKSPACE_COLUMNS, {"id": parent_workspace_id})
+    if parent_workspace:
+        parent_owner_id = str(parent_workspace.get("user_id") or "")
+        if parent_owner_id and parent_owner_id not in current_user_ids:
+            if parent_owner_id not in potential_user_ids:
+                potential_user_ids.append(parent_owner_id)
+
+    if not potential_user_ids:
+        return []
+        
+    profiles = await get_profiles(list(set(potential_user_ids)))
+    
+    results = []
+    for uid in potential_user_ids:
+        profile = profiles.get(uid, {})
+        results.append({
+            "user_id": uid,
+            "email": profile.get("email"),
+            "full_name": profile.get("full_name"),
+            "handle": profile.get("handle"),
+            "avatar_url": profile.get("avatar_url"),
+            "avatar_label": profile.get("avatar_label") or "U",
+        })
+        
+    # Sort by name
+    results.sort(key=lambda x: (x.get("full_name") or x.get("email") or x["user_id"]).lower())
+    return results
+
+
+async def assign_member_to_subspace(
+    workspace_id: str,
+    target_user_id: str,
+    role: str,
+    actor_user_id: str,
+) -> dict[str, Any]:
+    """
+    Assigns an existing organizational member to a private subspace.
+    """
+    # 1. Require management access
+    access = await require_workspace_management_access(workspace_id, actor_user_id)
+    workspace = normalize_workspace_record(access.workspace)
+    workspace_type = workspace.get("workspace_type") or "subworkspace"
+
+    if not is_subspace(workspace) or not workspace.get("parent_workspace_id"):
+         raise _workspace_validation_error("Members can only be assigned to subspaces.")
+
+    # 2. Permission enforcement
+    if not OrganizationalAccessAuthority.can_manage_members(access.role, workspace_type):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Insufficient permissions to assign members."
+        )
+
+    next_role = normalize_workspace_role(role)
+    if next_role == "founder":
+        raise _workspace_validation_error("Founder role cannot be assigned.")
+        
+    # Permission enforcement: can they assign leadership roles?
+    if next_role != "member" and not OrganizationalAccessAuthority.can_assign_leaders(access.role, workspace_type):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="You do not have permission to assign leadership roles in this subspace."
+        )
+
+    parent_workspace_id = str(workspace["parent_workspace_id"])
+
+    # 3. Verify target user belongs to the organization (parent super workspace)
+    try:
+        org_membership = await select_one_trusted(
+            "workspace_members",
+            "user_id",
+            {"workspace_id": parent_workspace_id, "user_id": target_user_id}
+        )
+        if not org_membership:
+             parent_ws = await select_one_trusted("workspaces", "user_id", {"id": parent_workspace_id})
+             if not parent_ws or str(parent_ws.get("user_id")) != target_user_id:
+                 raise _workspace_validation_error("Target user does not belong to the organization.")
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    # 4. Check for duplicate assignment
+    try:
+        existing = await select_one_trusted(
+            "workspace_members",
+            "user_id",
+            {"workspace_id": workspace_id, "user_id": target_user_id}
+        )
+        if existing:
+            raise _workspace_validation_error("User is already a member of this subspace.")
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    # 5. Insert membership
+    timestamp = utc_now_iso()
+    try:
+        await insert_one(
+            "workspace_members",
+            {
+                "workspace_id": workspace_id,
+                "user_id": target_user_id,
+                "role": next_role,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+        
+    # 6. Return hydrated record
+    profiles = await get_profiles([target_user_id])
+    profile = profiles.get(target_user_id, {})
+    
+    return {
+        "workspace_id": workspace_id,
+        "user_id": target_user_id,
+        "role": next_role,
+        "email": profile.get("email"),
+        "full_name": profile.get("full_name"),
+        "handle": profile.get("handle"),
+        "avatar_url": profile.get("avatar_url"),
+        "avatar_label": profile.get("avatar_label") or "U",
+        "created_at": timestamp,
+        "updated_at": timestamp,
+    }
 
 
 async def list_user_workspaces(user_id: str) -> list[dict[str, Any]]:
@@ -680,9 +856,10 @@ async def list_user_workspaces(user_id: str) -> list[dict[str, Any]]:
     for workspace in workspaces:
         workspace_id = str(workspace["id"])
         parent_workspace_id = str(workspace.get("parent_workspace_id") or "")
+        # Global workspaces inherit from parent; private subspaces do not.
         membership_workspace_by_workspace_id[workspace_id] = (
             workspace_by_id.get(parent_workspace_id, workspace)
-            if parent_workspace_id
+            if parent_workspace_id and workspace.get("is_global")
             else workspace
         )
 
