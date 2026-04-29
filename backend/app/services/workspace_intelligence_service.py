@@ -6,7 +6,6 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
 
-from ..db.supabase_client import get_async_supabase
 from ..services.supabase_service import select_all_trusted
 from .workspace_continuity_service import list_initiatives, list_unresolved_continuity
 from .workspace_service import (
@@ -204,36 +203,29 @@ async def build_workspace_intelligence_profile(
     ]
 
     members = await list_workspace_members(workspace)
-    
-    # Operational Continuity (Phases 2, 3, 6)
-    client = get_async_supabase()
-    
-    try:
-        init_res = await (client.table("workspace_initiatives")
-                    .select("*")
-                    .in_("workspace_id", scope_ids)
-                    .eq("status", "active")
-                    .order("momentum_score", desc=True)
-                    .limit(5)
-                    .execute())
-        initiatives = init_res.data or []
-    except Exception:
-        logger.warning("Failed to fetch initiatives for intelligence profile")
-        initiatives = []
 
-    try:
-        memory_res = await (client.table("workspace_intelligence_memory")
-                      .select("*")
-                      .in_("workspace_id", scope_ids)
-                      .in_("resolution_status", ["unresolved", "pending_collaboration", "blocked"])
-                      .order("importance_score", desc=True)
-                      .limit(5)
-                      .execute())
-        unresolved_continuity = memory_res.data or []
-    except Exception:
-        logger.warning("Failed to fetch continuity memory for intelligence profile")
-        unresolved_continuity = []
-    
+    # Operational Continuity (Phases 2, 3, 6)
+    initiatives = await select_all_trusted(
+        "workspace_initiatives",
+        "*",
+        filters={"workspace_id": scope_ids, "status": "active"},
+        order_by="momentum_score",
+        desc=True,
+        limit=5,
+    )
+
+    unresolved_continuity = await select_all_trusted(
+        "workspace_intelligence_memory",
+        "*",
+        filters={
+            "workspace_id": scope_ids,
+            "resolution_status": ["unresolved", "pending_collaboration", "blocked"],
+        },
+        order_by="importance_score",
+        desc=True,
+        limit=5,
+    )
+
     domains = _domain_candidates(workspace, scoped_files)
     preferences = normalize_intelligence_preferences(
         workspace.get("intelligence_preferences"),
@@ -276,7 +268,7 @@ async def build_workspace_intelligence_profile(
         member_count=len(members),
         domains=domains,
     )
-    
+
     _intelligence_profile_cache[cache_key] = (now_ts, profile)
     return profile
 
@@ -326,6 +318,3 @@ def workspace_intelligence_system_prompt(profile: dict[str, Any] | None) -> str:
         ]
     )
     return "\n".join(line for line in lines if line is not None)
-
-import logging
-logger = logging.getLogger(__name__)
