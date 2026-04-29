@@ -87,7 +87,7 @@ class ApiClient {
 
     if (!response.ok) {
       const errorData = (await response.json().catch(() => ({}))) as {
-        detail?: string | any[];
+        detail?: string | { msg?: string }[];
         message?: string;
       };
 
@@ -97,8 +97,8 @@ class ApiClient {
       } else if (Array.isArray(errorData.detail)) {
         // FastAPI validation errors often look like [{ "msg": "...", ... }]
         const firstError = errorData.detail[0];
-        errorMessage = typeof firstError === "object" && firstError?.msg
-          ? firstError.msg
+        errorMessage = firstError?.msg
+          ? String(firstError.msg)
           : JSON.stringify(errorData.detail);
       } else if (errorData.message) {
         errorMessage = errorData.message;
@@ -150,7 +150,7 @@ class ApiClient {
     if (!response.ok && response.status !== 200) {
       // For streaming endpoints some servers may return 200 with streaming body.
       const errorData = (await response.json().catch(() => ({}))) as {
-        detail?: string | any[];
+        detail?: string | { msg?: string }[];
         message?: string;
       };
 
@@ -159,8 +159,8 @@ class ApiClient {
         errorMessage = errorData.detail;
       } else if (Array.isArray(errorData.detail)) {
         const firstError = errorData.detail[0];
-        errorMessage = typeof firstError === "object" && firstError?.msg
-          ? firstError.msg
+        errorMessage = firstError?.msg
+          ? String(firstError.msg)
           : JSON.stringify(errorData.detail);
       } else if (errorData.message) {
         errorMessage = errorData.message;
