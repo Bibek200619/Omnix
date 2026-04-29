@@ -86,11 +86,27 @@ class ApiClient {
     }
 
     if (!response.ok) {
-      const error = (await response.json().catch(() => ({}))) as {
-        detail?: string;
+      const errorData = (await response.json().catch(() => ({}))) as {
+        detail?: string | any[];
         message?: string;
       };
-      throw new Error(error.detail || error.message || `HTTP ${response.status}`);
+
+      let errorMessage = "An error occurred";
+      if (typeof errorData.detail === "string") {
+        errorMessage = errorData.detail;
+      } else if (Array.isArray(errorData.detail)) {
+        // FastAPI validation errors often look like [{ "msg": "...", ... }]
+        const firstError = errorData.detail[0];
+        errorMessage = typeof firstError === "object" && firstError?.msg
+          ? firstError.msg
+          : JSON.stringify(errorData.detail);
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+      } else {
+        errorMessage = `HTTP ${response.status}`;
+      }
+
+      throw new Error(errorMessage);
     }
 
     return response;
@@ -133,8 +149,26 @@ class ApiClient {
 
     if (!response.ok && response.status !== 200) {
       // For streaming endpoints some servers may return 200 with streaming body.
-      const error = (await response.json().catch(() => ({}))) as { detail?: string; message?: string };
-      throw new Error(error.detail || error.message || `HTTP ${response.status}`);
+      const errorData = (await response.json().catch(() => ({}))) as {
+        detail?: string | any[];
+        message?: string;
+      };
+
+      let errorMessage = "An error occurred";
+      if (typeof errorData.detail === "string") {
+        errorMessage = errorData.detail;
+      } else if (Array.isArray(errorData.detail)) {
+        const firstError = errorData.detail[0];
+        errorMessage = typeof firstError === "object" && firstError?.msg
+          ? firstError.msg
+          : JSON.stringify(errorData.detail);
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+      } else {
+        errorMessage = `HTTP ${response.status}`;
+      }
+
+      throw new Error(errorMessage);
     }
 
     return response;
