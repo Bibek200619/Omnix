@@ -3,6 +3,7 @@ from typing import Literal, Final
 # Canonical Roles
 ROLE_SUPER_FOUNDER: Final = "super_founder"
 ROLE_SUB_LEADER: Final = "sub_leader"
+ROLE_TEAM_LEAD: Final = "team_lead"
 ROLE_SUB_MEMBER: Final = "sub_member"
 
 # Legacy mappings for backward compatibility during transition
@@ -14,6 +15,7 @@ LEGACY_ROLE_FOUNDER: Final = "founder"
 WorkspaceRole = Literal[
     "super_founder",
     "sub_leader",
+    "team_lead",
     "sub_member",
     "founder",
     "owner",
@@ -62,6 +64,17 @@ SUPER_FOUNDER_PERMISSIONS: set[WorkspacePermission] = {
 SUB_LEADER_PERMISSIONS: set[WorkspacePermission] = {
     PERMISSION_VIEW_WORKSPACE,
     PERMISSION_MANAGE_MEMBERS,  # Can add existing org members
+    PERMISSION_REMOVE_MEMBERS,
+    PERMISSION_MANAGE_AI,
+    PERMISSION_ACCESS_MEMORY,
+    PERMISSION_ACCESS_SOURCES,
+}
+
+# Team Lead: Scoped Subspace Operational Authority
+TEAM_LEAD_PERMISSIONS: set[WorkspacePermission] = {
+    PERMISSION_VIEW_WORKSPACE,
+    PERMISSION_MANAGE_MEMBERS,
+    PERMISSION_REMOVE_MEMBERS,
     PERMISSION_MANAGE_AI,
     PERMISSION_ACCESS_MEMORY,
     PERMISSION_ACCESS_SOURCES,

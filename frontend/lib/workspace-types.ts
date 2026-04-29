@@ -5,6 +5,7 @@ export type WorkspaceRole =
   | "member"
   | "super_founder"
   | "sub_leader"
+  | "team_lead"
   | "sub_member";
 
 export type WorkspaceMember = {

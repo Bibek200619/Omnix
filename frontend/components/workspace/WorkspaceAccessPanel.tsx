@@ -288,7 +288,9 @@ export function WorkspaceAccessPanel() {
                 const isFounder = isWorkspaceFounderRole(member.role);
                 const canActOnMember =
                   !isFounder &&
-                  (canManageRoles || (activeRole === "co_owner" && member.role === "member"));
+                  (canManageRoles || 
+                    ((activeRole === "co_owner" || activeRole === "sub_leader" || activeRole === "team_lead") && 
+                    (member.role === "member" || member.role === "sub_member")));
 
                 return (
                   <div
@@ -344,22 +346,27 @@ export function WorkspaceAccessPanel() {
                               role="menu"
                               className="absolute right-0 top-full z-40 mt-2 w-44 overflow-hidden rounded-lg border border-[var(--omnix-border-2)] bg-[#07131f] p-1.5 shadow-[0_18px_54px_rgba(0,0,0,0.58),var(--omnix-glow-xs)] ring-1 ring-black/40"
                             >
-                              {canManageRoles && member.role !== "co_owner" ? (
+                              {canManageRoles && member.role !== (isSubspace ? "team_lead" : "co_owner") && member.role !== "sub_leader" ? (
                                 <button
                                   type="button"
                                   role="menuitem"
-                                  onClick={() => setConfirmAction({ type: "role", member, role: "co_owner" })}
-                                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-amber-100 transition hover:bg-amber-300/10"
+                                  onClick={() => setConfirmAction({ type: "role", member, role: isSubspace ? "team_lead" : "co_owner" })}
+                                  className={cn(
+                                    "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition",
+                                    isSubspace 
+                                      ? "text-indigo-200 hover:bg-indigo-400/10"
+                                      : "text-amber-100 hover:bg-amber-300/10"
+                                  )}
                                 >
                                   <Shield className="h-4 w-4" />
-                                  Make co-owner
+                                  Make {isSubspace ? "team lead" : "co-owner"}
                                 </button>
                               ) : null}
-                              {canManageRoles && member.role !== "member" ? (
+                              {canManageRoles && member.role !== "member" && member.role !== "sub_member" ? (
                                 <button
                                   type="button"
                                   role="menuitem"
-                                  onClick={() => setConfirmAction({ type: "role", member, role: "member" })}
+                                  onClick={() => setConfirmAction({ type: "role", member, role: isSubspace ? "sub_member" : "member" })}
                                   className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-sky-100 transition hover:bg-sky-300/10"
                                 >
                                   <UserRound className="h-4 w-4" />

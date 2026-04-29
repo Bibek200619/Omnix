@@ -1,0 +1,1 @@
+{"nodes": [{"id": "pgvector_store", "label": "PgVectorStore", "file_type": "code", "source_file": "backend/app/rag/pgvector_store.py", "source_location": null}], "edges": [], "hyperedges": []}
