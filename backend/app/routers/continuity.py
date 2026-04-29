@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
-from ..dependencies import get_current_user
+from ..core.security import get_current_user
 from ..schemas.continuity import (
     WorkspaceInitiativeCreate,
     WorkspaceInitiativeResponse,
