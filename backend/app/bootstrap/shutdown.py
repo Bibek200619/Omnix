@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import logging
+from ..db.supabase_client import close_async_supabase
 from ..rag.startup import shutdown_vector_store
 from ..runtime.manager import RuntimeManager
 
@@ -20,6 +21,12 @@ async def graceful_shutdown():
         logger.info("Vector Store shut down.")
     except Exception as e:
         logger.error(f"Error shutting down Vector Store: {e}")
+
+    try:
+        await close_async_supabase()
+        logger.info("Async Supabase client shut down.")
+    except Exception as e:
+        logger.error(f"Error shutting down async Supabase client: {e}")
         
     # 3. Final cleanup
     RuntimeManager.get().set_status("terminated")
