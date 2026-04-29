@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import vector_store, observability, workers, redis, shutdown, middleware
 from ..runtime.manager import RuntimeManager
 from ..health.router import router as health_router
-from ..routers import conversations, files, cache, messages, upload, workspaces, actions, artifacts, insights, automations, google_drive, admin, profile
+from ..routers import conversations, files, cache, messages, upload, workspaces, actions, artifacts, insights, automations, google_drive, admin, profile, continuity
 from ..core.security import auth_context_middleware
 
 logger = logging.getLogger(__name__)
