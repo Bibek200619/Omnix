@@ -87,7 +87,7 @@ export function ChatInput({
   }
 
   return (
-    <div className="relative mx-auto w-full max-w-[860px]">
+    <div className="relative mx-auto w-full max-w-[860px] pb-safe">
       <div className="absolute -top-9 left-0 hidden items-center gap-1.5 sm:flex">
         {["Suggest ideas", "Summarize"].map((label) => (
           <button
@@ -122,12 +122,12 @@ export function ChatInput({
           {attachments.map((file) => (
             <div
               key={file.id}
-              className="group/file inline-flex min-w-0 max-w-full items-center gap-2 rounded-lg border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-2 text-xs text-cyan-50 sm:max-w-[260px]"
+              className="group/file inline-flex min-w-0 max-w-full items-center gap-2 rounded-lg border border-cyan-300/20 bg-cyan-300/10 px-2 py-1.5 text-xs text-cyan-50 sm:max-w-[260px] sm:py-2"
             >
               <FileText className="h-4 w-4 shrink-0 text-cyan-200" />
               <div className="min-w-0">
                 <p className="truncate font-medium">{attachmentName(file)}</p>
-                <p className="text-[11px] text-cyan-100/60">{formatBytes(file.size_bytes)}</p>
+                <p className="text-[10px] text-cyan-100/60 sm:text-[11px]">{formatBytes(file.size_bytes)}</p>
               </div>
               <button
                 type="button"
@@ -179,7 +179,7 @@ export function ChatInput({
           rows={1}
           placeholder="Type a message or '/' for commands..."
           disabled={loading}
-          className="block max-h-40 min-h-[54px] w-full resize-none border border-transparent bg-transparent px-[15px] py-[13px] text-sm leading-[1.6] text-white outline-none transition placeholder:text-[var(--omnix-text-3)] disabled:cursor-not-allowed disabled:opacity-70"
+          className="block max-h-40 min-h-[54px] w-full resize-none border border-transparent bg-transparent px-[15px] py-[13px] text-sm leading-[1.6] text-white outline-none transition placeholder:text-[var(--omnix-text-3)] disabled:cursor-not-allowed disabled:opacity-70 sm:text-base"
         />
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--omnix-border)] bg-[rgba(0,0,0,0.2)] px-3 py-2.5 transition focus-within:bg-[var(--omnix-surface)]">
         <div className="flex min-w-0 flex-wrap items-center gap-1">
@@ -190,9 +190,9 @@ export function ChatInput({
             aria-label={uploadOpen ? "Hide document upload" : "Attach document"}
             title={uploadOpen ? "Hide document upload" : "Attach document"}
             onClick={() => setUploadOpen((current) => !current)}
-            className={cn("h-7 w-7 rounded-[7px] border border-transparent text-[var(--omnix-text-3)] hover:bg-[var(--omnix-surface)] hover:text-white", uploadOpen && "border-cyan-300/25 bg-cyan-300/10 text-cyan-100")}
+            className={cn("h-8 w-8 rounded-[7px] border border-transparent text-[var(--omnix-text-3)] hover:bg-[var(--omnix-surface)] hover:text-white sm:h-7 sm:w-7", uploadOpen && "border-cyan-300/25 bg-cyan-300/10 text-cyan-100")}
           >
-            <Paperclip className={cn("h-3.5 w-3.5 transition-transform", uploadOpen && "rotate-45")} />
+            <Paperclip className={cn("h-4 w-4 transition-transform sm:h-3.5 sm:w-3.5", uploadOpen && "rotate-45")} />
           </Button>
           <div className="mx-1 h-3.5 w-px bg-[var(--omnix-border)]" />
           {searchModes.map((mode) => {
@@ -204,7 +204,7 @@ export function ChatInput({
                 type="button"
                 onClick={() => onSearchModeChange(mode.value)}
                 className={cn(
-                  "inline-flex h-7 min-w-0 items-center gap-1.5 rounded-[7px] border px-2.5 text-[11px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70",
+                  "inline-flex h-8 min-w-0 items-center gap-1.5 rounded-[7px] border px-2 text-[11px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 sm:h-7 sm:px-2.5",
                   active
                     ? "border-cyan-300/35 bg-cyan-300/12 text-cyan-50 shadow-[var(--omnix-glow-xs)]"
                     : "border-transparent text-[var(--omnix-text-3)] hover:bg-[var(--omnix-surface)] hover:text-slate-100",
@@ -212,7 +212,7 @@ export function ChatInput({
                 aria-pressed={active}
                 title={`${mode.label} search mode`}
               >
-                <Icon className="h-3 w-3 shrink-0" />
+                <Icon className="h-3.5 w-3.5 shrink-0 sm:h-3 sm:w-3" />
                 <span className={cn(!active && "max-[480px]:sr-only")}>{mode.label}</span>
               </button>
             );
@@ -229,9 +229,9 @@ export function ChatInput({
             aria-label="Stop generating"
             title="Stop generating"
             onClick={() => onCancel?.()}
-            className="h-[30px] w-[30px] rounded-lg border-0 bg-rose-500/20 text-rose-300 shadow-[var(--omnix-glow-sm)] hover:bg-rose-500/40 hover:text-white"
+            className="h-9 w-9 rounded-lg border-0 bg-rose-500/20 text-rose-300 shadow-[var(--omnix-glow-sm)] hover:bg-rose-500/40 hover:text-white sm:h-[30px] sm:w-[30px]"
           >
-            <Square className="h-3.5 w-3.5 fill-current" />
+            <Square className="h-4 w-4 fill-current sm:h-3.5 sm:w-3.5" />
           </Button>
         ) : (
           <Button
@@ -241,7 +241,7 @@ export function ChatInput({
             title="Send message"
             disabled={!value.trim()}
             onClick={submit}
-            className="h-[30px] w-[30px] rounded-lg border-0 bg-[var(--omnix-grad-primary)] text-[#050c17] shadow-[var(--omnix-glow-sm)] hover:shadow-[var(--omnix-glow-md)] disabled:bg-[var(--omnix-surface)] disabled:text-[var(--omnix-text-3)] disabled:shadow-none"
+            className="h-9 w-9 rounded-lg border-0 bg-[var(--omnix-grad-primary)] text-[#050c17] shadow-[var(--omnix-glow-sm)] hover:shadow-[var(--omnix-glow-md)] disabled:bg-[var(--omnix-surface)] disabled:text-[var(--omnix-text-3)] disabled:shadow-none sm:h-[30px] sm:w-[30px]"
           >
             <Send className="h-4 w-4" />
           </Button>
