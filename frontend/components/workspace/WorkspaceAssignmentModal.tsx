@@ -199,7 +199,7 @@ export function WorkspaceAssignmentModal({
               <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-[var(--omnix-text-3)]">
                 Workspace Scope
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className={cn("grid gap-3", canAssignLeader ? "grid-cols-2" : "grid-cols-1")}>
                 <button
                   onClick={() => setSelectedRole("sub_member")}
                   className={cn(
@@ -218,25 +218,25 @@ export function WorkspaceAssignmentModal({
                   </p>
                 </button>
 
-                <button
-                  onClick={() => canAssignLeader && setSelectedRole("sub_leader")}
-                  disabled={!canAssignLeader}
-                  className={cn(
-                    "flex flex-col gap-2 rounded-xl border p-4 text-left transition",
-                    selectedRole === "sub_leader"
-                      ? "border-amber-400/50 bg-amber-400/5"
-                      : "border-[var(--omnix-border)] bg-[var(--omnix-surface)]",
-                    !canAssignLeader && "opacity-40 cursor-not-allowed grayscale"
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <Shield className={cn("h-4 w-4", selectedRole === "sub_leader" ? "text-amber-300" : "text-slate-400")} />
-                    <span className="text-sm font-semibold text-white">Operational Lead</span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed text-slate-500">
-                    Authority to manage members and workspace configuration.
-                  </p>
-                </button>
+                {canAssignLeader && (
+                  <button
+                    onClick={() => setSelectedRole("team_lead")}
+                    className={cn(
+                      "flex flex-col gap-2 rounded-xl border p-4 text-left transition",
+                      selectedRole === "team_lead"
+                        ? "border-indigo-400/50 bg-indigo-400/5"
+                        : "border-[var(--omnix-border)] bg-[var(--omnix-surface)] hover:border-white/20"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Shield className={cn("h-4 w-4", selectedRole === "team_lead" ? "text-indigo-300" : "text-slate-400")} />
+                      <span className="text-sm font-semibold text-white">Team Lead</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-slate-500">
+                      Authority to manage members and operational collaboration.
+                    </p>
+                  </button>
+                )}
               </div>
             </div>
           )}
