@@ -12,6 +12,8 @@ import {
   type WorkspaceIntelligenceUpdatePayload,
   type WorkspaceInvite,
   type WorkspaceMember,
+  type WorkspaceMemberAssign,
+  type WorkspacePotentialMember,
   type WorkspaceRole,
   type WorkspaceSubspaceCreatePayload,
   type WorkspaceType,
@@ -54,6 +56,7 @@ type WorkspaceContextType = {
   inviteToActiveWorkspace: (target: string, role?: WorkspaceRole) => Promise<void>;
   updateWorkspaceMemberRole: (userId: string, role: WorkspaceRole) => Promise<WorkspaceMember>;
   removeWorkspaceMember: (userId: string) => Promise<void>;
+  assignWorkspaceMember: (payload: WorkspaceMemberAssign) => Promise<WorkspaceMember>;
   revokeInvite: (inviteId: string) => Promise<void>;
   acceptInvite: (inviteId: string) => Promise<Workspace>;
   declineInvite: (inviteId: string) => Promise<void>;
@@ -878,6 +881,48 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [activeMembers, activeWorkspaceId, refreshWorkspaces],
   );
 
+  const assignWorkspaceMember = useCallback(
+    async (payload: WorkspaceMemberAssign) => {
+      if (!activeWorkspaceId) {
+        throw new Error("Select a workspace first.");
+      }
+
+      const previousMembers = activeMembers;
+      const previousWorkspaces = workspaces;
+
+      // Optimistic member count update in tree
+      setWorkspaces((current) =>
+        patchWorkspaceInTree(current, activeWorkspaceId, (workspace) => ({
+          ...workspace,
+          member_count: workspace.member_count + 1,
+        })),
+      );
+
+      try {
+        const member = await apiClient.post<WorkspaceMember>(
+          `/workspaces/${activeWorkspaceId}/members/assign`,
+          payload,
+        );
+
+        setActiveMembers((current) => {
+          const exists = current.some((m) => m.user_id === member.user_id);
+          if (exists) return current;
+          return [...current, member];
+        });
+
+        // Trigger silent refresh to sync full state
+        void refreshWorkspaces({ silent: true });
+        return member;
+      } catch (err) {
+        // Rollback on failure
+        setWorkspaces(previousWorkspaces);
+        setActiveMembers(previousMembers);
+        throw err;
+      }
+    },
+    [activeWorkspaceId, activeMembers, workspaces, refreshWorkspaces],
+  );
+
   const revokeInvite = useCallback(
     async (inviteId: string) => {
       if (!activeWorkspaceId) {
@@ -1043,6 +1088,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       inviteToActiveWorkspace,
       updateWorkspaceMemberRole,
       removeWorkspaceMember,
+      assignWorkspaceMember,
       revokeInvite,
       acceptInvite,
       declineInvite,
@@ -1079,6 +1125,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       inviteToActiveWorkspace,
       updateWorkspaceMemberRole,
       removeWorkspaceMember,
+      assignWorkspaceMember,
       revokeInvite,
       acceptInvite,
       declineInvite,
