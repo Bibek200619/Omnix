@@ -233,7 +233,7 @@ export function WorkspaceAccessPanel() {
               }}
               className="rounded-full border-[var(--omnix-border)] bg-[var(--omnix-surface)] hover:bg-[var(--omnix-surface-hover)]"
             >
-              {isSubspace ? "Assign member" : "Invite teammate"}
+              {isSubspace ? "Add Existing Member" : "Invite teammate"}
             </Button>
           ) : null}
         </div>
@@ -263,11 +263,11 @@ export function WorkspaceAccessPanel() {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-white">
-                    {isSubspace ? "No operational members assigned yet" : "No members found"}
+                    {isSubspace ? "No operational members added yet" : "No members found"}
                   </h3>
                   <p className="mt-1 max-w-[280px] text-xs leading-relaxed text-slate-500">
                     {isSubspace 
-                      ? "Assign organizational collaborators into this workspace scope to begin."
+                      ? "Add organizational collaborators into this workspace scope to begin."
                       : "Start building your team by inviting teammates to this workspace."}
                   </p>
                   {canAssign && (
@@ -277,7 +277,7 @@ export function WorkspaceAccessPanel() {
                       className="mt-4 text-[var(--omnix-cyan)] hover:bg-[var(--omnix-cyan)]/10"
                       onClick={() => isSubspace ? setAssignOpen(true) : setInviteOpen(true)}
                     >
-                      {isSubspace ? "Assign first member" : "Invite first teammate"}
+                      {isSubspace ? "Add first collaborator" : "Invite first teammate"}
                     </Button>
                   )}
                 </div>
