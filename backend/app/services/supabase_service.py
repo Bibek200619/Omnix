@@ -232,7 +232,7 @@ def _apply_filters(
                 elif op == "neq":
                     query = query.neq(column, val)
                 else:
-                    logger.warning("Unsupported filter operator: %s", op)
+                    logger.warning("Unsupported filter operator encountered; using equality fallback.")
                     query = query.eq(column, val)
         else:
             query = query.eq(column, value)
