@@ -34,7 +34,7 @@ WORKSPACE_INVITE_COLUMNS = (
 )
 MEMBERS_PREVIEW_LIMIT = 3
 
-WorkspaceRole = Literal["founder", "co_owner", "member"]
+WorkspaceRole = Literal["founder", "co_owner", "team_lead", "member"]
 WorkspaceInviteStatus = Literal["pending", "accepted", "declined", "revoked"]
 WorkspaceType = Literal["workspace", "super_workspace", "subworkspace", "global_workspace"]
 WorkspaceAIMode = Literal["research", "coding", "design", "strategy", "analytics", "general"]
@@ -81,8 +81,10 @@ def normalize_workspace_role(
         return "founder"
     if role == "owner":
         return "founder" if owner_user_id and member_user_id == owner_user_id else "co_owner"
-    if role == "co_owner":
+    if role == "co_owner" or role == "sub_leader":
         return "co_owner"
+    if role == "team_lead":
+        return "team_lead"
     return "member"
 
 

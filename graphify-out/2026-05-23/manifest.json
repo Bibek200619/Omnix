@@ -1,0 +1,1637 @@
+{
+  "/Users/shinobi/bibek_code/Omnix/test_tiktoken.py": {
+    "mtime": 1779314490.5017743,
+    "ast_hash": "22695f73df215756c646bbe733aebeee",
+    "semantic_hash": "22695f73df215756c646bbe733aebeee"
+  },
+  "/Users/shinobi/bibek_code/Omnix/patch_workspace_context.py": {
+    "mtime": 1779314490.5007873,
+    "ast_hash": "c231313cd9fc15c983da15460a084412",
+    "semantic_hash": "c231313cd9fc15c983da15460a084412"
+  },
+  "/Users/shinobi/bibek_code/Omnix/test_pack.py": {
+    "mtime": 1779314490.5011709,
+    "ast_hash": "d52567e5aa4602133c856e3435748802",
+    "semantic_hash": "d52567e5aa4602133c856e3435748802"
+  },
+  "/Users/shinobi/bibek_code/Omnix/patch_sidebar.py": {
+    "mtime": 1779314490.500631,
+    "ast_hash": "ead819a0d19806808fc021d1ce0ff085",
+    "semantic_hash": "ead819a0d19806808fc021d1ce0ff085"
+  },
+  "/Users/shinobi/bibek_code/Omnix/package.json": {
+    "mtime": 1779229509.7658808,
+    "ast_hash": "07f90304838c68a8251bb9879a52011d",
+    "semantic_hash": "07f90304838c68a8251bb9879a52011d"
+  },
+  "/Users/shinobi/bibek_code/Omnix/test_speed.py": {
+    "mtime": 1779314490.5013635,
+    "ast_hash": "47c448bc2d3ce7c406ae6d03dfe20d79",
+    "semantic_hash": "47c448bc2d3ce7c406ae6d03dfe20d79"
+  },
+  "/Users/shinobi/bibek_code/Omnix/test_algo.py": {
+    "mtime": 1779314490.500984,
+    "ast_hash": "bd6c4b5869f41b9a810fe53147f648ee",
+    "semantic_hash": "bd6c4b5869f41b9a810fe53147f648ee"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/vercel.json": {
+    "mtime": 1779229509.1531703,
+    "ast_hash": "6eaabcc5784386cc5dc38e09ee861e2b",
+    "semantic_hash": "6eaabcc5784386cc5dc38e09ee861e2b"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/postcss.config.mjs": {
+    "mtime": 1779229509.1526074,
+    "ast_hash": "d3fd1d29b05a09ff76b595a70e1e7d50",
+    "semantic_hash": "d3fd1d29b05a09ff76b595a70e1e7d50"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/next-env.d.ts": {
+    "mtime": 1779229509.1521587,
+    "ast_hash": "ba64ff7d54714a8f64db89b1003207d8",
+    "semantic_hash": "ba64ff7d54714a8f64db89b1003207d8"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/tailwind.config.ts": {
+    "mtime": 1779229509.1530545,
+    "ast_hash": "5c8de1da9e3a4a44ffc4b99aa92d6109",
+    "semantic_hash": "5c8de1da9e3a4a44ffc4b99aa92d6109"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/package.json": {
+    "mtime": 1779229509.1525536,
+    "ast_hash": "7d048ab1b51d854d3d1b341d7945f8e2",
+    "semantic_hash": "7d048ab1b51d854d3d1b341d7945f8e2"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/tsconfig.json": {
+    "mtime": 1779229509.1531103,
+    "ast_hash": "e9e0029aaba1829710839639683fca36",
+    "semantic_hash": "e9e0029aaba1829710839639683fca36"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/eslint.config.mjs": {
+    "mtime": 1779229509.1513693,
+    "ast_hash": "ec84a3d68d0662c5496b04edfc9a34ca",
+    "semantic_hash": "ec84a3d68d0662c5496b04edfc9a34ca"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/next.config.ts": {
+    "mtime": 1779229509.1522088,
+    "ast_hash": "0cd7424c8c42bc4fbec2693eb1f50b38",
+    "semantic_hash": "0cd7424c8c42bc4fbec2693eb1f50b38"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/layout.tsx": {
+    "mtime": 1779229509.1466737,
+    "ast_hash": "4997fb93004be2bceea2e5d5997f91d3",
+    "semantic_hash": "4997fb93004be2bceea2e5d5997f91d3"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/manifest.ts": {
+    "mtime": 1779229509.1467352,
+    "ast_hash": "b54c737efd8117f71114c49e56c443f5",
+    "semantic_hash": "b54c737efd8117f71114c49e56c443f5"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/page.tsx": {
+    "mtime": 1779229509.1467838,
+    "ast_hash": "c3416db1eeadfddf260037cad51e3bb4",
+    "semantic_hash": "c3416db1eeadfddf260037cad51e3bb4"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/auth/callback/page.tsx": {
+    "mtime": 1779229509.1461623,
+    "ast_hash": "92480886a1e4213717dc11d68cde3e0a",
+    "semantic_hash": "92480886a1e4213717dc11d68cde3e0a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/invite/page.tsx": {
+    "mtime": 1779232795.2750065,
+    "ast_hash": "c11235856d5cb1b7b9342b89f6d0b73a",
+    "semantic_hash": "c11235856d5cb1b7b9342b89f6d0b73a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(auth)/register/page.tsx": {
+    "mtime": 1779229509.144758,
+    "ast_hash": "e5ce81ed0626ba67242a235b42d9d76c",
+    "semantic_hash": "e5ce81ed0626ba67242a235b42d9d76c"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(auth)/login/page.tsx": {
+    "mtime": 1779229509.1446733,
+    "ast_hash": "899c6ddc1013298bb7839ba544f4b696",
+    "semantic_hash": "899c6ddc1013298bb7839ba544f4b696"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/layout.tsx": {
+    "mtime": 1779229509.1451712,
+    "ast_hash": "2b7f0e70995686c4f9dea486a99fc278",
+    "semantic_hash": "2b7f0e70995686c4f9dea486a99fc278"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/settings/page.tsx": {
+    "mtime": 1779325207.7528467,
+    "ast_hash": "c1c4fef138b7d15272fb79da4578d402",
+    "semantic_hash": "c1c4fef138b7d15272fb79da4578d402"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/settings/interface/page.tsx": {
+    "mtime": 1779232156.3368242,
+    "ast_hash": "58fdbb59e41bfba1813c0456ac542a9d",
+    "semantic_hash": "58fdbb59e41bfba1813c0456ac542a9d"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/settings/security/page.tsx": {
+    "mtime": 1779232100.2061317,
+    "ast_hash": "da7e57e2860a4668216e01efb968896a",
+    "semantic_hash": "da7e57e2860a4668216e01efb968896a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/settings/appearance/page.tsx": {
+    "mtime": 1779261181.8775108,
+    "ast_hash": "2d1fdf0afeae11ef5b6e007110105dd5",
+    "semantic_hash": "2d1fdf0afeae11ef5b6e007110105dd5"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/settings/workspace/page.tsx": {
+    "mtime": 1779362760.7285607,
+    "ast_hash": "86e83fc6f7933b0c812fefe37d0079a2",
+    "semantic_hash": "86e83fc6f7933b0c812fefe37d0079a2"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/settings/terms/page.tsx": {
+    "mtime": 1779260185.778354,
+    "ast_hash": "c33bbe3a8c00ed5dbf28248f91b142d7",
+    "semantic_hash": "c33bbe3a8c00ed5dbf28248f91b142d7"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/settings/about/page.tsx": {
+    "mtime": 1779261211.074638,
+    "ast_hash": "eae6b8c0bc6609b31094e36d58b50dd4",
+    "semantic_hash": "eae6b8c0bc6609b31094e36d58b50dd4"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/settings/profile/page.tsx": {
+    "mtime": 1779232161.9195566,
+    "ast_hash": "b81f2787f8a988ef553c4811c5abb3de",
+    "semantic_hash": "b81f2787f8a988ef553c4811c5abb3de"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/settings/team/page.tsx": {
+    "mtime": 1779232165.858981,
+    "ast_hash": "17ad304ab708a3b11df3a8bb1cd8a5cc",
+    "semantic_hash": "17ad304ab708a3b11df3a8bb1cd8a5cc"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/settings/ai/page.tsx": {
+    "mtime": 1779261168.9736428,
+    "ast_hash": "e801b00624b0cd5537db2d690facc114",
+    "semantic_hash": "e801b00624b0cd5537db2d690facc114"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/settings/account/page.tsx": {
+    "mtime": 1779261222.0253637,
+    "ast_hash": "96a7d9fffd1c85b7db3cefbe9c11c2cb",
+    "semantic_hash": "96a7d9fffd1c85b7db3cefbe9c11c2cb"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/settings/notifications/page.tsx": {
+    "mtime": 1779261195.909719,
+    "ast_hash": "c09ff98431a1d2155d1e27ee4a0b1b50",
+    "semantic_hash": "c09ff98431a1d2155d1e27ee4a0b1b50"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/chat/page.tsx": {
+    "mtime": 1779229509.144887,
+    "ast_hash": "0db2ab79df945f8e09087fe29eea9071",
+    "semantic_hash": "0db2ab79df945f8e09087fe29eea9071"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/workspace/page.tsx": {
+    "mtime": 1779471132.2766736,
+    "ast_hash": "7ee5851adc15c92c5c1b51b2808f71e3",
+    "semantic_hash": "7ee5851adc15c92c5c1b51b2808f71e3"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/dashboard/page.tsx": {
+    "mtime": 1779465447.1433074,
+    "ast_hash": "ec78c574e8230bb7e06be75c0d0543f2",
+    "semantic_hash": "ec78c574e8230bb7e06be75c0d0543f2"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/team/page.tsx": {
+    "mtime": 1779466147.1924238,
+    "ast_hash": "4c98be4d1b4a0ca8fa07619b480b3969",
+    "semantic_hash": "4c98be4d1b4a0ca8fa07619b480b3969"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/history/page.tsx": {
+    "mtime": 1779229509.145113,
+    "ast_hash": "d4f94904640769491c1f4c8a6d85cc55",
+    "semantic_hash": "d4f94904640769491c1f4c8a6d85cc55"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/files/page.tsx": {
+    "mtime": 1779364311.3644793,
+    "ast_hash": "5a068ad089648097c44f827550e61edf",
+    "semantic_hash": "5a068ad089648097c44f827550e61edf"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/sources/page.tsx": {
+    "mtime": 1779324970.438153,
+    "ast_hash": "2464f8f8114c8939d855bb16b94c763d",
+    "semantic_hash": "2464f8f8114c8939d855bb16b94c763d"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/app/(dashboard)/analytics/page.tsx": {
+    "mtime": 1779465447.1431231,
+    "ast_hash": "03f4e64527e39acb6e37666916b38562",
+    "semantic_hash": "03f4e64527e39acb6e37666916b38562"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/ui/LoadingButton.tsx": {
+    "mtime": 1779229509.1505709,
+    "ast_hash": "f8c1294c8cee02568fe688c52788029c",
+    "semantic_hash": "f8c1294c8cee02568fe688c52788029c"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/ui/Alert.tsx": {
+    "mtime": 1779229509.1503174,
+    "ast_hash": "c5fd5ba03a9d24cfa4c6273fd64d6acb",
+    "semantic_hash": "c5fd5ba03a9d24cfa4c6273fd64d6acb"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/ui/ClientTime.tsx": {
+    "mtime": 1779229509.1504467,
+    "ast_hash": "fa40719310464f4303c988477f8d4e2a",
+    "semantic_hash": "fa40719310464f4303c988477f8d4e2a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/ui/Button.tsx": {
+    "mtime": 1779229509.1503873,
+    "ast_hash": "2abb09154b13cf6720954f0917c1ff4b",
+    "semantic_hash": "2abb09154b13cf6720954f0917c1ff4b"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/ui/Toggle.tsx": {
+    "mtime": 1779261240.3527348,
+    "ast_hash": "c9c98daae7ade312aa3d74c4fcdb3bfc",
+    "semantic_hash": "c9c98daae7ade312aa3d74c4fcdb3bfc"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/ui/Input.tsx": {
+    "mtime": 1779229509.1505077,
+    "ast_hash": "3ad207a2877f3699507e990b44e10918",
+    "semantic_hash": "3ad207a2877f3699507e990b44e10918"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/settings/SettingsShell.tsx": {
+    "mtime": 1779324948.5772889,
+    "ast_hash": "4076479cf0a5707b8fa4bf1a13bfe882",
+    "semantic_hash": "4076479cf0a5707b8fa4bf1a13bfe882"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/settings/AccountProfileSettings.tsx": {
+    "mtime": 1779260457.08157,
+    "ast_hash": "327a55428ad1bd81aff1a144cdae1e80",
+    "semantic_hash": "327a55428ad1bd81aff1a144cdae1e80"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/settings/WorkspaceSettingsPanel.tsx": {
+    "mtime": 1779465447.1456494,
+    "ast_hash": "00dd00656486696ce8e5330d02d47cd7",
+    "semantic_hash": "00dd00656486696ce8e5330d02d47cd7"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/landing/Hero.tsx": {
+    "mtime": 1779229509.1491103,
+    "ast_hash": "2ea13a65de8839bcfa9e107a2da7a860",
+    "semantic_hash": "2ea13a65de8839bcfa9e107a2da7a860"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/landing/Features.tsx": {
+    "mtime": 1779229509.1489394,
+    "ast_hash": "7a048185b08b9cddd9d41841f8cb120d",
+    "semantic_hash": "7a048185b08b9cddd9d41841f8cb120d"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/landing/Footer.tsx": {
+    "mtime": 1779229509.148993,
+    "ast_hash": "c0c8ccd2e54796be7307a7b83e7aea07",
+    "semantic_hash": "c0c8ccd2e54796be7307a7b83e7aea07"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/landing/CTA.tsx": {
+    "mtime": 1779229509.1488762,
+    "ast_hash": "2cc0d2a6e295d5d703f033c0fb327866",
+    "semantic_hash": "2cc0d2a6e295d5d703f033c0fb327866"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/landing/LandingExperience.tsx": {
+    "mtime": 1779229509.149245,
+    "ast_hash": "85b41f911643dc27734780d0685979f0",
+    "semantic_hash": "85b41f911643dc27734780d0685979f0"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/landing/About.tsx": {
+    "mtime": 1779229509.1488156,
+    "ast_hash": "82a3ba2a3b940832d0131891922d285e",
+    "semantic_hash": "82a3ba2a3b940832d0131891922d285e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/chat/ChatInterface.tsx": {
+    "mtime": 1779468920.072412,
+    "ast_hash": "4bbc80f9f9bae3d8e4cc541fdb6b660b",
+    "semantic_hash": "4bbc80f9f9bae3d8e4cc541fdb6b660b"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/chat/types.ts": {
+    "mtime": 1779466147.1930232,
+    "ast_hash": "f56000a9f419cf35fe33da8058dd4cc1",
+    "semantic_hash": "f56000a9f419cf35fe33da8058dd4cc1"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/chat/MessageList.tsx": {
+    "mtime": 1779465447.1444468,
+    "ast_hash": "12b7afcf70f6910f3bffc14117ad7634",
+    "semantic_hash": "12b7afcf70f6910f3bffc14117ad7634"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/chat/MarkdownRenderer.tsx": {
+    "mtime": 1779232999.2686105,
+    "ast_hash": "b75d196e7afd5f225f6dbe37f0494acd",
+    "semantic_hash": "b75d196e7afd5f225f6dbe37f0494acd"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/chat/MessageBubble.tsx": {
+    "mtime": 1779466147.192795,
+    "ast_hash": "754f047e44a48e3f0b48a7788c32f692",
+    "semantic_hash": "754f047e44a48e3f0b48a7788c32f692"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/chat/HistoryList.tsx": {
+    "mtime": 1779314490.6369553,
+    "ast_hash": "5e4c1f4c239a49ca1f0cc78d37c982c9",
+    "semantic_hash": "5e4c1f4c239a49ca1f0cc78d37c982c9"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/chat/TypingIndicator.tsx": {
+    "mtime": 1779465447.144591,
+    "ast_hash": "62064829eb8c08c4ef83bf173a088d6a",
+    "semantic_hash": "62064829eb8c08c4ef83bf173a088d6a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/chat/ChatInput.tsx": {
+    "mtime": 1779465447.1436706,
+    "ast_hash": "7c74fbd982732a6a7c84d54f5c4fdda3",
+    "semantic_hash": "7c74fbd982732a6a7c84d54f5c4fdda3"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/auth/LoginForm.tsx": {
+    "mtime": 1779229509.1472857,
+    "ast_hash": "a6a54804c40ec5ec5f68d8559018e05e",
+    "semantic_hash": "a6a54804c40ec5ec5f68d8559018e05e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/auth/RegisterForm.tsx": {
+    "mtime": 1779229509.1477716,
+    "ast_hash": "19e836eea1ad1907f31923c27babafc1",
+    "semantic_hash": "19e836eea1ad1907f31923c27babafc1"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/auth/OmnixAuthVisuals.tsx": {
+    "mtime": 1779229509.1476617,
+    "ast_hash": "1114d7cad81b57740a78adb23c732d0a",
+    "semantic_hash": "1114d7cad81b57740a78adb23c732d0a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/auth/RequireAuth.tsx": {
+    "mtime": 1779229509.1478293,
+    "ast_hash": "874a3c04f52bd6f2170e5770e3e0bac6",
+    "semantic_hash": "874a3c04f52bd6f2170e5770e3e0bac6"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/auth/AuthCard.tsx": {
+    "mtime": 1779229509.1471164,
+    "ast_hash": "a7844711a1ac3772fa6fe7dae502f43e",
+    "semantic_hash": "a7844711a1ac3772fa6fe7dae502f43e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/auth/OAuthCallbackClient.tsx": {
+    "mtime": 1779325241.3645747,
+    "ast_hash": "5b5195cc490c5414bcf7e46da69e3678",
+    "semantic_hash": "5b5195cc490c5414bcf7e46da69e3678"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/auth/OAuthButtons.tsx": {
+    "mtime": 1779229509.1474233,
+    "ast_hash": "f75da5378a78d7c2856a636cef901dc5",
+    "semantic_hash": "f75da5378a78d7c2856a636cef901dc5"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/layout/PageTransition.tsx": {
+    "mtime": 1779231606.2106166,
+    "ast_hash": "43e3aabe5e379ae0e43593b44cca86db",
+    "semantic_hash": "43e3aabe5e379ae0e43593b44cca86db"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/layout/ProfileMenu.tsx": {
+    "mtime": 1779261278.4477146,
+    "ast_hash": "1bcefc93d44404e92a631fa610d43a74",
+    "semantic_hash": "1bcefc93d44404e92a631fa610d43a74"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/layout/AppShell.tsx": {
+    "mtime": 1779471066.9233816,
+    "ast_hash": "d8017e56ef7a1295cccc49e7ff7c226c",
+    "semantic_hash": "d8017e56ef7a1295cccc49e7ff7c226c"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/layout/Header.tsx": {
+    "mtime": 1779324835.1431913,
+    "ast_hash": "a429458fdfb9f33900889dd5e7df415a",
+    "semantic_hash": "a429458fdfb9f33900889dd5e7df415a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/layout/Sidebar.tsx": {
+    "mtime": 1779468845.6822681,
+    "ast_hash": "610328fe9b98a7700ef0e18b9243732f",
+    "semantic_hash": "610328fe9b98a7700ef0e18b9243732f"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/workspace/WorkspaceOperationalTimeline.tsx": {
+    "mtime": 1779471203.6730316,
+    "ast_hash": "d561d345f9fb4d5cc0f47173cf15858e",
+    "semantic_hash": "d561d345f9fb4d5cc0f47173cf15858e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/workspace/WorkspacePresenceCluster.tsx": {
+    "mtime": 1779468766.2797134,
+    "ast_hash": "5b8b9ebf8cdc9e6879a16d6dd7940b16",
+    "semantic_hash": "5b8b9ebf8cdc9e6879a16d6dd7940b16"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/workspace/InviteNotifications.tsx": {
+    "mtime": 1779261304.050228,
+    "ast_hash": "ab408cfbe549040d7483fd9ea71b4c6a",
+    "semantic_hash": "ab408cfbe549040d7483fd9ea71b4c6a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/workspace/WorkspaceIntelligencePanel.tsx": {
+    "mtime": 1779468747.9904227,
+    "ast_hash": "e9be312f4b97bac0b35d7174615adb2d",
+    "semantic_hash": "e9be312f4b97bac0b35d7174615adb2d"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/workspace/WorkspaceActivityFeed.tsx": {
+    "mtime": 1779465447.145745,
+    "ast_hash": "a4c2ed56575df55539c77d5edcb3af65",
+    "semantic_hash": "a4c2ed56575df55539c77d5edcb3af65"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/workspace/WorkspaceAccessPanel.tsx": {
+    "mtime": 1779468799.1260839,
+    "ast_hash": "2ff81c73786d475d419d75a921d9e106",
+    "semantic_hash": "2ff81c73786d475d419d75a921d9e106"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/workspace/WorkspaceOnboardingGate.tsx": {
+    "mtime": 1779465447.1468005,
+    "ast_hash": "f536f97a8eafdf0660164a887417e118",
+    "semantic_hash": "f536f97a8eafdf0660164a887417e118"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/workspace/PendingWorkspaceInvites.tsx": {
+    "mtime": 1779232999.2675135,
+    "ast_hash": "b7d58d39526ed1f75957f060966f6ce0",
+    "semantic_hash": "b7d58d39526ed1f75957f060966f6ce0"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/workspace/WorkspaceMemberStack.tsx": {
+    "mtime": 1779465447.1465912,
+    "ast_hash": "9bfd4cd8341f07f00b66372221d71a9a",
+    "semantic_hash": "9bfd4cd8341f07f00b66372221d71a9a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/workspace/WorkspaceInviteModal.tsx": {
+    "mtime": 1779468845.6866317,
+    "ast_hash": "1c45d2c1d7e5010bdc1dcc4483b48792",
+    "semantic_hash": "1c45d2c1d7e5010bdc1dcc4483b48792"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/brand/OmnixMark.tsx": {
+    "mtime": 1779229509.1479278,
+    "ast_hash": "dc5b8b3a310deb4b9c71947795b5b34a",
+    "semantic_hash": "dc5b8b3a310deb4b9c71947795b5b34a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/profile/ProfileAvatar.tsx": {
+    "mtime": 1779232840.8586447,
+    "ast_hash": "f14fbb670ea24d745712f01195159c13",
+    "semantic_hash": "f14fbb670ea24d745712f01195159c13"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/actions/ActionsMenu.tsx": {
+    "mtime": 1779261330.978367,
+    "ast_hash": "501f69d88a79d1c3425847dfcda8420f",
+    "semantic_hash": "501f69d88a79d1c3425847dfcda8420f"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/components/upload/UploadDropzone.tsx": {
+    "mtime": 1779261251.5173345,
+    "ast_hash": "abc6f6e21470cd2a299e169b8bc888ba",
+    "semantic_hash": "abc6f6e21470cd2a299e169b8bc888ba"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/lib/realtime-registry.ts": {
+    "mtime": 1779465447.1470652,
+    "ast_hash": "b707023e0dcd1d94e01775acf79e96b1",
+    "semantic_hash": "b707023e0dcd1d94e01775acf79e96b1"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/lib/workspace-collaboration-context.tsx": {
+    "mtime": 1779488331.2783334,
+    "ast_hash": "17335da7f224465cec2e1ad1cc0c0589",
+    "semantic_hash": "17335da7f224465cec2e1ad1cc0c0589"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/lib/auth-redirects.ts": {
+    "mtime": 1779324745.2192948,
+    "ast_hash": "358de1b7c99243a84ca4db4032fe6ca9",
+    "semantic_hash": "358de1b7c99243a84ca4db4032fe6ca9"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/lib/workspace-context.tsx": {
+    "mtime": 1779466147.1942308,
+    "ast_hash": "e08f1cd22cb74c5f77a3cbf4a55c28ff",
+    "semantic_hash": "e08f1cd22cb74c5f77a3cbf4a55c28ff"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/lib/auth-context.tsx": {
+    "mtime": 1779229509.1515806,
+    "ast_hash": "9fb6ebca35a8716c14fdb8e503f9c9c3",
+    "semantic_hash": "9fb6ebca35a8716c14fdb8e503f9c9c3"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/lib/utils.ts": {
+    "mtime": 1779229509.1519063,
+    "ast_hash": "618d00bf4537ce84f9ba62c5b215fb30",
+    "semantic_hash": "618d00bf4537ce84f9ba62c5b215fb30"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/lib/api.ts": {
+    "mtime": 1779229509.1515155,
+    "ast_hash": "1ecbcc6cf1abc46a6ad2b60f93e2fb91",
+    "semantic_hash": "1ecbcc6cf1abc46a6ad2b60f93e2fb91"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/lib/workspace-roles.ts": {
+    "mtime": 1779468655.1458383,
+    "ast_hash": "6e35f210a7e5c2f98e8c4f43a7bc8570",
+    "semantic_hash": "6e35f210a7e5c2f98e8c4f43a7bc8570"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/lib/workspace-continuity-context.tsx": {
+    "mtime": 1779471180.0213268,
+    "ast_hash": "1b6903b07b198f09dd7bad572db2cb88",
+    "semantic_hash": "1b6903b07b198f09dd7bad572db2cb88"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/lib/profile-context.tsx": {
+    "mtime": 1779229509.1518009,
+    "ast_hash": "33a899a3a199c56c59761682569e48bf",
+    "semantic_hash": "33a899a3a199c56c59761682569e48bf"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/lib/conversation-history-context.tsx": {
+    "mtime": 1779229509.151744,
+    "ast_hash": "71755d6152c694cde7e029c42a27e3dd",
+    "semantic_hash": "71755d6152c694cde7e029c42a27e3dd"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/lib/supabase.ts": {
+    "mtime": 1779229509.1518505,
+    "ast_hash": "9739cdfd6149c2f33ad1ea8728eccc81",
+    "semantic_hash": "9739cdfd6149c2f33ad1ea8728eccc81"
+  },
+  "/Users/shinobi/bibek_code/Omnix/frontend/lib/workspace-types.ts": {
+    "mtime": 1779471169.30729,
+    "ast_hash": "0eae65ba47fcb07890f9db3786bc3943",
+    "semantic_hash": "0eae65ba47fcb07890f9db3786bc3943"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0008_automations_and_logs.sql": {
+    "mtime": 1779229509.1285539,
+    "ast_hash": "36b48ccf4e0ffc7dbf329a353c69fdd7",
+    "semantic_hash": "36b48ccf4e0ffc7dbf329a353c69fdd7"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0020_workspace_intelligence.sql": {
+    "mtime": 1779363938.1869729,
+    "ast_hash": "f82e9ff612b24a710626da0610069c73",
+    "semantic_hash": "f82e9ff612b24a710626da0610069c73"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0005_collaboration.sql": {
+    "mtime": 1779229509.1283803,
+    "ast_hash": "6b86abe49f86986247e9946e8bf55b33",
+    "semantic_hash": "6b86abe49f86986247e9946e8bf55b33"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0023_workspace_intelligence_memory.sql": {
+    "mtime": 1779465447.1422246,
+    "ast_hash": "fd4b2001494f069f925710d6e5a53632",
+    "semantic_hash": "fd4b2001494f069f925710d6e5a53632"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0024_federated_retrieval_rpcs.sql": {
+    "mtime": 1779465447.142387,
+    "ast_hash": "198eb63cdd0b2d60fc946102ce3dfd7b",
+    "semantic_hash": "198eb63cdd0b2d60fc946102ce3dfd7b"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0025_operational_continuity.sql": {
+    "mtime": 1779470337.2118902,
+    "ast_hash": "0caa50bd36de1b3aec35ee404bb81421",
+    "semantic_hash": "0caa50bd36de1b3aec35ee404bb81421"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0014_workspace_invites_invited_by.sql": {
+    "mtime": 1779229509.1290207,
+    "ast_hash": "5229ec4a5d5bb9f529ddec03c5218050",
+    "semantic_hash": "5229ec4a5d5bb9f529ddec03c5218050"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0004_pgvector.sql": {
+    "mtime": 1779229509.1282694,
+    "ast_hash": "98fc1a582f814d234eb1bf6e781589b9",
+    "semantic_hash": "98fc1a582f814d234eb1bf6e781589b9"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0015_workspace_member_roles.sql": {
+    "mtime": 1779229509.1290781,
+    "ast_hash": "152ec83fcfd0862a463e75fd821facb5",
+    "semantic_hash": "152ec83fcfd0862a463e75fd821facb5"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0016_profiles_and_invite_roles.sql": {
+    "mtime": 1779229509.129143,
+    "ast_hash": "89654022a19c502894eeab10b06beb5b",
+    "semantic_hash": "89654022a19c502894eeab10b06beb5b"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0011_change_embedding_dim_to_384.sql": {
+    "mtime": 1779229509.1287212,
+    "ast_hash": "6b24b7e88ff26a42d60ffd91c205bc2a",
+    "semantic_hash": "6b24b7e88ff26a42d60ffd91c205bc2a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0018_repair_profiles_schema.sql": {
+    "mtime": 1779229509.1292732,
+    "ast_hash": "335032f0004bfa0e762fe63ceae715e7",
+    "semantic_hash": "335032f0004bfa0e762fe63ceae715e7"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0012_local_embeddings_contract.sql": {
+    "mtime": 1779229509.1288438,
+    "ast_hash": "4b817e649b535f1df6dad3557744a67b",
+    "semantic_hash": "4b817e649b535f1df6dad3557744a67b"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0001_align_schema.sql": {
+    "mtime": 1779229509.128082,
+    "ast_hash": "9c9d77a541fe7c7407e2cc38cee1b177",
+    "semantic_hash": "9c9d77a541fe7c7407e2cc38cee1b177"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0002_add_pgvector.sql": {
+    "mtime": 1779229509.1281476,
+    "ast_hash": "128ef462b841f4f6bd968e0f7b8dafb3",
+    "semantic_hash": "128ef462b841f4f6bd968e0f7b8dafb3"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0021_workspace_collaboration_maturity.sql": {
+    "mtime": 1779465447.1418657,
+    "ast_hash": "847cc2108b87467ffefd9729a409ede0",
+    "semantic_hash": "847cc2108b87467ffefd9729a409ede0"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0013_hybrid_retrieval.sql": {
+    "mtime": 1779229509.1289551,
+    "ast_hash": "891beb94ea630d714d54ff4a2d467bcf",
+    "semantic_hash": "891beb94ea630d714d54ff4a2d467bcf"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0022_enable_realtime.sql": {
+    "mtime": 1779465447.1420417,
+    "ast_hash": "9a4164ae476b09a43877b4b1bcbef6bb",
+    "semantic_hash": "9a4164ae476b09a43877b4b1bcbef6bb"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0007_add_workspaces_updated_at.sql": {
+    "mtime": 1779229509.1284938,
+    "ast_hash": "ea7971c7fc33c50f40a9a38047ec1c8c",
+    "semantic_hash": "ea7971c7fc33c50f40a9a38047ec1c8c"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0003_workspaces.sql": {
+    "mtime": 1779229509.128206,
+    "ast_hash": "59d500a5026979bba78593f77bb665bf",
+    "semantic_hash": "59d500a5026979bba78593f77bb665bf"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0017_message_source_metadata.sql": {
+    "mtime": 1779229509.1292052,
+    "ast_hash": "13e21d68166b66785c28eac5e905c970",
+    "semantic_hash": "13e21d68166b66785c28eac5e905c970"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0019_messages_payload.sql": {
+    "mtime": 1779229509.1293318,
+    "ast_hash": "6a5e5d7f097d8b733169c4a6171ec6cf",
+    "semantic_hash": "6a5e5d7f097d8b733169c4a6171ec6cf"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0006_artifacts.sql": {
+    "mtime": 1779229509.1284347,
+    "ast_hash": "fcdc09da474f4582a24b62116458baa6",
+    "semantic_hash": "fcdc09da474f4582a24b62116458baa6"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/migrations/0010_jobs_table.sql": {
+    "mtime": 1779229509.1286657,
+    "ast_hash": "66b6eee0f0845004c2d85d0340f14d97",
+    "semantic_hash": "66b6eee0f0845004c2d85d0340f14d97"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/ven/bin/Activate.ps1": {
+    "mtime": 1779488331.2287228,
+    "ast_hash": "a7b31db8d9503fff9cbffe2f0264127d",
+    "semantic_hash": "a7b31db8d9503fff9cbffe2f0264127d"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/main.py": {
+    "mtime": 1779229509.1111042,
+    "ast_hash": "4d81b071257aacad7421858ab9b69099",
+    "semantic_hash": "4d81b071257aacad7421858ab9b69099"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/files.py": {
+    "mtime": 1779465447.1395972,
+    "ast_hash": "1cdcc5eaedc45aa567ba9e777a9690b7",
+    "semantic_hash": "1cdcc5eaedc45aa567ba9e777a9690b7"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/upload.py": {
+    "mtime": 1779465447.1399531,
+    "ast_hash": "364196e4bf234bca44d76954164b64f5",
+    "semantic_hash": "364196e4bf234bca44d76954164b64f5"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/profile.py": {
+    "mtime": 1779229509.12351,
+    "ast_hash": "4405115a48984a068d9cc4b08cd4513f",
+    "semantic_hash": "4405115a48984a068d9cc4b08cd4513f"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/cache.py": {
+    "mtime": 1779229509.122956,
+    "ast_hash": "50c8ebbfb56a9962b66c5958763c408c",
+    "semantic_hash": "50c8ebbfb56a9962b66c5958763c408c"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/actions.py": {
+    "mtime": 1779229509.1226218,
+    "ast_hash": "9743e915be4afc3631f6883b5e03d930",
+    "semantic_hash": "9743e915be4afc3631f6883b5e03d930"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/__init__.py": {
+    "mtime": 1779229509.1197999,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/admin.py": {
+    "mtime": 1779229509.1226764,
+    "ast_hash": "3559d067788f9326d5bb44dbc25b7282",
+    "semantic_hash": "3559d067788f9326d5bb44dbc25b7282"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/automations.py": {
+    "mtime": 1779229509.1228294,
+    "ast_hash": "c6c49f6257a6823beaf7a103758fd84f",
+    "semantic_hash": "c6c49f6257a6823beaf7a103758fd84f"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/messages.py": {
+    "mtime": 1779465447.1398058,
+    "ast_hash": "cd60215145dfba91788b70bbcc4dc08a",
+    "semantic_hash": "cd60215145dfba91788b70bbcc4dc08a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/artifacts.py": {
+    "mtime": 1779229509.1227732,
+    "ast_hash": "e64f9de01d258323f33b6b356c9b521b",
+    "semantic_hash": "e64f9de01d258323f33b6b356c9b521b"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/google_drive.py": {
+    "mtime": 1779229509.123302,
+    "ast_hash": "d5e9b4522bc245d28a199e99fe4b2f93",
+    "semantic_hash": "d5e9b4522bc245d28a199e99fe4b2f93"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/insights.py": {
+    "mtime": 1779229509.1233706,
+    "ast_hash": "0453d81b567c3b5abefedd3b48bb5e5e",
+    "semantic_hash": "0453d81b567c3b5abefedd3b48bb5e5e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/continuity.py": {
+    "mtime": 1779471654.104304,
+    "ast_hash": "c18597b6b20e42433a72ea0287413abb",
+    "semantic_hash": "c18597b6b20e42433a72ea0287413abb"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/conversations.py": {
+    "mtime": 1779229509.123063,
+    "ast_hash": "70d8b1e080a1ab76f92a8fe76ad79a91",
+    "semantic_hash": "70d8b1e080a1ab76f92a8fe76ad79a91"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/routers/workspaces.py": {
+    "mtime": 1779466147.190755,
+    "ast_hash": "95ff0f2c222a6681b959906baa45b184",
+    "semantic_hash": "95ff0f2c222a6681b959906baa45b184"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/insights/__init__.py": {
+    "mtime": 1779229509.1086276,
+    "ast_hash": "72a47c53713e7dadaf54eb2e83ce43fd",
+    "semantic_hash": "72a47c53713e7dadaf54eb2e83ce43fd"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/insights/conflict_detector.py": {
+    "mtime": 1779229509.109364,
+    "ast_hash": "00cc144a59423ee4bc7f171d56b80f54",
+    "semantic_hash": "00cc144a59423ee4bc7f171d56b80f54"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/insights/workspace_summary.py": {
+    "mtime": 1779229509.1094844,
+    "ast_hash": "e8aaea952a53e0cd8eaf7c247e97ad0e",
+    "semantic_hash": "e8aaea952a53e0cd8eaf7c247e97ad0e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/insights/action_item_detector.py": {
+    "mtime": 1779229509.1093037,
+    "ast_hash": "fc42d8e4e6cfee15a03aa42307675451",
+    "semantic_hash": "fc42d8e4e6cfee15a03aa42307675451"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/insights/topic_detection.py": {
+    "mtime": 1779229509.1094258,
+    "ast_hash": "96732b30509be47de9d6a0e0a945257a",
+    "semantic_hash": "96732b30509be47de9d6a0e0a945257a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/settings/__init__.py": {
+    "mtime": 1779229509.1271694,
+    "ast_hash": "e83c89965e1eee147cbe7bd52de11e65",
+    "semantic_hash": "e83c89965e1eee147cbe7bd52de11e65"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/settings/observability.py": {
+    "mtime": 1779229509.1277492,
+    "ast_hash": "ca5612aa95c25afe3c0cf418f0fd3888",
+    "semantic_hash": "ca5612aa95c25afe3c0cf418f0fd3888"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/settings/runtime.py": {
+    "mtime": 1779229509.12793,
+    "ast_hash": "1ff93f383b0eb0036791d52961ad2d77",
+    "semantic_hash": "1ff93f383b0eb0036791d52961ad2d77"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/settings/providers.py": {
+    "mtime": 1779229509.127813,
+    "ast_hash": "605e0c7a4dd039aa3c0fa4afafda6381",
+    "semantic_hash": "605e0c7a4dd039aa3c0fa4afafda6381"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/settings/retrieval.py": {
+    "mtime": 1779229509.1278725,
+    "ast_hash": "d54c768a599bb349f9e41d0d75f0339e",
+    "semantic_hash": "d54c768a599bb349f9e41d0d75f0339e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/settings/base.py": {
+    "mtime": 1779229509.1276937,
+    "ast_hash": "39210b43220a34bd3eda63a821f03c6d",
+    "semantic_hash": "39210b43220a34bd3eda63a821f03c6d"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/embeddings/local_provider.py": {
+    "mtime": 1779229509.1078918,
+    "ast_hash": "7b47fc617615a899c08161c9c9b7e854",
+    "semantic_hash": "7b47fc617615a899c08161c9c9b7e854"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/embeddings/provider.py": {
+    "mtime": 1779229509.1080115,
+    "ast_hash": "f125cf302107a9659460d334c3ab2678",
+    "semantic_hash": "f125cf302107a9659460d334c3ab2678"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/embeddings/dimensions.py": {
+    "mtime": 1779229509.107779,
+    "ast_hash": "6f98e17c28ffe57cf304f658a5a95f6f",
+    "semantic_hash": "6f98e17c28ffe57cf304f658a5a95f6f"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/embeddings/__init__.py": {
+    "mtime": 1779229509.106788,
+    "ast_hash": "bd5442351040e26388ac33489ecf3031",
+    "semantic_hash": "bd5442351040e26388ac33489ecf3031"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/embeddings/openai_provider.py": {
+    "mtime": 1779229509.1079485,
+    "ast_hash": "8d6f586a07be38300b74fc367df2a314",
+    "semantic_hash": "8d6f586a07be38300b74fc367df2a314"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/embeddings/utils.py": {
+    "mtime": 1779229509.1081283,
+    "ast_hash": "608b0cd076f563f6363b1baac45c4319",
+    "semantic_hash": "608b0cd076f563f6363b1baac45c4319"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/embeddings/search.py": {
+    "mtime": 1779229509.1080723,
+    "ast_hash": "288ddbfb26a6b373884312175b9c099d",
+    "semantic_hash": "288ddbfb26a6b373884312175b9c099d"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/citations.py": {
+    "mtime": 1779229509.1044028,
+    "ast_hash": "fc007528fe0156c5cfcc1197ba53eb31",
+    "semantic_hash": "fc007528fe0156c5cfcc1197ba53eb31"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/actions_context.py": {
+    "mtime": 1779229509.1042879,
+    "ast_hash": "c6dca7ff239db4fd9856bbcbce39285e",
+    "semantic_hash": "c6dca7ff239db4fd9856bbcbce39285e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/automations_context.py": {
+    "mtime": 1779229509.1043422,
+    "ast_hash": "71be5f61868bb51d0c6115c62425b4ee",
+    "semantic_hash": "71be5f61868bb51d0c6115c62425b4ee"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/prompt_builder.py": {
+    "mtime": 1779465447.13763,
+    "ast_hash": "546cf535d88476d29304b6a4a61cd476",
+    "semantic_hash": "546cf535d88476d29304b6a4a61cd476"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/memory.py": {
+    "mtime": 1779465447.1371677,
+    "ast_hash": "f04eb27c6f4f14f4b9e5dc54f5e43c42",
+    "semantic_hash": "f04eb27c6f4f14f4b9e5dc54f5e43c42"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/compression.py": {
+    "mtime": 1779229509.1044598,
+    "ast_hash": "a3c5b4c4ed2c24815b9799f747199e6a",
+    "semantic_hash": "a3c5b4c4ed2c24815b9799f747199e6a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/graph.py": {
+    "mtime": 1779465447.1366146,
+    "ast_hash": "5bf1f0c49a7e740e03132a4bf1bb5f23",
+    "semantic_hash": "5bf1f0c49a7e740e03132a4bf1bb5f23"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/__init__.py": {
+    "mtime": 1779229509.1029837,
+    "ast_hash": "b8112034c6bdb724d3f2e99cdcb680f8",
+    "semantic_hash": "b8112034c6bdb724d3f2e99cdcb680f8"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/persona.py": {
+    "mtime": 1779465447.1373637,
+    "ast_hash": "0d97fb0562ed660c56759c629af2b419",
+    "semantic_hash": "0d97fb0562ed660c56759c629af2b419"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/engine.py": {
+    "mtime": 1779465447.1362946,
+    "ast_hash": "6b2697f6906af5d60f844ba9638ced28",
+    "semantic_hash": "6b2697f6906af5d60f844ba9638ced28"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/schemas.py": {
+    "mtime": 1779229509.1051862,
+    "ast_hash": "ec08dc8e85c968fddc709ec5341df992",
+    "semantic_hash": "ec08dc8e85c968fddc709ec5341df992"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/workspace_context.py": {
+    "mtime": 1779465447.1380856,
+    "ast_hash": "087c20fc8eb25d859b51d4e618422411",
+    "semantic_hash": "087c20fc8eb25d859b51d4e618422411"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/retrieval.py": {
+    "mtime": 1779465447.1378615,
+    "ast_hash": "d219a2df4edc2a63848b57c19d68a30a",
+    "semantic_hash": "d219a2df4edc2a63848b57c19d68a30a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/ranking.py": {
+    "mtime": 1779229509.1050777,
+    "ast_hash": "b6c16eebae80712fa277bc7ecc452007",
+    "semantic_hash": "b6c16eebae80712fa277bc7ecc452007"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/providers/vllm.py": {
+    "mtime": 1779229509.1050255,
+    "ast_hash": "536835d467f030f59eb6399b1e721f7a",
+    "semantic_hash": "536835d467f030f59eb6399b1e721f7a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/providers/__init__.py": {
+    "mtime": 1779229509.1047542,
+    "ast_hash": "1199880b347b9cfbfa92a73e50651959",
+    "semantic_hash": "1199880b347b9cfbfa92a73e50651959"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/providers/local_llm.py": {
+    "mtime": 1779229509.1048715,
+    "ast_hash": "f1d9184d2e96cc415940f89b443c95b4",
+    "semantic_hash": "f1d9184d2e96cc415940f89b443c95b4"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/providers/openai.py": {
+    "mtime": 1779229509.1049786,
+    "ast_hash": "b3b29f150b6d1d54f1c0dc95bebfcfea",
+    "semantic_hash": "b3b29f150b6d1d54f1c0dc95bebfcfea"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/providers/ollama.py": {
+    "mtime": 1779229509.1049273,
+    "ast_hash": "c67f9d4a70ed810bea55096a91381765",
+    "semantic_hash": "c67f9d4a70ed810bea55096a91381765"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/providers/base.py": {
+    "mtime": 1779229509.1048102,
+    "ast_hash": "fdf648582bbde2ad3f5f91d4daf56b26",
+    "semantic_hash": "fdf648582bbde2ad3f5f91d4daf56b26"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/utils/chunking.py": {
+    "mtime": 1779229509.1053827,
+    "ast_hash": "894a7e60e9e5b7bc3c37aa228ddf8ee5",
+    "semantic_hash": "894a7e60e9e5b7bc3c37aa228ddf8ee5"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/utils/dedupe.py": {
+    "mtime": 1779229509.105432,
+    "ast_hash": "338882656aec841a8504ec34d8c8ca19",
+    "semantic_hash": "338882656aec841a8504ec34d8c8ca19"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/utils/__init__.py": {
+    "mtime": 1779229509.1053169,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/context/utils/formatting.py": {
+    "mtime": 1779229509.1054819,
+    "ast_hash": "49d640f5670741ef3d9e666bc66f4a54",
+    "semantic_hash": "49d640f5670741ef3d9e666bc66f4a54"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/core/config.py": {
+    "mtime": 1779229509.1061394,
+    "ast_hash": "20f5aedd3e40d3547f6b621f79dc582b",
+    "semantic_hash": "20f5aedd3e40d3547f6b621f79dc582b"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/core/security.py": {
+    "mtime": 1779229509.1062453,
+    "ast_hash": "6043c76a6ba94370d941b1121d0903b2",
+    "semantic_hash": "6043c76a6ba94370d941b1121d0903b2"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/core/rbac.py": {
+    "mtime": 1779466147.1903324,
+    "ast_hash": "80080f3601d7b6cfd4f53dbace19f1d6",
+    "semantic_hash": "80080f3601d7b6cfd4f53dbace19f1d6"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/core/__init__.py": {
+    "mtime": 1779229509.1055954,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/bootstrap/vector_store.py": {
+    "mtime": 1779229509.1028402,
+    "ast_hash": "0932ebf24ecf0dc70adc0d72144d8366",
+    "semantic_hash": "0932ebf24ecf0dc70adc0d72144d8366"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/bootstrap/shutdown.py": {
+    "mtime": 1779487128.87636,
+    "ast_hash": "b0478f0e29af5435034e659b3ce5e5ff",
+    "semantic_hash": "b0478f0e29af5435034e659b3ce5e5ff"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/bootstrap/observability.py": {
+    "mtime": 1779229509.1026669,
+    "ast_hash": "3644d34c5be9a650cb890cf1e5d3e26c",
+    "semantic_hash": "3644d34c5be9a650cb890cf1e5d3e26c"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/bootstrap/redis.py": {
+    "mtime": 1779229509.1027317,
+    "ast_hash": "ed9cdf706df7d266fc5a65365d8a32d7",
+    "semantic_hash": "ed9cdf706df7d266fc5a65365d8a32d7"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/bootstrap/app.py": {
+    "mtime": 1779488331.2265024,
+    "ast_hash": "2399be1a6eba8d98cfc2644adcff6015",
+    "semantic_hash": "2399be1a6eba8d98cfc2644adcff6015"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/bootstrap/workers.py": {
+    "mtime": 1779488331.2267828,
+    "ast_hash": "63bfa6fc0ae74b07dbac1107d82cc359",
+    "semantic_hash": "63bfa6fc0ae74b07dbac1107d82cc359"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/bootstrap/middleware.py": {
+    "mtime": 1779229509.1026108,
+    "ast_hash": "b97dd15a2c6b2f09c8117446421bab70",
+    "semantic_hash": "b97dd15a2c6b2f09c8117446421bab70"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/health/checks.py": {
+    "mtime": 1779229509.1084695,
+    "ast_hash": "e18d76000b4d526de0c82f85935ab62e",
+    "semantic_hash": "e18d76000b4d526de0c82f85935ab62e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/health/router.py": {
+    "mtime": 1779229509.1085289,
+    "ast_hash": "5642e67783fd13ee0321b7c16015b160",
+    "semantic_hash": "5642e67783fd13ee0321b7c16015b160"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/runtime/manager.py": {
+    "mtime": 1779229509.1239078,
+    "ast_hash": "313023358ddde44658a8a30ef12c6c7f",
+    "semantic_hash": "313023358ddde44658a8a30ef12c6c7f"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/metrics.py": {
+    "mtime": 1779229509.11422,
+    "ast_hash": "ee230f86bfff160221c3fc8bc7814611",
+    "semantic_hash": "ee230f86bfff160221c3fc8bc7814611"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/tracing.py": {
+    "mtime": 1779229509.1147358,
+    "ast_hash": "598011de8fa1e450bc81952c46b66aec",
+    "semantic_hash": "598011de8fa1e450bc81952c46b66aec"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/execution_graph.py": {
+    "mtime": 1779229509.1138167,
+    "ast_hash": "987e184dddb6f0a4ad9f35eadb4da56e",
+    "semantic_hash": "987e184dddb6f0a4ad9f35eadb4da56e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/provider_trace.py": {
+    "mtime": 1779229509.1143332,
+    "ast_hash": "55b057b63ffe039e785758819debb938",
+    "semantic_hash": "55b057b63ffe039e785758819debb938"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/prompt_trace.py": {
+    "mtime": 1779229509.1142752,
+    "ast_hash": "e4a169b7a0f2990d17ae4a1d88b285f2",
+    "semantic_hash": "e4a169b7a0f2990d17ae4a1d88b285f2"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/diagnostics.py": {
+    "mtime": 1779229509.1136837,
+    "ast_hash": "263ecee14eed2cf01bea28fe76a6b5e5",
+    "semantic_hash": "263ecee14eed2cf01bea28fe76a6b5e5"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/serializers.py": {
+    "mtime": 1779229509.1145654,
+    "ast_hash": "e57007a46db7a90b12e2121fd21eb6fe",
+    "semantic_hash": "e57007a46db7a90b12e2121fd21eb6fe"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/__init__.py": {
+    "mtime": 1779229509.1111968,
+    "ast_hash": "b10cca3630a38ba54ad8aff4c05c0ff1",
+    "semantic_hash": "b10cca3630a38ba54ad8aff4c05c0ff1"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/runtime.py": {
+    "mtime": 1779229509.1144462,
+    "ast_hash": "75bee431eacf160fcbb0f29c3f777f8a",
+    "semantic_hash": "75bee431eacf160fcbb0f29c3f777f8a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/event_bus.py": {
+    "mtime": 1779229509.1137488,
+    "ast_hash": "59ca82f17ff421b0ff8ef3dfea3e87a9",
+    "semantic_hash": "59ca82f17ff421b0ff8ef3dfea3e87a9"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/schemas.py": {
+    "mtime": 1779229509.114509,
+    "ast_hash": "1e5cc35ff2f97529deed2c549d416d7c",
+    "semantic_hash": "1e5cc35ff2f97529deed2c549d416d7c"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/streaming.py": {
+    "mtime": 1779229509.1146252,
+    "ast_hash": "9422119ba4e085097eae3c47e477a92d",
+    "semantic_hash": "9422119ba4e085097eae3c47e477a92d"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/retrieval_trace.py": {
+    "mtime": 1779229509.1143901,
+    "ast_hash": "700e797d6a727356e85a3fe289525863",
+    "semantic_hash": "700e797d6a727356e85a3fe289525863"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/exporters/console.py": {
+    "mtime": 1779229509.1139755,
+    "ast_hash": "45aa6c870f33800fd1cf517c68d126ae",
+    "semantic_hash": "45aa6c870f33800fd1cf517c68d126ae"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/exporters/json_exporter.py": {
+    "mtime": 1779229509.1140926,
+    "ast_hash": "1300448231d12aa4ec8938114dd578d2",
+    "semantic_hash": "1300448231d12aa4ec8938114dd578d2"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/exporters/__init__.py": {
+    "mtime": 1779229509.113913,
+    "ast_hash": "709f166ffb464dfbe1536238891b316b",
+    "semantic_hash": "709f166ffb464dfbe1536238891b316b"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/exporters/opentelemetry.py": {
+    "mtime": 1779229509.114155,
+    "ast_hash": "aff2e834605882bfd9885b32c4cb4a2e",
+    "semantic_hash": "aff2e834605882bfd9885b32c4cb4a2e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/observability/exporters/file_exporter.py": {
+    "mtime": 1779229509.1140344,
+    "ast_hash": "e74e49a1f649352245e676ac8da0271a",
+    "semantic_hash": "e74e49a1f649352245e676ac8da0271a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/ingestion.py": {
+    "mtime": 1779314490.4884257,
+    "ast_hash": "542e87cca86b9e337b96b4f33602283d",
+    "semantic_hash": "542e87cca86b9e337b96b4f33602283d"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/startup.py": {
+    "mtime": 1779229509.1174793,
+    "ast_hash": "4fb931eed02d7e3b5102c9698098c875",
+    "semantic_hash": "4fb931eed02d7e3b5102c9698098c875"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/chunking.py": {
+    "mtime": 1779314490.4876206,
+    "ast_hash": "5fa1d59130f54931435be4bc3bef023b",
+    "semantic_hash": "5fa1d59130f54931435be4bc3bef023b"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/models.py": {
+    "mtime": 1779314490.489442,
+    "ast_hash": "3783d80ab6aa74e00a8b885ac6549589",
+    "semantic_hash": "3783d80ab6aa74e00a8b885ac6549589"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/embedding.py": {
+    "mtime": 1779229509.117104,
+    "ast_hash": "313c0bc18546d3d8d3ecabde3b94b6f2",
+    "semantic_hash": "313c0bc18546d3d8d3ecabde3b94b6f2"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/__init__.py": {
+    "mtime": 1779229509.114829,
+    "ast_hash": "ff3a86af557f3be80f0f909f1e5ebc92",
+    "semantic_hash": "ff3a86af557f3be80f0f909f1e5ebc92"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/utils.py": {
+    "mtime": 1779229509.117534,
+    "ast_hash": "4646b72fca09209eb12ad07c371e34af",
+    "semantic_hash": "4646b72fca09209eb12ad07c371e34af"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/vector_store_base.py": {
+    "mtime": 1779229509.1176293,
+    "ast_hash": "16c877cafe4a3d3bcbcc7f4f07c21405",
+    "semantic_hash": "16c877cafe4a3d3bcbcc7f4f07c21405"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/keyword_retrieval.py": {
+    "mtime": 1779314490.489243,
+    "ast_hash": "f2a9818372a84dfbba822dec4c23f785",
+    "semantic_hash": "f2a9818372a84dfbba822dec4c23f785"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/pgvector_store.py": {
+    "mtime": 1779465447.1385345,
+    "ast_hash": "fd7aada78819eec77d40ad618ac24d90",
+    "semantic_hash": "fd7aada78819eec77d40ad618ac24d90"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/ingestion_service.py": {
+    "mtime": 1779314490.4888206,
+    "ast_hash": "97448addcb9b6a74dc5bbbd975c389d8",
+    "semantic_hash": "97448addcb9b6a74dc5bbbd975c389d8"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/parsers/pdf_parser.py": {
+    "mtime": 1779314490.4902372,
+    "ast_hash": "b8d0998ca1d6f7d01ad366e381b0a900",
+    "semantic_hash": "b8d0998ca1d6f7d01ad366e381b0a900"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/parsers/markdown_parser.py": {
+    "mtime": 1779314490.4900417,
+    "ast_hash": "8ff2d38e04bc4cab8993de99a6db8e34",
+    "semantic_hash": "8ff2d38e04bc4cab8993de99a6db8e34"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/parsers/__init__.py": {
+    "mtime": 1779314490.4896398,
+    "ast_hash": "f5f1590bf140d6263459bb73232e2fd7",
+    "semantic_hash": "f5f1590bf140d6263459bb73232e2fd7"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/rag/parsers/text_parser.py": {
+    "mtime": 1779314490.4905167,
+    "ast_hash": "08ff62e38e9ddd14d858a58ae87b10c1",
+    "semantic_hash": "08ff62e38e9ddd14d858a58ae87b10c1"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/schemas/profile.py": {
+    "mtime": 1779229509.1245084,
+    "ast_hash": "9154988cc3ed1d429820dec6c0781ad6",
+    "semantic_hash": "9154988cc3ed1d429820dec6c0781ad6"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/schemas/__init__.py": {
+    "mtime": 1779229509.123968,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/schemas/chat.py": {
+    "mtime": 1779529112.432164,
+    "ast_hash": "283cc5d853b70d3ec98cbeb103e4d3d6",
+    "semantic_hash": "283cc5d853b70d3ec98cbeb103e4d3d6"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/schemas/continuity.py": {
+    "mtime": 1779470372.199977,
+    "ast_hash": "1ac28307e136d19d72894162edf008ee",
+    "semantic_hash": "1ac28307e136d19d72894162edf008ee"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/integrations/google_drive.py": {
+    "mtime": 1779229509.1099057,
+    "ast_hash": "787bdc960b41499f2a29ae4e4b2e24b8",
+    "semantic_hash": "787bdc960b41499f2a29ae4e4b2e24b8"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/retrieval/hybrid_search.py": {
+    "mtime": 1779465447.1388123,
+    "ast_hash": "b33af81ceee7f2cf04d657ee6cfc44ce",
+    "semantic_hash": "b33af81ceee7f2cf04d657ee6cfc44ce"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/retrieval/reranker.py": {
+    "mtime": 1779229509.119518,
+    "ast_hash": "f66d833382e15980d353f4811e16b80f",
+    "semantic_hash": "f66d833382e15980d353f4811e16b80f"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/retrieval/keyword_search.py": {
+    "mtime": 1779465447.1390753,
+    "ast_hash": "cec4f636c9cac65b69b08f1cfa726354",
+    "semantic_hash": "cec4f636c9cac65b69b08f1cfa726354"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/retrieval/context_builder.py": {
+    "mtime": 1779229509.119238,
+    "ast_hash": "2b4772c8733c1628afaeb8fbf1cbee24",
+    "semantic_hash": "2b4772c8733c1628afaeb8fbf1cbee24"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/retrieval/scoring.py": {
+    "mtime": 1779229509.1196246,
+    "ast_hash": "4abc5387701dfc05ece5a29691618b83",
+    "semantic_hash": "4abc5387701dfc05ece5a29691618b83"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/retrieval/__init__.py": {
+    "mtime": 1779229509.1177218,
+    "ast_hash": "b2537c493f8f47dd1e37e03f54ad9682",
+    "semantic_hash": "b2537c493f8f47dd1e37e03f54ad9682"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/retrieval/router.py": {
+    "mtime": 1779465447.1392264,
+    "ast_hash": "691750855f34272d5b781b8f7135c8d2",
+    "semantic_hash": "691750855f34272d5b781b8f7135c8d2"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/retrieval/semantic_search.py": {
+    "mtime": 1779465447.1394522,
+    "ast_hash": "3f8c4cc404e11155d3acfb433ed9667a",
+    "semantic_hash": "3f8c4cc404e11155d3acfb433ed9667a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/actions/tasks.py": {
+    "mtime": 1779229509.1007445,
+    "ast_hash": "f1a341390d97db3c19c3943bfe8910fe",
+    "semantic_hash": "f1a341390d97db3c19c3943bfe8910fe"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/actions/__init__.py": {
+    "mtime": 1779229509.0996845,
+    "ast_hash": "ae7038d35f41c3b169bb63377c63e47a",
+    "semantic_hash": "ae7038d35f41c3b169bb63377c63e47a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/actions/summarize.py": {
+    "mtime": 1779229509.1006796,
+    "ast_hash": "8d1513f72afdbf531169e3a25e68d068",
+    "semantic_hash": "8d1513f72afdbf531169e3a25e68d068"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/actions/notes.py": {
+    "mtime": 1779229509.100621,
+    "ast_hash": "a2546b0c36874050d427e98c52893c74",
+    "semantic_hash": "a2546b0c36874050d427e98c52893c74"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/actions/faq.py": {
+    "mtime": 1779229509.1005476,
+    "ast_hash": "4974d22e16be3d918d51d9712a217c10",
+    "semantic_hash": "4974d22e16be3d918d51d9712a217c10"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/actions/compare.py": {
+    "mtime": 1779229509.100497,
+    "ast_hash": "d2bcbed1a7389ac2452eb9071c7b51a7",
+    "semantic_hash": "d2bcbed1a7389ac2452eb9071c7b51a7"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/db/__init__.py": {
+    "mtime": 1779229509.1063035,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/db/supabase_client.py": {
+    "mtime": 1779488420.6638935,
+    "ast_hash": "02c61a2de317723d5666acf5d1486ef3",
+    "semantic_hash": "02c61a2de317723d5666acf5d1486ef3"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/automation/insight_jobs.py": {
+    "mtime": 1779229509.1017325,
+    "ast_hash": "34d381fc2ca6b3e08a34f7e87d09b053",
+    "semantic_hash": "34d381fc2ca6b3e08a34f7e87d09b053"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/automation/__init__.py": {
+    "mtime": 1779229509.1008432,
+    "ast_hash": "30e10a42810214f9c9d2e75e6fdc51d0",
+    "semantic_hash": "30e10a42810214f9c9d2e75e6fdc51d0"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/automation/workspace_jobs.py": {
+    "mtime": 1779488331.2262945,
+    "ast_hash": "425b52022f646a7fc28e4eddc9984cd2",
+    "semantic_hash": "425b52022f646a7fc28e4eddc9984cd2"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/automation/scheduler.py": {
+    "mtime": 1779488331.226152,
+    "ast_hash": "a873a0b8783539adf565b9ebf2f7d2ee",
+    "semantic_hash": "a873a0b8783539adf565b9ebf2f7d2ee"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/automation/artifact_jobs.py": {
+    "mtime": 1779229509.101674,
+    "ast_hash": "c416c2473233d316abce2b4cf363fe52",
+    "semantic_hash": "c416c2473233d316abce2b4cf363fe52"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/jobs/queue.py": {
+    "mtime": 1779229509.1108148,
+    "ast_hash": "6cab356569842c0390286ae065374e25",
+    "semantic_hash": "6cab356569842c0390286ae065374e25"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/jobs/worker.py": {
+    "mtime": 1779229509.111041,
+    "ast_hash": "7ab90d4e6170515ce15d1ebfb3cd8899",
+    "semantic_hash": "7ab90d4e6170515ce15d1ebfb3cd8899"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/jobs/automation_jobs.py": {
+    "mtime": 1779229509.110574,
+    "ast_hash": "37d14c84434afce868d87d060db4cdd1",
+    "semantic_hash": "37d14c84434afce868d87d060db4cdd1"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/jobs/__init__.py": {
+    "mtime": 1779229509.1100018,
+    "ast_hash": "860155dc74bf4413abc6bbd99eb5a0c5",
+    "semantic_hash": "860155dc74bf4413abc6bbd99eb5a0c5"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/jobs/reembed_jobs.py": {
+    "mtime": 1779229509.1109326,
+    "ast_hash": "51300a36125bf918572891e7c7e1bab6",
+    "semantic_hash": "51300a36125bf918572891e7c7e1bab6"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/jobs/ingestion_jobs.py": {
+    "mtime": 1779314490.4847324,
+    "ast_hash": "6102686ab0b531646588e2a2b38b72ff",
+    "semantic_hash": "6102686ab0b531646588e2a2b38b72ff"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/jobs/preflight.py": {
+    "mtime": 1779229509.1107597,
+    "ast_hash": "883883e7076edb2c341ff5a7e10d93de",
+    "semantic_hash": "883883e7076edb2c341ff5a7e10d93de"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/workspace_permissions.py": {
+    "mtime": 1779466147.1912506,
+    "ast_hash": "a9a58e394205454580cbb5b5a0e5b2a2",
+    "semantic_hash": "a9a58e394205454580cbb5b5a0e5b2a2"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/chat_service.py": {
+    "mtime": 1779364135.9612982,
+    "ast_hash": "5d5715310a454f47842dc7c6815c1630",
+    "semantic_hash": "5d5715310a454f47842dc7c6815c1630"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/workspace_service.py": {
+    "mtime": 1779529121.1493535,
+    "ast_hash": "f9b6113822e029d3ae772ea089720068",
+    "semantic_hash": "f9b6113822e029d3ae772ea089720068"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/workspace_collaboration_service.py": {
+    "mtime": 1779488331.2275581,
+    "ast_hash": "777b251a90cdd2ddba923816551a3448",
+    "semantic_hash": "777b251a90cdd2ddba923816551a3448"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/workspace_continuity_service.py": {
+    "mtime": 1779488479.2403026,
+    "ast_hash": "72bffb64caa168d0227bddeb7b987690",
+    "semantic_hash": "72bffb64caa168d0227bddeb7b987690"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/__init__.py": {
+    "mtime": 1779229509.124575,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/workspace_intelligence_service.py": {
+    "mtime": 1779488463.5464566,
+    "ast_hash": "dae36f7610536cb88a5c4fc3d878ec4b",
+    "semantic_hash": "dae36f7610536cb88a5c4fc3d878ec4b"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/query_classifier.py": {
+    "mtime": 1779229509.1264951,
+    "ast_hash": "4347ac8c403dbd2970a3992d5201c6ff",
+    "semantic_hash": "4347ac8c403dbd2970a3992d5201c6ff"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/email_service.py": {
+    "mtime": 1779229509.1255958,
+    "ast_hash": "5086ab7b990360f75c58ef62380ba858",
+    "semantic_hash": "5086ab7b990360f75c58ef62380ba858"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/web_search.py": {
+    "mtime": 1779229509.1266992,
+    "ast_hash": "c5ba327a66fd156d22464ddea5fa8643",
+    "semantic_hash": "c5ba327a66fd156d22464ddea5fa8643"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/profile_service.py": {
+    "mtime": 1779229509.1264274,
+    "ast_hash": "e861945850df0976159d235ccda47aa1",
+    "semantic_hash": "e861945850df0976159d235ccda47aa1"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/supabase_service.py": {
+    "mtime": 1779488400.3936846,
+    "ast_hash": "9678cbf40cdc466a28861e17f12cf85d",
+    "semantic_hash": "9678cbf40cdc466a28861e17f12cf85d"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/document_context_service.py": {
+    "mtime": 1779364081.9654436,
+    "ast_hash": "6c3f12d3cd09c27bb6658d80f30a83ef",
+    "semantic_hash": "6c3f12d3cd09c27bb6658d80f30a83ef"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/llm/config.py": {
+    "mtime": 1779229509.1257358,
+    "ast_hash": "5c1a870d3cd109e262fdbf2907a8f0b0",
+    "semantic_hash": "5c1a870d3cd109e262fdbf2907a8f0b0"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/llm/__init__.py": {
+    "mtime": 1779229509.12568,
+    "ast_hash": "523f2f2e7438ca7b611b7cdd08a73e51",
+    "semantic_hash": "523f2f2e7438ca7b611b7cdd08a73e51"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/llm/schemas.py": {
+    "mtime": 1779229509.1262708,
+    "ast_hash": "78bfba5a0ef2dd5891125d5755128477",
+    "semantic_hash": "78bfba5a0ef2dd5891125d5755128477"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/llm/utils.py": {
+    "mtime": 1779229509.1263292,
+    "ast_hash": "6d22e0ac85f14c3fa9f227cfb3556613",
+    "semantic_hash": "6d22e0ac85f14c3fa9f227cfb3556613"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/llm/manager.py": {
+    "mtime": 1779229509.1257892,
+    "ast_hash": "78e1667c533d4c982822c6f5526f1b0b",
+    "semantic_hash": "78e1667c533d4c982822c6f5526f1b0b"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/llm/providers/placeholder.py": {
+    "mtime": 1779229509.1262105,
+    "ast_hash": "e0edb9fdd3cbb8da490857357a09c58f",
+    "semantic_hash": "e0edb9fdd3cbb8da490857357a09c58f"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/llm/providers/__init__.py": {
+    "mtime": 1779229509.1258729,
+    "ast_hash": "3d2ba87e1d886efa2bf0e05c65693777",
+    "semantic_hash": "3d2ba87e1d886efa2bf0e05c65693777"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/llm/providers/openai.py": {
+    "mtime": 1779229509.126145,
+    "ast_hash": "a1642d5d7d3917deac78e9f827d62c41",
+    "semantic_hash": "a1642d5d7d3917deac78e9f827d62c41"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/llm/providers/ollama.py": {
+    "mtime": 1779229509.126083,
+    "ast_hash": "eccb0b5d29d0ecefd0ae49d138fa3058",
+    "semantic_hash": "eccb0b5d29d0ecefd0ae49d138fa3058"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/llm/providers/base.py": {
+    "mtime": 1779229509.1259282,
+    "ast_hash": "a1c899beeb96496a857f918835808f20",
+    "semantic_hash": "a1c899beeb96496a857f918835808f20"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/app/services/llm/providers/local_model.py": {
+    "mtime": 1779229509.1259792,
+    "ast_hash": "51f70d541f3f901f9ef4ec9fb8afc0d7",
+    "semantic_hash": "51f70d541f3f901f9ef4ec9fb8afc0d7"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/tests/routers/test_workspaces_invites.py": {
+    "mtime": 1779466147.192021,
+    "ast_hash": "928de4c87278b1ba65e229aa58c0e09a",
+    "semantic_hash": "928de4c87278b1ba65e229aa58c0e09a"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/tests/routers/test_message_payload.py": {
+    "mtime": 1779229509.1304271,
+    "ast_hash": "caea7c703a76962647e11fbdd795f580",
+    "semantic_hash": "caea7c703a76962647e11fbdd795f580"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/tests/routers/test_profile_api.py": {
+    "mtime": 1779229509.130549,
+    "ast_hash": "e22b59c72ab76ffb19f3811f543f2449",
+    "semantic_hash": "e22b59c72ab76ffb19f3811f543f2449"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/tests/routers/test_workspace_hierarchy.py": {
+    "mtime": 1779466147.1918213,
+    "ast_hash": "795e63005a3da3c629a3a7c3fc8ed151",
+    "semantic_hash": "795e63005a3da3c629a3a7c3fc8ed151"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/tests/llm/test_llm.py": {
+    "mtime": 1779229509.129622,
+    "ast_hash": "b740c12cbca986e82d22a8999b55e3c5",
+    "semantic_hash": "b740c12cbca986e82d22a8999b55e3c5"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/tests/observability/test_observability.py": {
+    "mtime": 1779229509.12999,
+    "ast_hash": "3f86741dd8f5e0c7fb0dcef3d121014e",
+    "semantic_hash": "3f86741dd8f5e0c7fb0dcef3d121014e"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/tests/retrieval/test_web_search_context.py": {
+    "mtime": 1779314490.496199,
+    "ast_hash": "7b26142a56a1aa952dfa655f65e42dd3",
+    "semantic_hash": "7b26142a56a1aa952dfa655f65e42dd3"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/tests/retrieval/test_hybrid_retrieval.py": {
+    "mtime": 1779314490.4956703,
+    "ast_hash": "c39e3ddaccf90ac09eb269d4ef9f9f3c",
+    "semantic_hash": "c39e3ddaccf90ac09eb269d4ef9f9f3c"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/tests/retrieval/test_rag_chunking_pipeline.py": {
+    "mtime": 1779314490.4958901,
+    "ast_hash": "df2c58cdfd7aa8cfcbb5b9836e42f3fb",
+    "semantic_hash": "df2c58cdfd7aa8cfcbb5b9836e42f3fb"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/tests/db/test_async_supabase_client.py": {
+    "mtime": 1779487212.0915716,
+    "ast_hash": "a7a23c2709684f4f1c7fd04ced391c5f",
+    "semantic_hash": "a7a23c2709684f4f1c7fd04ced391c5f"
+  },
+  "/Users/shinobi/bibek_code/Omnix/backend/tests/db/test_rag_db.py": {
+    "mtime": 1779229509.1295168,
+    "ast_hash": "0756635991b5cd0e5a49038659183307",
+    "semantic_hash": "0756635991b5cd0e5a49038659183307"
+  },
+  "/Users/shinobi/bibek_code/Omnix/.devcontainer/devcontainer.json": {
+    "mtime": 1779229509.0952327,
+    "ast_hash": "4b636b7dd23d697da6048f50ed1f05a8",
+    "semantic_hash": "4b636b7dd23d697da6048f50ed1f05a8"
+  },
+  "/Users/shinobi/bibek_code/Omnix/scripts/patch_scheduler.py": {
+    "mtime": 1779229509.7660742,
+    "ast_hash": "5986994acac727afda48462c39e7b18f",
+    "semantic_hash": "5986994acac727afda48462c39e7b18f"
+  },
+  "/Users/shinobi/bibek_code/Omnix/scripts/start_workers.sh": {
+    "mtime": 1779229509.766179,
+    "ast_hash": "aa767c962a3f2f8939b12ddc98a4c853",
+    "semantic_hash": "aa767c962a3f2f8939b12ddc98a4c853"
+  },
+  "/Users/shinobi/bibek_code/Omnix/scripts/test_bootstrap.py": {
+    "mtime": 1779229509.7662337,
+    "ast_hash": "5b560b475cf07974dff11646090e4c90",
+    "semantic_hash": "5b560b475cf07974dff11646090e4c90"
+  },
+  "/Users/shinobi/bibek_code/Omnix/scripts/deploy.sh": {
+    "mtime": 1779229509.7659662,
+    "ast_hash": "1aba1baeaca0067f1242b1eef8561909",
+    "semantic_hash": "1aba1baeaca0067f1242b1eef8561909"
+  },
+  "/Users/shinobi/bibek_code/Omnix/scripts/runtime_status.py": {
+    "mtime": 1779229509.7661293,
+    "ast_hash": "38d592a7a2fe95e2551ff31ac73d0d15",
+    "semantic_hash": "38d592a7a2fe95e2551ff31ac73d0d15"
+  },
+  "/Users/shinobi/bibek_code/Omnix/scripts/healthcheck.sh": {
+    "mtime": 1779229509.7660186,
+    "ast_hash": "a06190f35f9c74c7ff4dbffdf1de40e6",
+    "semantic_hash": "a06190f35f9c74c7ff4dbffdf1de40e6"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/backend_tests/test_vectorstore_abstraction.py": {
+    "mtime": 1779229509.0975099,
+    "ast_hash": "c10ca0456fba1e94aefc1f7039ee7633",
+    "semantic_hash": "c10ca0456fba1e94aefc1f7039ee7633"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/backend_tests/test_run_upload.py": {
+    "mtime": 1779229509.0973084,
+    "ast_hash": "43e391e0c79d4e6d242e89fbbc7c6389",
+    "semantic_hash": "43e391e0c79d4e6d242e89fbbc7c6389"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/backend_tests/test_upload_client.py": {
+    "mtime": 1779229509.097415,
+    "ast_hash": "988bc6a78daa08c5b61259c4ccc429ab",
+    "semantic_hash": "988bc6a78daa08c5b61259c4ccc429ab"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/backend_tests/test_run_server.py": {
+    "mtime": 1779229509.0972512,
+    "ast_hash": "2148ec59b1b98e0a60909e301a4ae416",
+    "semantic_hash": "2148ec59b1b98e0a60909e301a4ae416"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/backend_tests/test_db.py": {
+    "mtime": 1779229509.0970762,
+    "ast_hash": "1df22b3d25ace755632fff27903eaf24",
+    "semantic_hash": "1df22b3d25ace755632fff27903eaf24"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/backend_tests/test.py": {
+    "mtime": 1779229509.0969672,
+    "ast_hash": "c28d6c9977becbab3a91b199bc398a26",
+    "semantic_hash": "c28d6c9977becbab3a91b199bc398a26"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/backend_tests/test_upload.py": {
+    "mtime": 1779229509.097362,
+    "ast_hash": "97df727461c9e0bb9679dd5f78bcd397",
+    "semantic_hash": "97df727461c9e0bb9679dd5f78bcd397"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/backend_tests/test_improvements.py": {
+    "mtime": 1779229509.097195,
+    "ast_hash": "01474a5356ac0e93c3e17fba5b12aafd",
+    "semantic_hash": "01474a5356ac0e93c3e17fba5b12aafd"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/backend_tests/dummy_model.py": {
+    "mtime": 1779229509.096913,
+    "ast_hash": "3c78a02f3893b3d03faad165476061cf",
+    "semantic_hash": "3c78a02f3893b3d03faad165476061cf"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/root/rewrite_dropzone.py": {
+    "mtime": 1779229509.0982819,
+    "ast_hash": "112b1b1ba4c40960d42692c5fe777cd3",
+    "semantic_hash": "112b1b1ba4c40960d42692c5fe777cd3"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/root/fix_tests.py": {
+    "mtime": 1779229509.0981846,
+    "ast_hash": "b538df1fd7f4e3128893bd1926a20ba9",
+    "semantic_hash": "b538df1fd7f4e3128893bd1926a20ba9"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/root/fix2.py": {
+    "mtime": 1779229509.098065,
+    "ast_hash": "24993ec6fc1127a3bd55988f5c0230a0",
+    "semantic_hash": "24993ec6fc1127a3bd55988f5c0230a0"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/root/fix.py": {
+    "mtime": 1779229509.0980017,
+    "ast_hash": "0cfe9733874d671fb349628133048e11",
+    "semantic_hash": "0cfe9733874d671fb349628133048e11"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/root/fix3.py": {
+    "mtime": 1779229509.0981333,
+    "ast_hash": "be28896af59fedf0bbbe37b64a6a97a3",
+    "semantic_hash": "be28896af59fedf0bbbe37b64a6a97a3"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/root/fix.js": {
+    "mtime": 1779229509.097891,
+    "ast_hash": "557ee37f706a21ca8949a74966ea2f7b",
+    "semantic_hash": "557ee37f706a21ca8949a74966ea2f7b"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/faiss/faiss_map.json": {
+    "mtime": 1779229509.0976655,
+    "ast_hash": "301f59b65d5ef758bad8a90ad3bbbac3",
+    "semantic_hash": "301f59b65d5ef758bad8a90ad3bbbac3"
+  },
+  "/Users/shinobi/bibek_code/Omnix/_archive/faiss/vector_store.py": {
+    "mtime": 1779229509.0977957,
+    "ast_hash": "4d3b310442eab507b7464a8476fd0581",
+    "semantic_hash": "4d3b310442eab507b7464a8476fd0581"
+  }
+}
