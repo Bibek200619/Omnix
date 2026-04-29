@@ -18,6 +18,8 @@ from ..schemas.chat import (
     WorkspaceLiveStatusRead,
     WorkspaceMemberRead,
     WorkspaceMemberRoleUpdate,
+    WorkspaceMemberAssign,
+    WorkspacePotentialMemberRead,
     WorkspacePresenceHeartbeat,
     WorkspacePresenceRead,
     WorkspaceRead,
@@ -40,6 +42,7 @@ from ..services.profile_service import get_auth_profile_for_user, resolve_profil
 from ..services.workspace_service import (
     WORKSPACE_COLUMNS,
     WORKSPACE_INVITE_COLUMNS,
+    assign_member_to_subspace,
     create_subspace_for_user,
     create_workspace_for_user,
     get_global_space_for_super_workspace,
@@ -47,6 +50,7 @@ from ..services.workspace_service import (
     is_super_workspace,
     is_subspace,
     list_pending_invites_for_email,
+    list_potential_subspace_members,
     list_subspaces_for_super_workspace,
     list_user_workspaces,
     list_workspace_invites,
@@ -847,6 +851,39 @@ async def get_workspace_members(
     user_id = _user_id_from_claims(current_user)
     access = await require_workspace_access(workspace_id, user_id)
     return await list_workspace_members(access.workspace)
+
+
+@router.get("/{workspace_id}/potential-members", response_model=list[WorkspacePotentialMemberRead])
+async def get_potential_subspace_members(
+    workspace_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    user_id = _user_id_from_claims(current_user)
+    return await list_potential_subspace_members(workspace_id, user_id)
+
+
+@router.post("/{workspace_id}/members/assign", response_model=WorkspaceMemberRead)
+async def assign_subspace_member(
+    workspace_id: str,
+    payload: WorkspaceMemberAssign,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    member = await assign_member_to_subspace(
+        workspace_id=workspace_id,
+        target_user_id=payload.user_id,
+        role=payload.role,
+        actor_user_id=user_id,
+    )
+    
+    await log_workspace_activity(
+        workspace_id=workspace_id,
+        actor_user_id=user_id,
+        event_type="workspace.member_assigned",
+        summary="An organizational member was assigned to this subspace.",
+        metadata={"target_user_id": payload.user_id, "role": payload.role},
+    )
+    return member
 
 
 from app.services.workspace_permissions import OrganizationalAccessAuthority
