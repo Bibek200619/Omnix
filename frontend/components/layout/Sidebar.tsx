@@ -1460,7 +1460,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
           )}
         </section>
 
-        <div className="relative border-t border-[rgba(0,255,255,0.07)] p-2.5">
+        <div className="relative border-t border-[rgba(0,255,255,0.07)] p-2.5 pb-[calc(env(safe-area-inset-bottom)+0.625rem)]">
           {/* Top beam on profile section */}
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(0,255,255,0.2),transparent)]" />
           <Link
