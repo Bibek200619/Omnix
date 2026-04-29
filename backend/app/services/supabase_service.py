@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
+import inspect
 import logging
 import random
+import re
 import time
-from collections.abc import Mapping
 from typing import Any, NoReturn
 
 import httpx
-from starlette.concurrency import run_in_threadpool
 
 from ..db.supabase_client import get_async_supabase, get_supabase
 
 logger = logging.getLogger(__name__)
-
 INTERNAL_DB_ERROR = "Internal server error"
 SUPABASE_AUTH_ERROR = (
     "Supabase rejected the backend API key. Verify backend/.env "
@@ -29,19 +29,20 @@ TRANSIENT_SUPABASE_ERRORS = (
     httpx.TimeoutException,
 )
 
-# Global state to track infrastructure pressure
 _last_pressure_event: float = 0
-PRESSURE_COOLDOWN = 60.0  # Pressure status lasts for 60s after an event
+PRESSURE_COOLDOWN = 60.0
 
-def _mark_pressure():
+
+def _mark_pressure() -> None:
     global _last_pressure_event
     _last_pressure_event = time.perf_counter()
 
+
 def check_infrastructure_pressure() -> bool:
-    """Returns True if the system has recently experienced high infrastructure pressure."""
     if _last_pressure_event == 0:
         return False
     return (time.perf_counter() - _last_pressure_event) < PRESSURE_COOLDOWN
+
 
 def _execute_with_retry(
     query: Any,
@@ -50,7 +51,6 @@ def _execute_with_retry(
     retries: int = 3,
     base_delay: float = 0.5,
 ) -> Any:
-    """Sync retry logic with exponential backoff and jitter."""
     last_exc: Exception | None = None
 
     for attempt in range(retries):
@@ -58,25 +58,25 @@ def _execute_with_retry(
             start_time = time.perf_counter()
             result = query.execute()
             duration = time.perf_counter() - start_time
-
             if duration > 2.0:
-                logger.warning("Slow Supabase sync operation | operation=%s | duration=%.2fs", operation, duration)
+                logger.warning(
+                    "Slow Supabase sync operation | operation=%s | duration=%.2fs",
+                    operation,
+                    duration,
+                )
                 _mark_pressure()
-
             return result
         except TRANSIENT_SUPABASE_ERRORS as exc:
             last_exc = exc
             _mark_pressure()
-            # Add jitter to avoid thundering herd
             delay = (base_delay * (2**attempt)) + (random.random() * 0.1)
-
             logger.warning(
-                "Supabase transient error during %s (attempt %s/%s): %s | retrying in %.2fs",
+                "Supabase transient transport error during %s (attempt %s/%s): %s | retrying in %.2fs",
                 operation,
                 attempt + 1,
                 retries,
                 exc,
-                delay
+                delay,
             )
 
             if attempt < retries - 1:
@@ -95,32 +95,32 @@ async def _execute_with_retry_async(
     retries: int = 3,
     base_delay: float = 0.5,
 ) -> Any:
-    """Async retry logic with exponential backoff and jitter."""
     last_exc: Exception | None = None
 
     for attempt in range(retries):
         try:
-            start_time = asyncio.get_event_loop().time()
+            start_time = asyncio.get_running_loop().time()
             result = await query.execute()
-            duration = asyncio.get_event_loop().time() - start_time
-
+            duration = asyncio.get_running_loop().time() - start_time
             if duration > 2.0:
-                logger.warning("Slow Supabase async operation | operation=%s | duration=%.2fs", operation, duration)
+                logger.warning(
+                    "Slow Supabase async operation | operation=%s | duration=%.2fs",
+                    operation,
+                    duration,
+                )
                 _mark_pressure()
-
             return result
         except TRANSIENT_SUPABASE_ERRORS as exc:
             last_exc = exc
             _mark_pressure()
             delay = (base_delay * (2**attempt)) + (random.random() * 0.1)
-
             logger.warning(
                 "Supabase transient async error during %s (attempt %s/%s): %s | retrying in %.2fs",
                 operation,
                 attempt + 1,
                 retries,
                 exc,
-                delay
+                delay,
             )
 
             if attempt < retries - 1:
@@ -131,6 +131,14 @@ async def _execute_with_retry_async(
 
     return await query.execute()
 
+
+async def _async_client() -> Any:
+    client = await get_async_supabase()
+    if inspect.isawaitable(client):
+        client = await client
+    if not hasattr(client, "table"):
+        raise TypeError(f"Async Supabase client is not initialized: {type(client)!r}")
+    return client
 
 
 def execute_query_sync(query: Any, *, operation: str = "execute") -> Any:
@@ -149,11 +157,6 @@ def _is_supabase_auth_error(exc: Exception) -> bool:
 
 def _is_supabase_network_error(exc: Exception) -> bool:
     message = str(exc).lower()
-    is_timeout = any(m in message for m in ("readtimeout", "connecttimeout", "pooltimeout", "timed out"))
-    
-    if "pooltimeout" in message:
-        logger.error("Supabase connection pool exhausted! Requests are queuing up.")
-        
     return any(
         marker in message
         for marker in (
@@ -229,11 +232,34 @@ def _apply_filters(
                 elif op == "neq":
                     query = query.neq(column, val)
                 else:
-                    logger.warning("Unsupported filter operator: %s", op)
+                    logger.warning("Unsupported filter operator encountered; using equality fallback.")
                     query = query.eq(column, val)
         else:
             query = query.eq(column, value)
     return query
+
+
+def _select_columns_after_missing_column(
+    table: str,
+    columns: str,
+    error_message: str,
+) -> tuple[str, str] | None:
+    if "does not exist" not in error_message:
+        return None
+
+    match = re.search(r"column\s+([^\s]+)\s+does not exist", error_message)
+    if match is None:
+        return None
+
+    missing = match.group(1)
+    missing_col = missing.split(".")[-1]
+    cols_raw = [c.strip() for c in columns.split(",")] if "," in columns else [columns.strip()]
+    cols = [
+        col
+        for col in cols_raw
+        if col and col != missing_col and col != f"{table}.{missing_col}"
+    ]
+    return missing_col, ",".join(cols) if cols else "*"
 
 
 def _insert_one_sync(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -578,15 +604,16 @@ def _delete_many_trusted_sync(
 
 
 async def insert_one(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
-    # WARNING: get_async_supabase() uses the SERVICE ROLE KEY. 
+    # WARNING: get_async_supabase() uses the SERVICE ROLE KEY.
     # This bypasses RLS completely. Enforcing user_id mapping prevents privilege escalation.
     if "user_id" not in payload:
         logger.error("Rejected insert into '%s' without explicit user_id.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
     try:
+        client = await _async_client()
         response = await _execute_with_retry_async(
-            get_async_supabase().table(table).insert(dict(payload)),
+            client.table(table).insert(dict(payload)),
             operation=f"insert {table}",
         )
         data = getattr(response, "data", None) or []
@@ -602,8 +629,9 @@ async def insert_one(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
 
 async def insert_one_trusted(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
     try:
+        client = await _async_client()
         response = await _execute_with_retry_async(
-            get_async_supabase().table(table).insert(dict(payload)),
+            client.table(table).insert(dict(payload)),
             operation=f"trusted insert {table}",
         )
         data = getattr(response, "data", None) or []
@@ -618,7 +646,7 @@ async def insert_one_trusted(table: str, payload: Mapping[str, Any]) -> dict[str
 
 
 async def insert_many(table: str, payloads: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    # WARNING: get_async_supabase() uses the SERVICE ROLE KEY. 
+    # WARNING: get_async_supabase() uses the SERVICE ROLE KEY.
     # This bypasses RLS completely. Enforcing user_id mapping prevents privilege escalation.
     for payload in payloads:
         if "user_id" not in payload:
@@ -626,8 +654,9 @@ async def insert_many(table: str, payloads: list[Mapping[str, Any]]) -> list[dic
             raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
     try:
+        client = await _async_client()
         response = await _execute_with_retry_async(
-            get_async_supabase().table(table).insert([dict(p) for p in payloads]),
+            client.table(table).insert([dict(p) for p in payloads]),
             operation=f"batch insert {table}",
         )
         data = getattr(response, "data", None) or []
@@ -643,8 +672,9 @@ async def insert_many(table: str, payloads: list[Mapping[str, Any]]) -> list[dic
 
 async def insert_many_trusted(table: str, payloads: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
     try:
+        client = await _async_client()
         response = await _execute_with_retry_async(
-            get_async_supabase().table(table).insert([dict(p) for p in payloads]),
+            client.table(table).insert([dict(p) for p in payloads]),
             operation=f"trusted batch insert {table}",
         )
         data = getattr(response, "data", None) or []
@@ -667,14 +697,15 @@ async def select_all(
     limit: int | None = None,
     offset: int | None = None,
 ) -> list[dict[str, Any]]:
-    # WARNING: get_async_supabase() uses the SERVICE ROLE KEY. 
+    # WARNING: get_async_supabase() uses the SERVICE ROLE KEY.
     # This bypasses RLS completely. Enforcing user_id filters prevents data leaks.
     if not filters or "user_id" not in filters:
         logger.error("Rejected read on table '%s' missing user_id filter.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
     try:
-        query = get_async_supabase().table(table).select(columns)
+        client = await _async_client()
+        query = client.table(table).select(columns)
         query = _apply_filters(query, filters)
 
         if order_by:
@@ -689,24 +720,20 @@ async def select_all(
             return list(getattr(response, "data", None) or [])
         except Exception as exc:
             msg = str(exc)
-            if "does not exist" in msg and isinstance(columns, str):
-                import re
-                m = re.search(r"column\s+([^\s]+)\s+does not exist", msg)
-                if m:
-                    missing = m.group(1)
-                    missing_col = missing.split(".")[-1]
-                    cols_raw = [c.strip() for c in columns.split(",")] if "," in columns else [columns.strip()]
-                    cols = [c for c in cols_raw if c and c != missing_col and c != f"{table}.{missing_col}"]
-                    if cols:
-                        new_columns = ",".join(cols)
-                        logger.warning("Retrying async select on %s without missing column '%s'", table, missing_col)
-                        query = get_async_supabase().table(table).select(new_columns)
-                        query = _apply_filters(query, filters)
-                        if order_by: query = query.order(order_by, desc=desc)
-                        if limit is not None: query = query.limit(limit)
-                        if offset is not None: query = query.offset(offset)
-                        response = await _execute_with_retry_async(query, operation=f"select {table} recovery")
-                        return list(getattr(response, "data", None) or [])
+            recovery = _select_columns_after_missing_column(table, columns, msg)
+            if recovery is not None:
+                missing_col, new_columns = recovery
+                logger.warning("Retrying select on %s without missing column '%s'", table, missing_col)
+                query = client.table(table).select(new_columns)
+                query = _apply_filters(query, filters)
+                if order_by:
+                    query = query.order(order_by, desc=desc)
+                if limit is not None:
+                    query = query.limit(limit)
+                if offset is not None:
+                    query = query.offset(offset)
+                response = await _execute_with_retry_async(query, operation=f"select {table} recovery")
+                return list(getattr(response, "data", None) or [])
             raise
     except Exception as exc:
         if isinstance(exc, SupabaseServiceError):
@@ -724,7 +751,8 @@ async def select_all_trusted(
     offset: int | None = None,
 ) -> list[dict[str, Any]]:
     try:
-        query = get_async_supabase().table(table).select(columns)
+        client = await _async_client()
+        query = client.table(table).select(columns)
         query = _apply_filters(query, filters)
 
         if order_by:
@@ -739,6 +767,20 @@ async def select_all_trusted(
             return list(getattr(response, "data", None) or [])
         except Exception as exc:
             msg = str(exc)
+            recovery = _select_columns_after_missing_column(table, columns, msg)
+            if recovery is not None:
+                missing_col, new_columns = recovery
+                logger.warning("Retrying trusted select on %s without missing column '%s'", table, missing_col)
+                query = client.table(table).select(new_columns)
+                query = _apply_filters(query, filters)
+                if order_by:
+                    query = query.order(order_by, desc=desc)
+                if limit is not None:
+                    query = query.limit(limit)
+                if offset is not None:
+                    query = query.offset(offset)
+                response = await _execute_with_retry_async(query, operation=f"trusted select {table} recovery")
+                return list(getattr(response, "data", None) or [])
             if "does not exist" in msg:
                 logger.warning("Trusted query on '%s' failed due to missing column: %s. Returning empty list.", table, msg)
                 return []
@@ -752,16 +794,17 @@ async def select_one(
     columns: str,
     filters: Mapping[str, Any],
 ) -> dict[str, Any] | None:
-    # WARNING: get_async_supabase() uses the SERVICE ROLE KEY. 
+    # WARNING: get_async_supabase() uses the SERVICE ROLE KEY.
     # This bypasses RLS completely. Enforcing user_id filters prevents data leaks.
     if not filters or "user_id" not in filters:
         logger.error("Rejected read on table '%s' missing user_id filter.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
     try:
-        query = get_async_supabase().table(table).select(columns)
+        client = await _async_client()
+        query = client.table(table).select(columns)
         query = _apply_filters(query, filters)
-        
+
         try:
             response = await _execute_with_retry_async(
                 query.limit(1).maybe_single(),
@@ -770,24 +813,17 @@ async def select_one(
             return getattr(response, "data", None)
         except Exception as exc:
             msg = str(exc)
-            if "does not exist" in msg and isinstance(columns, str):
-                import re
-                m = re.search(r"column\s+([^\s]+)\s+does not exist", msg)
-                if m:
-                    missing = m.group(1)
-                    missing_col = missing.split(".")[-1]
-                    cols_raw = [c.strip() for c in columns.split(",")] if "," in columns else [columns.strip()]
-                    cols = [c for c in cols_raw if c and c != missing_col and c != f"{table}.{missing_col}"]
-                    if cols:
-                        new_columns = ",".join(cols)
-                        logger.warning("Retrying async select one on %s without missing column '%s'", table, missing_col)
-                        query = get_async_supabase().table(table).select(new_columns)
-                        query = _apply_filters(query, filters)
-                        response = await _execute_with_retry_async(
-                            query.limit(1).maybe_single(),
-                            operation=f"select one {table} recovery",
-                        )
-                        return getattr(response, "data", None)
+            recovery = _select_columns_after_missing_column(table, columns, msg)
+            if recovery is not None:
+                missing_col, new_columns = recovery
+                logger.warning("Retrying select one on %s without missing column '%s'", table, missing_col)
+                query = client.table(table).select(new_columns)
+                query = _apply_filters(query, filters)
+                response = await _execute_with_retry_async(
+                    query.limit(1).maybe_single(),
+                    operation=f"select one {table} recovery",
+                )
+                return getattr(response, "data", None)
             raise
     except Exception as exc:
         if isinstance(exc, SupabaseServiceError):
@@ -801,7 +837,8 @@ async def select_one_trusted(
     filters: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     try:
-        query = get_async_supabase().table(table).select(columns)
+        client = await _async_client()
+        query = client.table(table).select(columns)
         query = _apply_filters(query, filters)
         try:
             response = await _execute_with_retry_async(
@@ -811,6 +848,17 @@ async def select_one_trusted(
             return getattr(response, "data", None)
         except Exception as exc:
             msg = str(exc)
+            recovery = _select_columns_after_missing_column(table, columns, msg)
+            if recovery is not None:
+                missing_col, new_columns = recovery
+                logger.warning("Retrying trusted select one on %s without missing column '%s'", table, missing_col)
+                query = client.table(table).select(new_columns)
+                query = _apply_filters(query, filters)
+                response = await _execute_with_retry_async(
+                    query.limit(1).maybe_single(),
+                    operation=f"trusted select one {table} recovery",
+                )
+                return getattr(response, "data", None)
             if "does not exist" in msg:
                 logger.warning("Trusted query on '%s' failed due to missing column: %s. Returning None.", table, msg)
                 return None
@@ -824,7 +872,7 @@ async def update_one(
     filters: Mapping[str, Any],
     payload: Mapping[str, Any],
 ) -> dict[str, Any] | None:
-    # WARNING: get_async_supabase() uses the SERVICE ROLE KEY. 
+    # WARNING: get_async_supabase() uses the SERVICE ROLE KEY.
     # This bypasses RLS completely. Enforcing user_id filters prevents unauthorized modifications.
     if not filters or "user_id" not in filters:
         logger.error("Rejected update on table '%s' missing user_id filter.", table)
@@ -835,7 +883,8 @@ async def update_one(
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
     try:
-        query = get_async_supabase().table(table).update(dict(payload))
+        client = await _async_client()
+        query = client.table(table).update(dict(payload))
         query = _apply_filters(query, filters)
         response = await _execute_with_retry_async(query, operation=f"update {table}")
         data = getattr(response, "data", None) or []
@@ -856,7 +905,8 @@ async def update_one_trusted(
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
     try:
-        query = get_async_supabase().table(table).update(dict(payload))
+        client = await _async_client()
+        query = client.table(table).update(dict(payload))
         query = _apply_filters(query, filters)
         response = await _execute_with_retry_async(query, operation=f"trusted update {table}")
         data = getattr(response, "data", None) or []
@@ -868,15 +918,16 @@ async def update_one_trusted(
 
 
 async def upsert_one(table: str, payload: Mapping[str, Any], on_conflict: str) -> dict[str, Any]:
-    # WARNING: get_async_supabase() uses the SERVICE ROLE KEY. 
+    # WARNING: get_async_supabase() uses the SERVICE ROLE KEY.
     # This bypasses RLS completely. Enforcing user_id mapping prevents privilege escalation.
     if "user_id" not in payload:
         logger.error("Rejected upsert into '%s' without explicit user_id.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
     try:
+        client = await _async_client()
         response = await _execute_with_retry_async(
-            get_async_supabase().table(table).upsert(dict(payload), on_conflict=on_conflict),
+            client.table(table).upsert(dict(payload), on_conflict=on_conflict),
             operation=f"upsert {table}",
         )
         data = getattr(response, "data", None) or []
@@ -895,7 +946,8 @@ async def delete_many_trusted(
     filters: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
     try:
-        query = get_async_supabase().table(table).delete()
+        client = await _async_client()
+        query = client.table(table).delete()
         query = _apply_filters(query, filters)
         response = await _execute_with_retry_async(query, operation=f"trusted delete {table}")
         return list(getattr(response, "data", None) or [])
