@@ -13,7 +13,6 @@ import {
   type WorkspaceInvite,
   type WorkspaceMember,
   type WorkspaceMemberAssign,
-  type WorkspacePotentialMember,
   type WorkspaceRole,
   type WorkspaceSubspaceCreatePayload,
   type WorkspaceType,
