@@ -64,9 +64,19 @@
   --role-admin: #9b5cff;
   --role-member: #3366ff;
 
-  /* ── Additional ambient tokens ─────────────── */
-  --omnix-glow-role: 0 0 18px rgba(0, 255, 255, 0.28);
-  --omnix-sidebar-glow: 0 0 40px rgba(0, 255, 255, 0.06);
+  /* ── Mobile Safe Areas ── */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right);
+  }
 }
 
 * {
