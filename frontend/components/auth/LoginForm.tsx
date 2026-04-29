@@ -4,31 +4,37 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { supabase } from "@/lib/supabase";
 
 export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    console.log("[LoginForm] Submitting auth credentials...");
     
-    // Simulate API call
-    setTimeout(() => {
-      // Simulate fake error occasionally or just redirect
-      if (Math.random() < 0.1) {
-        setLoading(false);
-        setError("Invalid email or password. Please try again.");
-        console.error("[LoginForm] Authentication failed");
-      } else {
-        setLoading(false);
-        console.log("[LoginForm] Authentication successful. Redirecting to /chat...");
-        router.push("/chat");
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
       }
-    }, 1500);
+
+      // Authentication successful
+      router.push("/chat");
+    } catch (err: any) {
+      setError(err.message || "Invalid email or password. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -45,15 +51,24 @@ export function LoginForm() {
             type="email" 
             required
             placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
+          <label className="block text-sm font-medium text-gray-300 mb-2 flex justify-between">
+            <span>Password</span>
+            <Link href="/auth/forgot-password" className="text-purple-400 hover:text-purple-300 transition-colors text-xs font-medium">
+              Forgot password?
+            </Link>
+          </label>
           <Input 
             type="password" 
             required
             placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
           />
         </div>
 
@@ -82,3 +97,4 @@ export function LoginForm() {
     </div>
   );
 }
+

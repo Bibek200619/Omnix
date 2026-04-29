@@ -5,15 +5,20 @@ import { PageTransition } from "@/components/layout/PageTransition";
 import { ArrowLeft, Check } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 export default function TermsPage() {
   const [accepted, setAccepted] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const router = useRouter();
 
   const handleContinue = () => {
     if (!accepted) return;
     setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3000);
+    setTimeout(() => {
+      setShowSuccess(false);
+      router.push("/settings");
+    }, 1500);
   };
 
   return (
@@ -71,13 +76,14 @@ export default function TermsPage() {
                 </label>
                 
                 <div className="flex items-center gap-4 pt-2">
-                  <button 
+                  <motion.button 
+                    whileTap={!accepted ? {} : { scale: 0.95 }}
                     onClick={handleContinue}
                     disabled={!accepted}
                     className="px-6 py-2.5 rounded-xl font-medium text-sm transition-all bg-white text-black hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Continue
-                  </button>
+                  </motion.button>
                   {showSuccess && (
                     <motion.span 
                       initial={{ opacity: 0, x: -10 }}
