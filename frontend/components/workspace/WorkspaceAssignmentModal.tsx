@@ -116,8 +116,8 @@ export function WorkspaceAssignmentModal({
               <UserPlus className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="omnix-display text-lg font-semibold text-white">Workspace Assignment</h2>
-              <p className="text-xs text-[var(--omnix-text-2)]">Assign operational access to {workspaceName}</p>
+              <h2 className="omnix-display text-lg font-semibold text-white">Add Collaborator</h2>
+              <p className="text-xs text-[var(--omnix-text-2)]">Add members from your organization to {workspaceName}</p>
             </div>
           </div>
           <button
@@ -153,7 +153,7 @@ export function WorkspaceAssignmentModal({
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-white">No collaborators found</h3>
-                  <p className="mt-1 text-xs text-slate-500">All available members are already assigned.</p>
+                  <p className="mt-1 text-xs text-slate-500">All available members are already added.</p>
                 </div>
               </div>
             ) : (
@@ -197,7 +197,7 @@ export function WorkspaceAssignmentModal({
           {selectedUserId && (
             <div className="mt-6 animate-in fade-in slide-in-from-top-2 duration-300">
               <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-[var(--omnix-text-3)]">
-                Collaborative Scope
+                Workspace Scope
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <button
@@ -259,7 +259,7 @@ export function WorkspaceAssignmentModal({
             isLoading={Boolean(assigningId)}
             className="rounded-xl px-6"
           >
-            Add to collaborative scope
+            Add to workspace
           </Button>
         </div>
       </div>
