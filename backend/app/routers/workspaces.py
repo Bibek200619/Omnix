@@ -34,6 +34,7 @@ from ..services.supabase_service import (
     delete_many_trusted,
     insert_one,
     insert_one_trusted,
+    select_all_trusted,
     select_one_trusted,
     update_one_trusted,
 )
@@ -1123,6 +1124,7 @@ async def remove_workspace_member(
     user_id = _user_id_from_claims(current_user)
     access = await require_workspace_access(workspace_id, user_id)
     workspace_type = access.workspace.get("workspace_type") or "workspace"
+    is_super = is_super_workspace(access.workspace)
 
     if not OrganizationalAccessAuthority.can_remove_members(access.role, workspace_type):
         raise HTTPException(
@@ -1133,6 +1135,7 @@ async def remove_workspace_member(
     membership_workspace = _membership_workspace(access)
     membership_workspace_id = _membership_workspace_id(access)
     founder_user_id = str(membership_workspace.get("user_id") or access.workspace.get("user_id") or "")
+    
     if founder_user_id == member_user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1159,17 +1162,50 @@ async def remove_workspace_member(
         member_user_id=member_user_id,
         owner_user_id=founder_user_id,
     )
-    if access.role == "co_owner" and target_role != "member":
+
+    # Phase 5: Permission enforcement logic
+    if is_super:
+        # Removing from super workspace means organization-wide revocation
+        if access.role != "founder":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the organization founder can remove members from the entire organization.",
+            )
+    elif access.role == "co_owner" and target_role != "member":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Co-owners can remove members only.",
         )
+    elif access.role == "team_lead" and target_role != "member":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Team leads can remove members only.",
+        )
+
+    # Prepare for cascading removal if it is a super workspace
+    workspace_ids_to_clean = [membership_workspace_id]
+    if is_super:
+        try:
+            subspaces = await select_all_trusted(
+                "workspaces",
+                "id",
+                {"parent_workspace_id": membership_workspace_id}
+            )
+            workspace_ids_to_clean.extend([str(s["id"]) for s in subspaces])
+        except SupabaseServiceError:
+            logger.error("Failed to fetch subspaces for cascading removal | super_workspace_id=%s", membership_workspace_id)
 
     try:
+        # Batch delete memberships
         await delete_many_trusted(
             "workspace_members",
-            {"workspace_id": membership_workspace_id, "user_id": member_user_id},
+            {"workspace_id": workspace_ids_to_clean, "user_id": member_user_id},
         )
+        
+        # Cleanup presence for all affected workspaces
+        for wid in workspace_ids_to_clean:
+            await leave_workspace_presence(workspace_id=wid, user_id=member_user_id)
+            
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
@@ -1177,8 +1213,13 @@ async def remove_workspace_member(
         workspace_id=membership_workspace_id,
         actor_user_id=user_id,
         event_type="workspace.member_removed",
-        summary="A workspace member was removed.",
-        metadata={"member_user_id": member_user_id, "role": target_role},
+        summary="An organization member was removed." if is_super else "A workspace member was removed.",
+        metadata={
+            "member_user_id": member_user_id, 
+            "role": target_role,
+            "is_organization_removal": is_super,
+            "cascaded_workspace_count": len(workspace_ids_to_clean)
+        },
     )
     return None
 

@@ -106,29 +106,29 @@ export function WorkspaceAssignmentModal({
   const canAssignLeader = isWorkspaceFounderRole(currentUserRole);
 
   return (
-    <div className="omnix-modal-backdrop fixed inset-0 z-[150] flex items-center justify-center px-4 backdrop-blur-md">
-      <div className="omnix-modal-card relative w-full max-w-xl overflow-hidden rounded-3xl border border-[var(--omnix-border-2)] bg-[#0a0d14]/90 shadow-[0_32px_128px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+    <div className="omnix-modal-backdrop fixed inset-0 z-[150] flex items-center justify-center p-4 backdrop-blur-md">
+      <div className="omnix-modal-card relative flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-[var(--omnix-border-2)] bg-[#0a0d14]/90 shadow-[0_32px_128px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
         <div className="pointer-events-none absolute left-1/2 top-0 h-48 w-full -translate-x-1/2 bg-[var(--omnix-cyan)] opacity-5 blur-[80px]" />
         
-        <div className="relative z-10 flex items-center justify-between border-b border-[var(--omnix-border)] px-6 py-5">
+        <div className="relative z-10 flex shrink-0 items-center justify-between border-b border-[var(--omnix-border)] px-6 py-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--omnix-grad-primary)] text-white shadow-[var(--omnix-glow-sm)]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--omnix-grad-primary)] text-white shadow-[var(--omnix-glow-sm)]">
               <UserPlus className="h-5 w-5" />
             </div>
-            <div>
-              <h2 className="omnix-display text-lg font-semibold text-white">Add Collaborator</h2>
-              <p className="text-xs text-[var(--omnix-text-2)]">Add members from your organization to {workspaceName}</p>
+            <div className="min-w-0">
+              <h2 className="omnix-display truncate text-lg font-semibold text-white">Add Collaborator</h2>
+              <p className="truncate text-xs text-[var(--omnix-text-2)]">Add members to {workspaceName}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="relative z-10 p-6">
+        <div className="relative z-10 flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="relative mb-6">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
@@ -140,7 +140,7 @@ export function WorkspaceAssignmentModal({
             />
           </div>
 
-          <div className="custom-scrollbar h-[320px] overflow-y-auto pr-1">
+          <div className="h-[280px] min-h-[200px] overflow-y-auto pr-1 sm:h-[320px]">
             {loading ? (
               <div className="flex h-full flex-col items-center justify-center gap-3 text-[var(--omnix-text-2)]">
                 <Loader2 className="h-6 w-6 animate-spin text-[var(--omnix-cyan)]" />
@@ -157,7 +157,7 @@ export function WorkspaceAssignmentModal({
                 </div>
               </div>
             ) : (
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 pb-2">
                 {filteredMembers.map((member) => (
                   <button
                     key={member.user_id}
@@ -199,7 +199,7 @@ export function WorkspaceAssignmentModal({
               <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-[var(--omnix-text-3)]">
                 Workspace Scope
               </label>
-              <div className={cn("grid gap-3", canAssignLeader ? "grid-cols-2" : "grid-cols-1")}>
+              <div className={cn("grid gap-3", canAssignLeader ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
                 <button
                   onClick={() => setSelectedRole("sub_member")}
                   className={cn(
@@ -248,7 +248,7 @@ export function WorkspaceAssignmentModal({
           )}
         </div>
 
-        <div className="relative z-10 flex items-center justify-end gap-3 border-t border-[var(--omnix-border)] bg-black/20 px-6 py-4">
+        <div className="relative z-10 flex shrink-0 items-center justify-end gap-3 border-t border-[var(--omnix-border)] bg-black/20 px-6 py-4 pb-safe">
           <Button variant="ghost" onClick={onClose} disabled={Boolean(assigningId)}>
             Cancel
           </Button>

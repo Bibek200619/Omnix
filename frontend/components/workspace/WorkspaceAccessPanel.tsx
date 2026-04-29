@@ -127,6 +127,7 @@ export function WorkspaceAccessPanel() {
   );
   const activeRole = activeWorkspace?.current_user_role;
   const isSubspace = activeWorkspace?.workspace_type === "subworkspace" || activeWorkspace?.parent_workspace_id;
+  const isSuper = activeWorkspace?.workspace_type === "super_workspace" && !activeWorkspace?.parent_workspace_id;
   const canManageRoles = isWorkspaceFounderRole(activeRole);
   const canAssign = canManageRoles || activeRole === "sub_leader" || activeRole === "co_owner";
 
@@ -290,7 +291,8 @@ export function WorkspaceAccessPanel() {
                   !isFounder &&
                   (canManageRoles || 
                     ((activeRole === "co_owner" || activeRole === "sub_leader" || activeRole === "team_lead") && 
-                    (member.role === "member" || member.role === "sub_member")));
+                    (member.role === "member" || member.role === "sub_member"))) &&
+                  (!isSuper || activeRole === "founder" || activeRole === "super_founder" || activeRole === "owner");
 
                 return (
                   <div
@@ -380,7 +382,7 @@ export function WorkspaceAccessPanel() {
                                 className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-rose-100 transition hover:bg-rose-400/10"
                               >
                                 <Ban className="h-4 w-4" />
-                                Remove
+                                {isSuper ? "Remove from organization" : "Remove from workspace"}
                               </button>
                             </div>
                           ) : null}
@@ -506,11 +508,15 @@ export function WorkspaceAccessPanel() {
               />
               <div>
                 <h3 className="text-base font-semibold text-white">
-                  {confirmAction.type === "remove" ? "Remove team member?" : "Change workspace role?"}
+                  {confirmAction.type === "remove" 
+                    ? (isSuper ? "Remove from organization?" : "Remove from workspace?") 
+                    : "Change workspace role?"}
                 </h3>
                 <p className="mt-1 text-sm leading-6 text-slate-400">
                   {confirmAction.type === "remove"
-                    ? `${workspaceMemberName(confirmAction.member)} will lose access to this workspace.`
+                    ? (isSuper 
+                        ? `${workspaceMemberName(confirmAction.member)} will lose all access to the organization, its subspaces, and all collaborative memory.`
+                        : `${workspaceMemberName(confirmAction.member)} will lose access to this specific workspace scope.`)
                     : `${workspaceMemberName(confirmAction.member)} will become ${workspaceRoleLabel(confirmAction.role).toLowerCase()}.`}
                 </p>
               </div>
@@ -526,7 +532,9 @@ export function WorkspaceAccessPanel() {
                 isLoading={Boolean(busyKey)}
                 onClick={handleConfirmAction}
               >
-                {confirmAction.type === "remove" ? "Remove member" : "Update role"}
+                {confirmAction.type === "remove" 
+                  ? (isSuper ? "Remove from organization" : "Remove member") 
+                  : "Update role"}
               </Button>
             </div>
           </div>
