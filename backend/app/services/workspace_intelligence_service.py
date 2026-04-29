@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
@@ -18,6 +19,11 @@ from .workspace_service import (
 FILE_COLUMNS = "id,file_name,file_type,workspace_id,metadata,created_at"
 CONVERSATION_COLUMNS = "id,title,workspace_id,last_message_at,updated_at,created_at"
 DOMAIN_RE = re.compile(r"[A-Za-z][A-Za-z0-9+#-]{2,}")
+
+# Cache for intelligence profiles to reduce massive read amplification
+# Structure: {(workspace_id, user_id): (timestamp, profile_dict)}
+_intelligence_profile_cache: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
+INTELLIGENCE_CACHE_TTL = 15.0  # Seconds
 
 
 def _text(value: Any) -> str | None:
@@ -162,6 +168,12 @@ async def build_workspace_intelligence_profile(
     workspace_id: str,
     user_id: str,
 ) -> dict[str, Any]:
+    now_ts = time.perf_counter()
+    cache_key = (workspace_id, user_id)
+    cached = _intelligence_profile_cache.get(cache_key)
+    if cached and (now_ts - cached[0] < INTELLIGENCE_CACHE_TTL):
+        return cached[1]
+
     access = await require_workspace_access(workspace_id, user_id)
     workspace = normalize_workspace_record(access.workspace)
     scope_ids = await workspace_retrieval_scope_ids(workspace, user_id)
@@ -191,7 +203,7 @@ async def build_workspace_intelligence_profile(
     ]
 
     members = await list_workspace_members(workspace)
-    
+
     # Operational Continuity (Phases 2, 3, 6)
     initiatives = await select_all_trusted(
         "workspace_initiatives",
@@ -213,7 +225,7 @@ async def build_workspace_intelligence_profile(
         desc=True,
         limit=5,
     )
-    
+
     domains = _domain_candidates(workspace, scoped_files)
     preferences = normalize_intelligence_preferences(
         workspace.get("intelligence_preferences"),
@@ -256,6 +268,8 @@ async def build_workspace_intelligence_profile(
         member_count=len(members),
         domains=domains,
     )
+
+    _intelligence_profile_cache[cache_key] = (now_ts, profile)
     return profile
 
 

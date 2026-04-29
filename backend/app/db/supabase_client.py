@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from functools import lru_cache
 import inspect
+import logging
 
 import httpx
 from supabase import Client, ClientOptions, create_client
@@ -11,37 +12,35 @@ from supabase.lib.client_options import AsyncClientOptions
 
 from ..core.config import get_settings
 
+logger = logging.getLogger(__name__)
 
-def _build_http_client(timeout_seconds: float) -> httpx.Client:
+HTTPX_LIMITS = httpx.Limits(
+    max_connections=200,
+    max_keepalive_connections=50,
+    keepalive_expiry=30.0,
+)
+
+DEFAULT_TIMEOUT = httpx.Timeout(
+    connect=10.0,
+    read=30.0,
+    write=30.0,
+    pool=30.0,
+)
+
+
+@lru_cache
+def _get_sync_http_client() -> httpx.Client:
     return httpx.Client(
-        timeout=httpx.Timeout(
-            connect=10.0,
-            read=timeout_seconds,
-            write=timeout_seconds,
-            pool=10.0,
-        ),
-        limits=httpx.Limits(
-            max_connections=20,
-            max_keepalive_connections=5,
-            keepalive_expiry=15.0,
-        ),
+        timeout=DEFAULT_TIMEOUT,
+        limits=HTTPX_LIMITS,
         http2=False,
     )
 
 
-def _build_async_http_client(timeout_seconds: float) -> httpx.AsyncClient:
+def _build_async_http_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(
-        timeout=httpx.Timeout(
-            connect=10.0,
-            read=timeout_seconds,
-            write=timeout_seconds,
-            pool=10.0,
-        ),
-        limits=httpx.Limits(
-            max_connections=20,
-            max_keepalive_connections=5,
-            keepalive_expiry=15.0,
-        ),
+        timeout=DEFAULT_TIMEOUT,
+        limits=HTTPX_LIMITS,
         http2=False,
     )
 
@@ -51,37 +50,19 @@ _async_http_client: httpx.AsyncClient | None = None
 _async_init_lock = asyncio.Lock()
 
 
-def _client_options(
-    timeout_seconds: float,
-    *,
-    httpx_client: httpx.Client | None = None,
-) -> ClientOptions:
+def _client_options() -> ClientOptions:
     return ClientOptions(
-        postgrest_client_timeout=httpx.Timeout(
-            connect=10.0,
-            read=timeout_seconds,
-            write=timeout_seconds,
-            pool=10.0,
-        ),
-        storage_client_timeout=int(timeout_seconds),
+        postgrest_client_timeout=DEFAULT_TIMEOUT,
+        storage_client_timeout=30,
         function_client_timeout=10,
-        httpx_client=httpx_client or _build_http_client(timeout_seconds),
+        httpx_client=_get_sync_http_client(),
     )
 
 
-def _async_client_options(
-    timeout_seconds: float,
-    *,
-    httpx_client: httpx.AsyncClient,
-) -> AsyncClientOptions:
+def _async_client_options(httpx_client: httpx.AsyncClient) -> AsyncClientOptions:
     return AsyncClientOptions(
-        postgrest_client_timeout=httpx.Timeout(
-            connect=10.0,
-            read=timeout_seconds,
-            write=timeout_seconds,
-            pool=10.0,
-        ),
-        storage_client_timeout=int(timeout_seconds),
+        postgrest_client_timeout=DEFAULT_TIMEOUT,
+        storage_client_timeout=30,
         function_client_timeout=10,
         httpx_client=httpx_client,
     )
@@ -99,7 +80,7 @@ def get_supabase() -> Client:
     return create_client(
         settings.supabase_base_url,
         key,
-        options=_client_options(30.0),
+        options=_client_options(),
     )
 
 
@@ -120,16 +101,17 @@ async def get_async_supabase() -> AsyncClient:
                 "SUPABASE_SERVICE_ROLE_KEY must be set for trusted backend database operations."
             )
 
-        _async_http_client = _build_async_http_client(30.0)
+        _async_http_client = _build_async_http_client()
         client = create_async_client(
             settings.supabase_base_url,
             key,
-            options=_async_client_options(30.0, httpx_client=_async_http_client),
+            options=_async_client_options(_async_http_client),
         )
         if inspect.isawaitable(client):
             client = await client
 
         _async_supabase_client = client
+        logger.info("Async Supabase client initialized.")
         return _async_supabase_client
 
 
@@ -149,5 +131,5 @@ def get_supabase_auth_client() -> Client:
     return create_client(
         settings.supabase_base_url,
         settings.SUPABASE_ANON_KEY,
-        options=_client_options(20.0),
+        options=_client_options(),
     )
