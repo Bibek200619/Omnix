@@ -155,10 +155,10 @@ async def test_assign_member_to_subspace_duplicate(monkeypatch: pytest.MonkeyPat
 
 @pytest.mark.asyncio
 async def test_assign_member_to_subspace_escalation_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Setup: actor is a co_owner (sub_leader), trying to assign another co_owner
+    # Setup: actor is a team_lead, trying to assign a co_owner (escalation)
     workspace_id = "sub-1"
     target_user_id = "member-2"
-    actor_user_id = "co-owner-1"
+    actor_user_id = "team-lead-1"
     
     async def fake_require_workspace_management_access(wid, uid):
         return workspace_service.WorkspaceAccess(
@@ -169,7 +169,7 @@ async def test_assign_member_to_subspace_escalation_rejected(monkeypatch: pytest
                 "workspace_type": "subworkspace",
                 "is_global": False
             },
-            role="co_owner" # Scoped as sub_leader
+            role="team_lead"
         )
         
     async def fake_select_one_trusted(table, columns, filters):
@@ -180,7 +180,7 @@ async def test_assign_member_to_subspace_escalation_rejected(monkeypatch: pytest
     monkeypatch.setattr(workspace_service, "require_workspace_management_access", fake_require_workspace_management_access)
     monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
 
-    # Execute & Verify: sub_leader cannot assign co_owner
+    # Execute & Verify: team_lead cannot assign co_owner
     with pytest.raises(HTTPException) as exc:
         await workspace_service.assign_member_to_subspace(workspace_id, target_user_id, "co_owner", actor_user_id)
     assert exc.value.status_code == 403
@@ -238,3 +238,97 @@ async def test_private_subspace_member_listing_is_scoped(monkeypatch: pytest.Mon
     assert "assigned-member" in user_ids
     assert "founder-1" in user_ids
     assert "org-member" not in user_ids
+
+@pytest.mark.asyncio
+async def test_assign_member_to_subspace_team_lead_and_sub_member(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Setup
+    workspace_id = "sub-1"
+    parent_workspace_id = "super-1"
+    target_user_id = "member-2"
+    actor_user_id = "founder-1"
+    
+    async def fake_require_workspace_management_access(wid, uid):
+        return workspace_service.WorkspaceAccess(
+            workspace={
+                "id": workspace_id,
+                "user_id": actor_user_id,
+                "parent_workspace_id": parent_workspace_id,
+                "workspace_type": "subworkspace",
+                "is_global": False
+            },
+            role="founder"
+        )
+        
+    async def fake_select_one_trusted(table, columns, filters):
+        if table == "workspace_members" and filters.get("workspace_id") == parent_workspace_id:
+            return {"user_id": target_user_id}
+        return None
+
+    inserted = []
+    async def fake_insert_one(table, payload):
+        inserted.append(payload)
+        return payload
+
+    async def fake_get_profiles(user_ids):
+        return {uid: {} for uid in user_ids}
+
+    monkeypatch.setattr(workspace_service, "require_workspace_management_access", fake_require_workspace_management_access)
+    monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_service, "insert_one", fake_insert_one)
+    monkeypatch.setattr(workspace_service, "get_profiles", fake_get_profiles)
+
+    # 1. Founder assigning team_lead
+    await workspace_service.assign_member_to_subspace(workspace_id, target_user_id, "team_lead", actor_user_id)
+    assert inserted[0]["role"] == "team_lead"
+    
+    # 2. Founder assigning sub_member (normalized to member)
+    inserted.clear()
+    await workspace_service.assign_member_to_subspace(workspace_id, target_user_id, "sub_member", actor_user_id)
+    assert inserted[0]["role"] == "member"
+
+@pytest.mark.asyncio
+async def test_team_lead_assignment_authority(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Setup
+    workspace_id = "sub-1"
+    parent_workspace_id = "super-1"
+    target_user_id = "member-2"
+    actor_user_id = "team-lead-1"
+    
+    async def fake_require_workspace_management_access(wid, uid):
+        return workspace_service.WorkspaceAccess(
+            workspace={
+                "id": workspace_id,
+                "user_id": "founder-1",
+                "parent_workspace_id": parent_workspace_id,
+                "workspace_type": "subworkspace",
+                "is_global": False
+            },
+            role="team_lead"
+        )
+        
+    async def fake_select_one_trusted(table, columns, filters):
+        if table == "workspace_members" and filters.get("workspace_id") == parent_workspace_id:
+            return {"user_id": target_user_id}
+        return None
+
+    inserted = []
+    async def fake_insert_one(table, payload):
+        inserted.append(payload)
+        return payload
+
+    async def fake_get_profiles(user_ids):
+        return {uid: {} for uid in user_ids}
+
+    monkeypatch.setattr(workspace_service, "require_workspace_management_access", fake_require_workspace_management_access)
+    monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_service, "insert_one", fake_insert_one)
+    monkeypatch.setattr(workspace_service, "get_profiles", fake_get_profiles)
+
+    # 1. Team lead assigning sub_member (Success)
+    await workspace_service.assign_member_to_subspace(workspace_id, target_user_id, "sub_member", actor_user_id)
+    assert inserted[0]["role"] == "member"
+
+    # 2. Team lead attempting leader escalation (Rejected)
+    with pytest.raises(HTTPException) as exc:
+        await workspace_service.assign_member_to_subspace(workspace_id, target_user_id, "team_lead", actor_user_id)
+    assert exc.value.status_code == 403
