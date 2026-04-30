@@ -89,7 +89,7 @@ function workspaceIcon(workspace: Workspace) {
   return Users;
 }
 
-function WorkspaceSelector() {
+function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => void }) {
   const {
     workspaces,
     loading,
@@ -185,6 +185,7 @@ function WorkspaceSelector() {
       setNewWorkspaceName("");
       setShowCreateForm(false);
       setOpen(false);
+      onWorkspaceSelect?.();
     } catch (err) {
       console.error("Failed to create workspace", err);
       setCreateError(err instanceof Error ? err.message : "Unable to create workspace");
@@ -208,6 +209,7 @@ function WorkspaceSelector() {
       setNewSubspaceName("");
       setShowCreateSubspaceModal(false);
       setOpen(false);
+      onWorkspaceSelect?.();
     } catch (err) {
       console.error("Failed to create subspace", err);
       setCreateSubspaceError(err instanceof Error ? err.message : "Unable to create subspace");
@@ -235,6 +237,7 @@ function WorkspaceSelector() {
       await inviteToActiveWorkspace(target, role);
       setInviteOpen(false);
       setOpen(false);
+      onWorkspaceSelect?.();
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "Unable to invite teammate");
     } finally {
@@ -258,6 +261,7 @@ function WorkspaceSelector() {
       await renameWorkspace(active.id, { name: renameDraft.trim() });
       setRenameOpen(false);
       setOpen(false);
+      onWorkspaceSelect?.();
     } catch (err) {
       setRenameError(err instanceof Error ? err.message : "Unable to rename workspace");
     } finally {
@@ -281,6 +285,7 @@ function WorkspaceSelector() {
       await deleteWorkspace(active.id);
       setDeleteOpen(false);
       setOpen(false);
+      onWorkspaceSelect?.();
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : "Unable to delete workspace");
     } finally {
@@ -291,6 +296,7 @@ function WorkspaceSelector() {
   function selectWorkspace(workspaceId: string) {
     setActiveWorkspace(workspaceId);
     setOpen(false);
+    onWorkspaceSelect?.();
   }
 
   function renderSubspaceRow(subspace: Workspace, index: number) {
@@ -309,7 +315,7 @@ function WorkspaceSelector() {
         type="button"
         onClick={() => selectWorkspace(subspace.id)}
         className={cn(
-          "relative my-0.5 flex min-h-9 w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-left transition-all duration-300",
+          "relative my-0.5 flex min-h-[42px] w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-left transition-all duration-300 sm:min-h-9",
           isActive
             ? "bg-cyan-300/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
             : "text-[var(--omnix-text-2)] hover:bg-[var(--omnix-surface)] hover:text-white",
@@ -492,35 +498,42 @@ function WorkspaceSelector() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "group flex w-full items-center justify-between gap-2 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-[11px] py-[9px] text-left transition duration-200 hover:border-[var(--omnix-border-2)] hover:bg-[var(--omnix-surface-hover)]",
+          "group flex w-full items-center justify-between gap-2 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 py-3 text-left transition duration-200 hover:border-[var(--omnix-border-2)] hover:bg-[var(--omnix-surface-hover)] sm:px-[11px] sm:py-[9px]",
           realtimeStatus === "connected" && "border-cyan-300/20"
         )}
         aria-expanded={open}
       >
-        <div className="flex min-w-0 items-center gap-[9px]">
-          <div className="relative">
-            <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-[5px] border border-cyan-300/35 bg-cyan-300/15 text-[var(--omnix-cyan)] shadow-[0_0_8px_rgba(0,255,255,0.2)]">
-              <ActiveWorkspaceIcon className="h-3.5 w-3.5" />
+        <div className="flex min-w-0 items-center gap-3 sm:gap-[9px]">
+          <div className="relative shrink-0">
+            <div className={cn(
+              "flex h-9 w-9 items-center justify-center rounded-lg border transition-all duration-300 sm:h-8 sm:w-8",
+              open ? "border-cyan-300/40 bg-cyan-300/20 text-cyan-200" : "border-white/10 bg-white/5 text-white/40"
+            )}>
+              <ActiveWorkspaceIcon className="h-4.5 w-4.5 sm:h-4 sm:w-4" />
             </div>
             {realtimeStatus === "connected" && (
-              <span className="absolute -bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-cyan-400" />
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#060a14] bg-[var(--omnix-green)] shadow-[0_0_8px_var(--omnix-green)]" />
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-1.5 text-xs font-medium leading-tight text-[var(--omnix-text)]">
-              <span className="truncate">{active ? active.name : "No workspace selected"}</span>
+            <div className="flex items-center gap-2">
+              <span className="truncate text-sm font-bold tracking-tight text-white sm:text-[13px]">
+                {active ? active.name : "No workspace selected"}
+              </span>
               <WorkspaceTypeBadge workspace={active} />
             </div>
-            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-[var(--omnix-text-3)]">
-              <span>{active ? workspaceRoleLabel(active.current_user_role) : "Workspace hierarchy"}</span>
-              {active ? (
-                <>
-                  <span className="h-1 w-1 rounded-full bg-cyan-200/20" />
-                  <span className={cn(realtimeStatus === "connected" && "text-cyan-300/80")}>
+            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--omnix-text-3)]">
+               <span className={cn("px-1.5 py-0.5 rounded border border-white/5", workspaceRoleBadgeClass(active?.current_user_role))}>
+                  {active ? workspaceRoleLabel(active.current_user_role) : "Workspace"}
+               </span>
+               {active && (
+                 <>
+                   <span className="h-0.5 w-0.5 rounded-full bg-white/10" />
+                   <span className={cn(realtimeStatus === "connected" && "text-cyan-300/80")}>
                     {presence?.active_count ?? statusForWorkspace(active.id)?.active_count ?? 0} active
-                  </span>
-                </>
-              ) : null}
+                   </span>
+                 </>
+               )}
             </div>
           </div>
         </div>
@@ -1135,7 +1148,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[var(--omnix-sidebar-w)] flex-col overflow-hidden border-r border-[var(--omnix-border)] bg-[linear-gradient(180deg,rgba(5,12,23,0.99),rgba(4,10,20,0.998))] shadow-[20px_0_100px_rgba(0,0,0,0.5),4px_0_30px_rgba(0,255,255,0.04)] backdrop-blur-2xl transition-transform duration-200 ease-out",
+          "fixed inset-y-0 left-0 z-50 flex w-[var(--omnix-sidebar-w)] flex-col overflow-hidden border-r border-[var(--omnix-border)] bg-[linear-gradient(180deg,rgba(5,12,23,0.98),rgba(4,10,20,0.985))] shadow-[24px_0_120px_rgba(0,0,0,0.6),4px_0_40px_rgba(0,255,255,0.05)] backdrop-blur-[28px] transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]",
           isOpen ? "translate-x-0" : "-translate-x-full",
           collapsed ? "lg:-translate-x-full" : "lg:translate-x-0",
         )}
@@ -1193,7 +1206,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                   Workspace
                 </p>
               </div>
-              <WorkspaceSelector />
+              <WorkspaceSelector onWorkspaceSelect={onClose} />
             </div>
             <PendingWorkspaceInvites compact maxVisible={2} />
           </div>
