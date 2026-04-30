@@ -649,21 +649,6 @@ async def leave_presence(
     return None
 
 
-@router.post("/{workspace_id}/presence/typing", response_model=WorkspacePresenceRead)
-async def update_typing_presence(
-    workspace_id: str,
-    typing_payload: WorkspaceTypingUpdate,
-    current_user: dict[str, Any] = Depends(get_current_user),
-) -> dict[str, Any]:
-    user_id = _user_id_from_claims(current_user)
-    return await update_workspace_typing(
-        workspace_id=workspace_id,
-        user_id=user_id,
-        conversation_id=typing_payload.conversation_id,
-        is_typing=typing_payload.is_typing,
-    )
-
-
 @router.get("/{workspace_id}/activity", response_model=list[WorkspaceActivityRead])
 async def get_workspace_activity(
     workspace_id: str,
