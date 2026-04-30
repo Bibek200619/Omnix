@@ -135,7 +135,7 @@ export function WorkspaceInviteModal({
           <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button type="submit" leftIcon={<UserPlus className="h-4 w-4" />} isLoading={loading} onClick={(e) => {
+          <Button type="submit" leftIcon={<UserPlus className="h-4 w-4" />} isLoading={loading} onClick={() => {
             // Manual trigger because form might not be parent of buttons if we re-arrange
             // but here it is still.
           }}>
