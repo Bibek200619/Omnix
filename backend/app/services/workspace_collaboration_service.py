@@ -22,23 +22,28 @@ from .workspace_service import (
     require_workspace_access,
     utc_now_iso,
 )
+from ..bootstrap.redis import get_redis
+import json
 
 logger = logging.getLogger(__name__)
 
 import time
 
-# In-memory caches for high-frequency infrastructure optimizations
-# Structure: {(workspace_id, user_id, 'heartbeat'): last_time}
-_presence_write_cooldowns: dict[tuple[str, str, str], float] = {}
-# Structure: {workspace_id: (timestamp, presence_snapshot)}
-_presence_snapshot_cache: dict[str, tuple[float, dict[str, Any]]] = {}
-# Structure: {user_id: (timestamp, live_statuses_list)}
-_live_status_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+# Redis Key Constants
+# presence:{workspace_id}:{user_id} -> presence snapshot (JSON) with TTL
+# status:{user_id} -> live status snapshot (JSON) with TTL
+# cooldown:{workspace_id}:{user_id}:{action} -> dummy value with TTL
+PRESENCE_KEY_PREFIX = "presence"
+STATUS_KEY_PREFIX = "status"
+COOLDOWN_KEY_PREFIX = "cooldown"
 
-HEARTBEAT_COOLDOWN = 60.0  # Seconds between actual DB writes for heartbeats
-TYPING_COOLDOWN = 5.0      # Seconds between actual DB writes for typing
-SNAPSHOT_CACHE_TTL = 10.0  # Seconds to cache presence snapshots
-STATUS_CACHE_TTL = 30.0    # Seconds to cache live status results
+HEARTBEAT_TTL = 90         # Seconds for presence key to expire
+STATUS_TTL = 30           # Seconds for live status cache to expire
+COOLDOWN_HEARTBEAT = 60    # Seconds between actual DB writes for heartbeats
+COOLDOWN_TYPING = 5       # Seconds between actual DB writes for typing
+
+SNAPSHOT_CACHE_TTL = 10.0  # Seconds to cache presence snapshots (ephemeral local optimization)
+_local_snapshot_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 
 PRESENCE_COLUMNS = (
     "workspace_id,user_id,status,current_view,current_label,typing_until,"
@@ -100,11 +105,6 @@ def _presence_status(row: Mapping[str, Any], now: datetime) -> str:
     return "offline"
 
 
-def _presence_is_typing(row: Mapping[str, Any], now: datetime) -> bool:
-    typing_until = _parse_dt(row.get("typing_until"))
-    return bool(typing_until and typing_until > now)
-
-
 def _presence_member_payload(
     row: Mapping[str, Any],
     profile: Mapping[str, Any],
@@ -112,7 +112,6 @@ def _presence_member_payload(
 ) -> dict[str, Any]:
     user_id = str(row.get("user_id") or "")
     status = _presence_status(row, now)
-    is_typing = _presence_is_typing(row, now)
     return {
         "workspace_id": str(row.get("workspace_id") or ""),
         "user_id": user_id,
@@ -120,8 +119,8 @@ def _presence_member_payload(
         "current_view": row.get("current_view"),
         "current_label": row.get("current_label"),
         "is_online": status == "online",
-        "is_typing": is_typing,
-        "typing_conversation_id": row.get("typing_conversation_id"),
+        "is_typing": False,
+        "typing_conversation_id": None,
         "last_seen_at": row.get("last_seen_at"),
         "updated_at": row.get("updated_at"),
         "email": profile.get("email"),
@@ -154,16 +153,20 @@ async def heartbeat_workspace_presence(
 ) -> dict[str, Any]:
     await require_workspace_access(workspace_id, user_id)
     
+    redis = get_redis()
     now_ts = time.perf_counter()
-    cache_key = (workspace_id, user_id, "heartbeat")
-    last_write = _presence_write_cooldowns.get(cache_key, 0)
     
-    # Graceful degradation: increase cooldown if infrastructure is under pressure
-    effective_cooldown = HEARTBEAT_COOLDOWN * 2 if check_infrastructure_pressure() else HEARTBEAT_COOLDOWN
+    # Check if we should write to Postgres (cooldown)
+    # We use Redis for global cooldown across all workers
+    cooldown_key = f"{COOLDOWN_KEY_PREFIX}:{workspace_id}:{user_id}:heartbeat"
+    on_cooldown = await redis.get(cooldown_key)
     
-    # If within cooldown, check if we have a recent snapshot to return immediately
-    if now_ts - last_write < effective_cooldown:
-        cached = _presence_snapshot_cache.get(workspace_id)
+    # Graceful degradation: decrease cooldown if infrastructure is under pressure
+    effective_cooldown = COOLDOWN_HEARTBEAT * 2 if check_infrastructure_pressure() else COOLDOWN_HEARTBEAT
+    
+    # If within cooldown, return cached snapshot or fresh list
+    if on_cooldown:
+        cached = _local_snapshot_cache.get(workspace_id)
         if cached and (now_ts - cached[0] < SNAPSHOT_CACHE_TTL):
             return cached[1]
         return await list_workspace_presence(workspace_id=workspace_id, user_id=user_id)
@@ -181,13 +184,17 @@ async def heartbeat_workspace_presence(
     }
 
     try:
+        # Write to Postgres for persistent authority
         await upsert_one("workspace_presence", payload, on_conflict="workspace_id,user_id")
-        _presence_write_cooldowns[cache_key] = now_ts
-        # Force cache invalidation on write to ensure subsequent reads get fresh data
-        _presence_snapshot_cache.pop(workspace_id, None)
+        
+        # Set global cooldown in Redis
+        await redis.setex(cooldown_key, effective_cooldown, "1")
+        
+        # Invalidate local caches across all workers isn't easy without PubSub,
+        # but here we just invalidate our own. Others will time out.
+        _local_snapshot_cache.pop(workspace_id, None)
     except SupabaseServiceError:
         logger.exception("Failed to persist workspace presence heartbeat | workspace_id=%s", workspace_id)
-        # Non-fatal for the heartbeating user, list_workspace_presence might still work or return stale data
         pass
 
     return await list_workspace_presence(workspace_id=workspace_id, user_id=user_id)
@@ -199,7 +206,24 @@ async def leave_workspace_presence(
     user_id: str,
 ) -> None:
     """Explicitly mark a user as offline/gone from a workspace presence tracking."""
-    # We use a trusted delete because we already validated workspace_id/user_id via router
+    redis = get_redis()
+    
+    # 1. Invalidate distributed snapshot cache for this workspace
+    # and live status cache for this user
+    try:
+        await redis.delete(f"{PRESENCE_KEY_PREFIX}:{workspace_id}")
+        await redis.delete(f"{STATUS_KEY_PREFIX}:{user_id}")
+        
+        # Clear cooldowns to allow immediate re-entry/re-broadcast if needed
+        await redis.delete(f"{COOLDOWN_KEY_PREFIX}:{workspace_id}:{user_id}:heartbeat")
+        await redis.delete(f"{COOLDOWN_KEY_PREFIX}:{workspace_id}:{user_id}:typing")
+    except Exception:
+        logger.error("Redis cache invalidation failed during leave_presence")
+
+    # 2. Invalidate local worker cache
+    _local_snapshot_cache.pop(workspace_id, None)
+
+    # 3. Persistent removal from Postgres
     from ..services.supabase_service import delete_many_trusted
     try:
         await delete_many_trusted(
@@ -210,8 +234,21 @@ async def leave_workspace_presence(
         logger.exception("Failed to remove workspace presence on leave | workspace_id=%s", workspace_id)
 
 
+async def invalidate_workspace_presence_cache(workspace_id: str):
+    """Force invalidation of presence caches for a workspace (e.g. after member removal)."""
+    redis = get_redis()
+    try:
+        await redis.delete(f"{PRESENCE_KEY_PREFIX}:{workspace_id}")
+    except Exception:
+        pass
+    _local_snapshot_cache.pop(workspace_id, None)
+
+
 async def cleanup_stale_presence() -> int:
-    """Purge presence records that haven't been updated recently."""
+    """
+    Purge presence records that haven't been updated recently.
+    In a Redis-backed model, this is primarily for Postgres maintenance.
+    """
     from ..services.supabase_service import delete_many_trusted
     # Records older than 10 minutes are considered long gone
     stale_threshold = (_now() - timedelta(minutes=10)).isoformat()
@@ -229,58 +266,29 @@ async def cleanup_stale_presence() -> int:
         return 0
 
 
-async def update_workspace_typing(
-    *,
-    workspace_id: str,
-    user_id: str,
-    conversation_id: str | None,
-    is_typing: bool,
-) -> dict[str, Any]:
-    await require_workspace_access(workspace_id, user_id)
-    
-    now_ts = time.perf_counter()
-    cache_key = (workspace_id, user_id, "typing")
-    last_write = _presence_write_cooldowns.get(cache_key, 0)
-    
-    # Typing is even higher frequency. We only update if state changes (stopping typing)
-    # or if the cooldown has passed to renew the typing_until TTL.
-    if is_typing and now_ts - last_write < TYPING_COOLDOWN:
-        cached = _presence_snapshot_cache.get(workspace_id)
-        if cached and (now_ts - cached[0] < SNAPSHOT_CACHE_TTL):
-            return cached[1]
-        return await list_workspace_presence(workspace_id=workspace_id, user_id=user_id)
-
-    timestamp = utc_now_iso()
-    typing_until = (_now() + TYPING_WINDOW).isoformat() if is_typing else None
-    payload = {
-        "workspace_id": workspace_id,
-        "user_id": user_id,
-        "status": "online",
-        "typing_until": typing_until,
-        "typing_conversation_id": conversation_id if is_typing else None,
-        "last_seen_at": timestamp,
-        "updated_at": timestamp,
-    }
-    try:
-        await upsert_one("workspace_presence", payload, on_conflict="workspace_id,user_id")
-        _presence_write_cooldowns[cache_key] = now_ts
-        _presence_snapshot_cache.pop(workspace_id, None)
-    except SupabaseServiceError:
-        logger.exception("Failed to persist typing state | workspace_id=%s", workspace_id)
-        # Non-fatal for UI
-        pass
-
-    return await list_workspace_presence(workspace_id=workspace_id, user_id=user_id)
-
-
 async def list_workspace_presence(*, workspace_id: str, user_id: str) -> dict[str, Any]:
     await require_workspace_access(workspace_id, user_id)
     
+    redis = get_redis()
     now_ts = time.perf_counter()
-    cached = _presence_snapshot_cache.get(workspace_id)
+    
+    # 1. Try local cache for ultra-low latency within the same request/worker
+    cached = _local_snapshot_cache.get(workspace_id)
     if cached and (now_ts - cached[0] < SNAPSHOT_CACHE_TTL):
         return cached[1]
 
+    # 2. Try Redis for distributed consistency
+    presence_key = f"{PRESENCE_KEY_PREFIX}:{workspace_id}"
+    try:
+        redis_cached = await redis.get(presence_key)
+        if redis_cached:
+            snapshot = json.loads(redis_cached)
+            _local_snapshot_cache[workspace_id] = (now_ts, snapshot)
+            return snapshot
+    except Exception:
+        logger.error("Redis fetch failed for presence snapshot")
+
+    # 3. Authoritative fetch from Postgres
     now = _now()
     try:
         rows = await select_all_trusted(
@@ -305,21 +313,27 @@ async def list_workspace_presence(*, workspace_id: str, user_id: str) -> dict[st
     )
     online_members = [member for member in members if member["status"] == "online"]
     recently_active_members = [member for member in members if member["status"] in {"online", "recent"}]
-    typing_members = [member for member in online_members if member.get("is_typing")]
 
     result = {
         "workspace_id": workspace_id,
         "online_count": len(online_members),
         "active_count": len(online_members),
         "recently_active_count": len(recently_active_members),
-        "typing_count": len(typing_members),
+        "typing_count": 0,
         "online_members": online_members,
         "active_members": online_members,
         "recently_active_members": recently_active_members,
-        "typing_members": typing_members,
+        "typing_members": [],
         "updated_at": now.isoformat(),
     }
-    _presence_snapshot_cache[workspace_id] = (now_ts, result)
+    
+    # 4. Update caches
+    try:
+        await redis.setex(presence_key, int(SNAPSHOT_CACHE_TTL), json.dumps(result))
+    except Exception:
+        logger.error("Failed to update presence snapshot in Redis")
+        
+    _local_snapshot_cache[workspace_id] = (now_ts, result)
     return result
 
 
@@ -420,11 +434,18 @@ def _status_from_counts(
 
 
 async def list_workspace_live_statuses(user_id: str) -> list[dict[str, Any]]:
-    now_ts = time.perf_counter()
-    cached = _live_status_cache.get(user_id)
-    if cached and (now_ts - cached[0] < STATUS_CACHE_TTL):
-        return cached[1]
+    redis = get_redis()
+    
+    # 1. Try Redis for distributed user-scoped cache
+    status_key = f"{STATUS_KEY_PREFIX}:{user_id}"
+    try:
+        redis_cached = await redis.get(status_key)
+        if redis_cached:
+            return json.loads(redis_cached)
+    except Exception:
+        logger.error("Redis fetch failed for live statuses")
 
+    # 2. Authoritative build
     workspaces = await list_user_workspaces(user_id)
     normalized_workspaces = [normalize_workspace_record(workspace) for workspace in workspaces]
     workspace_ids = [str(workspace["id"]) for workspace in normalized_workspaces if workspace.get("id")]
@@ -480,7 +501,6 @@ async def list_workspace_live_statuses(user_id: str) -> list[dict[str, Any]]:
             "online_count": 0,
             "active_count": 0,
             "recently_active_count": 0,
-            "typing_count": 0,
         }
         for workspace_id in workspace_ids
     }
@@ -492,8 +512,6 @@ async def list_workspace_live_statuses(user_id: str) -> list[dict[str, Any]]:
         if status == "online":
             counts_by_workspace_id[workspace_id]["online_count"] += 1
             counts_by_workspace_id[workspace_id]["active_count"] += 1
-            if _presence_is_typing(row, now):
-                counts_by_workspace_id[workspace_id]["typing_count"] += 1
         if status in {"online", "recent"}:
             counts_by_workspace_id[workspace_id]["recently_active_count"] += 1
 
@@ -517,7 +535,7 @@ async def list_workspace_live_statuses(user_id: str) -> list[dict[str, Any]]:
                 "online_count": counts.get("online_count", 0),
                 "active_count": counts.get("active_count", 0),
                 "recently_active_count": counts.get("recently_active_count", 0),
-                "typing_count": counts.get("typing_count", 0),
+                "typing_count": 0,
                 "source_count": source_count,
                 "ai_specialization": normalize_ai_specialization(workspace.get("ai_specialization")),
                 "ai_status": ai_status,
@@ -527,5 +545,10 @@ async def list_workspace_live_statuses(user_id: str) -> list[dict[str, Any]]:
             }
         )
 
-    _live_status_cache[user_id] = (now_ts, statuses)
+    # 3. Update Redis cache
+    try:
+        await redis.setex(status_key, STATUS_TTL, json.dumps(statuses))
+    except Exception:
+        logger.error("Failed to update status cache in Redis")
+        
     return statuses
