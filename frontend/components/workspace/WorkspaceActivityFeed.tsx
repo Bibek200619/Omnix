@@ -74,23 +74,23 @@ export function WorkspaceActivityFeed({
 
       <div className="relative z-10 mb-6 flex items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200/50">
-            <Activity className={cn("h-3.5 w-3.5", !loading && "animate-pulse text-cyan-400")} />
-            Activity Log
+          <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.18em] text-cyan-200/50">
+            <Activity className={cn("h-3.5 w-3.5", !loading && "text-cyan-400/80")} />
+            Recent Updates
           </div>
-          <h3 className="mt-1.5 text-lg font-bold tracking-tight text-white/90">Workspace Pulse</h3>
+          <h3 className="mt-1.5 text-lg font-medium tracking-tight text-white/90">Workspace Activity</h3>
         </div>
         <div className="flex items-center gap-2">
           {loading && (
-            <span className="flex h-1.5 w-1.5 animate-ping rounded-full bg-cyan-400" />
+            <span className="flex h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400/50" />
           )}
           <span className={cn(
-            "rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider",
+            "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider",
             loading 
-              ? "border-cyan-500/20 bg-cyan-500/10 text-cyan-300" 
-              : "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+              ? "border-cyan-500/20 bg-cyan-500/10 text-cyan-300/70" 
+              : "border-emerald-500/20 bg-emerald-500/10 text-emerald-400/70"
           )}>
-            {loading ? "Syncing" : "Verified"}
+            {loading ? "Syncing" : "Live"}
           </span>
         </div>
       </div>
@@ -156,11 +156,10 @@ export function WorkspaceActivityFeed({
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/5 bg-white/[0.01] p-10 text-center">
             <div className="relative">
               <Activity className="h-10 w-10 text-white/10" />
-              <div className="absolute inset-0 animate-pulse bg-cyan-400/10 blur-xl rounded-full" />
             </div>
-            <p className="mt-4 text-sm font-bold text-white/60">Quiescent State</p>
+            <p className="mt-4 text-sm font-medium text-white/60">Quiet right now</p>
             <p className="mt-2 max-w-[200px] text-[11px] leading-relaxed text-white/30">
-              Awaiting operational events. Teammate actions and AI insights will materialize here.
+              Waiting for activity. Teammate updates and AI insights will appear here.
             </p>
           </div>
         )}
@@ -174,8 +173,5 @@ export function WorkspaceActivityFeed({
         </div>
       )}
     </section>
-  );
-}
-
   );
 }
