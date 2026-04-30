@@ -235,3 +235,12 @@ export type WorkspaceLiveStatus = {
   recent_activity_at?: string | null;
   recent_activity_summary?: string | null;
 };
+
+export type TypingSignal = {
+  userId: string;
+  fullName: string;
+  avatarUrl?: string | null;
+  conversationId: string | null;
+  isTyping: boolean;
+  sentAt: string;
+};
