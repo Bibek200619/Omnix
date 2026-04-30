@@ -113,22 +113,22 @@ export function WorkspaceActivityFeed({
                       email={item.actor_email}
                       avatarUrl={item.actor_avatar_url}
                       className={cn(
-                        "h-11 w-11 rounded-xl border bg-black/40 text-sm font-bold shadow-xl transition-all duration-300 group-hover:scale-105",
+                        "h-11 w-11 rounded-xl border bg-black/40 text-sm font-medium transition-all duration-500 group-hover:scale-[1.02]",
                         isAI 
-                          ? "border-purple-500/30 ring-1 ring-purple-500/10" 
-                          : "border-cyan-500/20 ring-1 ring-cyan-500/5"
+                          ? "border-purple-500/20" 
+                          : "border-cyan-500/10"
                       )}
                     />
                     <div className={cn(
-                      "absolute -right-1 -top-1 rounded-full border border-white/10 p-1 shadow-lg backdrop-blur-md",
+                      "absolute -right-1 -top-1 rounded-full border border-white/10 p-1 shadow-sm backdrop-blur-md",
                       isAI ? "bg-purple-600/80" : "bg-cyan-600/80"
                     )}>
-                      <Icon className="h-2.5 w-2.5 text-white" />
+                      <Icon className="h-2.5 w-2.5 text-white/90" />
                     </div>
                   </div>
                   <div className="min-w-0 flex-1 pt-0.5">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-[13px] font-bold text-white/90 group-hover:text-cyan-200 transition-colors">
+                      <p className="truncate text-[13px] font-medium text-white/90 group-hover:text-cyan-100 transition-colors">
                         {item.summary}
                       </p>
                       <span className="shrink-0 text-[10px] font-medium text-white/30">
