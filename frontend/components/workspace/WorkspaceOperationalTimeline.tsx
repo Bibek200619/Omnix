@@ -43,7 +43,7 @@ export function WorkspaceOperationalTimeline({
     return (
       <div className={cn("flex flex-col items-center justify-center p-12 text-slate-500", className)}>
         <Loader2 className="h-6 w-6 animate-spin mb-3" />
-        <p className="text-sm font-medium">Synchronizing operational continuity...</p>
+        <p className="text-sm font-medium">Loading timeline...</p>
       </div>
     );
   }
@@ -52,8 +52,8 @@ export function WorkspaceOperationalTimeline({
     return (
       <div className={cn("p-12 text-center rounded-[18px] border border-dashed border-white/10 bg-white/[0.02]", className)}>
         <History className="h-8 w-8 mx-auto mb-4 text-white/20" />
-        <h3 className="text-sm font-bold text-white/60 mb-1">No Continuity History</h3>
-        <p className="text-xs text-white/30">Organizational progression events will appear here.</p>
+        <h3 className="text-sm font-medium text-white/60 mb-1">Quiet Timeline</h3>
+        <p className="text-xs text-white/30">Key milestones and decisions will appear here.</p>
       </div>
     );
   }
@@ -92,8 +92,8 @@ export function WorkspaceOperationalTimeline({
                     className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 shadow-[0_0_8px_rgba(34,211,238,0.5)]"
                   />
                 </div>
-                <span className="text-[10px] font-bold text-white/40">
-                  {Math.round(initiative.momentum_score * 10)}% Momentum
+                <span className="text-[10px] font-medium text-white/40">
+                  {Math.round(initiative.momentum_score * 10)}% Activity
                 </span>
               </div>
             </motion.div>
@@ -129,8 +129,12 @@ export function WorkspaceOperationalTimeline({
                       <ClientTime value={event.created_at} fallback="Recently" />
                     </span>
                     <span className="hidden sm:inline-block h-1 w-1 rounded-full bg-white/10" />
-                    <span className="inline-flex w-fit items-center gap-1.5 px-2 py-0.5 rounded-full border border-white/5 bg-white/[0.03] text-[8px] sm:text-[9px] font-bold text-cyan-200/60 uppercase tracking-tight">
-                      {event.event_type.replace(/_/g, ' ')}
+                    <span className="inline-flex w-fit items-center gap-1.5 px-2 py-0.5 rounded-full border border-white/5 bg-white/[0.03] text-[8px] sm:text-[9px] font-medium text-cyan-200/50 uppercase tracking-tight">
+                      {event.event_type === 'momentum_spike' ? 'High Activity' : 
+                       event.event_type === 'initiative_started' ? 'Project Started' :
+                       event.event_type === 'decision_made' ? 'Decision' :
+                       event.event_type === 'synthesis' ? 'Summary' :
+                       event.event_type.replace(/_/g, ' ')}
                     </span>
                   </div>
                   
@@ -143,20 +147,6 @@ export function WorkspaceOperationalTimeline({
                         <div className="mt-2.5 sm:mt-3 flex items-center gap-2 text-[9px] sm:text-[10px] font-bold text-white/30">
                           <Milestone className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                           <span>Part of <span className="text-white/60">{event.metadata.initiative_name}</span></span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-    <span>Part of <span className="text-white/60">{event.metadata.initiative_name}</span></span>
                         </div>
                       )}
                     </div>
