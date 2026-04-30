@@ -108,25 +108,25 @@ export function WorkspaceIntelligencePanel({
       {!compact ? (
         <div className="relative z-10 mt-8 grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-1">
-            <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
+            <div className="mb-3 flex items-center gap-2 text-[10px] font-medium uppercase tracking-widest text-white/40">
               <Globe2 className="h-3 w-3 text-cyan-400" />
-              Active Domains
+              Topics
             </div>
             <div className="flex flex-wrap gap-2">
               {domains.length ? domains.map((domain) => (
-                <span key={domain} className="rounded-lg border border-white/5 bg-white/[0.04] px-2.5 py-1.5 text-[11px] font-bold text-cyan-50/70 hover:text-white transition-colors cursor-default">
+                <span key={domain} className="rounded-lg border border-white/5 bg-white/[0.04] px-2.5 py-1.5 text-[11px] font-medium text-cyan-50/70 hover:text-white transition-colors cursor-default">
                   {domain}
                 </span>
               )) : (
-                <span className="text-[11px] font-medium text-white/20 italic">No domains identified in current scope.</span>
+                <span className="text-[11px] font-medium text-white/20 italic">No topics identified yet.</span>
               )}
             </div>
           </div>
           
           <div className="lg:col-span-2">
-            <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
+            <div className="mb-3 flex items-center gap-2 text-[10px] font-medium uppercase tracking-widest text-white/40">
               <Database className="h-3 w-3 text-emerald-400" />
-              Intelligence Sources
+              Connected Files
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               {sources.length ? sources.slice(0, 4).map((source) => (
@@ -136,16 +136,16 @@ export function WorkspaceIntelligencePanel({
                 </div>
               )) : (
                 <div className="col-span-2 rounded-xl border border-dashed border-white/5 bg-white/[0.01] p-4 text-center text-[11px] font-medium text-white/20">
-                  Connect assets to expand operational intelligence.
+                  Connect files to help the AI learn about this workspace.
                 </div>
               )}
             </div>
           </div>
 
           <div className="lg:col-span-3 border-t border-white/5 pt-6">
-            <div className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
+            <div className="mb-4 flex items-center gap-2 text-[10px] font-medium uppercase tracking-widest text-white/40">
               <BrainCircuit className="h-3 w-3 text-purple-400" />
-              AI Memory Synthesis
+              AI Memory
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {insights.length ? insights.slice(0, 4).map((insight) => (
@@ -162,6 +162,12 @@ export function WorkspaceIntelligencePanel({
           </div>
         </div>
       ) : null}
+    </section>
+  );
+}
+ );
+}
+) : null}
     </section>
   );
 }
