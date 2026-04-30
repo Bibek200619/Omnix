@@ -12,6 +12,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth-context";
 import { useWorkspace } from "@/lib/workspace-context";
+import { cn } from "@/lib/utils";
 import { InviteNotificationBar, InviteNotificationBell } from "@/components/workspace/InviteNotifications";
 import { ProfileMenu } from "@/components/layout/ProfileMenu";
 
