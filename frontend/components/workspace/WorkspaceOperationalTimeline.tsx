@@ -73,8 +73,8 @@ export function WorkspaceOperationalTimeline({
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/80">Active Initiative</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span className="text-[10px] font-medium uppercase tracking-widest text-emerald-400/70">Focus Area</span>
                   </div>
                   <h4 className="text-sm font-bold text-white group-hover:text-cyan-200 transition-colors truncate">
                     {initiative.name}
@@ -143,6 +143,20 @@ export function WorkspaceOperationalTimeline({
                         <div className="mt-2.5 sm:mt-3 flex items-center gap-2 text-[9px] sm:text-[10px] font-bold text-white/30">
                           <Milestone className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                           <span>Part of <span className="text-white/60">{event.metadata.initiative_name}</span></span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+    <span>Part of <span className="text-white/60">{event.metadata.initiative_name}</span></span>
                         </div>
                       )}
                     </div>

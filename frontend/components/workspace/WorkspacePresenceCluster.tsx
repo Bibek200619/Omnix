@@ -110,8 +110,8 @@ export function WorkspacePresenceCluster({
             <Eye className="h-3.5 w-3.5 text-cyan-300/80" />
             <span className="min-w-0 flex-1 truncate">
               {activeViewer
-                ? <><span className="font-bold text-white">{memberName(activeViewer)}</span> is viewing <span className="text-cyan-200">{viewLabel(activeViewer, workspaceName)}</span></>
-                : "Operational state: Monitoring workspace activity"}
+                ? <><span className="font-medium text-white">{memberName(activeViewer)}</span> is active in <span className="text-cyan-200/80">{viewLabel(activeViewer, workspaceName)}</span></>
+                : "You are currently connected to this workspace"}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2">
