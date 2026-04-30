@@ -33,19 +33,19 @@ export function WorkspaceIntelligencePanel({
 
   return (
     <section className={cn(
-      "relative overflow-hidden rounded-[18px] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.9),rgba(8,12,24,0.95))] p-6 shadow-2xl backdrop-blur-xl transition-all duration-500 hover:shadow-cyan-500/10",
+      "relative overflow-hidden rounded-[18px] border border-white/5 bg-[linear-gradient(135deg,rgba(15,23,42,0.8),rgba(8,12,24,0.85))] p-6 shadow-xl backdrop-blur-xl transition-all duration-500 hover:shadow-cyan-500/5",
       className
     )}>
-      <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-500/10 blur-[90px] animate-pulse" />
-      <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-purple-500/10 blur-[90px] animate-pulse" />
+      <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-500/5 blur-[90px]" />
+      <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-purple-500/5 blur-[90px]" />
       
       <div className="relative z-10 flex flex-col md:flex-row md:items-start justify-between gap-6">
         <div className="flex min-w-0 gap-4">
           <div className="relative shrink-0">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.2)]">
-              {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : <BrainCircuit className="h-6 w-6" />}
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/5 text-cyan-300/80 shadow-[0_0_10px_rgba(34,211,238,0.1)]">
+              {loading ? <Loader2 className="h-6 w-6 animate-spin opacity-50" /> : <BrainCircuit className="h-6 w-6 opacity-80" />}
             </span>
-            <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] border-2 border-slate-900" />
+            <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-emerald-500/80 shadow-[0_0_4px_rgba(16,185,129,0.5)] border-2 border-slate-900" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
