@@ -142,14 +142,14 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
           email={message.senderEmail}
           handle={message.senderHandle}
           avatarUrl={message.senderAvatarUrl}
-          className={cn("mt-1 h-9 w-9 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]", workspaceRoleAvatarClass(senderRole))}
+          className={cn("mt-1 h-9 w-9 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]", workspaceRoleAvatarClass(senderRole))}
         />
       ) : (
         <div
-          className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-cyan-300/40 bg-[linear-gradient(135deg,rgba(0,255,255,0.2),rgba(0,100,255,0.3))] text-cyan-100 shadow-[0_0_20px_rgba(0,255,255,0.35),0_0_40px_rgba(0,100,255,0.15),inset_0_1px_0_rgba(255,255,255,0.12)]"
+          className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-cyan-300/20 bg-[linear-gradient(135deg,rgba(0,255,255,0.1),rgba(0,100,255,0.15))] text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
           title={senderName}
         >
-          <Sparkles className="h-4 w-4 drop-shadow-[0_0_6px_rgba(0,255,255,0.9)]" />
+          <Sparkles className="h-4 w-4 drop-shadow-sm opacity-80" />
         </div>
       )}
       <div
@@ -158,7 +158,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
           failed
             ? "overflow-hidden rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-rose-50"
           : isUser
-            ? "omnix-human-card max-w-[680px] px-4 py-3 text-[var(--omnix-text-2)] shadow-[0_16px_46px_rgba(0,0,0,0.16)]"
+            ? "omnix-human-card max-w-[680px] px-4 py-3 text-[var(--omnix-text-2)] shadow-sm"
             : "omnix-ai-card max-w-[740px] px-5 py-[18px] text-slate-100",
           sending && "opacity-80",
         )}
@@ -167,20 +167,20 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         <div className="relative z-10 mb-2 flex flex-wrap items-center gap-2">
           <span
             className={cn(
-              "truncate text-[13px] font-semibold",
+              "truncate text-[13px] font-medium",
               isOwn ? "text-cyan-50" : isOtherHuman ? "text-sky-50" : "text-cyan-100",
             )}
           >
             {senderName}
           </span>
           {!isUser ? (
-            <span className="h-[5px] w-[5px] rounded-full bg-[var(--omnix-cyan)] shadow-[0_0_12px_rgba(0,255,255,0.85)] [animation:omnix-glow-pulse_2s_ease-in-out_infinite]" />
+            <span className="h-[5px] w-[5px] rounded-full bg-[var(--omnix-cyan)] opacity-70" />
           ) : null}
           {isUser && message.senderHandle ? (
             <span className="truncate text-[10px] font-medium text-slate-400">@{message.senderHandle}</span>
           ) : null}
           {isUser ? (
-            <span className="h-[5px] w-[5px] rounded-full shadow-[0_0_10px_currentColor]" style={{ background: roleColor, color: roleColor }} />
+            <span className="h-[5px] w-[5px] rounded-full opacity-60" style={{ background: roleColor }} />
           ) : null}
           <span
             className={cn(

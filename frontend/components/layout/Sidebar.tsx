@@ -512,7 +512,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
               <ActiveWorkspaceIcon className="h-4.5 w-4.5 sm:h-4 sm:w-4" />
             </div>
             {realtimeStatus === "connected" && (
-              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#060a14] bg-[var(--omnix-green)] shadow-[0_0_8px_var(--omnix-green)]" />
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#060a14] bg-[var(--omnix-green)] opacity-80" />
             )}
           </div>
           <div className="min-w-0 flex-1">
