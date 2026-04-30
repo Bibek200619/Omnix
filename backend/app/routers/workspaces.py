@@ -69,6 +69,7 @@ from ..services.workspace_service import (
 from ..services.workspace_intelligence_service import build_workspace_intelligence_profile
 from ..services.workspace_collaboration_service import (
     heartbeat_workspace_presence,
+    invalidate_workspace_presence_cache,
     leave_workspace_presence,
     list_workspace_activity,
     list_workspace_live_statuses,
@@ -1205,6 +1206,7 @@ async def remove_workspace_member(
         # Cleanup presence for all affected workspaces
         for wid in workspace_ids_to_clean:
             await leave_workspace_presence(workspace_id=wid, user_id=member_user_id)
+            await invalidate_workspace_presence_cache(workspace_id=wid)
             
     except SupabaseServiceError as exc:
         raise _database_error() from exc
