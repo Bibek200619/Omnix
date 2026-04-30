@@ -105,11 +105,6 @@ def _presence_status(row: Mapping[str, Any], now: datetime) -> str:
     return "offline"
 
 
-def _presence_is_typing(row: Mapping[str, Any], now: datetime) -> bool:
-    typing_until = _parse_dt(row.get("typing_until"))
-    return bool(typing_until and typing_until > now)
-
-
 def _presence_member_payload(
     row: Mapping[str, Any],
     profile: Mapping[str, Any],
@@ -117,7 +112,6 @@ def _presence_member_payload(
 ) -> dict[str, Any]:
     user_id = str(row.get("user_id") or "")
     status = _presence_status(row, now)
-    is_typing = _presence_is_typing(row, now)
     return {
         "workspace_id": str(row.get("workspace_id") or ""),
         "user_id": user_id,
@@ -125,8 +119,8 @@ def _presence_member_payload(
         "current_view": row.get("current_view"),
         "current_label": row.get("current_label"),
         "is_online": status == "online",
-        "is_typing": is_typing,
-        "typing_conversation_id": row.get("typing_conversation_id"),
+        "is_typing": False,
+        "typing_conversation_id": None,
         "last_seen_at": row.get("last_seen_at"),
         "updated_at": row.get("updated_at"),
         "email": profile.get("email"),
@@ -272,55 +266,6 @@ async def cleanup_stale_presence() -> int:
         return 0
 
 
-async def update_workspace_typing(
-    *,
-    workspace_id: str,
-    user_id: str,
-    conversation_id: str | None,
-    is_typing: bool,
-) -> dict[str, Any]:
-    await require_workspace_access(workspace_id, user_id)
-    
-    redis = get_redis()
-    now_ts = time.perf_counter()
-    
-    cooldown_key = f"{COOLDOWN_KEY_PREFIX}:{workspace_id}:{user_id}:typing"
-    on_cooldown = await redis.get(cooldown_key) if is_typing else None
-    
-    # Typing is even higher frequency. We only update if state changes (stopping typing)
-    # or if the cooldown has passed to renew the typing_until TTL.
-    if is_typing and on_cooldown:
-        cached = _local_snapshot_cache.get(workspace_id)
-        if cached and (now_ts - cached[0] < SNAPSHOT_CACHE_TTL):
-            return cached[1]
-        return await list_workspace_presence(workspace_id=workspace_id, user_id=user_id)
-
-    timestamp = utc_now_iso()
-    typing_until = (_now() + TYPING_WINDOW).isoformat() if is_typing else None
-    payload = {
-        "workspace_id": workspace_id,
-        "user_id": user_id,
-        "status": "online",
-        "typing_until": typing_until,
-        "typing_conversation_id": conversation_id if is_typing else None,
-        "last_seen_at": timestamp,
-        "updated_at": timestamp,
-    }
-    try:
-        await upsert_one("workspace_presence", payload, on_conflict="workspace_id,user_id")
-        
-        if is_typing:
-            await redis.setex(cooldown_key, COOLDOWN_TYPING, "1")
-            
-        _local_snapshot_cache.pop(workspace_id, None)
-    except SupabaseServiceError:
-        logger.exception("Failed to persist typing state | workspace_id=%s", workspace_id)
-        # Non-fatal for UI
-        pass
-
-    return await list_workspace_presence(workspace_id=workspace_id, user_id=user_id)
-
-
 async def list_workspace_presence(*, workspace_id: str, user_id: str) -> dict[str, Any]:
     await require_workspace_access(workspace_id, user_id)
     
@@ -368,18 +313,17 @@ async def list_workspace_presence(*, workspace_id: str, user_id: str) -> dict[st
     )
     online_members = [member for member in members if member["status"] == "online"]
     recently_active_members = [member for member in members if member["status"] in {"online", "recent"}]
-    typing_members = [member for member in online_members if member.get("is_typing")]
 
     result = {
         "workspace_id": workspace_id,
         "online_count": len(online_members),
         "active_count": len(online_members),
         "recently_active_count": len(recently_active_members),
-        "typing_count": len(typing_members),
+        "typing_count": 0,
         "online_members": online_members,
         "active_members": online_members,
         "recently_active_members": recently_active_members,
-        "typing_members": typing_members,
+        "typing_members": [],
         "updated_at": now.isoformat(),
     }
     
@@ -557,7 +501,6 @@ async def list_workspace_live_statuses(user_id: str) -> list[dict[str, Any]]:
             "online_count": 0,
             "active_count": 0,
             "recently_active_count": 0,
-            "typing_count": 0,
         }
         for workspace_id in workspace_ids
     }
@@ -569,8 +512,6 @@ async def list_workspace_live_statuses(user_id: str) -> list[dict[str, Any]]:
         if status == "online":
             counts_by_workspace_id[workspace_id]["online_count"] += 1
             counts_by_workspace_id[workspace_id]["active_count"] += 1
-            if _presence_is_typing(row, now):
-                counts_by_workspace_id[workspace_id]["typing_count"] += 1
         if status in {"online", "recent"}:
             counts_by_workspace_id[workspace_id]["recently_active_count"] += 1
 
@@ -594,7 +535,7 @@ async def list_workspace_live_statuses(user_id: str) -> list[dict[str, Any]]:
                 "online_count": counts.get("online_count", 0),
                 "active_count": counts.get("active_count", 0),
                 "recently_active_count": counts.get("recently_active_count", 0),
-                "typing_count": counts.get("typing_count", 0),
+                "typing_count": 0,
                 "source_count": source_count,
                 "ai_specialization": normalize_ai_specialization(workspace.get("ai_specialization")),
                 "ai_status": ai_status,

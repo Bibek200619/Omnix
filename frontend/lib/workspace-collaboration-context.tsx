@@ -16,6 +16,7 @@ import { useAuth } from "./auth-context";
 import { useWorkspace } from "./workspace-context";
 import { realtimeRegistry } from "./realtime-registry";
 import type {
+  TypingSignal,
   WorkspaceActivityEvent,
   WorkspaceLiveStatus,
   WorkspacePresenceSnapshot,
@@ -27,6 +28,7 @@ type CollaborationContextType = {
   presence: WorkspacePresenceSnapshot | null;
   activity: WorkspaceActivityEvent[];
   liveStatuses: Record<string, WorkspaceLiveStatus>;
+  typingUsers: Record<string, TypingSignal>;
   realtimeStatus: RealtimeStatus;
   loadingPresence: boolean;
   loadingActivity: boolean;
@@ -43,6 +45,7 @@ const CollaborationContext = createContext<CollaborationContextType | undefined>
 const HEARTBEAT_INTERVAL_MS = 60_000; // Calmer heartbeat
 const STATUS_INTERVAL_MS = 90_000;    // Less frequent status polling
 const TYPING_THROTTLE_MS = 3_000;
+const TYPING_TIMEOUT_MS = 8_000;
 
 function currentViewFromPath(pathname: string | null) {
   if (!pathname) return "workspace";
@@ -70,11 +73,11 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
   const [presence, setPresence] = useState<WorkspacePresenceSnapshot | null>(null);
   const [activity, setActivity] = useState<WorkspaceActivityEvent[]>([]);
   const [liveStatuses, setLiveStatuses] = useState<Record<string, WorkspaceLiveStatus>>({});
+  const [typingUsers, setTypingUsers] = useState<Record<string, TypingSignal>>({});
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
   const [loadingPresence] = useState(false);
   const [loadingActivity, setLoadingActivity] = useState(false);
   const typingSentAtRef = useRef(0);
-  const typingInFlightRef = useRef<Promise<void> | null>(null);
 
   const refreshPresence = useCallback(async () => {
     if (!session || !activeWorkspaceId) {
@@ -177,25 +180,32 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       }
       typingSentAtRef.current = now;
 
-      const request = apiClient
-        .post<WorkspacePresenceSnapshot>(`/workspaces/${activeWorkspaceId}/presence/typing`, {
-          conversation_id: conversationId || null,
-          is_typing: isTyping,
-        })
-        .then((snapshot) => {
-          setPresence(snapshot);
-        })
-        .catch((err) => {
-          console.warn("Unable to send typing signal", err);
-        })
-        .finally(() => {
-          if (typingInFlightRef.current === request) {
-            typingInFlightRef.current = null;
-          }
-        });
+      const channel = realtimeRegistry.getSubscription({ 
+        type: "presence", 
+        workspaceId: activeWorkspaceId 
+      });
 
-      typingInFlightRef.current = request;
-      await request;
+      if (!channel) return;
+
+      const user = session.user;
+      const payload: TypingSignal = {
+        userId: user.id,
+        fullName: user.user_metadata?.full_name || user.email?.split("@")[0] || "Teammate",
+        avatarUrl: user.user_metadata?.avatar_url,
+        conversationId: conversationId || null,
+        isTyping,
+        sentAt: new Date().toISOString(),
+      };
+
+      try {
+        await channel.send({
+          type: "broadcast",
+          event: "typing",
+          payload,
+        });
+      } catch (err) {
+        console.warn("Unable to broadcast typing signal", err);
+      }
     },
     [activeWorkspaceId, session],
   );
@@ -204,10 +214,12 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
   useEffect(() => {
     if (!session || !activeWorkspaceId) {
       setRealtimeStatus("disconnected");
+      setTypingUsers({});
       return;
     }
 
     setRealtimeStatus("connecting");
+    setTypingUsers({});
 
     // Presence Subscription
     realtimeRegistry.subscribe(
@@ -227,6 +239,19 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
               void refreshPresence();
             }
           )
+          .on("broadcast", { event: "typing" }, ({ payload }: { payload: TypingSignal }) => {
+             setTypingUsers(current => {
+                if (!payload.isTyping) {
+                   const next = { ...current };
+                   delete next[payload.userId];
+                   return next;
+                }
+                return {
+                   ...current,
+                   [payload.userId]: payload
+                };
+             });
+          })
           .subscribe((status) => {
             if (status === "SUBSCRIBED") setRealtimeStatus("connected");
             if (status === "CHANNEL_ERROR") setRealtimeStatus("error");
@@ -304,11 +329,33 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     };
   }, [refreshActivity, refreshLiveStatuses, heartbeatPresence, session]);
 
+  useEffect(() => {
+    const timeoutId = window.setInterval(() => {
+       setTypingUsers(current => {
+          const now = Date.now();
+          let changed = false;
+          const next = { ...current };
+          
+          for (const [uid, signal] of Object.entries(current)) {
+             if (now - new Date(signal.sentAt).getTime() > TYPING_TIMEOUT_MS) {
+                delete next[uid];
+                changed = true;
+             }
+          }
+          
+          return changed ? next : current;
+       });
+    }, 2000);
+
+    return () => window.clearInterval(timeoutId);
+  }, []);
+
   const value = useMemo<CollaborationContextType>(
     () => ({
       presence,
       activity,
       liveStatuses,
+      typingUsers,
       realtimeStatus,
       loadingPresence,
       loadingActivity,
@@ -323,6 +370,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     [
       activity,
       liveStatuses,
+      typingUsers,
       realtimeStatus,
       loadingActivity,
       loadingPresence,
@@ -349,4 +397,3 @@ export function useWorkspaceCollaboration() {
   }
   return context;
 }
-
