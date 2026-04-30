@@ -343,6 +343,7 @@ export function ChatInterface() {
   } = useConversationHistory();
   const {
     presence,
+    typingUsers,
     sendTypingSignal,
     statusForWorkspace,
   } = useWorkspaceCollaboration();
@@ -366,15 +367,26 @@ export function ChatInterface() {
     [activeMembers, activeWorkspace?.members_preview],
   );
   const activeLiveStatus = statusForWorkspace(activeWorkspaceId);
-  const conversationTypingMembers = useMemo(
-    () =>
-      (presence?.typing_members ?? []).filter((member) => {
-        if (member.user_id === user?.id) return false;
+
+  const conversationTypingMembers = useMemo(() => {
+    return Object.values(typingUsers)
+      .filter((signal) => {
+        if (signal.userId === user?.id) return false;
         if (!currentConversation) return true;
-        return !member.typing_conversation_id || member.typing_conversation_id === currentConversation;
-      }),
-    [currentConversation, presence?.typing_members, user?.id],
-  );
+        return !signal.conversationId || signal.conversationId === currentConversation;
+      })
+      .map((signal) => ({
+        user_id: signal.userId,
+        full_name: signal.fullName,
+        avatar_url: signal.avatarUrl,
+        avatar_label: initialsFromText(signal.fullName),
+        is_typing: true,
+        workspace_id: activeWorkspaceId || "",
+        status: "online" as const,
+        is_online: true,
+      }));
+  }, [currentConversation, typingUsers, user?.id, activeWorkspaceId]);
+
   const senderLookup = useMemo<SenderLookup>(() => {
     const membersById = new Map<string, WorkspaceMember>();
     for (const member of workspaceMembers) {

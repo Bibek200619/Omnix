@@ -69,12 +69,12 @@ from ..services.workspace_service import (
 from ..services.workspace_intelligence_service import build_workspace_intelligence_profile
 from ..services.workspace_collaboration_service import (
     heartbeat_workspace_presence,
+    invalidate_workspace_presence_cache,
     leave_workspace_presence,
     list_workspace_activity,
     list_workspace_live_statuses,
     list_workspace_presence,
     log_workspace_activity,
-    update_workspace_typing,
 )
 
 logger = logging.getLogger(__name__)
@@ -648,21 +648,6 @@ async def leave_presence(
     return None
 
 
-@router.post("/{workspace_id}/presence/typing", response_model=WorkspacePresenceRead)
-async def update_typing_presence(
-    workspace_id: str,
-    typing_payload: WorkspaceTypingUpdate,
-    current_user: dict[str, Any] = Depends(get_current_user),
-) -> dict[str, Any]:
-    user_id = _user_id_from_claims(current_user)
-    return await update_workspace_typing(
-        workspace_id=workspace_id,
-        user_id=user_id,
-        conversation_id=typing_payload.conversation_id,
-        is_typing=typing_payload.is_typing,
-    )
-
-
 @router.get("/{workspace_id}/activity", response_model=list[WorkspaceActivityRead])
 async def get_workspace_activity(
     workspace_id: str,
@@ -1205,6 +1190,7 @@ async def remove_workspace_member(
         # Cleanup presence for all affected workspaces
         for wid in workspace_ids_to_clean:
             await leave_workspace_presence(workspace_id=wid, user_id=member_user_id)
+            await invalidate_workspace_presence_cache(workspace_id=wid)
             
     except SupabaseServiceError as exc:
         raise _database_error() from exc
