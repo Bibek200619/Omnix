@@ -93,10 +93,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         <div className="border-t border-white/10 p-4">
           <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-sm font-medium text-white">Backend ready</p>
+            <p className="text-sm font-medium text-white">Live system</p>
             <p className="mt-1 text-xs leading-5 text-slate-400">
-              The UI is mocked now and shaped for Supabase auth plus FastAPI
-              chat integration.
+              Connected to Supabase auth and FastAPI backend.
             </p>
           </div>
         </div>
