@@ -1,99 +1,108 @@
 "use client";
 
-import * as React from "react";
-import { Database, FileText, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Database, FileSearch, ShieldCheck } from "lucide-react";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageList } from "@/components/chat/MessageList";
-import type { ChatMessage } from "@/components/chat/MessageBubble";
-import { sendMessage as sendChatMessage } from "@/lib/api";
+import type { Message } from "@/components/chat/types";
+import { mockChats, starterMessages } from "@/lib/mock-data";
 
-const starterMessages: ChatMessage[] = [
-  {
-    id: "welcome",
-    role: "assistant",
-    content:
-      "Hi, I’m Omnix. Ask a question and I’ll answer using the connected backend.",
-    timestamp: "Now"
-  }
-];
-
-const suggestions = [
-  { icon: FileText, label: "Summarize the latest uploaded policy" },
-  { icon: Database, label: "Find context for customer onboarding" },
-  { icon: ShieldCheck, label: "Check whether an answer is grounded" }
-];
-
-function createMessage(role: ChatMessage["role"], content: string): ChatMessage {
-  return {
-    id: `${role}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    role,
-    content,
-    timestamp: new Intl.DateTimeFormat("en", {
-      hour: "numeric",
-      minute: "2-digit"
-    }).format(new Date())
-  };
+function nowLabel() {
+  return new Intl.DateTimeFormat("en", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date());
 }
 
 export function ChatInterface() {
-  const [messages, setMessages] = React.useState<ChatMessage[]>(starterMessages);
-  const [loading, setLoading] = React.useState(false);
+  const params = useSearchParams();
+  const conversationId = params.get("conversation");
+  const activeChat = useMemo(
+    () => mockChats.find((chat) => chat.id === conversationId),
+    [conversationId],
+  );
+  const [messages, setMessages] = useState<Message[]>(
+    activeChat?.messages ?? starterMessages,
+  );
+  const [loading, setLoading] = useState(false);
 
-  const sendMessage = async (content: string) => {
-    const message = content.trim();
+  useEffect(() => {
+    setMessages(activeChat?.messages ?? starterMessages);
+  }, [activeChat]);
 
-    if (!message || loading) {
-      return;
-    }
+  function handleSend(content: string) {
+    const userMessage: Message = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content,
+      timestamp: nowLabel(),
+    };
 
-    setMessages((current) => [...current, createMessage("user", message)]);
+    setMessages((current) => [...current, userMessage]);
     setLoading(true);
 
-    try {
-      const data = await sendChatMessage(message);
-
-      setMessages((current) => [...current, createMessage("assistant", data.response)]);
-    } catch (error) {
-      console.error("Failed to send chat message:", error);
-      setMessages((current) => [
-        ...current,
-        createMessage("assistant", "Sorry, I couldn’t reach the AI service. Please try again in a moment.")
-      ]);
-    } finally {
+    window.setTimeout(() => {
+      const response: Message = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        timestamp: nowLabel(),
+        content:
+          "I would send this to the FastAPI RAG endpoint next. For now, the frontend keeps the interaction local so the UX is ready before backend wiring.",
+      };
+      setMessages((current) => [...current, response]);
       setLoading(false);
-    }
-  };
+    }, 700);
+  }
 
   return (
-    <section className="flex h-[calc(100vh-7.5rem)] min-h-[36rem] flex-col overflow-hidden rounded-lg border border-white/10 bg-[#11110f] shadow-2xl shadow-black/25">
-      <div className="border-b border-white/10 px-4 py-3 sm:px-6">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-white">Knowledge chat</h2>
-            <p className="mt-1 text-sm text-stone-400">Backend-connected chat with grounded responses.</p>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {suggestions.map((suggestion) => {
-              const Icon = suggestion.icon;
-
-              return (
-                <button
-                  key={suggestion.label}
-                  type="button"
-                  onClick={() => sendMessage(suggestion.label)}
-                  disabled={loading}
-                  className="flex min-h-10 items-center gap-2 rounded-md border border-white/10 bg-white/[0.045] px-3 text-left text-xs font-medium text-stone-300 transition hover:border-teal-200/35 hover:bg-white/[0.075] disabled:pointer-events-none disabled:opacity-55"
-                >
-                  <Icon className="h-4 w-4 shrink-0 text-teal-200" aria-hidden="true" />
-                  <span>{suggestion.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+    <section className="flex min-h-[calc(100vh-8rem)] flex-col gap-4">
+      <div className="grid gap-3 md:grid-cols-3">
+        {[
+          {
+            icon: Database,
+            label: "RAG source",
+            value: "Vector retrieval ready",
+            color: "text-cyan-200",
+          },
+          {
+            icon: ShieldCheck,
+            label: "Auth state",
+            value: "Supabase handoff",
+            color: "text-emerald-200",
+          },
+          {
+            icon: FileSearch,
+            label: "Context",
+            value: activeChat ? activeChat.title : "New conversation",
+            color: "text-amber-200",
+          },
+        ].map((item) => {
+          const Icon = item.icon;
+          return (
+            <div
+              key={item.label}
+              className="rounded-lg border border-white/10 bg-white/[0.04] p-4"
+            >
+              <div className="flex items-center gap-3">
+                <Icon className={`h-5 w-5 ${item.color}`} />
+                <div className="min-w-0">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                    {item.label}
+                  </p>
+                  <p className="truncate text-sm font-medium text-white">
+                    {item.value}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
-      <MessageList messages={messages} loading={loading} />
-      <ChatInput onSend={sendMessage} loading={loading} />
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <MessageList messages={messages} loading={loading} />
+        <ChatInput onSend={handleSend} loading={loading} />
+      </div>
     </section>
   );
 }

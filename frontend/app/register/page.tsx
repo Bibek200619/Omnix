@@ -3,7 +3,10 @@ import { RegisterForm } from "@/components/auth/RegisterForm";
 
 export default function RegisterPage() {
   return (
-    <AuthCard title="Create your account" subtitle="Register for Omnix and verify your email before entering the app.">
+    <AuthCard
+      title="Create your account"
+      description="Register now. Supabase auth can be wired into this flow without changing the screen structure."
+    >
       <RegisterForm />
     </AuthCard>
   );

@@ -1,64 +1,70 @@
 "use client";
 
-import { useMemo } from "react";
+import { Menu, MessageSquarePlus, LogOut } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+
+const routeTitles = [
+  { match: "/chat", title: "Chat", eyebrow: "RAG workspace" },
+  { match: "/history", title: "History", eyebrow: "Previous conversations" },
+  { match: "/settings/terms", title: "Terms", eyebrow: "Product policies" },
+  { match: "/settings", title: "Settings", eyebrow: "Account controls" },
+];
 
 type HeaderProps = {
   onMenuClick: () => void;
 };
 
-const titles: Record<string, { title: string; eyebrow: string }> = {
-  "/chat": {
-    title: "Chat",
-    eyebrow: "Ask with context"
-  },
-  "/history": {
-    title: "History",
-    eyebrow: "Recent conversations"
-  },
-  "/settings": {
-    title: "Settings",
-    eyebrow: "Profile and workspace"
-  },
-  "/settings/terms": {
-    title: "Terms",
-    eyebrow: "Service and usage"
-  }
-};
-
 export function Header({ onMenuClick }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const page = useMemo(() => titles[pathname] ?? titles["/chat"], [pathname]);
+  const active =
+    routeTitles.find((route) => pathname.startsWith(route.match)) ??
+    routeTitles[0];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-[#0d0d0b]/82 backdrop-blur-xl">
-      <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
-        <Button variant="ghost" size="icon" className="lg:hidden" onClick={onMenuClick} aria-label="Open menu">
-          <Menu className="h-5 w-5" aria-hidden="true" />
-        </Button>
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-teal-200/80">{page.eyebrow}</p>
-          <h1 className="truncate text-lg font-semibold text-white">{page.title}</h1>
+    <header className="sticky top-0 z-30 border-b border-white/10 bg-canvas/90 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            aria-label="Open navigation"
+            title="Open navigation"
+            onClick={onMenuClick}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200/70">
+              {active.eyebrow}
+            </p>
+            <h1 className="truncate text-lg font-semibold text-white sm:text-xl">
+              {active.title}
+            </h1>
+          </div>
         </div>
-        <div className="ml-auto hidden h-10 w-full max-w-xs items-center gap-2 rounded-md border border-white/10 bg-white/[0.045] px-3 text-sm text-stone-500 md:flex">
-          <Search className="h-4 w-4" aria-hidden="true" />
-          Search chats
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            leftIcon={<MessageSquarePlus className="h-4 w-4" />}
+            onClick={() => router.push("/chat")}
+            className="hidden sm:inline-flex"
+          >
+            New chat
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            leftIcon={<LogOut className="h-4 w-4" />}
+            onClick={() => router.push("/login")}
+          >
+            Sign out
+          </Button>
         </div>
-        <Button variant="secondary" onClick={() => router.push("/chat")} className="hidden sm:inline-flex">
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          New chat
-        </Button>
-        <button
-          type="button"
-          className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-amber-200 text-sm font-semibold text-stone-950 transition hover:bg-amber-100"
-          aria-label="Open profile"
-          onClick={() => router.push("/settings")}
-        >
-          O
-        </button>
       </div>
     </header>
   );
