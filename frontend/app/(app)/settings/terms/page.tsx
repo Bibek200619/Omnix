@@ -5,9 +5,9 @@ import { ArrowLeft, FileText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 const terms = [
-  "Omnix AI is currently a frontend-ready product surface with mocked interactions.",
-  "Authentication, verification, and chat calls should be connected to Supabase and FastAPI before production use.",
-  "Conversation data shown in this build is sample data only and should be replaced by authenticated API responses.",
+  "Omnix AI uses Supabase authentication for sign in, registration, and session persistence.",
+  "Authenticated API calls include the current access token as a Bearer credential.",
+  "Conversation data belongs to the signed-in user returned by the backend.",
 ];
 
 export default function TermsPage() {
@@ -33,8 +33,7 @@ export default function TermsPage() {
             Terms
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            Placeholder terms for the Omnix AI frontend while backend
-            integration is pending.
+            Terms for the Omnix AI authenticated workspace.
           </p>
         </div>
       </div>

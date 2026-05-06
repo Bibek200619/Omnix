@@ -13,9 +13,9 @@ const features = [
   },
   {
     icon: KeyRound,
-    title: "Auth-ready flows",
+    title: "Supabase auth",
     description:
-      "Login, registration, and OTP verification screens already follow a Supabase-friendly navigation path.",
+      "Login, registration, persisted sessions, protected routes, and logout run through Supabase.",
     color: "text-emerald-200",
   },
   {
