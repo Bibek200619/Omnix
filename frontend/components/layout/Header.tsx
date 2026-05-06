@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Menu, MessageSquarePlus, LogOut } from "lucide-react";
+import { AlertCircle, Menu, MessageSquarePlus, LogOut } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth-context";
 
 const routeTitles = [
-  { match: "/chat", title: "Chat", eyebrow: "RAG workspace" },
+  { match: "/chat", title: "Chat", eyebrow: "AI workspace" },
   { match: "/history", title: "History", eyebrow: "Previous conversations" },
   { match: "/settings/terms", title: "Terms", eyebrow: "Product policies" },
   { match: "/settings", title: "Settings", eyebrow: "Account controls" },
@@ -22,26 +22,30 @@ export function Header({ onMenuClick }: HeaderProps) {
   const router = useRouter();
   const { signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const active =
     routeTitles.find((route) => pathname.startsWith(route.match)) ??
     routeTitles[0];
 
   async function handleSignOut() {
     setSigningOut(true);
+    setSignOutError(null);
 
     const { error } = await signOut();
 
     if (error) {
       console.error("Unable to sign out", error);
+      setSignOutError(error.message || "Unable to sign out.");
       setSigningOut(false);
       return;
     }
 
     router.replace("/login");
+    router.refresh();
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-canvas/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-white/10 bg-canvas/85 backdrop-blur-xl">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <Button
@@ -85,6 +89,14 @@ export function Header({ onMenuClick }: HeaderProps) {
           </Button>
         </div>
       </div>
+      {signOutError ? (
+        <div className="border-t border-rose-400/20 bg-rose-400/10 px-4 py-2 text-sm text-rose-100 sm:px-6 lg:px-8">
+          <div className="mx-auto flex max-w-7xl items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {signOutError}
+          </div>
+        </div>
+      ) : null}
     </header>
   );
 }

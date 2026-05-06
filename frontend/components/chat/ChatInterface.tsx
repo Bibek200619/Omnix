@@ -1,128 +1,321 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { Database, FileSearch, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Database, FileSearch, ShieldCheck, WifiOff } from "lucide-react";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageList } from "@/components/chat/MessageList";
-import type { Message } from "@/components/chat/types";
+import type {
+  ApiMessage,
+  ChatApiResponse,
+  ConversationSummary,
+  Message,
+} from "@/components/chat/types";
+import { Alert } from "@/components/ui/Alert";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useConversationHistory } from "@/lib/conversation-history-context";
 
-function nowLabel() {
+function formatTime(value?: string) {
+  const date = value ? new Date(value) : new Date();
+
   return new Intl.DateTimeFormat("en", {
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date());
+  }).format(Number.isNaN(date.getTime()) ? new Date() : date);
+}
+
+function normalizeMessage(message: ApiMessage, index: number): Message {
+  const failed = message.status === "failed";
+  const pending = message.status === "pending";
+  const role = message.role === "user" ? "user" : "assistant";
+  const content =
+    message.content ||
+    (failed && role === "assistant"
+      ? "The assistant response failed before it could be completed."
+      : "");
+
+  return {
+    id: message.id ?? `message-${index}`,
+    role,
+    content,
+    timestamp: formatTime(message.timestamp ?? message.created_at),
+    status: failed ? "failed" : pending ? "sending" : "sent",
+    error: failed ? "Not completed" : undefined,
+  };
+}
+
+function optimisticConversation(
+  conversationId: string,
+  content: string,
+): ConversationSummary {
+  const compact = content.replace(/\s+/g, " ").trim();
+  const title = compact.length > 72 ? `${compact.slice(0, 69)}...` : compact;
+  const timestamp = new Date().toISOString();
+
+  return {
+    id: conversationId,
+    title: title || "New conversation",
+    preview: compact,
+    latest_message_role: "user",
+    latest_message_at: timestamp,
+    last_message_at: timestamp,
+    updated_at: timestamp,
+    created_at: timestamp,
+  };
 }
 
 export function ChatInterface() {
   const params = useSearchParams();
+  const router = useRouter();
   const { session } = useAuth();
+  const {
+    refreshConversations,
+    setActiveConversation,
+    upsertConversation,
+  } = useConversationHistory();
   const conversationId = params.get("conversation");
-  
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content: "Welcome to Omnix. Ask me anything about your documents.",
-      timestamp: nowLabel(),
-    },
-  ]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [currentConversation, setCurrentConversation] = useState<string | null>(conversationId);
 
-  // Load conversation if specified
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [responding, setResponding] = useState(false);
+  const [loadingConversation, setLoadingConversation] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentConversation, setCurrentConversation] = useState<string | null>(
+    conversationId,
+  );
+
+  const loadConversation = useCallback(
+    async (convId: string) => {
+      try {
+        setLoadingConversation(true);
+        setError(null);
+        const data = await apiClient.get<ApiMessage[]>(
+          `/conversations/${convId}/messages`,
+        );
+        setMessages(data.map(normalizeMessage));
+        setCurrentConversation(convId);
+        setActiveConversation(convId);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to load conversation";
+        setError(message);
+        setMessages([]);
+
+        if (message.toLowerCase().includes("conversation not found")) {
+          setCurrentConversation(null);
+          setActiveConversation(null);
+          await refreshConversations();
+          router.replace("/chat", { scroll: false });
+        }
+      } finally {
+        setLoadingConversation(false);
+      }
+    },
+    [refreshConversations, router, setActiveConversation],
+  );
+
   useEffect(() => {
     if (conversationId) {
       loadConversation(conversationId);
+      return;
     }
-  }, [conversationId]);
 
-  async function loadConversation(convId: string) {
-    try {
-      const messages = await apiClient.get<Message[]>(
-        `/messages/conversations/${convId}/messages`
-      );
-      setMessages(messages);
-      setCurrentConversation(convId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load conversation");
-    }
-  }
-
-  async function handleSend(content: string) {
-    const userMessage: Message = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content,
-      timestamp: nowLabel(),
-    };
-
-    setMessages((current) => [...current, userMessage]);
-    setLoading(true);
+    setCurrentConversation(null);
+    setActiveConversation(null);
+    setMessages([]);
     setError(null);
+  }, [conversationId, loadConversation, setActiveConversation]);
 
-    try {
-      const response = await apiClient.post<{
-        conversation_id: string;
-        user_message_id: string;
-        assistant_message_id: string;
-        response: string;
-      }>("/messages/chat", {
-        message: content,
-        conversation_id: currentConversation || undefined,
-        title: !currentConversation ? "New conversation" : undefined,
-      });
+  const statusItems = useMemo(
+    () => [
+      {
+        icon: Database,
+        label: "Retrieval",
+        value: currentConversation ? "Context attached" : "Ready",
+        color: "text-cyan-200",
+      },
+      {
+        icon: ShieldCheck,
+        label: "Session",
+        value: session?.user?.email ?? "Authenticated",
+        color: "text-emerald-200",
+      },
+      {
+        icon: FileSearch,
+        label: "Workspace",
+        value: currentConversation ? "Saved thread" : "Draft thread",
+        color: "text-amber-200",
+      },
+    ],
+    [currentConversation, session?.user?.email],
+  );
 
-      setCurrentConversation(response.conversation_id);
+  const sendMessage = useCallback(
+    async (content: string, retryMessageId?: string) => {
+      if (responding) return;
 
-      const assistantMessage: Message = {
-        id: response.assistant_message_id,
-        role: "assistant",
-        content: response.response,
-        timestamp: nowLabel(),
+      const messageId = retryMessageId ?? crypto.randomUUID();
+      const userMessage: Message = {
+        id: messageId,
+        role: "user",
+        content,
+        timestamp: formatTime(),
+        status: "sending",
       };
 
-      setMessages((current) => [...current, assistantMessage]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send message");
-      // Remove the user message on error
-      setMessages((current) => current.slice(0, -1));
-    } finally {
-      setLoading(false);
-    }
+      setMessages((current) => {
+        if (retryMessageId) {
+          return current.map((message) =>
+            message.id === retryMessageId
+              ? { ...message, status: "sending", error: undefined }
+              : message,
+          );
+        }
+
+        return [...current, userMessage];
+      });
+
+      // keep responding true until streaming completes
+      setResponding(true);
+      setError(null);
+
+      try {
+        const response = await apiClient.post<ChatApiResponse>("/chat", {
+          message: content,
+          conversation_id: currentConversation || undefined,
+        });
+
+        setCurrentConversation(response.conversation_id);
+        setActiveConversation(response.conversation_id);
+
+        if (response.conversation) {
+          upsertConversation(response.conversation);
+        } else {
+          upsertConversation(optimisticConversation(response.conversation_id, content));
+          refreshConversations();
+        }
+
+        const persistedUserMessage = response.user_message
+          ? normalizeMessage(response.user_message, 0)
+          : null;
+
+        // create assistant placeholder that will stream progressively
+        const assistantId = response.assistant_message_id ?? crypto.randomUUID();
+
+        // Insert persisted user message (if any) and streaming assistant placeholder
+        setMessages((current) => [
+          ...current.map((message) =>
+            message.id === messageId
+              ? {
+                  ...(persistedUserMessage ?? message),
+                  id: persistedUserMessage?.id ?? response.user_message_id ?? message.id,
+                  status: "sent" as const,
+                  error: undefined,
+                }
+              : message,
+          ),
+          {
+            id: assistantId,
+            role: "assistant",
+            content: "",
+            timestamp: formatTime(),
+            status: "streaming",
+            isStreaming: true,
+            sources: (response.sources as any[]) ?? [],
+          },
+        ]);
+
+        // scroll to end while we stream
+        // simulate tokenized streaming (word-level with small random delays)
+        const finalText = response.response || "";
+        const tokens = finalText.split(/(\s+|[^\s\w]+|\w+)/).filter(Boolean);
+
+        for (let i = 0; i < tokens.length; i++) {
+          const token = tokens[i];
+          // append next token
+          setMessages((current) =>
+            current.map((m) =>
+              m.id === assistantId
+                ? { ...m, content: (m.content || "") + token }
+                : m,
+            ),
+          );
+
+          // realistic variable delay between 12-70ms per token
+          // slightly longer at punctuation
+          const base = token.trim().length > 0 && /[.!?]/.test(token) ? 70 : 28;
+          const jitter = Math.random() * 40;
+          await new Promise((r) => setTimeout(r, base + jitter));
+        }
+
+        // finalize assistant message
+        setMessages((current) =>
+          current.map((m) =>
+            m.id === assistantId
+              ? { ...m, status: "sent", isStreaming: false }
+              : m,
+          ),
+        );
+
+        if (!conversationId) {
+          router.replace(`/chat?conversation=${response.conversation_id}`, {
+            scroll: false,
+          });
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to send message";
+        setError(message);
+        refreshConversations();
+        setMessages((current) =>
+          current.map((item) =>
+            item.id === messageId
+              ? { ...item, status: "failed", error: "Not sent" }
+              : item,
+          ),
+        );
+      } finally {
+        // ensure responding is cleared when streaming completes or error occurred
+        setResponding(false);
+      }
+    },
+    [
+      conversationId,
+      currentConversation,
+      refreshConversations,
+      responding,
+      router,
+      setActiveConversation,
+      upsertConversation,
+    ],
+  );
+
+  function handleRetry(message: Message) {
+    sendMessage(message.content, message.id);
+  }
+
+  function handleRegenerate(assistantMessageId: string) {
+    // find the preceding user message and resend it
+    const idx = messages.findIndex((m) => m.id === assistantMessageId);
+    if (idx <= 0) return;
+    const prev = messages[idx - 1];
+    if (!prev || prev.role !== "user") return;
+    sendMessage(prev.content);
+  }
+
+  function handlePromptSelect(prompt: string) {
+    sendMessage(prompt);
   }
 
   return (
     <section className="flex min-h-[calc(100vh-8rem)] flex-col gap-4">
       <div className="grid gap-3 md:grid-cols-3">
-        {[
-          {
-            icon: Database,
-            label: "RAG source",
-            value: "Vector retrieval ready",
-            color: "text-cyan-200",
-          },
-          {
-            icon: ShieldCheck,
-            label: "Auth state",
-            value: session ? "Authenticated" : "Not authenticated",
-            color: "text-emerald-200",
-          },
-          {
-            icon: FileSearch,
-            label: "Context",
-            value: currentConversation ? "Active conversation" : "New conversation",
-            color: "text-amber-200",
-          },
-        ].map((item) => {
+        {statusItems.map((item) => {
           const Icon = item.icon;
           return (
             <div
               key={item.label}
-              className="rounded-lg border border-white/10 bg-white/[0.04] p-4"
+              className="rounded-lg border border-white/10 bg-white/[0.04] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] transition hover:border-white/15 hover:bg-white/[0.055]"
             >
               <div className="flex items-center gap-3">
                 <Icon className={`h-5 w-5 ${item.color}`} />
@@ -139,14 +332,28 @@ export function ChatInterface() {
           );
         })}
       </div>
-      {error && (
-        <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-200">
-          {error}
-        </div>
-      )}
+      {error ? (
+        <Alert
+          variant="error"
+          title="Omnix could not complete the request"
+          className="items-start"
+        >
+          <span className="inline-flex items-start gap-2">
+            <WifiOff className="mt-1 h-3.5 w-3.5 shrink-0" />
+            {error}
+          </span>
+        </Alert>
+      ) : null}
       <div className="flex min-h-0 flex-1 flex-col gap-3">
-        <MessageList messages={messages} loading={loading} />
-        <ChatInput onSend={handleSend} loading={loading} />
+        <MessageList
+          messages={messages}
+          loading={responding}
+          loadingConversation={loadingConversation}
+          onRetry={handleRetry}
+          onPromptSelect={handlePromptSelect}
+          onRegenerate={handleRegenerate}
+        />
+        <ChatInput onSend={sendMessage} loading={responding} />
       </div>
     </section>
   );

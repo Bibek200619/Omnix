@@ -3,13 +3,14 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+import os
 
 from ..core.security import get_current_user
 from ..schemas.chat import FileCreate, FileRead
 from ..services.supabase_service import SupabaseServiceError, insert_one, select_all, select_one
 
 router = APIRouter(prefix="/files", tags=["files"])
-FILE_COLUMNS = "id,user_id,conversation_id,filename,content_type,size_bytes,storage_path,metadata,created_at"
+FILE_COLUMNS = "id,user_id,conversation_id,file_name,file_type,size_bytes,storage_path,metadata,created_at"
 CONVERSATION_OWNERSHIP_COLUMNS = "id,user_id"
 DEFAULT_FILE_LIMIT = 50
 MAX_FILE_LIMIT = 100
@@ -81,3 +82,37 @@ async def get_files(
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
+
+
+@router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_file(
+    file_id: str, current_user: dict[str, Any] = Depends(get_current_user)
+) -> None:
+    """Delete a file owned by the authenticated user. Attempts to remove DB record and local storage path if present."""
+    user_id = _user_id_from_claims(current_user)
+
+    try:
+        file_row = await select_one("files", FILE_COLUMNS, {"id": file_id, "user_id": user_id})
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    if file_row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    # Attempt DB delete using service role client but enforce user_id
+    try:
+        # Direct low-level delete to support removal; keep guard on user_id
+        supabase = get_supabase()
+        resp = supabase.table("files").delete().eq("id", file_id).eq("user_id", user_id).execute()
+        # remove local storage if present
+        storage_path = file_row.get("storage_path")
+        if storage_path:
+            try:
+                os.remove(storage_path)
+            except Exception:
+                logger.exception("Failed to remove local file at %s", storage_path)
+    except Exception as exc:
+        logger.exception("Failed to delete file: %s", exc)
+        raise _database_error() from exc
+
+    return None

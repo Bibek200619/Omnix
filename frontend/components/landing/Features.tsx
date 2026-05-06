@@ -6,30 +6,30 @@ import { Brain, History, KeyRound, MessageSquareText } from "lucide-react";
 const features = [
   {
     icon: MessageSquareText,
-    title: "RAG chat workspace",
+    title: "Source-aware chat",
     description:
-      "A focused message surface with loading states, resilient layout, and clean user/AI bubble treatment.",
+      "A focused conversation surface for answers, analysis, follow-ups, markdown, and code-heavy responses.",
     color: "text-cyan-200",
   },
   {
     icon: KeyRound,
-    title: "Supabase auth",
+    title: "Secure accounts",
     description:
-      "Login, registration, persisted sessions, protected routes, and logout run through Supabase.",
+      "Supabase sign in, registration, persisted sessions, protected routes, and reliable logout flows.",
     color: "text-emerald-200",
   },
   {
     icon: History,
-    title: "Conversation history",
+    title: "Searchable memory",
     description:
-      "Searchable chat history with an empty state and one-click routing back into active conversations.",
+      "Find previous threads quickly, reopen the active conversation, and keep work moving across sessions.",
     color: "text-amber-200",
   },
   {
     icon: Brain,
-    title: "AI SaaS structure",
+    title: "Integration-ready",
     description:
-      "Production-minded components, route groups, shared layout, and simple state ready for backend integration.",
+      "Clean route groups, reusable UI, and API-aware states leave the frontend ready for FastAPI services.",
     color: "text-rose-200",
   },
 ];
@@ -43,7 +43,7 @@ export function Features() {
             Features
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            Everything the first frontend release needs
+            The core workspace, designed as a product
           </h2>
         </div>
         <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
