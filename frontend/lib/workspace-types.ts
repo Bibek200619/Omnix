@@ -251,3 +251,56 @@ export type TypingSignal = {
   isTyping: boolean;
   sentAt: string;
 };
+
+export type WorkspaceChannel = {
+  id: string;
+  workspace_id: string;
+  created_by?: string | null;
+  name: string;
+  slug: string;
+  purpose?: string | null;
+  channel_type: "operational" | "announcement";
+  visibility: "workspace" | "private" | "project";
+  posting_policy: "members" | "leaders";
+  is_archived: boolean;
+  message_count: number;
+  last_message_preview?: string | null;
+  last_message_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type ExecutionContextLink = {
+  entity_type: "file" | "ai_session" | "decision" | "task" | "initiative" | "memory";
+  entity_id: string;
+  label?: string | null;
+};
+
+export type WorkspaceChannelMessage = {
+  id: string;
+  workspace_id: string;
+  channel_id: string;
+  author_user_id: string;
+  parent_message_id?: string | null;
+  content: string;
+  context_links: ExecutionContextLink[];
+  metadata: Record<string, unknown>;
+  client_nonce?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  edited_at?: string | null;
+  author_name?: string | null;
+  author_email?: string | null;
+  author_avatar_url?: string | null;
+  author_avatar_label: string;
+  thread_reply_count: number;
+};
+
+export type WorkspaceConversationAssistanceMode = "summary" | "decisions" | "actions" | "blockers";
+
+export type WorkspaceConversationAssistance = {
+  mode: WorkspaceConversationAssistanceMode;
+  content: string;
+  source_message_count: number;
+  generated_at: string;
+};
