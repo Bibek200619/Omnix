@@ -134,7 +134,7 @@ export function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleP
                         >
                           <div className="pt-2 mt-1 border-t border-white/5">
                             <p className="text-[11px] leading-relaxed text-slate-400 italic">
-                              "{cleanExcerpt}"
+                              &ldquo;{cleanExcerpt}&rdquo;
                             </p>
                           </div>
                         </motion.div>

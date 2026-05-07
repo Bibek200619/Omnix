@@ -1,9 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { useWorkspace } from "@/lib/workspace-context";
+import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 
 const UploadDropzone = dynamic(() => import("@/components/upload/UploadDropzone").then((m) => m.UploadDropzone), { ssr: false });
 
@@ -19,11 +21,13 @@ interface FileData {
 }
 
 export default function FilesPage() {
+  const { activeWorkspace, activeMembers, activeWorkspaceId } = useWorkspace();
   const [files, setFiles] = useState<FileData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
 
-  async function loadFiles() {
+  const loadFiles = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -34,11 +38,11 @@ export default function FilesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    loadFiles();
-  }, []);
+    void loadFiles();
+  }, [activeWorkspaceId, loadFiles]);
 
   async function handleDelete(id: string) {
     try {
@@ -70,15 +74,36 @@ export default function FilesPage() {
 
   return (
     <section className="flex min-h-[calc(100vh-8rem)] flex-col gap-4">
-      <h1 className="text-lg font-semibold text-white">Workspace files</h1>
-      <p className="text-sm text-slate-400">Upload documents to your workspace. Supported: PDF, DOCX, TXT, Markdown.</p>
+      <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/[0.04] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-white">
+            {activeWorkspace?.name ?? "Workspace"} files
+          </h1>
+          <p className="text-sm text-slate-400">
+            {activeWorkspace?.is_shared
+              ? "Shared documents are available to every workspace member."
+              : "Upload documents to your workspace. Supported: PDF, DOCX, TXT, Markdown."}
+          </p>
+        </div>
+        {activeWorkspace ? (
+          <div className="flex items-center gap-3">
+            <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} size="md" />
+            <div className="text-right text-xs text-slate-400">
+              <div>{activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "member" : "members"}</div>
+              <div>{activeWorkspace.current_user_role === "owner" ? "Owner" : "Member"}</div>
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       <div className="mt-4">
         <UploadDropzone />
       </div>
 
       <div className="mt-6">
-        <h2 className="text-sm font-medium text-white">Your files</h2>
+        <h2 className="text-sm font-medium text-white">
+          {activeWorkspace?.is_shared ? "Shared files" : "Workspace files"}
+        </h2>
         {loading ? (
           <p className="text-slate-400">Loading...</p>
         ) : error ? (

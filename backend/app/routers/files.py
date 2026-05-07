@@ -1,22 +1,30 @@
 from __future__ import annotations
 
-import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse
 
 from ..core.security import get_current_user
-from ..db.supabase import get_supabase
 from ..schemas.chat import FileCreate, FileRead
-from ..services.supabase_service import SupabaseServiceError, insert_one, select_all, select_one
-
-logger = logging.getLogger(__name__)
+from ..services.supabase_service import (
+    SupabaseServiceError,
+    delete_many_trusted,
+    insert_one,
+    select_all,
+    select_all_trusted,
+    select_one_trusted,
+)
+from ..services.workspace_service import (
+    active_workspace_id_from_request,
+    can_manage_workspace_resource,
+    require_workspace_access,
+)
+from .conversations import require_conversation_access
 
 router = APIRouter(prefix="/files", tags=["files"])
 FILE_COLUMNS = "id,user_id,workspace_id,conversation_id,file_name,file_type,size_bytes,storage_path,metadata,created_at"
-CONVERSATION_OWNERSHIP_COLUMNS = "id,user_id"
 DEFAULT_FILE_LIMIT = 50
 MAX_FILE_LIMIT = 100
 
@@ -32,47 +40,70 @@ def _database_error() -> HTTPException:
     )
 
 
-async def _validate_conversation_ownership(conversation_id: str, user_id: str) -> None:
+async def _require_file_access(
+    file_id: str,
+    user_id: str,
+) -> tuple[dict[str, Any], Any | None]:
     try:
-        conversation = await select_one(
-            "conversations",
-            CONVERSATION_OWNERSHIP_COLUMNS,
-            {"id": conversation_id, "user_id": user_id},
-        )
+        file_row = await select_one_trusted("files", FILE_COLUMNS, {"id": file_id})
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
-    if conversation is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Conversation not found.",
-        )
+    if file_row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
+
+    workspace_id = file_row.get("workspace_id")
+    if workspace_id:
+        access = await require_workspace_access(str(workspace_id), user_id)
+        return file_row, access
+
+    if str(file_row.get("user_id") or "") != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
+
+    return file_row, None
+
+
+async def _resolve_effective_workspace_id(
+    request: Request,
+    user_id: str,
+    conversation_id: str | None,
+    workspace_id: str | None,
+) -> str | None:
+    effective_workspace_id = workspace_id or active_workspace_id_from_request(request)
+
+    if conversation_id:
+        conversation, _ = await require_conversation_access(conversation_id, user_id)
+        conversation_workspace_id = str(conversation.get("workspace_id") or "") or None
+        if effective_workspace_id and conversation_workspace_id and effective_workspace_id != conversation_workspace_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Conversation and workspace scope do not match.",
+            )
+        effective_workspace_id = conversation_workspace_id
+
+    if effective_workspace_id:
+        await require_workspace_access(effective_workspace_id, user_id)
+
+    return effective_workspace_id
 
 
 @router.post("", response_model=FileRead, status_code=status.HTTP_201_CREATED)
-async def _validate_workspace_ownership(workspace_id: str, user_id: str) -> None:
-    try:
-        workspace = await select_one("workspaces", "id,user_id", {"id": workspace_id, "user_id": user_id})
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-
-    if workspace is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found.")
-
-
 async def create_file_metadata(
     file_payload: FileCreate,
+    request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
-
-    if file_payload.conversation_id:
-        await _validate_conversation_ownership(file_payload.conversation_id, user_id)
-
-    if getattr(file_payload, "workspace_id", None):
-        await _validate_workspace_ownership(file_payload.workspace_id, user_id)
+    effective_workspace_id = await _resolve_effective_workspace_id(
+        request,
+        user_id,
+        file_payload.conversation_id,
+        file_payload.workspace_id,
+    )
 
     payload = {"user_id": user_id, **file_payload.model_dump(exclude_none=True)}
+    if effective_workspace_id:
+        payload["workspace_id"] = effective_workspace_id
 
     try:
         return await insert_one("files", payload)
@@ -82,6 +113,7 @@ async def create_file_metadata(
 
 @router.get("", response_model=list[FileRead])
 async def get_files(
+    request: Request,
     limit: int = Query(default=DEFAULT_FILE_LIMIT, ge=1, le=MAX_FILE_LIMIT),
     offset: int = Query(default=0, ge=0),
     conversation_id: str | None = Query(default=None),
@@ -89,14 +121,31 @@ async def get_files(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     user_id = _user_id_from_claims(current_user)
-
-    filters = {"user_id": user_id}
-    if conversation_id is not None:
-        filters["conversation_id"] = conversation_id
-    if workspace_id is not None:
-        filters["workspace_id"] = workspace_id
+    effective_workspace_id = await _resolve_effective_workspace_id(
+        request,
+        user_id,
+        conversation_id,
+        workspace_id,
+    )
 
     try:
+        if effective_workspace_id:
+            filters: dict[str, Any] = {"workspace_id": effective_workspace_id}
+            if conversation_id is not None:
+                filters["conversation_id"] = conversation_id
+            return await select_all_trusted(
+                "files",
+                FILE_COLUMNS,
+                filters=filters,
+                order_by="created_at",
+                desc=True,
+                limit=limit,
+                offset=offset,
+            )
+
+        filters = {"user_id": user_id}
+        if conversation_id is not None:
+            filters["conversation_id"] = conversation_id
         return await select_all(
             "files",
             FILE_COLUMNS,
@@ -112,21 +161,15 @@ async def get_files(
 
 @router.get("/{file_id}/download")
 async def download_file(
-    file_id: str, current_user: dict[str, Any] = Depends(get_current_user)
+    file_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
 ) -> FileResponse:
     user_id = _user_id_from_claims(current_user)
-
-    try:
-        file_row = await select_one("files", FILE_COLUMNS, {"id": file_id, "user_id": user_id})
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-
-    if file_row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    file_row, _ = await _require_file_access(file_id, user_id)
 
     storage_path = file_row.get("storage_path")
     if not storage_path or not os.path.exists(storage_path):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File content not found on server")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File content not found on server.")
 
     filename = file_row.get("file_name") or "download"
     file_type = file_row.get("file_type") or "application/octet-stream"
@@ -135,33 +178,34 @@ async def download_file(
 
 @router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_file(
-    file_id: str, current_user: dict[str, Any] = Depends(get_current_user)
+    file_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
 ) -> None:
-    """Delete a file owned by the authenticated user. Attempts to remove DB record and local storage path if present."""
     user_id = _user_id_from_claims(current_user)
+    file_row, workspace_access = await _require_file_access(file_id, user_id)
+
+    if workspace_access is not None and not can_manage_workspace_resource(
+        str(file_row.get("user_id") or ""),
+        workspace_access,
+        user_id,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the uploader or workspace owner can delete this file.",
+        )
 
     try:
-        file_row = await select_one("files", FILE_COLUMNS, {"id": file_id, "user_id": user_id})
+        await delete_many_trusted("files", {"id": file_id})
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
-    if file_row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
-
-    # Attempt DB delete using service role client but enforce user_id
-    try:
-        # Direct low-level delete to support removal; keep guard on user_id
-        supabase = get_supabase()
-        supabase.table("files").delete().eq("id", file_id).eq("user_id", user_id).execute()
-        # remove local storage if present
-        storage_path = file_row.get("storage_path")
-        if storage_path:
-            try:
-                os.remove(storage_path)
-            except Exception:
-                logger.exception("Failed to remove local file at %s", storage_path)
-    except Exception as exc:
-        logger.exception("Failed to delete file: %s", exc)
-        raise _database_error() from exc
+    storage_path = file_row.get("storage_path")
+    if storage_path:
+        try:
+            os.remove(storage_path)
+        except FileNotFoundError:
+            pass
+        except Exception as exc:
+            raise _database_error() from exc
 
     return None

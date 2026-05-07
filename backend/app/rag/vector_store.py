@@ -112,12 +112,12 @@ class FAISSStore(VectorStore):
 
             try:
                 string_id = self.index_to_id[idx]
-                # Filter by user_id and workspace_id before returning
-                if self.id_to_user.get(string_id) != user_id:
-                    continue
+                # Workspace searches are shared across all members of that workspace.
                 if workspace_id is not None:
                     if self.id_to_workspace.get(string_id) != workspace_id:
                         continue
+                elif self.id_to_user.get(string_id) != user_id:
+                    continue
 
                 results.append((string_id, float(dist)))
                 if len(results) >= top_k:

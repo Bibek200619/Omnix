@@ -12,6 +12,7 @@ import {
 import type { ConversationSummary } from "@/components/chat/types";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useWorkspace } from "@/lib/workspace-context";
 
 type ConversationHistoryContextType = {
   conversations: ConversationSummary[];
@@ -38,12 +39,17 @@ function sortConversations(items: ConversationSummary[]) {
   });
 }
 
+function conversationStorageKey(workspaceId: string | null) {
+  return `omnix.activeConversationId.${workspaceId ?? "none"}`;
+}
+
 export function ConversationHistoryProvider({
   children,
 }: {
   children: ReactNode;
 }) {
   const { user } = useAuth();
+  const { activeWorkspaceId } = useWorkspace();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,13 +64,14 @@ export function ConversationHistoryProvider({
       return;
     }
 
+    const key = conversationStorageKey(activeWorkspaceId);
     if (conversationId) {
-      window.localStorage.setItem("omnix.activeConversationId", conversationId);
+      window.localStorage.setItem(key, conversationId);
       return;
     }
 
-    window.localStorage.removeItem("omnix.activeConversationId");
-  }, []);
+    window.localStorage.removeItem(key);
+  }, [activeWorkspaceId]);
 
   const refreshConversations = useCallback(async () => {
     try {
@@ -136,9 +143,9 @@ export function ConversationHistoryProvider({
     }
 
     setActiveConversationId(
-      window.localStorage.getItem("omnix.activeConversationId"),
+      window.localStorage.getItem(conversationStorageKey(activeWorkspaceId)),
     );
-  }, []);
+  }, [activeWorkspaceId]);
 
   useEffect(() => {
     if (!user) {
@@ -150,7 +157,17 @@ export function ConversationHistoryProvider({
     }
 
     refreshConversations();
-  }, [refreshConversations, setActiveConversation, user]);
+  }, [activeWorkspaceId, refreshConversations, setActiveConversation, user]);
+
+  useEffect(() => {
+    if (!activeConversationId) {
+      return;
+    }
+
+    if (!conversations.some((conversation) => conversation.id === activeConversationId)) {
+      setActiveConversation(null);
+    }
+  }, [activeConversationId, conversations, setActiveConversation]);
 
   const value = useMemo(
     () => ({

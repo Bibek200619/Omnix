@@ -15,7 +15,14 @@ class KeywordRetriever:
     Scores chunks based on keyword frequency, exact phrase matches, and multi-keyword overlap.
     """
 
-    async def retrieve(self, query: str, user_id: str, conversation_id: str | None = None, top_k: int = 5) -> list[dict[str, Any]]:
+    async def retrieve(
+        self,
+        query: str,
+        user_id: str,
+        conversation_id: str | None = None,
+        workspace_id: str | None = None,
+        top_k: int = 5,
+    ) -> list[dict[str, Any]]:
         if not query or not query.strip():
             logger.warning("Empty query provided to keyword retriever.")
             return []
@@ -26,10 +33,14 @@ class KeywordRetriever:
         try:
             supabase = get_supabase()
             
-            # 1. Fetch files to restrict scope (optionally by conversation)
-            files_query = supabase.table("files").select("id,file_name").eq("user_id", user_id)
-            if conversation_id:
-                files_query = files_query.eq("conversation_id", conversation_id)
+            # 1. Fetch files to restrict scope.
+            files_query = supabase.table("files").select("id,file_name")
+            if workspace_id:
+                files_query = files_query.eq("workspace_id", workspace_id)
+            else:
+                files_query = files_query.eq("user_id", user_id)
+                if conversation_id:
+                    files_query = files_query.eq("conversation_id", conversation_id)
                 
             files_resp = files_query.execute()
             files_data = getattr(files_resp, "data", []) or []
@@ -42,7 +53,13 @@ class KeywordRetriever:
                 return []
                 
             # 2. Fetch all document chunks for these files (include created_at to compute chunk index)
-            docs_resp = supabase.table("documents").select("id,content,file_id,created_at").in_("file_id", file_ids).eq("user_id", user_id).execute()
+            docs_query = supabase.table("documents").select("id,content,file_id,created_at").in_("file_id", file_ids)
+            if workspace_id:
+                docs_query = docs_query.eq("workspace_id", workspace_id)
+            else:
+                docs_query = docs_query.eq("user_id", user_id)
+
+            docs_resp = docs_query.execute()
             docs = getattr(docs_resp, "data", []) or []
             
             if not docs:

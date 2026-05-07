@@ -7,12 +7,14 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 
 from ..core.security import get_current_user
 from ..rag.chunking import split_text_into_chunks
 from ..services.supabase_service import SupabaseServiceError, insert_many, insert_one
 from ..db.supabase import get_supabase
+from ..services.workspace_service import active_workspace_id_from_request, require_workspace_access
+from .conversations import require_conversation_access
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +102,7 @@ def _extract_text_from_bytes(filename: str, file_type: str | None, data: bytes) 
 
 @router.post("/upload")
 async def upload_file(
+    request: Request,
     file: UploadFile = File(...),
     conversation_id: str | None = Form(default=None),
     current_user: dict[str, Any] = Depends(get_current_user),
@@ -109,6 +112,20 @@ async def upload_file(
     Returns the created file metadata row.
     """
     user_id = str(current_user["sub"])
+
+    workspace_id = active_workspace_id_from_request(request)
+    if conversation_id:
+        conversation, _ = await require_conversation_access(conversation_id, user_id)
+        conversation_workspace_id = str(conversation.get("workspace_id") or "") or None
+        if workspace_id and conversation_workspace_id and workspace_id != conversation_workspace_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Conversation and workspace scope do not match.",
+            )
+        workspace_id = conversation_workspace_id
+
+    if workspace_id:
+        await require_workspace_access(workspace_id, user_id)
 
     # Read bytes and validate size
     contents = await file.read()
@@ -159,6 +176,8 @@ async def upload_file(
         "metadata": {"extracted_text_preview": normalized[:2000], "extraction_error": extraction_error},
         "conversation_id": conversation_id,
     }
+    if workspace_id:
+        payload["workspace_id"] = workspace_id
 
     try:
         file_row = await insert_one("files", {"user_id": user_id, **payload})
@@ -173,7 +192,12 @@ async def upload_file(
         
         vector_store = get_vector_store()
         pipeline = RAGIngestionPipeline(vector_store)
-        await pipeline.ingest_text(normalized, user_id, document_id=file_row.get("id"))
+        await pipeline.ingest_text(
+            normalized,
+            user_id,
+            document_id=file_row.get("id"),
+            workspace_id=workspace_id,
+        )
     except Exception:
         logger.exception("Failed to run ingestion pipeline. Continuing without chunks.")
 

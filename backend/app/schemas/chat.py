@@ -22,6 +22,7 @@ class ConversationRead(BaseModel):
 
     id: str
     user_id: str
+    workspace_id: str | None = None
     title: str | None = None
     is_archived: bool | None = None
     created_at: datetime | None = None
@@ -108,8 +109,47 @@ class WorkspaceRead(BaseModel):
     user_id: str
     name: str
     description: str | None = None
+    current_user_role: Literal["owner", "member"] = "owner"
+    member_count: int = 1
+    is_shared: bool = False
+    members_preview: list["WorkspaceMemberRead"] = Field(default_factory=list)
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+class WorkspaceMemberRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    workspace_id: str
+    user_id: str
+    role: Literal["owner", "member"]
+    email: str | None = None
+    full_name: str | None = None
+    avatar_label: str = "U"
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class WorkspaceInviteCreate(BaseModel):
+    email: str = Field(..., min_length=3, max_length=320)
+
+
+class WorkspaceInviteRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    workspace_id: str
+    email: str
+    role: Literal["member"]
+    status: Literal["pending", "accepted", "declined", "revoked"]
+    invited_by_user_id: str
+    accepted_by_user_id: str | None = None
+    workspace_name: str | None = None
+    inviter_name: str | None = None
+    inviter_email: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    accepted_at: datetime | None = None
 
 
 class CacheCreate(BaseModel):
@@ -126,3 +166,6 @@ class CacheRead(BaseModel):
     value: Any
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+WorkspaceRead.model_rebuild()
