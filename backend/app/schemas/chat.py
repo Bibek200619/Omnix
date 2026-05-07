@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field
 MAX_INPUT_SIZE = 4000
 WorkspaceType = Literal["workspace", "super_workspace", "subworkspace", "global_workspace"]
 WorkspaceFocus = Literal["general", "engineering", "design", "research", "strategy"]
+WorkspaceRole = Literal["founder", "co_owner", "member", "team_lead", "sub_leader", "sub_member"]
+WorkspaceAssignableRole = Literal["co_owner", "member", "team_lead", "sub_leader", "sub_member"]
 WorkspaceFocusInput = Literal[
     "general",
     "engineering",
@@ -171,7 +173,7 @@ class WorkspaceRead(BaseModel):
     ai_specialization: WorkspaceAIMode = "general"
     ai_instructions: str | None = None
     intelligence_preferences: dict[str, Any] = Field(default_factory=dict)
-    current_user_role: Literal["founder", "co_owner", "member"] = "founder"
+    current_user_role: WorkspaceRole = "founder"
     member_count: int = 1
     is_shared: bool = False
     members_preview: list["WorkspaceMemberRead"] = Field(default_factory=list)
@@ -305,7 +307,7 @@ class WorkspaceMemberRead(BaseModel):
 
     workspace_id: str
     user_id: str
-    role: Literal["founder", "co_owner", "member", "team_lead", "sub_leader", "sub_member"]
+    role: WorkspaceRole
     email: str | None = None
     full_name: str | None = None
     handle: str | None = None
@@ -316,12 +318,12 @@ class WorkspaceMemberRead(BaseModel):
 
 
 class WorkspaceMemberRoleUpdate(BaseModel):
-    role: Literal["founder", "co_owner", "member", "team_lead", "sub_leader", "sub_member"]
+    role: WorkspaceRole
 
 
 class WorkspaceMemberAssign(BaseModel):
     user_id: str
-    role: Literal["co_owner", "member", "team_lead", "sub_leader", "sub_member"] = "member"
+    role: WorkspaceAssignableRole = "member"
 
 
 class WorkspacePotentialMemberRead(BaseModel):
@@ -335,7 +337,7 @@ class WorkspacePotentialMemberRead(BaseModel):
 
 class WorkspaceInviteCreate(BaseModel):
     email: str = Field(..., min_length=3, max_length=320)
-    role: Literal["co_owner", "member", "team_lead", "sub_leader", "sub_member"] = "member"
+    role: WorkspaceAssignableRole = "member"
 
 
 class WorkspaceInviteRead(BaseModel):
@@ -345,7 +347,7 @@ class WorkspaceInviteRead(BaseModel):
     invite_id: str
     workspace_id: str
     email: str
-    role: Literal["co_owner", "member", "team_lead", "sub_leader", "sub_member"]
+    role: WorkspaceAssignableRole
     status: Literal["pending", "accepted", "declined", "revoked"]
     invited_by: str | None = None
     accepted_by_user_id: str | None = None
