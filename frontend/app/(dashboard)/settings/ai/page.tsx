@@ -49,13 +49,13 @@ export default function AISettingsPage() {
                   Online
                 </span>
               </div>
-              <p className="mt-1 text-sm text-[var(--omnix-text-2)]">Backend model routing is preserved through the existing Omnix API.</p>
+              <p className="mt-1 text-sm text-[var(--omnix-text-2)]">Operational model routing is managed via the Omnix Intelligence API.</p>
             </div>
           </div>
           <div className="relative z-10 mt-4 grid gap-3 sm:grid-cols-3">
-            <StatRow label="Provider" value="Omnix API" />
-            <StatRow label="Streaming" value="Enabled" />
-            <StatRow label="Workspace" value={activeWorkspace?.name ?? "No active workspace"} />
+            <StatRow label="Routing API" value="Production" />
+            <StatRow label="Streaming" value="Active" />
+            <StatRow label="Inference" value="Cloud Native" />
           </div>
         </section>
 
