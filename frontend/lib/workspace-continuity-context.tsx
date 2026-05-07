@@ -28,15 +28,21 @@ export function WorkspaceContinuityProvider({ children }: { children: ReactNode 
   const [unresolvedContinuity, setUnresolvedContinuity] = useState<WorkspaceContinuityMemory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const requestGenerationRef = useRef(0);
   const activeWorkspaceIdRef = useRef<string | null>(activeWorkspaceId);
 
   useEffect(() => {
+    if (activeWorkspaceId !== activeWorkspaceIdRef.current) {
+      requestGenerationRef.current += 1;
+    }
     activeWorkspaceIdRef.current = activeWorkspaceId;
   }, [activeWorkspaceId]);
 
   const refreshContinuity = useCallback(async () => {
     if (!activeWorkspaceId) return;
     const requestWorkspaceId = activeWorkspaceId;
+    const generation = requestGenerationRef.current;
     
     setLoading(true);
     setError(null);
@@ -47,18 +53,27 @@ export function WorkspaceContinuityProvider({ children }: { children: ReactNode 
         apiClient.get<WorkspaceContinuityMemory[]>(`/workspaces/${requestWorkspaceId}/continuity/unresolved`)
       ]);
 
-      if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+      if (
+        activeWorkspaceIdRef.current === requestWorkspaceId &&
+        requestGenerationRef.current === generation
+      ) {
         setInitiatives(initData);
         setTimeline(timelineData);
         setUnresolvedContinuity(unresolvedData);
       }
     } catch (err) {
       console.error("Failed to refresh operational continuity", err);
-      if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+      if (
+        activeWorkspaceIdRef.current === requestWorkspaceId &&
+        requestGenerationRef.current === generation
+      ) {
         setError(err instanceof Error ? err.message : "Unable to load continuity data.");
       }
     } finally {
-      if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+      if (
+        activeWorkspaceIdRef.current === requestWorkspaceId &&
+        requestGenerationRef.current === generation
+      ) {
         setLoading(false);
       }
     }

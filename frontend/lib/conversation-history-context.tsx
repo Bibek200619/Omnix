@@ -61,11 +61,20 @@ export function ConversationHistoryProvider({
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
     null,
   );
-  const refreshInFlightRef = useRef<{ workspaceId: string | null; request: Promise<void> } | null>(null);
+  
+  const requestGenerationRef = useRef(0);
+  const refreshInFlightRef = useRef<{ 
+    workspaceId: string | null; 
+    generation: number;
+    request: Promise<void> 
+  } | null>(null);
   const activeWorkspaceIdRef = useRef<string | null>(activeWorkspaceId);
   const lastRefreshAtRef = useRef(0);
 
   useEffect(() => {
+    if (activeWorkspaceId !== activeWorkspaceIdRef.current) {
+      requestGenerationRef.current += 1;
+    }
     activeWorkspaceIdRef.current = activeWorkspaceId;
   }, [activeWorkspaceId]);
 
@@ -87,7 +96,9 @@ export function ConversationHistoryProvider({
 
   const refreshConversations = useCallback(async (options?: { force?: boolean; silent?: boolean }) => {
     const requestWorkspaceId = activeWorkspaceId;
+    const generation = requestGenerationRef.current;
     const now = Date.now();
+    
     if (
       options?.silent &&
       !options.force &&
@@ -96,7 +107,10 @@ export function ConversationHistoryProvider({
       return;
     }
 
-    if (refreshInFlightRef.current?.workspaceId === requestWorkspaceId) {
+    if (
+      refreshInFlightRef.current?.workspaceId === requestWorkspaceId &&
+      refreshInFlightRef.current?.generation === generation
+    ) {
       return refreshInFlightRef.current.request;
     }
 
@@ -106,29 +120,43 @@ export function ConversationHistoryProvider({
           setLoading(true);
         }
         const data = await apiClient.get<ConversationSummary[]>("/conversations");
-        if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+        
+        if (
+          activeWorkspaceIdRef.current === requestWorkspaceId &&
+          requestGenerationRef.current === generation
+        ) {
           setConversations(sortConversations(data));
           setError(null);
           lastRefreshAtRef.current = Date.now();
         }
       } catch (err) {
-        if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+        if (
+          activeWorkspaceIdRef.current === requestWorkspaceId &&
+          requestGenerationRef.current === generation
+        ) {
           setError(err instanceof Error ? err.message : "Failed to load conversations");
           if (!options?.silent) {
             setConversations([]);
           }
         }
       } finally {
-        if (!options?.silent && activeWorkspaceIdRef.current === requestWorkspaceId) {
+        if (
+          !options?.silent && 
+          activeWorkspaceIdRef.current === requestWorkspaceId &&
+          requestGenerationRef.current === generation
+        ) {
           setLoading(false);
         }
-        if (refreshInFlightRef.current?.workspaceId === requestWorkspaceId) {
+        if (
+          refreshInFlightRef.current?.workspaceId === requestWorkspaceId &&
+          refreshInFlightRef.current?.generation === generation
+        ) {
           refreshInFlightRef.current = null;
         }
       }
     })();
 
-    refreshInFlightRef.current = { workspaceId: requestWorkspaceId, request };
+    refreshInFlightRef.current = { workspaceId: requestWorkspaceId, generation, request };
     return request;
   }, [activeWorkspaceId]);
 
