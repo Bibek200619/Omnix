@@ -18,6 +18,7 @@ from .workspace_service import (
     get_profiles,
     list_user_workspaces,
     normalize_ai_specialization,
+    normalize_workspace_focus,
     normalize_workspace_record,
     require_workspace_access,
     utc_now_iso,
@@ -421,14 +422,14 @@ def _status_from_counts(
     recently_active_count: int,
     recent_activity_at: datetime | None,
 ) -> tuple[str, str]:
-    ai_specialization = normalize_ai_specialization(workspace.get("ai_specialization"))
-    ai_status = "active" if source_count > 0 and ai_specialization != "general" else "learning" if source_count > 0 else "ready"
+    workspace_focus = normalize_workspace_focus(workspace.get("workspace_focus") or workspace.get("ai_specialization"))
+    ai_status = "active" if source_count > 0 and workspace_focus != "general" else "learning" if source_count > 0 else "ready"
 
     if active_count > 0:
         return ai_status, "alive"
     if recent_activity_at and _now() - recent_activity_at <= timedelta(hours=1):
         return ai_status, "alive"
-    if recently_active_count > 0 or source_count > 0 or ai_specialization != "general":
+    if recently_active_count > 0 or source_count > 0 or workspace_focus != "general":
         return ai_status, "warming"
     return ai_status, "quiet"
 
@@ -537,7 +538,8 @@ async def list_workspace_live_statuses(user_id: str) -> list[dict[str, Any]]:
                 "recently_active_count": counts.get("recently_active_count", 0),
                 "typing_count": 0,
                 "source_count": source_count,
-                "ai_specialization": normalize_ai_specialization(workspace.get("ai_specialization")),
+                "workspace_focus": normalize_workspace_focus(workspace.get("workspace_focus") or workspace.get("ai_specialization")),
+                "ai_specialization": normalize_ai_specialization(workspace.get("workspace_focus") or workspace.get("ai_specialization")),
                 "ai_status": ai_status,
                 "health": health,
                 "recent_activity_at": latest_activity.get("created_at") if latest_activity else None,

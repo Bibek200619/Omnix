@@ -5,12 +5,11 @@ import { BrainCircuit, Database, FileText, Globe2, Layers3, Loader2, Sparkles, U
 import { cn } from "@/lib/utils";
 import type { WorkspaceIntelligenceProfile } from "@/lib/workspace-types";
 
-const modeLabels: Record<WorkspaceIntelligenceProfile["ai_specialization"], string> = {
+const focusLabels: Record<WorkspaceIntelligenceProfile["workspace_focus"], string> = {
   research: "Research",
-  coding: "Coding",
+  engineering: "Engineering",
   design: "Design",
   strategy: "Strategy",
-  analytics: "Analytics",
   general: "General Collaboration",
 };
 
@@ -31,7 +30,7 @@ export function WorkspaceIntelligencePanel({
   const sources = profile?.connected_sources ?? [];
   const insights = profile?.recent_insights ?? [];
   const summary = profile?.context_summary ?? "Intelligence awaiting workspace context synchronization.";
-  const mode = profile?.ai_specialization ?? "general";
+  const focus = profile?.workspace_focus ?? profile?.ai_specialization ?? "general";
   const expertise = profile?.expertise_area;
 
   return (
@@ -83,8 +82,8 @@ export function WorkspaceIntelligencePanel({
         <div className="shrink-0 flex flex-row md:flex-col items-center md:items-end justify-between w-full md:w-auto gap-3">
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
-               <div className="text-[10px] font-medium uppercase tracking-wider text-white/30">Specialization</div>
-               <div className="text-sm font-medium text-white/80">{modeLabels[mode]}</div>
+               <div className="text-[10px] font-medium uppercase tracking-wider text-white/30">Focus</div>
+               <div className="text-sm font-medium text-white/80">{focusLabels[focus]}</div>
             </div>
             <div className="h-8 w-px bg-white/5 hidden sm:block" />
             <div className="text-right">
