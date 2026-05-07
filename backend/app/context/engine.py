@@ -15,6 +15,8 @@ from .compression import ContextCompressor
 from .citations import CitationManager
 from .token_budget import TokenBudgetEngine
 from .prompt_builder import PromptBuilder
+from ..services.supabase_service import select_one_trusted
+from ..services.workspace_cognition import normalize_workspace_focus
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +46,7 @@ class ContextEngine:
         """
         started_at = time.perf_counter()
         raw_citations = []
-        specialization = None
+        workspace_focus = None
 
         # 1. Gather Context Sources
         try:
@@ -64,14 +66,15 @@ class ContextEngine:
             ws_cites = await self.workspace_manager.fetch_workspace_context(payload)
             raw_citations.extend(ws_cites)
 
-            # Optimization: Fetch specialization for PromptBuilder
+            # Optimization: Fetch focus for PromptBuilder
             if payload.workspace_id:
-                from ..services import workspace_service
-                ws = await workspace_service.select_one_trusted(
-                    "workspaces", "ai_specialization", {"id": payload.workspace_id}
+                ws = await select_one_trusted(
+                    "workspaces", "workspace_focus,ai_specialization", {"id": payload.workspace_id}
                 )
                 if ws:
-                    specialization = ws.get("ai_specialization")
+                    workspace_focus = normalize_workspace_focus(
+                        ws.get("workspace_focus") or ws.get("ai_specialization")
+                    )
 
             # Memory (recent convos & current convo history)
             # Refactored to include Synthesized Workspace Memory
@@ -102,7 +105,7 @@ class ContextEngine:
             payload.query, 
             budgeted_citations, 
             system_instructions,
-            specialization=specialization
+            specialization=workspace_focus
         )
 
         latency_ms = (time.perf_counter() - started_at) * 1000
@@ -136,4 +139,3 @@ class ContextEngine:
             "retrieval": {"results": [c.to_dict() for c in assembled.citations if c.source_type == "retrieval"]},
             "diagnostics": assembled.diagnostics
         }
-
