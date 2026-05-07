@@ -116,10 +116,10 @@ export function WorkspaceOperationalTimeline({
                 transition={{ delay: index * 0.05 }}
                 className="relative pl-10 sm:pl-12"
               >
-                <div className="absolute left-0 top-0 flex h-[34px] w-[34px] items-center justify-center rounded-xl border border-white/10 bg-[#060a14] shadow-[var(--omnix-glow-xs)] sm:h-10 sm:w-10">
-                  <Icon className="h-3.5 w-3.5 text-cyan-400 sm:h-4 sm:w-4" />
+                <div className="absolute left-0 top-0 flex h-[34px] w-[34px] items-center justify-center rounded-xl border border-white/10 bg-[#060a14] sm:h-10 sm:w-10">
+                  <Icon className="h-3.5 w-3.5 text-cyan-400/80 sm:h-4 sm:w-4" />
                   {index === 0 && (
-                    <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-cyan-500 animate-pulse border-2 border-[#060a14] sm:h-3 sm:w-3" />
+                    <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-cyan-500/80 border-2 border-[#060a14] sm:h-3 sm:w-3" />
                   )}
                 </div>
                 
@@ -158,8 +158,5 @@ export function WorkspaceOperationalTimeline({
         </div>
       </div>
     </section>
-  );
-}
-ion>
   );
 }
