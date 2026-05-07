@@ -304,3 +304,68 @@ export type WorkspaceConversationAssistance = {
   source_message_count: number;
   generated_at: string;
 };
+
+export type WorkspaceTaskStatus = "idea" | "planned" | "active" | "review" | "complete";
+
+export type WorkspaceTaskContextLink = {
+  context_type:
+    | "conversation_message"
+    | "channel"
+    | "ai_session"
+    | "file"
+    | "decision"
+    | "initiative"
+    | "ai_action_extraction";
+  context_id: string;
+  label?: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type WorkspaceTask = {
+  id: string;
+  workspace_id: string;
+  title: string;
+  description?: string | null;
+  status: WorkspaceTaskStatus;
+  owner_user_id?: string | null;
+  created_by: string;
+  due_date?: string | null;
+  blockers: string[];
+  linked_context: WorkspaceTaskContextLink[];
+  activity_metadata: Record<string, unknown>;
+  momentum_metadata: Record<string, unknown>;
+  initiative_id?: string | null;
+  client_nonce?: string | null;
+  completed_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  owner_name?: string | null;
+  owner_email?: string | null;
+  owner_avatar_label?: string | null;
+  creator_name?: string | null;
+};
+
+export type WorkspaceTaskMomentum = {
+  workspace_id: string;
+  total_count: number;
+  open_count: number;
+  complete_count: number;
+  blocked_count: number;
+  due_soon_count: number;
+  overdue_count: number;
+  unassigned_count: number;
+  flow_counts: Record<WorkspaceTaskStatus, number>;
+  completion_ratio: number;
+  health: "quiet" | "moving" | "blocked" | "complete";
+  summary: string;
+  calculated_at: string;
+};
+
+export type WorkspaceTaskAssistanceMode = "blockers" | "stalled" | "next_actions" | "workload";
+
+export type WorkspaceTaskAssistance = {
+  mode: WorkspaceTaskAssistanceMode;
+  content: string;
+  source_task_count: number;
+  generated_at: string;
+};
