@@ -381,15 +381,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [intelligenceLoading, setIntelligenceLoading] = useState(false);
   const [subspaceLoadingByParentId, setSubspaceLoadingByParentId] = useState<Record<string, boolean>>({});
   const [subspaceErrorByParentId, setSubspaceErrorByParentId] = useState<Record<string, string | null>>({});
+  
+  const requestGenerationRef = useRef(0);
   const workspaceFetchIdRef = useRef(0);
+  
   const createWorkspaceInFlightRef = useRef<Map<string, Promise<Workspace>>>(new Map());
   const workspaceRefreshInFlightRef = useRef<Promise<void> | null>(null);
   const workspaceTreeRefreshInFlightRef = useRef<Map<string, Promise<Workspace | null>>>(new Map());
   const subspaceRefreshInFlightRef = useRef<Map<string, Promise<Workspace[]>>>(new Map());
   const pendingInvitesInFlightRef = useRef<Promise<void> | null>(null);
-  const activeWorkspaceDataInFlightRef = useRef<{ workspaceId: string; request: Promise<void> } | null>(null);
+  const activeWorkspaceDataInFlightRef = useRef<{ 
+    workspaceId: string; 
+    generation: number;
+    request: Promise<void> 
+  } | null>(null);
   const workspaceIntelligenceInFlightRef = useRef<{
     workspaceId: string;
+    generation: number;
     request: Promise<WorkspaceIntelligenceProfile | null>;
   } | null>(null);
   const activeWorkspaceIdRef = useRef<string | null>(activeWorkspaceId);
@@ -409,10 +417,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     activeWorkspaceIdRef.current = activeWorkspaceId;
+    requestGenerationRef.current += 1; // Increment generation on workspace switch
   }, [activeWorkspaceId]);
 
   const setActiveWorkspace = useCallback((id: string | null) => {
     console.debug("[workspace] set active workspace", { id });
+    if (id !== activeWorkspaceIdRef.current) {
+      requestGenerationRef.current += 1;
+    }
     setActiveWorkspaceId(id);
     try {
       if (typeof window !== "undefined") {
@@ -617,7 +629,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
 
     const requestWorkspaceId = activeWorkspaceId;
-    if (activeWorkspaceDataInFlightRef.current?.workspaceId === requestWorkspaceId) {
+    const generation = requestGenerationRef.current;
+    
+    if (
+      activeWorkspaceDataInFlightRef.current?.workspaceId === requestWorkspaceId &&
+      activeWorkspaceDataInFlightRef.current?.generation === generation
+    ) {
       return activeWorkspaceDataInFlightRef.current.request;
     }
 
@@ -627,22 +644,40 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           setMembersLoading(true);
         }
         const members = await apiClient.get<WorkspaceMember[]>(`/workspaces/${requestWorkspaceId}/members`);
-        if (activeWorkspaceIdRef.current === requestWorkspaceId) {
-          setActiveMembers(members || []);
+        
+        // Discard if workspace or generation changed
+        if (
+          activeWorkspaceIdRef.current !== requestWorkspaceId || 
+          requestGenerationRef.current !== generation
+        ) {
+          return;
         }
+        
+        setActiveMembers(members || []);
       } catch (err) {
         console.error("Failed to load workspace members", err);
-        if (!options?.silent && activeWorkspaceIdRef.current === requestWorkspaceId) {
+        if (
+          !options?.silent && 
+          activeWorkspaceIdRef.current === requestWorkspaceId &&
+          requestGenerationRef.current === generation
+        ) {
           setActiveMembers([]);
         }
       } finally {
-        if (!options?.silent && activeWorkspaceIdRef.current === requestWorkspaceId) {
+        if (
+          !options?.silent && 
+          activeWorkspaceIdRef.current === requestWorkspaceId &&
+          requestGenerationRef.current === generation
+        ) {
           setMembersLoading(false);
         }
       }
 
       if (!isWorkspaceFounderRole(activeWorkspace.current_user_role)) {
-        if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+        if (
+          activeWorkspaceIdRef.current === requestWorkspaceId &&
+          requestGenerationRef.current === generation
+        ) {
           setActiveInvites([]);
         }
         lastActiveWorkspaceDataRefreshAtRef.current = Date.now();
@@ -657,14 +692,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           setInvitesLoading(true);
         }
         const invites = await apiClient.get<WorkspaceInvite[]>(`/workspaces/${requestWorkspaceId}/invites`);
-        if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+        if (
+          activeWorkspaceIdRef.current === requestWorkspaceId &&
+          requestGenerationRef.current === generation
+        ) {
           setActiveInvites((current) => reconcileWorkspaceInvites(current, invites || []));
         }
         lastActiveWorkspaceDataRefreshAtRef.current = Date.now();
       } catch (err) {
         console.error("Failed to load workspace invites", err);
       } finally {
-        if (!options?.silent && activeWorkspaceIdRef.current === requestWorkspaceId) {
+        if (
+          !options?.silent && 
+          activeWorkspaceIdRef.current === requestWorkspaceId &&
+          requestGenerationRef.current === generation
+        ) {
           setInvitesLoading(false);
         }
         if (activeWorkspaceDataInFlightRef.current?.workspaceId === requestWorkspaceId) {
@@ -673,7 +715,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
     })();
 
-    activeWorkspaceDataInFlightRef.current = { workspaceId: requestWorkspaceId, request };
+    activeWorkspaceDataInFlightRef.current = { workspaceId: requestWorkspaceId, generation, request };
     return request;
   }, [activeWorkspace, activeWorkspaceId]);
 
@@ -684,7 +726,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
 
     const requestWorkspaceId = activeWorkspaceId;
-    if (workspaceIntelligenceInFlightRef.current?.workspaceId === requestWorkspaceId) {
+    const generation = requestGenerationRef.current;
+
+    if (
+      workspaceIntelligenceInFlightRef.current?.workspaceId === requestWorkspaceId &&
+      workspaceIntelligenceInFlightRef.current?.generation === generation
+    ) {
       return workspaceIntelligenceInFlightRef.current.request;
     }
 
@@ -694,18 +741,29 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           setIntelligenceLoading(true);
         }
         const profile = await apiClient.get<WorkspaceIntelligenceProfile>(`/workspaces/${requestWorkspaceId}/intelligence`);
-        if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+        if (
+          activeWorkspaceIdRef.current === requestWorkspaceId &&
+          requestGenerationRef.current === generation
+        ) {
           setActiveWorkspaceIntelligence(profile);
         }
         return profile;
       } catch (err) {
         console.error("Failed to load workspace intelligence", err);
-        if (!options?.silent && activeWorkspaceIdRef.current === requestWorkspaceId) {
+        if (
+          !options?.silent && 
+          activeWorkspaceIdRef.current === requestWorkspaceId &&
+          requestGenerationRef.current === generation
+        ) {
           setActiveWorkspaceIntelligence(null);
         }
         return null;
       } finally {
-        if (!options?.silent && activeWorkspaceIdRef.current === requestWorkspaceId) {
+        if (
+          !options?.silent && 
+          activeWorkspaceIdRef.current === requestWorkspaceId &&
+          requestGenerationRef.current === generation
+        ) {
           setIntelligenceLoading(false);
         }
         if (workspaceIntelligenceInFlightRef.current?.workspaceId === requestWorkspaceId) {
@@ -714,7 +772,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
     })();
 
-    workspaceIntelligenceInFlightRef.current = { workspaceId: requestWorkspaceId, request };
+    workspaceIntelligenceInFlightRef.current = { workspaceId: requestWorkspaceId, generation, request };
     return request;
   }, [activeWorkspaceId]);
 
