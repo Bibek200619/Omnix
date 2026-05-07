@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 
 from .schemas import AssembledContext, Citation, ContextSourceType
 from .citations import CitationManager
-from .persona import persona_engine
+from ..services.workspace_cognition import build_workspace_focus_prompt, normalize_workspace_focus
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +26,11 @@ class PromptBuilder:
         system_instructions: str = "",
         specialization: str | None = None
     ) -> AssembledContext:
-        """Assemble final prompt from query, citations, and operational persona."""
+        """Assemble final prompt from query, citations, and workspace cognitive posture."""
         
-        # 1. Operational Persona Directive
-        persona_directive = persona_engine.get_behavioral_directive(specialization)
+        # 1. Workspace Cognitive Posture Directive
+        workspace_focus = normalize_workspace_focus(specialization)
+        posture_directive = build_workspace_focus_prompt(workspace_focus)
         
         # 2. Workspace Profile Directive (if present in citations)
         workspace_citations = [c for c in citations if c.source_type == ContextSourceType.WORKSPACE]
@@ -45,8 +46,8 @@ class PromptBuilder:
             "You are Omnix, a unified operational intelligence environment.",
             "You are currently operating within a specialized team workspace.",
             "",
-            "CORE OPERATIONAL BEHAVIOR:",
-            persona_directive,
+            "CORE WORKSPACE COGNITION:",
+            posture_directive,
             "",
             "IDENTITY & PRIVACY:",
             "- Your knowledge is strictly scoped to the provided context and the current workspace.",
@@ -77,7 +78,7 @@ class PromptBuilder:
             citations=citations,
             diagnostics={
                 "citations_count": len(citations),
-                "specialization": specialization or "general"
+                "workspace_focus": workspace_focus,
             },
             token_usage={}
         )

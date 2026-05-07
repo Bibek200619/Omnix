@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { useWorkspace } from "@/lib/workspace-context";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { Workspace } from "@/lib/workspace-types";
-import type { WorkspaceAIMode } from "@/lib/workspace-types";
+import type { WorkspaceFocus } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
 
 function flattenWorkspaces(workspaces: Workspace[]) {
@@ -35,13 +35,12 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-const aiModes: Array<{ value: WorkspaceAIMode; label: string; hint: string }> = [
-  { value: "research", label: "Research", hint: "Evidence, synthesis, and source-heavy answers" },
-  { value: "coding", label: "Coding", hint: "Architecture, APIs, deployment, and code context" },
-  { value: "design", label: "Design", hint: "Brand systems, UI language, and creative critique" },
-  { value: "strategy", label: "Strategy", hint: "Planning, positioning, and decision support" },
-  { value: "analytics", label: "Analytics", hint: "Metrics, reporting, and operational analysis" },
-  { value: "general", label: "General", hint: "Collaborative workspace assistant" },
+const workspaceFocuses: Array<{ value: WorkspaceFocus; label: string; hint: string }> = [
+  { value: "general", label: "General", hint: "Balanced collaborative intelligence" },
+  { value: "engineering", label: "Engineering", hint: "Implementation, debugging, architecture, and scale" },
+  { value: "design", label: "Design", hint: "UX psychology, hierarchy, interaction clarity, and flow" },
+  { value: "research", label: "Research", hint: "Exploration, synthesis, evidence, and comparison" },
+  { value: "strategy", label: "Strategy", hint: "Systems thinking, leverage, sequencing, and execution" },
 ];
 
 export function WorkspaceSettingsPanel() {
@@ -70,7 +69,7 @@ export function WorkspaceSettingsPanel() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [expertiseArea, setExpertiseArea] = useState("");
-  const [aiSpecialization, setAiSpecialization] = useState<WorkspaceAIMode>("general");
+  const [workspaceFocus, setWorkspaceFocus] = useState<WorkspaceFocus>("general");
   const [aiInstructions, setAiInstructions] = useState("");
   const [memoryEnabled, setMemoryEnabled] = useState(true);
   const [savingIntelligence, setSavingIntelligence] = useState(false);
@@ -92,7 +91,7 @@ export function WorkspaceSettingsPanel() {
     setSubspaceError(null);
     setDeleteError(null);
     setExpertiseArea(activeWorkspace?.expertise_area ?? "");
-    setAiSpecialization(activeWorkspace?.ai_specialization ?? "general");
+    setWorkspaceFocus(activeWorkspace?.workspace_focus ?? activeWorkspace?.ai_specialization ?? "general");
     setAiInstructions(activeWorkspace?.ai_instructions ?? "");
     setMemoryEnabled(activeWorkspace?.intelligence_preferences?.memory_enabled !== false);
     setIntelligenceError(null);
@@ -168,7 +167,8 @@ export function WorkspaceSettingsPanel() {
       setIntelligenceError(null);
       await updateWorkspaceIntelligence({
         expertise_area: expertiseArea.trim() || null,
-        ai_specialization: aiSpecialization,
+        workspace_focus: workspaceFocus,
+        ai_specialization: workspaceFocus,
         ai_instructions: aiInstructions.trim() || null,
         intelligence_preferences: {
           ...(activeWorkspaceIntelligence?.intelligence_preferences ?? activeWorkspace.intelligence_preferences ?? {}),
@@ -330,10 +330,10 @@ export function WorkspaceSettingsPanel() {
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
               <BrainCircuit className="h-4 w-4 text-cyan-200" />
-              Workspace AI intelligence
+              Workspace cognition
             </div>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--omnix-text-3)]">
-              Define how Omnix should think inside this workspace. These settings are included in chat context and retrieval diagnostics.
+              Define the cognitive posture Omnix should use inside this workspace. It shapes chat, continuity, and retrieval-aware reasoning without changing Omnix identity.
             </p>
           </div>
           <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
@@ -344,23 +344,23 @@ export function WorkspaceSettingsPanel() {
         <div className="relative z-10 grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
           <div className="space-y-4">
             <div>
-              <div className="mb-2 text-sm font-medium text-slate-300">AI specialization mode</div>
+              <div className="mb-2 text-sm font-medium text-slate-300">Cognitive focus</div>
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                {aiModes.map((mode) => (
+                {workspaceFocuses.map((focus) => (
                   <button
-                    key={mode.value}
+                    key={focus.value}
                     type="button"
                     disabled={!canEdit || savingIntelligence}
-                    onClick={() => setAiSpecialization(mode.value)}
+                    onClick={() => setWorkspaceFocus(focus.value)}
                     className={cn(
                       "rounded-xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60",
-                      aiSpecialization === mode.value
+                      workspaceFocus === focus.value
                         ? "border-cyan-300/35 bg-cyan-300/10 shadow-[var(--omnix-glow-xs)]"
                         : "border-[var(--omnix-border)] bg-black/15 hover:border-[var(--omnix-border-active)]",
                     )}
                   >
-                    <span className="block text-sm font-semibold text-white">{mode.label}</span>
-                    <span className="mt-1 block text-xs leading-5 text-[var(--omnix-text-3)]">{mode.hint}</span>
+                    <span className="block text-sm font-semibold text-white">{focus.label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-[var(--omnix-text-3)]">{focus.hint}</span>
                   </button>
                 ))}
               </div>
@@ -405,7 +405,7 @@ export function WorkspaceSettingsPanel() {
             <label className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-[var(--omnix-border)] bg-black/15 px-3 py-3">
               <span>
                 <span className="block text-sm font-medium text-white">Workspace memory</span>
-                <span className="block text-xs text-[var(--omnix-text-3)]">Include workspace profile in AI prompts.</span>
+                <span className="block text-xs text-[var(--omnix-text-3)]">Include workspace profile and continuity context. Cognitive focus stays active.</span>
               </span>
               <input
                 type="checkbox"
@@ -428,8 +428,8 @@ export function WorkspaceSettingsPanel() {
           </Alert>
         ) : null}
         {intelligenceSaved ? (
-          <Alert className="mt-5" variant="success" title="Intelligence profile saved">
-            Workspace AI context is updated.
+          <Alert className="mt-5" variant="success" title="Workspace cognition saved">
+            Workspace cognitive routing is updated.
           </Alert>
         ) : null}
 
@@ -441,7 +441,7 @@ export function WorkspaceSettingsPanel() {
             disabled={!canEdit}
             onClick={saveIntelligence}
           >
-            Save AI intelligence
+            Save workspace cognition
           </Button>
         </div>
       </section>

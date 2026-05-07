@@ -57,6 +57,7 @@ from ..services.workspace_service import (
     list_workspace_invites,
     list_workspace_members,
     normalize_workspace_record,
+    normalize_workspace_focus,
     normalize_email,
     normalize_workspace_role,
     require_workspace_access,
@@ -746,12 +747,36 @@ async def update_workspace_intelligence(
     user_id = _user_id_from_claims(current_user)
     access = await require_workspace_management_access(workspace_id, user_id)
     normalized_workspace = normalize_workspace_record(access.workspace)
-    payload = intelligence_payload.model_dump()
+    raw_payload = intelligence_payload.model_dump(exclude_unset=True)
+    focus = normalize_workspace_focus(
+        raw_payload.get("workspace_focus")
+        or raw_payload.get("ai_specialization")
+        or normalized_workspace.get("workspace_focus")
+        or normalized_workspace.get("ai_specialization")
+    )
+    payload: dict[str, Any] = {
+        "workspace_focus": focus,
+        # Compatibility mirror until all clients stop reading ai_specialization.
+        "ai_specialization": focus,
+    }
+    payload["expertise_area"] = (
+        str(raw_payload.get("expertise_area") or "").strip()
+        if "expertise_area" in raw_payload
+        else str(normalized_workspace.get("expertise_area") or "").strip()
+    ) or None
+    payload["ai_instructions"] = (
+        str(raw_payload.get("ai_instructions") or "").strip()
+        if "ai_instructions" in raw_payload
+        else str(normalized_workspace.get("ai_instructions") or "").strip()
+    ) or None
+    preferences_payload = raw_payload.get("intelligence_preferences")
+    if not isinstance(preferences_payload, Mapping):
+        preferences_payload = normalized_workspace.get("intelligence_preferences") or {}
     payload["expertise_area"] = str(payload.get("expertise_area") or "").strip() or None
     payload["ai_instructions"] = str(payload.get("ai_instructions") or "").strip() or None
     payload["intelligence_preferences"] = {
-        **(payload.get("intelligence_preferences") or {}),
-        "retrieval_scope": "global" if normalized_workspace.get("is_global") else (payload.get("intelligence_preferences") or {}).get("retrieval_scope", "workspace"),
+        **dict(preferences_payload),
+        "retrieval_scope": "global" if normalized_workspace.get("is_global") else dict(preferences_payload).get("retrieval_scope", "workspace"),
     }
     payload["updated_at"] = utc_now_iso()
 
@@ -777,6 +802,7 @@ async def update_workspace_intelligence(
         event_type="workspace.intelligence_updated",
         summary="Workspace AI intelligence profile was updated.",
         metadata={
+            "workspace_focus": payload.get("workspace_focus"),
             "ai_specialization": payload.get("ai_specialization"),
             "retrieval_scope": (payload.get("intelligence_preferences") or {}).get("retrieval_scope"),
         },
@@ -801,6 +827,13 @@ async def update_workspace(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Workspace name cannot be empty.",
             )
+    if "workspace_focus" in payload or "ai_specialization" in payload:
+        focus = normalize_workspace_focus(
+            payload.get("workspace_focus") or payload.get("ai_specialization")
+        )
+        payload["workspace_focus"] = focus
+        # Compatibility mirror until all clients stop reading ai_specialization.
+        payload["ai_specialization"] = focus
 
     if not payload:
         raise HTTPException(
