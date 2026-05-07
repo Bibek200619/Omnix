@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   Activity,
   BrainCircuit,
-  Cpu,
   Database,
   FileText,
   History,
@@ -25,7 +24,7 @@ import { apiClient } from "@/lib/api";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
-import { initialsFromText, workspaceRoleLabel } from "@/lib/workspace-roles";
+import { workspaceRoleLabel } from "@/lib/workspace-roles";
 import { WorkspaceIntelligencePanel } from "@/components/workspace/WorkspaceIntelligencePanel";
 import { WorkspaceActivityFeed } from "@/components/workspace/WorkspaceActivityFeed";
 import { WorkspacePresenceCluster } from "@/components/workspace/WorkspacePresenceCluster";
@@ -34,37 +33,19 @@ type FileData = {
   id: string;
 };
 
-function roleColor(role?: string | null) {
-  if (role === "owner" || role === "founder") return "var(--role-founder)";
-  if (role === "co_owner") return "var(--role-coowner)";
-  return "var(--role-member)";
-}
-
-function roleCssClass(role?: string | null) {
-  if (role === "owner" || role === "founder") return "omnix-role-founder";
-  if (role === "co_owner") return "omnix-role-coowner";
-  return "omnix-role-member";
-}
-
 export default function DashboardPage() {
   const router = useRouter();
-  const { conversations, loading: conversationsLoading } = useConversationHistory();
+  const { conversations } = useConversationHistory();
   const {
     activeWorkspace,
-    activeMembers,
-    activeInvites,
-    pendingInvites,
     workspaces,
     activeWorkspaceIntelligence,
     intelligenceLoading,
   } = useWorkspace();
-  const { activity, loadingActivity, presence, statusForWorkspace } = useWorkspaceCollaboration();
-  const [files, setFiles] = useState<FileData[]>([]);
-  const [filesLoading, setFilesLoading] = useState(false);
-  const [filesError, setFilesError] = useState<string | null>(null);
-  const memberCount = activeWorkspace?.member_count ?? activeMembers.length;
-  const sharedState = activeWorkspace?.is_shared ? "Shared" : "Solo";
-  const activeLiveStatus = statusForWorkspace(activeWorkspace?.id);
+  const { activity, loadingActivity, presence } = useWorkspaceCollaboration();
+  const [, setFiles] = useState<FileData[]>([]);
+  const [, setFilesLoading] = useState(false);
+  const [, setFilesError] = useState<string | null>(null);
 
   const loadFiles = useCallback(async () => {
     setFilesLoading(true);
@@ -84,41 +65,6 @@ export default function DashboardPage() {
     void loadFiles();
   }, [loadFiles, activeWorkspace?.id]);
 
-  const metrics = [
-    {
-      label: "AI Conversations",
-      value: conversationsLoading ? "..." : conversations.length,
-      trend: conversations.length ? "Synced" : "Empty",
-      icon: MessageSquare,
-      color: "var(--omnix-cyan)",
-      metricColor: "#00FFFF",
-    },
-    {
-      label: "Team Members",
-      value: memberCount,
-      trend: activeLiveStatus ? `${activeLiveStatus.active_count} active` : activeWorkspace ? sharedState : "Loading",
-      icon: Users,
-      color: "var(--omnix-purple)",
-      metricColor: "#9b5cff",
-    },
-    {
-      label: "Knowledge Sources",
-      value: activeWorkspaceIntelligence?.source_count ?? (filesLoading ? "..." : files.length),
-      trend: filesError ? "Unavailable" : (activeWorkspaceIntelligence?.source_count ?? files.length) ? "Indexed" : "Empty",
-      icon: Database,
-      color: "var(--omnix-pink)",
-      metricColor: "#ff4df4",
-    },
-    {
-      label: "Workspace Role",
-      value: workspaceRoleLabel(activeWorkspace?.current_user_role),
-      trend: pendingInvites.length ? `${pendingInvites.length} invite` : "Clear",
-      icon: Cpu,
-      color: "var(--omnix-green)",
-      metricColor: "#00e87a",
-    },
-  ];
-
   const actions = [
     { label: "Analyze Document", desc: "Upload and query source material", icon: FileText, color: "#3366ff", href: "/sources" },
     { label: "Start AI Chat", desc: "Open a collaborative thread", icon: Sparkles, color: "#00FFFF", href: "/chat" },
@@ -128,7 +74,6 @@ export default function DashboardPage() {
   ];
 
   const recent = conversations.slice(0, 4);
-  const workspaceMembers = activeMembers.length ? activeMembers : activeWorkspace?.members_preview ?? [];
   const recentWorkspaces = workspaces.slice(0, 4);
 
   return (
@@ -182,52 +127,6 @@ export default function DashboardPage() {
           >
             View Full Report
           </Button>
-        </div>
-
-        {/* ── Metric Cards ── */}
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {metrics.map((metric, index) => {
-            const Icon = metric.icon;
-            return (
-              <article
-                key={metric.label}
-                className="omnix-metric-card p-5"
-                style={{
-                  "--metric-color": metric.metricColor,
-                  animation: `omnix-card-enter 0.45s ease-out ${index * 90}ms both`,
-                } as CSSProperties}
-              >
-                <div className="relative z-10 flex items-start justify-between">
-                  <div
-                    className="rounded-xl p-2.5"
-                    style={{
-                      background: `${metric.metricColor}18`,
-                      border: `1px solid ${metric.metricColor}28`,
-                      boxShadow: `0 0 12px ${metric.metricColor}20`,
-                    }}
-                  >
-                    <Icon className="h-5 w-5" style={{ color: metric.metricColor, filter: `drop-shadow(0 0 5px ${metric.metricColor}90)` }} />
-                  </div>
-                  <span
-                    className="rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide"
-                    style={{
-                      background: `${metric.metricColor}12`,
-                      border: `1px solid ${metric.metricColor}25`,
-                      color: metric.metricColor,
-                    }}
-                  >
-                    {metric.trend}
-                  </span>
-                </div>
-                <div className="relative z-10 mt-5">
-                  <div className="omnix-display text-3xl font-bold text-white drop-shadow-[0_0_14px_rgba(255,255,255,0.08)]">
-                    {metric.value}
-                  </div>
-                  <div className="mt-1.5 text-sm text-[var(--omnix-text-3)]">{metric.label}</div>
-                </div>
-              </article>
-            );
-          })}
         </div>
 
         <WorkspaceIntelligencePanel
@@ -387,103 +286,6 @@ export default function DashboardPage() {
                 )) : (
                   <div className="rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/15 p-5 text-center text-sm text-[var(--omnix-text-2)]">
                     No workspaces yet
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* Workspace State */}
-            <section className="omnix-section-card p-6" style={{ animation: "omnix-card-enter 0.45s ease-out 0.32s both" }}>
-              <div className="omnix-top-line" />
-              <h2 className="relative z-10 mb-5 flex items-center gap-2 text-lg font-semibold text-white">
-                <Activity className="h-4 w-4 text-[var(--omnix-green)] drop-shadow-[0_0_6px_rgba(0,232,122,0.8)]" />
-                Workspace State
-              </h2>
-              <div className="relative z-10 space-y-3">
-                {[
-                  { label: "Workspace", value: activeWorkspace?.name ?? "No active workspace", color: "var(--omnix-green)" },
-                  {
-                    label: "Access",
-                    value: activeWorkspace?.is_shared ? "Enabled" : "Private",
-                    color: "var(--omnix-cyan)",
-                  },
-                  {
-                    label: "Invite Queue",
-                    value: activeInvites.length ? `${activeInvites.length} active` : "Clear",
-                    color: "var(--omnix-amber)",
-                  },
-                  {
-                    label: "Live Members",
-                    value: activeLiveStatus ? `${activeLiveStatus.active_count} active` : `${presence?.active_count ?? 0} active`,
-                    color: "var(--omnix-green)",
-                  },
-                  {
-                    label: "AI Status",
-                    value: activeLiveStatus?.ai_status ?? "ready",
-                    color: "var(--omnix-purple)",
-                  },
-                ].map((item) => (
-                  <div key={item.label} className="rounded-xl border border-[var(--omnix-border)] bg-black/15 px-3 py-3">
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <span className="text-[var(--omnix-text-3)]">{item.label}</span>
-                      <span className="truncate font-semibold" style={{ color: item.color }}>{item.value}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* Workspace Members */}
-            <section className="omnix-section-card flex flex-col p-6" style={{ animation: "omnix-card-enter 0.45s ease-out 0.4s both" }}>
-              <div className="omnix-top-line" />
-              <div className="relative z-10 mb-5 flex items-center justify-between">
-                <h2 className="flex items-center gap-2.5 text-lg font-semibold text-white">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-pink-300/25 bg-pink-300/10">
-                    <Users className="h-3.5 w-3.5 text-pink-400" />
-                  </span>
-                  Workspace Members
-                </h2>
-              </div>
-
-              <div className="relative z-10 flex-1 space-y-5">
-                {workspaceMembers.length ? workspaceMembers.slice(0, 4).map((member, index, items) => {
-                  const displayName = member.full_name || member.email || member.handle || "Workspace member";
-                  const role = workspaceRoleLabel(member.role);
-                  const color = roleColor(member.role);
-                  const cssClass = roleCssClass(member.role);
-                  return (
-                  <div key={member.user_id || member.email || index} className="relative flex gap-4">
-                    {index !== items.length - 1 ? (
-                      <div className="absolute bottom-[-20px] left-4 top-11 w-px bg-[linear-gradient(180deg,var(--omnix-border),transparent)]" />
-                    ) : null}
-                    <div
-                      className={`omnix-role-avatar ${cssClass} relative z-10 h-8 w-8 shrink-0 text-xs font-bold`}
-                    >
-                      {member.avatar_label || initialsFromText(displayName)}
-                    </div>
-                    <div className="pb-1 pt-0.5">
-                      <div className="mb-1.5 text-sm leading-5">
-                        <span className="font-semibold text-white">{displayName}</span>
-                        {member.email ? <span className="text-[var(--omnix-text-3)]"> {member.email}</span> : null}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span
-                          className="omnix-role-badge"
-                          style={{ "--role-color": color } as CSSProperties}
-                        >
-                          {role}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-                }) : (
-                  <div className="rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/15 p-5 text-center">
-                    <Users className="mx-auto h-7 w-7 text-cyan-200/35" />
-                    <p className="mt-3 text-sm font-semibold text-white">No members loaded yet</p>
-                    <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">
-                      Real workspace members will appear here after membership data is returned.
-                    </p>
                   </div>
                 )}
               </div>
