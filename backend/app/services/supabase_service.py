@@ -231,6 +231,8 @@ def _apply_filters(
                     query = query.eq(column, val)
                 elif op == "neq":
                     query = query.neq(column, val)
+                elif op == "is":
+                    query = query.is_(column, val)
                 else:
                     logger.warning("Unsupported filter operator encountered; using equality fallback.")
                     query = query.eq(column, val)
