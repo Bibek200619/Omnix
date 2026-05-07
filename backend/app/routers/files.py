@@ -15,7 +15,7 @@ from ..services.supabase_service import SupabaseServiceError, insert_one, select
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/files", tags=["files"])
-FILE_COLUMNS = "id,user_id,conversation_id,file_name,file_type,size_bytes,storage_path,metadata,created_at"
+FILE_COLUMNS = "id,user_id,workspace_id,conversation_id,file_name,file_type,size_bytes,storage_path,metadata,created_at"
 CONVERSATION_OWNERSHIP_COLUMNS = "id,user_id"
 DEFAULT_FILE_LIMIT = 50
 MAX_FILE_LIMIT = 100
@@ -50,6 +50,16 @@ async def _validate_conversation_ownership(conversation_id: str, user_id: str) -
 
 
 @router.post("", response_model=FileRead, status_code=status.HTTP_201_CREATED)
+async def _validate_workspace_ownership(workspace_id: str, user_id: str) -> None:
+    try:
+        workspace = await select_one("workspaces", "id,user_id", {"id": workspace_id, "user_id": user_id})
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    if workspace is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found.")
+
+
 async def create_file_metadata(
     file_payload: FileCreate,
     current_user: dict[str, Any] = Depends(get_current_user),
@@ -58,6 +68,9 @@ async def create_file_metadata(
 
     if file_payload.conversation_id:
         await _validate_conversation_ownership(file_payload.conversation_id, user_id)
+
+    if getattr(file_payload, "workspace_id", None):
+        await _validate_workspace_ownership(file_payload.workspace_id, user_id)
 
     payload = {"user_id": user_id, **file_payload.model_dump(exclude_none=True)}
 
@@ -72,6 +85,7 @@ async def get_files(
     limit: int = Query(default=DEFAULT_FILE_LIMIT, ge=1, le=MAX_FILE_LIMIT),
     offset: int = Query(default=0, ge=0),
     conversation_id: str | None = Query(default=None),
+    workspace_id: str | None = Query(default=None),
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     user_id = _user_id_from_claims(current_user)
@@ -79,6 +93,8 @@ async def get_files(
     filters = {"user_id": user_id}
     if conversation_id is not None:
         filters["conversation_id"] = conversation_id
+    if workspace_id is not None:
+        filters["workspace_id"] = workspace_id
 
     try:
         return await select_all(
