@@ -189,10 +189,10 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                 "inline-flex shrink-0 items-center rounded px-1.5 py-px text-[9px] font-medium uppercase tracking-[0.08em]",
                 isUser
                   ? workspaceRoleBadgeClass(senderRole)
-                  : "border-cyan-300/20 bg-cyan-300/5 text-cyan-200/80",
+                  : "border-cyan-300/10 bg-white/5 text-white/30",
               )}
             >
-              {isUser ? workspaceRoleLabel(senderRole) : "Assistant"}
+              {isUser ? workspaceRoleLabel(senderRole) : "Omnix"}
             </span>
           </div>
         </div>
@@ -241,22 +241,22 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         ) : null}
 
         {!isUser && activelyStreaming && sources.length > 0 ? (
-          <div className="relative z-10 mt-4 border-t border-[var(--omnix-border)] pt-3">
-            <p className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[11px] font-medium text-cyan-100">
-              <Globe2 className="h-3.5 w-3.5" />
-              Sources ready ({sources.length})
+          <div className="relative z-10 mt-4 border-t border-white/5 pt-3">
+            <p className="inline-flex items-center gap-2 rounded-full border border-white/5 bg-white/[0.03] px-2.5 py-1 text-[10px] font-medium text-white/20">
+              <Globe2 className="h-3 w-3 opacity-40" />
+              Intelligence context ready
             </p>
           </div>
         ) : null}
 
         {!isUser && !activelyStreaming && sources.length > 0 ? (
-          <div className="relative z-10 mt-4 border-t border-[var(--omnix-border)] pt-4">
+          <div className="relative z-10 mt-4 border-t border-white/5 pt-4">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="flex items-center gap-2 text-xs font-medium text-[var(--omnix-text-2)]">
-                <Globe2 className="h-3.5 w-3.5 text-cyan-300/80" />
-                Sources ({sources.length})
+              <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wider text-white/20">
+                <Globe2 className="h-3 w-3 opacity-40" />
+                Context
               </p>
-              <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2 py-0.5 text-[10px] font-medium text-cyan-100">
+              <span className="rounded-full border border-white/5 bg-white/[0.03] px-2 py-0.5 text-[9px] font-medium text-white/30 uppercase tracking-tight">
                 {sourceBadgeLabel()}
               </span>
             </div>

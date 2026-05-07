@@ -82,7 +82,7 @@ function normalizeMessage(message: ApiMessage, index: number, senderLookup: Send
   const isOwn = role === "user" && Boolean(userId && userId === senderLookup.currentUserId);
   const senderName =
     role === "assistant"
-      ? "Omnix AI"
+      ? "Omnix"
       : isOwn
       ? "You"
       : member?.full_name || member?.email || "Teammate";
@@ -92,7 +92,7 @@ function normalizeMessage(message: ApiMessage, index: number, senderLookup: Send
       : member?.email ?? (isOwn ? senderLookup.currentUserEmail ?? null : null);
   const senderAvatar =
     role === "assistant"
-      ? "AI"
+      ? "OX"
       : member?.avatar_label || initialsFromText(senderName || senderEmail || userId || "U");
   const senderAvatarUrl =
     role === "assistant"
@@ -851,8 +851,8 @@ export function ChatInterface() {
                 {
                   id: assistantId as string,
                   role: "assistant",
-                  senderName: "Omnix AI",
-                  senderAvatar: "AI",
+                  senderName: "Omnix",
+                  senderAvatar: "OX",
                   senderRole: "assistant",
                   isOwn: false,
                   content: "",
