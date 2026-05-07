@@ -19,6 +19,7 @@ type SubscriptionEntry = {
   onStatus?: SubscriptionStatusHandler;
   reconnectAttempts: number;
   reconnectTimer: number | null;
+  isUnsubscribing: boolean;
 };
 
 const MAX_RECONNECT_DELAY_MS = 15_000;
@@ -35,30 +36,44 @@ class RealtimeSubscriptionRegistry {
     setup: SubscriptionSetup,
     onStatus?: SubscriptionStatusHandler,
     reconnectAttempts = 0,
-  ): RealtimeChannel {
+  ): RealtimeChannel | null {
     if (!supabase) {
-      throw new Error("Supabase is not configured.");
+      console.warn("[realtime] supabase not configured");
+      return null;
     }
 
-    const channel = setup(supabase.channel(stringKey));
+    // Ensure we don't have an active entry for this key before creating
+    const existing = this.subscriptions.get(stringKey);
+    if (existing && !existing.isUnsubscribing) {
+      console.warn(`[realtime] channel ${stringKey} already exists and is active`);
+      return existing.channel;
+    }
+
+    const rawChannel = supabase.channel(stringKey);
+    const channel = setup(rawChannel);
+    
     const entry: SubscriptionEntry = {
       channel,
       setup,
       onStatus,
       reconnectAttempts,
       reconnectTimer: null,
+      isUnsubscribing: false,
     };
     this.subscriptions.set(stringKey, entry);
 
     channel.subscribe((status) => {
+      // Re-verify entry still exists and matches this channel instance
+      const current = this.subscriptions.get(stringKey);
+      if (!current || current.channel !== channel || current.isUnsubscribing) {
+        return;
+      }
+
       console.debug(`[realtime] ${stringKey} status:`, status);
       onStatus?.(status);
 
       if (status === "SUBSCRIBED") {
-        const current = this.subscriptions.get(stringKey);
-        if (current) {
-          current.reconnectAttempts = 0;
-        }
+        current.reconnectAttempts = 0;
         return;
       }
 
@@ -72,7 +87,7 @@ class RealtimeSubscriptionRegistry {
 
   private scheduleReconnect(stringKey: string) {
     const entry = this.subscriptions.get(stringKey);
-    if (!entry || entry.reconnectTimer) {
+    if (!entry || entry.reconnectTimer || entry.isUnsubscribing) {
       return;
     }
 
@@ -82,13 +97,18 @@ class RealtimeSubscriptionRegistry {
 
     entry.reconnectTimer = window.setTimeout(() => {
       const current = this.subscriptions.get(stringKey);
-      if (!current) {
+      if (!current || current.isUnsubscribing) {
         return;
       }
 
       current.reconnectTimer = null;
-      void current.channel.unsubscribe();
-      this.createChannel(stringKey, current.setup, current.onStatus, current.reconnectAttempts);
+      // Use internal unsubscribe logic that doesn't clear the entry if we're just reconnecting
+      void current.channel.unsubscribe().then(() => {
+        // Double check we still want to reconnect
+        if (this.subscriptions.get(stringKey) === current && !current.isUnsubscribing) {
+          this.createChannel(stringKey, current.setup, current.onStatus, current.reconnectAttempts);
+        }
+      });
     }, delay);
   }
 
@@ -105,7 +125,10 @@ class RealtimeSubscriptionRegistry {
     const stringKey = this.generateKey(key);
     
     // Cleanup existing if any
-    this.unsubscribe(key);
+    const existing = this.subscriptions.get(stringKey);
+    if (existing) {
+       this.unsubscribe(key);
+    }
 
     return this.createChannel(stringKey, setup, onStatus);
   }
@@ -113,23 +136,32 @@ class RealtimeSubscriptionRegistry {
   unsubscribe(key: SubscriptionKey) {
     const stringKey = this.generateKey(key);
     const existing = this.subscriptions.get(stringKey);
-    if (existing) {
+    if (existing && !existing.isUnsubscribing) {
       console.debug(`[realtime] unsubscribing from ${stringKey}`);
+      existing.isUnsubscribing = true;
       if (existing.reconnectTimer) {
         window.clearTimeout(existing.reconnectTimer);
+        existing.reconnectTimer = null;
       }
-      void existing.channel.unsubscribe();
-      this.subscriptions.delete(stringKey);
+      void existing.channel.unsubscribe().finally(() => {
+        if (this.subscriptions.get(stringKey) === existing) {
+           this.subscriptions.delete(stringKey);
+        }
+      });
     }
   }
 
   unsubscribeAll() {
     console.debug(`[realtime] unsubscribing from all ${this.subscriptions.size} channels`);
-    this.subscriptions.forEach((entry) => {
-      if (entry.reconnectTimer) {
-        window.clearTimeout(entry.reconnectTimer);
+    this.subscriptions.forEach((entry, stringKey) => {
+      if (!entry.isUnsubscribing) {
+        entry.isUnsubscribing = true;
+        if (entry.reconnectTimer) {
+          window.clearTimeout(entry.reconnectTimer);
+          entry.reconnectTimer = null;
+        }
+        void entry.channel.unsubscribe();
       }
-      void entry.channel.unsubscribe();
     });
     this.subscriptions.clear();
   }

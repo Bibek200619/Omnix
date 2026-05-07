@@ -85,6 +85,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
   const [loadingPresence] = useState(false);
   const [loadingActivity, setLoadingActivity] = useState(false);
+  
   const typingSentAtRef = useRef(0);
   const lastPresenceWorkspaceIdRef = useRef<string | null>(null);
   const activeWorkspaceIdRef = useRef<string | null>(activeWorkspaceId);
@@ -225,6 +226,17 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     setActiveWorkspace,
   ]);
 
+  // Use refs for stable callback access in the subscription effect
+  const refreshPresenceRef = useRef(refreshPresence);
+  const refreshActivityRef = useRef(refreshActivity);
+  const handleAuthorityRevocationRef = useRef(handleAuthorityRevocation);
+
+  useEffect(() => {
+    refreshPresenceRef.current = refreshPresence;
+    refreshActivityRef.current = refreshActivity;
+    handleAuthorityRevocationRef.current = handleAuthorityRevocation;
+  }, [refreshPresence, refreshActivity, handleAuthorityRevocation]);
+
   const sendTypingSignal = useCallback(
     async (conversationId?: string | null, isTyping = true) => {
       if (!userId || !activeWorkspaceId) return;
@@ -290,7 +302,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
             },
             () => {
               console.debug("[realtime] presence change detected, refreshing...");
-              void refreshPresence();
+              void refreshPresenceRef.current();
             }
           )
           .on("broadcast", { event: "typing" }, ({ payload }: { payload: TypingSignal }) => {
@@ -328,7 +340,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
             },
             (payload) => {
               console.debug("[realtime] activity insert detected", payload);
-              void refreshActivity();
+              void refreshActivityRef.current();
             }
           )
     );
@@ -349,7 +361,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
             (payload: { new: { workspace_id: string; revocation_type: string } }) => {
               console.warn("[realtime] authority revocation detected", payload);
               const { workspace_id, revocation_type } = payload.new;
-              handleAuthorityRevocation(workspace_id, revocation_type);
+              handleAuthorityRevocationRef.current(workspace_id, revocation_type);
             }
           )
     );
@@ -359,7 +371,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       realtimeRegistry.unsubscribe({ type: "activity", workspaceId: activeWorkspaceId });
       realtimeRegistry.unsubscribe({ type: "revocation" });
     };
-  }, [activeWorkspaceId, handleAuthorityRevocation, refreshActivity, refreshPresence, userId]);
+  }, [activeWorkspaceId, userId]);
 
   // Periodic Refresh / Heartbeat
   useEffect(() => {
