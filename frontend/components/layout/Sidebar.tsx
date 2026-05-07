@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { OmnixMark } from "@/components/brand/OmnixMark";
 import { Button } from "@/components/ui/Button";
+import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { ClientTime } from "@/components/ui/ClientTime";
 import { Input } from "@/components/ui/Input";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -111,6 +112,8 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
   } = useWorkspace();
   const { presence, statusForWorkspace, realtimeStatus } = useWorkspaceCollaboration();
   const [open, setOpen] = useState(false);
+  const selectorRef = useRef<HTMLDivElement | null>(null);
+  const selectorMenuRef = useRef<HTMLDivElement | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showCreateSubspaceModal, setShowCreateSubspaceModal] = useState(false);
   const [newSubspaceName, setNewSubspaceName] = useState("");
@@ -140,6 +143,30 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
   const canCreateSubspace = Boolean(
     activeSuperWorkspace && isWorkspaceFounderRole(activeSuperWorkspace.current_user_role),
   );
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (!selectorRef.current?.contains(target) && !selectorMenuRef.current?.contains(target)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    window.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!activeRootWorkspace?.id || (activeRootWorkspace.workspace_type !== "super" && activeRootWorkspace.workspace_type !== "super_workspace")) {
@@ -493,7 +520,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
   const ActiveWorkspaceIcon = active ? workspaceIcon(active) : Layers3;
 
   return (
-    <div className="relative">
+    <div ref={selectorRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -549,14 +576,15 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
 
       <AnimatePresence>
         {open && (
+          <FloatingMenuLayer anchorRef={selectorRef} contentRef={selectorMenuRef} placement="bottom-start" width="anchor" minWidth={248} offset={6} zIndex={145}>
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="omnix-floating-card absolute left-0 top-full z-50 mt-1 w-full overflow-hidden"
+            className="omnix-floating-card w-full overflow-hidden"
           >
-            <div className="max-h-[22rem] overflow-y-auto py-1">
+            <div className="omnix-scrollbar overflow-y-auto py-1" style={{ maxHeight: "min(22rem, var(--omnix-floating-max-h))" }}>
               {workspaceError ? (
                 <div className="m-2 rounded-md border border-rose-400/25 bg-rose-400/10 p-2 text-xs text-rose-100">
                   <div className="flex items-start gap-2">
@@ -725,6 +753,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
               </div>
             </div>
           </motion.div>
+          </FloatingMenuLayer>
         )}
       </AnimatePresence>
       {active ? (

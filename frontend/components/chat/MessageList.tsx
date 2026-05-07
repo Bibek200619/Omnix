@@ -83,7 +83,7 @@ export function MessageList({
   }
 
   return (
-    <div className="omnix-scrollbar flex min-h-0 flex-1 flex-col gap-[26px] overflow-y-auto px-5 py-6 pb-36 sm:px-7">
+    <div className="omnix-scrollbar flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 pb-36 sm:gap-7 sm:px-7 lg:px-9">
       <AnimatePresence initial={false}>
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} onRetry={onRetry} onRegenerate={onRegenerate} />
@@ -92,7 +92,7 @@ export function MessageList({
           <motion.div
             key="collaborator-typing"
             layout
-            className="flex gap-3"
+            className="flex w-full items-start gap-3"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
@@ -114,7 +114,7 @@ export function MessageList({
           <motion.div
             key="typing"
             layout
-            className="flex gap-3"
+            className="flex w-full items-start gap-3"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
