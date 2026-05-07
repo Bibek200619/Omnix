@@ -134,7 +134,10 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -6, scale: 0.99 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
-      className="group flex gap-3"
+      className={cn(
+        "group flex w-full items-start gap-3",
+        isOwn ? "flex-row-reverse" : "flex-row",
+      )}
     >
       {isUser ? (
         <ProfileAvatar
@@ -154,12 +157,15 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
       )}
       <div
         className={cn(
-          "group/content relative max-w-[92%] transition sm:max-w-[78%]",
+          "group/content relative min-w-0 transition",
+          isOwn
+            ? "max-w-[86%] sm:max-w-[680px]"
+            : "max-w-[92%] sm:max-w-[78%]",
           failed
             ? "overflow-hidden rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-rose-50"
           : isUser
-            ? "omnix-human-card max-w-[680px] px-4 py-3 text-[var(--omnix-text-2)] shadow-sm"
-            : "omnix-ai-card max-w-[740px] px-5 py-[18px] text-slate-100",
+            ? "omnix-human-card px-4 py-3 text-[var(--omnix-text-2)] shadow-sm"
+            : "omnix-ai-card px-5 py-[18px] text-slate-100",
           sending && "opacity-80",
         )}
         style={isUser ? ({ "--role-color": roleColor } as CSSProperties) : undefined}
@@ -167,7 +173,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         <div className="relative z-10 mb-2 flex flex-wrap items-center gap-2">
           <span
             className={cn(
-              "truncate text-[13px] font-medium",
+              "min-w-0 truncate text-[13px] font-medium",
               isOwn ? "text-cyan-50" : isOtherHuman ? "text-sky-50" : "text-cyan-100",
             )}
           >
@@ -180,7 +186,14 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
             <span className="h-[5px] w-[5px] rounded-full opacity-60" style={{ background: roleColor }} />
           ) : null}
           
-          <div className="flex items-center gap-2 opacity-0 transition-opacity duration-300 group-hover/content:opacity-100">
+          <div
+            className={cn(
+              "flex min-w-0 items-center gap-2 transition-opacity duration-300",
+              isOtherHuman
+                ? "opacity-100"
+                : "opacity-0 group-hover/content:opacity-100 group-focus-within/content:opacity-100",
+            )}
+          >
             {isUser && message.senderHandle ? (
               <span className="truncate text-[10px] font-medium text-slate-400/80">@{message.senderHandle}</span>
             ) : null}
@@ -198,11 +211,11 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         </div>
 
         {isUser ? (
-          <p className="relative z-10 whitespace-pre-wrap text-sm font-light leading-[1.65] text-[var(--omnix-text)]">{message.content}</p>
+          <p className="relative z-10 whitespace-pre-wrap break-words text-sm font-light leading-[1.65] text-[var(--omnix-text)]">{message.content}</p>
         ) : activelyStreaming ? (
-          <div className="relative z-10"><StreamingTextRenderer content={message.content} compact /></div>
+          <div className="relative z-10 break-words"><StreamingTextRenderer content={message.content} compact /></div>
         ) : (
-          <div className="relative z-10"><MarkdownRenderer content={message.content} compact /></div>
+          <div className="relative z-10 break-words"><MarkdownRenderer content={message.content} compact /></div>
         )}
 
         {isUser && message.attachments && message.attachments.length > 0 ? (
@@ -349,7 +362,12 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
           </div>
         ) : null}
 
-        <div className="relative z-10 mt-2 flex items-center justify-between gap-2">
+        <div
+          className={cn(
+            "relative z-10 mt-3 flex items-center justify-between gap-2",
+            isOwn && "flex-row-reverse",
+          )}
+        >
           <p
             className={cn(
               "text-[11px]",
@@ -365,13 +383,13 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
             {sending ? (message.status === "streaming" ? "Thinking…" : "Sending...") : message.timestamp}
           </p>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             {!sending && message.content ? (
               <button
                 type="button"
                 onClick={copyMessage}
                 className={cn(
-                  "inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
+                  "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
                   isOwn && "text-emerald-100/50 hover:text-emerald-50",
                   isOtherHuman && "text-sky-100/50 hover:text-sky-50",
                 )}
@@ -389,7 +407,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                   onClick={handleRegenerate}
                   title="Regenerate"
                   aria-label="Regenerate"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                 </button>
@@ -400,7 +418,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                   title="Helpful"
                   aria-label="Helpful"
                   className={cn(
-                    "inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white",
+                    "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
                     gaveFeedback === "up" && "bg-emerald-400/10 text-emerald-200",
                   )}
                 >
@@ -413,7 +431,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                   title="Not helpful"
                   aria-label="Not helpful"
                   className={cn(
-                    "inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white",
+                    "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
                     gaveFeedback === "down" && "bg-rose-400/10 text-rose-200",
                   )}
                 >
