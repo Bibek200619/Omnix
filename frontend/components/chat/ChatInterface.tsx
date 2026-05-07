@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Database, FileSearch, ShieldCheck, WifiOff } from "lucide-react";
+import dynamic from "next/dynamic";
+const UploadDropzone = dynamic(() => import("@/components/upload/UploadDropzone").then((m) => m.UploadDropzone), { ssr: false });
+import { FileText } from "lucide-react";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageList } from "@/components/chat/MessageList";
 import type {
@@ -12,6 +15,7 @@ import type {
   Message,
 } from "@/components/chat/types";
 import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
@@ -65,6 +69,17 @@ function optimisticConversation(
   };
 }
 
+
+interface FileData {
+  id: string;
+  file_name?: string;
+  filename?: string;
+  file_type?: string;
+  content_type?: string;
+  size_bytes?: number;
+  storage_path?: string;
+}
+
 export function ChatInterface() {
   const params = useSearchParams();
   const router = useRouter();
@@ -80,9 +95,21 @@ export function ChatInterface() {
   const [responding, setResponding] = useState(false);
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentConversation, setCurrentConversation] = useState<string | null>(
+    const [currentConversation, setCurrentConversation] = useState<string | null>(
     conversationId,
   );
+
+  const [chatFiles, setChatFiles] = useState<FileData[]>([]);
+  const [showUpload, setShowUpload] = useState(false);
+
+  useEffect(() => {
+    if (currentConversation) {
+      apiClient.get<FileData[]>("/files?conversation_id=" + currentConversation).then(setChatFiles).catch(console.error);
+    } else {
+      setChatFiles([]);
+    }
+  }, [currentConversation]);
+
 
   const loadConversation = useCallback(
     async (convId: string) => {
@@ -221,7 +248,7 @@ export function ChatInterface() {
             timestamp: formatTime(),
             status: "streaming",
             isStreaming: true,
-            sources: (response.sources as any[]) ?? [],
+            sources: (response.sources as Record<string, unknown>[]) ?? [],
           },
         ]);
 
@@ -353,6 +380,38 @@ export function ChatInterface() {
           onPromptSelect={handlePromptSelect}
           onRegenerate={handleRegenerate}
         />
+        
+        <div className="w-full mx-auto mb-2">
+            {chatFiles.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs font-medium text-slate-400 mb-2">Using retrieved sources:</p>
+                <div className="flex flex-wrap gap-2">
+                  {chatFiles.map(f => (
+                    <div key={f.id as string} className="flex items-center gap-2 bg-white/[0.04] border border-white/10 rounded-md px-3 py-1.5 text-xs text-slate-200">
+                      <FileText className="w-3 h-3 text-cyan-400" />
+                      <span className="truncate max-w-[150px]">{f.file_name as string}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {showUpload && (
+              <div className="mb-4">
+                <UploadDropzone conversationId={currentConversation || undefined} onUploadSuccess={() => {
+                  if (currentConversation) {
+                    apiClient.get<FileData[]>("/files?conversation_id=" + currentConversation).then(setChatFiles).catch(console.error);
+                  }
+                }} />
+              </div>
+            )}
+            <div className="flex justify-end mb-2">
+              <Button variant="ghost" size="sm" onClick={() => setShowUpload(!showUpload)} className="text-xs text-slate-400">
+                {showUpload ? "Hide Upload" : "Attach Document"}
+              </Button>
+            </div>
+        </div>
+
         <ChatInput onSend={sendMessage} loading={responding} />
       </div>
     </section>

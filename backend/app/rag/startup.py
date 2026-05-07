@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 from ..core.config import get_settings
-from .vector_store import FAISSStore
+from .pgvector_store import PgVectorStore
 from .vector_store_base import VectorStore
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ async def initialize_vector_store() -> VectorStore:
     logger.debug("Ensured data directory exists: %s", data_dir)
     
     # Initialize new FAISS store
-    store: VectorStore = FAISSStore()
+    store: VectorStore = PgVectorStore()
     logger.debug("Created new FAISSStore instance.")
     
     # Try to load from disk if files exist
