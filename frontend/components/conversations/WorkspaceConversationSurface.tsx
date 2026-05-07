@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import {
   ArrowRight,
   CircleDot,
+  ClipboardCheck,
   CornerDownRight,
   FileText,
   Loader2,
@@ -26,11 +27,16 @@ import type {
   WorkspaceChannelMessage,
   WorkspaceConversationAssistance,
   WorkspaceConversationAssistanceMode,
+  WorkspaceTask,
 } from "@/lib/workspace-types";
 
 type DisplayMessage = WorkspaceChannelMessage & {
   delivery?: "sending" | "failed";
 };
+
+type TaskSource =
+  | { kind: "message"; message: WorkspaceChannelMessage }
+  | { kind: "assistance"; assistance: WorkspaceConversationAssistance };
 
 const assistanceLabels: Record<WorkspaceConversationAssistanceMode, string> = {
   summary: "Summarize",
@@ -93,6 +99,11 @@ export function WorkspaceConversationSurface() {
   const [creatingChannel, setCreatingChannel] = useState(false);
   const [assistance, setAssistance] = useState<WorkspaceConversationAssistance | null>(null);
   const [assistanceLoading, setAssistanceLoading] = useState<WorkspaceConversationAssistanceMode | null>(null);
+  const [taskSource, setTaskSource] = useState<TaskSource | null>(null);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [creatingTask, setCreatingTask] = useState(false);
+  const [taskConfirmation, setTaskConfirmation] = useState<string | null>(null);
   const workspaceRef = useRef(activeWorkspaceId);
   const selectedChannelRef = useRef(selectedChannelId);
   const channelRequestRef = useRef(0);
@@ -189,6 +200,8 @@ export function WorkspaceConversationSurface() {
     setThreadRoot(null);
     setThreadMessages([]);
     setAssistance(null);
+    setTaskSource(null);
+    setTaskConfirmation(null);
     void loadChannels();
   }, [activeWorkspaceId, loadChannels]);
 
@@ -381,6 +394,60 @@ export function WorkspaceConversationSurface() {
     void loadThread(selectedChannelId, message);
   }
 
+  function openMessageTask(message: WorkspaceChannelMessage) {
+    const title = message.content.replace(/\s+/g, " ").trim();
+    setTaskSource({ kind: "message", message });
+    setTaskTitle(title.length > 110 ? `${title.slice(0, 107).trim()}...` : title);
+    setTaskDescription(message.content);
+  }
+
+  function openAssistanceTask(result: WorkspaceConversationAssistance) {
+    setTaskSource({ kind: "assistance", assistance: result });
+    setTaskTitle("");
+    setTaskDescription(result.content);
+  }
+
+  async function createTaskFromContext(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!activeWorkspaceId || !selectedChannelId || !taskSource || !taskTitle.trim()) return;
+    const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+    try {
+      setCreatingTask(true);
+      let created: WorkspaceTask;
+      if (taskSource.kind === "message") {
+        created = await apiClient.post<WorkspaceTask>(
+          `/workspaces/${activeWorkspaceId}/tasks/from-message/${selectedChannelId}/${taskSource.message.id}`,
+          {
+            title: taskTitle.trim(),
+            description: taskDescription.trim() || null,
+            status: "idea",
+            client_nonce: nonce,
+          },
+        );
+      } else {
+        created = await apiClient.post<WorkspaceTask>(
+          `/workspaces/${activeWorkspaceId}/tasks/from-assistance/${selectedChannelId}`,
+          {
+            title: taskTitle.trim(),
+            description: taskDescription.trim() || null,
+            assistance_text: taskSource.assistance.content,
+            thread_root_id: threadRoot?.id ?? null,
+            status: "idea",
+            client_nonce: nonce,
+          },
+        );
+      }
+      setTaskConfirmation(`Task opened: ${created.title}`);
+      setTaskSource(null);
+      setTaskTitle("");
+      setTaskDescription("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to open task from discussion.");
+    } finally {
+      setCreatingTask(false);
+    }
+  }
+
   function MessageRow({ message, threaded = false }: { message: DisplayMessage; threaded?: boolean }) {
     return (
       <article
@@ -413,15 +480,27 @@ export function WorkspaceConversationSurface() {
                 ))}
               </div>
             ) : null}
-            {!threaded && message.delivery !== "sending" ? (
-              <button
-                type="button"
-                onClick={() => openThread(message)}
-                className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-[var(--omnix-text-3)] transition hover:text-cyan-100"
-              >
-                <CornerDownRight className="h-3.5 w-3.5" />
-                {message.thread_reply_count ? `${message.thread_reply_count} thread replies` : "Open thread"}
-              </button>
+            {message.delivery !== "sending" ? (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                {!threaded ? (
+                  <button
+                    type="button"
+                    onClick={() => openThread(message)}
+                    className="inline-flex items-center gap-1.5 text-[11px] text-[var(--omnix-text-3)] transition hover:text-cyan-100"
+                  >
+                    <CornerDownRight className="h-3.5 w-3.5" />
+                    {message.thread_reply_count ? `${message.thread_reply_count} thread replies` : "Open thread"}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => openMessageTask(message)}
+                  className="inline-flex items-center gap-1.5 text-[11px] text-[var(--omnix-text-3)] transition hover:text-cyan-100"
+                >
+                  <ClipboardCheck className="h-3.5 w-3.5" />
+                  Track as task
+                </button>
+              </div>
             ) : null}
           </div>
         </div>
@@ -462,6 +541,12 @@ export function WorkspaceConversationSurface() {
         <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-rose-400/20 bg-rose-400/8 px-3 py-2 text-xs text-rose-100">
           <span>{error}</span>
           <button type="button" onClick={() => setError(null)} aria-label="Dismiss error"><X className="h-3.5 w-3.5" /></button>
+        </div>
+      ) : null}
+      {taskConfirmation ? (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-emerald-300/18 bg-emerald-300/[0.06] px-3 py-2 text-xs text-emerald-100">
+          <span>{taskConfirmation}. Source context is preserved.</span>
+          <button type="button" onClick={() => setTaskConfirmation(null)} aria-label="Dismiss confirmation"><X className="h-3.5 w-3.5" /></button>
         </div>
       ) : null}
 
@@ -546,7 +631,18 @@ export function WorkspaceConversationSurface() {
                 <button type="button" onClick={() => setAssistance(null)} className="text-white/30 hover:text-white"><X className="h-3.5 w-3.5" /></button>
               </div>
               <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--omnix-text)]">{assistance.content}</p>
-              <p className="mt-2 text-[10px] text-[var(--omnix-text-3)]">Derived from {assistance.source_message_count} discussion messages. Not posted into the channel.</p>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[10px] text-[var(--omnix-text-3)]">Derived from {assistance.source_message_count} discussion messages. Not posted into the channel.</p>
+                {assistance.mode === "actions" ? (
+                  <button
+                    type="button"
+                    onClick={() => openAssistanceTask(assistance)}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-purple-300/15 px-2 py-1 text-[11px] text-purple-100/85 transition hover:bg-purple-300/[0.08]"
+                  >
+                    <ClipboardCheck className="h-3.5 w-3.5" /> Convert selected action
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
           <div className="omnix-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto px-2 py-3 sm:px-3">
@@ -642,6 +738,37 @@ export function WorkspaceConversationSurface() {
           </aside>
         ) : null}
       </div>
+      {taskSource ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6">
+          <form onSubmit={createTaskFromContext} className="omnix-panel-strong w-full max-w-lg rounded-2xl border border-cyan-300/15 p-4 shadow-2xl sm:p-5">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Discussion to execution</p>
+                <h2 className="mt-1 text-base font-semibold text-white">Open linked task</h2>
+              </div>
+              <button type="button" onClick={() => setTaskSource(null)} className="rounded-md p-1.5 text-white/45 hover:text-white" aria-label="Close task conversion">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <Input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} placeholder="Name the specific next step" className="h-10 text-sm" autoFocus />
+            <textarea
+              value={taskDescription}
+              onChange={(event) => setTaskDescription(event.target.value)}
+              className="omnix-input mt-2 min-h-[104px] w-full resize-none rounded-lg p-3 text-sm leading-6"
+              placeholder="Carry forward the operational context"
+            />
+            <p className="mt-2 text-[11px] leading-5 text-[var(--omnix-text-3)]">
+              This creates one Idea task linked to {taskSource.kind === "message" ? "the source message" : "the selected AI extraction and channel"}. Ownership and dates remain unset unless recorded later.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button type="button" size="sm" variant="ghost" onClick={() => setTaskSource(null)}>Cancel</Button>
+              <Button type="submit" size="sm" isLoading={creatingTask} disabled={!taskTitle.trim()} leftIcon={<ClipboardCheck className="h-3.5 w-3.5" />}>
+                Open task
+              </Button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </section>
   );
 }
