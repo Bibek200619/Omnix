@@ -36,10 +36,18 @@ def mock_db_services(monkeypatch):
         pass
     monkeypatch.setattr("app.routers.workspaces.leave_workspace_presence", mock_leave_presence)
 
+    async def mock_invalidate_presence_cache(workspace_id):
+        pass
+    monkeypatch.setattr("app.routers.workspaces.invalidate_workspace_presence_cache", mock_invalidate_presence_cache)
+
     # Mock log_workspace_activity
     async def mock_log_activity(**kwargs):
         return {}
     monkeypatch.setattr("app.routers.workspaces.log_workspace_activity", mock_log_activity)
+
+    async def mock_emit_authority_revocation(**kwargs):
+        return None
+    monkeypatch.setattr("app.services.realtime_service.emit_authority_revocation", mock_emit_authority_revocation)
 
     # Mock is_super_workspace/is_subspace if needed, though they are usually safe
     # But for tests, we might want to control them
@@ -189,4 +197,3 @@ async def test_team_lead_cannot_remove_another_team_lead(monkeypatch: pytest.Mon
     
     assert exc.value.status_code == status.HTTP_403_FORBIDDEN
     assert "Team leads can remove members only" in exc.value.detail
-
