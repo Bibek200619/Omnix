@@ -182,7 +182,7 @@ export function ChatInput({
           className="block max-h-40 min-h-[54px] w-full resize-none border border-transparent bg-transparent px-[15px] py-[13px] text-sm leading-[1.6] text-white outline-none transition placeholder:text-[var(--omnix-text-3)] disabled:cursor-not-allowed disabled:opacity-70 sm:text-base"
         />
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--omnix-border)] bg-[rgba(0,0,0,0.2)] px-3 py-2.5 transition focus-within:bg-[var(--omnix-surface)]">
-        <div className="flex min-w-0 flex-wrap items-center gap-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <Button
             type="button"
             variant={uploadOpen ? "secondary" : "ghost"}
@@ -204,7 +204,7 @@ export function ChatInput({
                 type="button"
                 onClick={() => onSearchModeChange(mode.value)}
                 className={cn(
-                  "inline-flex h-8 min-w-0 items-center gap-1.5 rounded-[7px] border px-2 text-[11px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 sm:h-7 sm:px-2.5",
+                  "inline-flex h-8 min-w-0 items-center gap-1.5 rounded-[7px] border px-2.5 text-[11px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 sm:h-7",
                   active
                     ? "border-cyan-300/35 bg-cyan-300/12 text-cyan-50 shadow-[var(--omnix-glow-xs)]"
                     : "border-transparent text-[var(--omnix-text-3)] hover:bg-[var(--omnix-surface)] hover:text-slate-100",
