@@ -412,6 +412,76 @@ async def test_founder_can_promote_member_to_co_owner(monkeypatch: pytest.Monkey
     assert response["role"] == "co_owner"
 
 
+@pytest.mark.asyncio
+async def test_inherited_subspace_role_update_uses_subspace_scope(monkeypatch: pytest.MonkeyPatch) -> None:
+    updates: list[tuple[dict[str, object], dict[str, object]]] = []
+    revocations: list[dict[str, object]] = []
+
+    async def fake_require_workspace_access(workspace_id: str, user_id: str):
+        assert workspace_id == "sub-1"
+        assert user_id == "founder-1"
+        return SimpleNamespace(
+            workspace={
+                "id": workspace_id,
+                "user_id": "sub-founder-1",
+                "workspace_type": "subworkspace",
+                "parent_workspace_id": "super-1",
+                "is_global": False,
+            },
+            role="founder",
+            membership_workspace={"id": "super-1", "user_id": "founder-1"},
+            membership_workspace_id="super-1",
+        )
+
+    async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
+        assert table == "workspace_members"
+        assert filters == {"workspace_id": "sub-1", "user_id": "member-1"}
+        return {"workspace_id": "sub-1", "user_id": "member-1", "role": "member"}
+
+    async def fake_update_one_trusted(table: str, filters: dict[str, object], payload: dict[str, object]):
+        assert table == "workspace_members"
+        updates.append((filters, payload))
+        return {"workspace_id": "sub-1", "user_id": "member-1", **payload}
+
+    async def fake_emit_authority_revocation(**kwargs):
+        revocations.append(kwargs)
+        return True
+
+    async def fake_list_workspace_members(workspace: dict[str, object]):
+        assert workspace["id"] == "sub-1"
+        return [
+            {
+                "workspace_id": "sub-1",
+                "user_id": "member-1",
+                "role": "team_lead",
+                "avatar_label": "M",
+            },
+        ]
+
+    monkeypatch.setattr(workspaces, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(workspaces, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspaces, "update_one_trusted", fake_update_one_trusted)
+    monkeypatch.setattr(workspaces, "list_workspace_members", fake_list_workspace_members)
+    monkeypatch.setattr("app.services.realtime_service.emit_authority_revocation", fake_emit_authority_revocation)
+    monkeypatch.setattr(workspaces, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
+
+    response = await workspaces.update_workspace_member_role(
+        "sub-1",
+        "member-1",
+        WorkspaceMemberRoleUpdate(role="team_lead"),
+        current_user={"sub": "founder-1"},
+    )
+
+    assert updates == [
+        (
+            {"workspace_id": "sub-1", "user_id": "member-1"},
+            {"role": "team_lead", "updated_at": "2026-05-16T00:00:00+00:00"},
+        )
+    ]
+    assert revocations[0]["workspace_id"] == "sub-1"
+    assert response["role"] == "team_lead"
+
+
 def test_workspace_member_patch_routes_are_registered() -> None:
     assert any(
         route.path == "/workspaces/{workspace_id}/members/{member_user_id}"

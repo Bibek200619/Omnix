@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useId, useState } from "react";
 import { Mail, ShieldCheck, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -27,6 +27,7 @@ export function WorkspaceInviteModal({
   onClose,
   onSubmit,
 }: WorkspaceInviteModalProps) {
+  const formId = useId();
   const [target, setTarget] = useState("");
   const [role, setRole] = useState<WorkspaceRole>("member");
   const [localError, setLocalError] = useState<string | null>(null);
@@ -82,7 +83,7 @@ export function WorkspaceInviteModal({
           </Button>
         </div>
 
-        <form onSubmit={handleSubmit} className="relative z-10 mt-5 flex-1 overflow-y-auto pr-1">
+        <form id={formId} onSubmit={handleSubmit} className="relative z-10 mt-5 flex-1 overflow-y-auto pr-1">
           <div className="space-y-4 pb-1">
             <Input
               id="invite-email"
@@ -135,10 +136,7 @@ export function WorkspaceInviteModal({
           <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button type="submit" leftIcon={<UserPlus className="h-4 w-4" />} isLoading={loading} onClick={() => {
-            // Manual trigger because form might not be parent of buttons if we re-arrange
-            // but here it is still.
-          }}>
+          <Button type="submit" form={formId} leftIcon={<UserPlus className="h-4 w-4" />} isLoading={loading}>
             Assign Scope
           </Button>
         </div>
