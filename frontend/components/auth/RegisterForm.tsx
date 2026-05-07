@@ -71,7 +71,6 @@ export function RegisterForm() {
         });
         await refreshSession();
         router.replace(redirectFromWindow());
-        router.refresh();
         return;
       }
 

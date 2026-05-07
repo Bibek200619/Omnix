@@ -1220,6 +1220,7 @@ async def chat_stream(
 
     async def event_generator() -> AsyncIterator[str]:
         assistant_parts: list[str] = []
+        client_disconnected = False
         prompt_message = message_text
         sources: list[dict[str, Any]] = []
         retrieval_debug = _empty_retrieval_debug("pending")
@@ -1287,6 +1288,7 @@ async def chat_stream(
             ):
                 if await request.is_disconnected():
                     logger.info("Client disconnected during streaming.")
+                    client_disconnected = True
                     break
 
                 assistant_parts.append(token)
@@ -1296,10 +1298,14 @@ async def chat_stream(
             err = {"type": "error", "detail": str(exc)}
             yield f"data: {json.dumps(err)}\n\n"
             try:
-                await update_one(
-                    "messages",
-                    {"id": assistant_message["id"], "user_id": user_id},
-                    {"status": "failed"},
+                await _update_assistant_message(
+                    assistant_message_id=str(assistant_message["id"]),
+                    user_id=user_id,
+                    content="".join(assistant_parts),
+                    status_value="failed",
+                    sources=sources,
+                    search_mode=payload.search_mode,
+                    retrieval_debug=retrieval_debug,
                 )
             except Exception:
                 logger.exception("Failed to mark streaming assistant message as failed.")
@@ -1309,10 +1315,14 @@ async def chat_stream(
             err = {"type": "error", "detail": "Streaming failed unexpectedly."}
             yield f"data: {json.dumps(err)}\n\n"
             try:
-                await update_one(
-                    "messages",
-                    {"id": assistant_message["id"], "user_id": user_id},
-                    {"status": "failed"},
+                await _update_assistant_message(
+                    assistant_message_id=str(assistant_message["id"]),
+                    user_id=user_id,
+                    content="".join(assistant_parts),
+                    status_value="failed",
+                    sources=sources,
+                    search_mode=payload.search_mode,
+                    retrieval_debug=retrieval_debug,
                 )
             except Exception:
                 logger.exception("Failed to mark unexpected streaming error state.")
@@ -1327,7 +1337,7 @@ async def chat_stream(
                     assistant_message_id=str(assistant_message["id"]),
                     user_id=user_id,
                     content=final_content,
-                    status_value="completed",
+                    status_value="failed" if client_disconnected else "completed",
                     sources=sources,
                     search_mode=payload.search_mode,
                     retrieval_debug=retrieval_debug,
@@ -1341,6 +1351,9 @@ async def chat_stream(
             )
         except Exception:
             logger.exception("Failed to finalize streaming assistant message.")
+
+        if client_disconnected:
+            return
 
         if workspace_id and final_content:
             await log_workspace_activity(
