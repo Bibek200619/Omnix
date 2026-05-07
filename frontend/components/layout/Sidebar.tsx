@@ -20,6 +20,7 @@ import {
     Loader2,
     MessageSquare,
     MessageSquarePlus,
+    MessagesSquare,
     Network,
     PanelLeftClose,
     Plus,
@@ -51,6 +52,7 @@ import type { Workspace, WorkspaceRole } from "@/lib/workspace-types";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/chat", label: "AI Chat", icon: MessageSquare },
+  { href: "/conversations", label: "Conversations", icon: MessagesSquare },
   { href: "/workspace", label: "Workspaces", icon: Layers3 },
   { href: "/team", label: "Team", icon: Users },
   { href: "/sources", label: "Sources", icon: FileText },
