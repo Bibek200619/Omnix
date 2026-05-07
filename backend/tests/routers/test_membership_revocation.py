@@ -17,6 +17,8 @@ def mock_db_services(monkeypatch):
     # Mock select_one_trusted
     async def mock_select_one(table, columns, filters):
         if table == "workspace_members":
+            if isinstance(filters.get("workspace_id"), list):
+                return None
             return {"workspace_id": filters.get("workspace_id"), "user_id": filters.get("user_id"), "role": "member"}
         return None
     monkeypatch.setattr("app.routers.workspaces.select_one_trusted", mock_select_one)
@@ -57,8 +59,25 @@ def mock_db_services(monkeypatch):
 async def test_remove_member_from_subspace_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
     # Setup
     workspace_id = "sub-1"
+    parent_workspace_id = "super-1"
     member_user_id = "user-2"
     actor_user_id = "founder-1"
+
+    async def mock_require_access(wid, uid):
+        return type("Access", (), {
+            "workspace": {
+                "id": wid,
+                "workspace_type": "subworkspace",
+                "parent_workspace_id": parent_workspace_id,
+                "is_global": False,
+                "user_id": "sub-founder-1",
+            },
+            "workspace_id": wid,
+            "role": "founder",
+            "membership_workspace": {"id": parent_workspace_id, "user_id": actor_user_id},
+            "membership_workspace_id": parent_workspace_id,
+        })
+    monkeypatch.setattr("app.routers.workspaces.require_workspace_access", mock_require_access)
     
     deleted_workspaces = []
     async def mock_delete_many(table, filters):
@@ -82,6 +101,43 @@ async def test_remove_member_from_subspace_scoped(monkeypatch: pytest.MonkeyPatc
     # Verify
     assert deleted_workspaces == [workspace_id]
     assert presence_cleaned == [workspace_id]
+
+@pytest.mark.asyncio
+async def test_remove_member_from_global_workspace_rejects_inherited_parent_removal(monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace_id = "global-1"
+    parent_workspace_id = "super-1"
+    member_user_id = "user-2"
+    actor_user_id = "founder-1"
+    delete_called = False
+
+    async def mock_require_access(wid, uid):
+        return type("Access", (), {
+            "workspace": {
+                "id": wid,
+                "workspace_type": "global_workspace",
+                "parent_workspace_id": parent_workspace_id,
+                "is_global": True,
+                "user_id": actor_user_id,
+            },
+            "workspace_id": wid,
+            "role": "founder",
+            "membership_workspace": {"id": parent_workspace_id, "user_id": actor_user_id},
+            "membership_workspace_id": parent_workspace_id,
+        })
+    monkeypatch.setattr("app.routers.workspaces.require_workspace_access", mock_require_access)
+
+    async def mock_delete_many(table, filters):
+        nonlocal delete_called
+        delete_called = True
+        return []
+    monkeypatch.setattr("app.routers.workspaces.delete_many_trusted", mock_delete_many)
+
+    with pytest.raises(HTTPException) as exc:
+        await remove_workspace_member(workspace_id, member_user_id, current_user={"id": actor_user_id})
+
+    assert exc.value.status_code == status.HTTP_400_BAD_REQUEST
+    assert "inherited from the parent organization" in exc.value.detail
+    assert delete_called is False
 
 @pytest.mark.asyncio
 async def test_remove_member_from_super_workspace_cascades(monkeypatch: pytest.MonkeyPatch) -> None:

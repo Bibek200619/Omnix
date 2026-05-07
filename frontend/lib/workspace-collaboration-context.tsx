@@ -197,28 +197,43 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
 
   const handleAuthorityRevocation = useCallback((workspaceId: string, type: string) => {
      console.warn(`[authority] Revocation detected for workspace ${workspaceId}: ${type}`);
+     const currentWorkspaceId = activeWorkspaceIdRef.current;
+     const activeInheritsRevokedWorkspace =
+       Boolean(activeWorkspace?.is_global && activeWorkspace.parent_workspace_id === workspaceId);
      
      // 1. Unsubscribe from all channels for this workspace
      realtimeRegistry.unsubscribe({ type: "presence", workspaceId });
      realtimeRegistry.unsubscribe({ type: "activity", workspaceId });
+
+     void refreshWorkspaces({ force: true, silent: true });
      
      // 2. If it's the active workspace, we must evacuate
-     if (workspaceId === activeWorkspaceId) {
+     if (workspaceId === currentWorkspaceId) {
         if (type === "membership_removed" || type === "workspace_deleted") {
            setPresence(null);
            setActivity([]);
            setTypingUsers({});
            setActiveWorkspace(null);
-           void refreshWorkspaces({ force: true, silent: true });
            router.replace("/dashboard");
         } else if (type === "role_changed") {
-           void refreshWorkspaces({ force: true, silent: true });
            void refreshActiveWorkspaceData({ force: true, silent: true });
            void refreshWorkspaceIntelligence({ force: true, silent: true });
         }
+     } else if (activeInheritsRevokedWorkspace) {
+       if (type === "membership_removed" || type === "workspace_deleted") {
+         setPresence(null);
+         setActivity([]);
+         setTypingUsers({});
+         setActiveWorkspace(null);
+         router.replace("/dashboard");
+       } else if (type === "role_changed") {
+         void refreshActiveWorkspaceData({ force: true, silent: true });
+         void refreshWorkspaceIntelligence({ force: true, silent: true });
+       }
      }
   }, [
-    activeWorkspaceId,
+    activeWorkspace?.is_global,
+    activeWorkspace?.parent_workspace_id,
     refreshActiveWorkspaceData,
     refreshWorkspaceIntelligence,
     refreshWorkspaces,
