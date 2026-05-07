@@ -197,6 +197,35 @@ def _membership_workspace_id(access: Any) -> str:
     return str(workspace.get("id") or "")
 
 
+def _mutation_workspace(access: Any) -> dict[str, Any]:
+    workspace = getattr(access, "workspace", {})
+    return dict(workspace) if isinstance(workspace, Mapping) else {}
+
+
+def _mutation_workspace_id(access: Any) -> str:
+    workspace_id = getattr(access, "workspace_id", None)
+    if workspace_id:
+        return str(workspace_id)
+    workspace = _mutation_workspace(access)
+    return str(workspace.get("id") or "")
+
+
+def _is_inherited_global_workspace(workspace: Mapping[str, Any]) -> bool:
+    normalized = normalize_workspace_record(dict(workspace))
+    return bool(normalized.get("is_global")) or normalized.get("workspace_type") == "global_workspace"
+
+
+def _is_unique_constraint_error(exc: SupabaseServiceError) -> bool:
+    root_error = exc.__cause__ or exc
+    message = str(root_error).lower()
+    return (
+        "duplicate key" in message
+        or "unique constraint" in message
+        or "violates unique" in message
+        or "23505" in message
+    )
+
+
 async def _enriched_workspace_for_user(
     workspace_id: str,
     user_id: str,
@@ -352,14 +381,20 @@ async def _accept_workspace_invite(invite_id: str, current_user: Any) -> dict[st
                     "updated_at": timestamp,
                 },
             )
-            membership_created = True
         except SupabaseServiceError as exc:
-            logger.exception(
-                "Failed to create workspace membership from invite | workspace_id=%s | user_id=%s",
-                workspace_id,
-                user_id,
-            )
-            raise _database_error() from exc
+            if _is_unique_constraint_error(exc):
+                logger.info(
+                    "Workspace invite accept observed existing membership during insert | invite_id=%s",
+                    invite_id,
+                )
+            else:
+                logger.exception(
+                    "Failed to create workspace membership from invite | invite_id=%s",
+                    invite_id,
+                )
+                raise _database_error() from exc
+        else:
+            membership_created = True
 
     accept_payload = {
         "status": "accepted",
@@ -925,9 +960,15 @@ async def update_workspace_member_role(
             detail="You do not have permission to manage roles in this workspace.",
         )
 
-    membership_workspace = _membership_workspace(access)
-    membership_workspace_id = _membership_workspace_id(access)
-    founder_user_id = str(membership_workspace.get("user_id") or access.workspace.get("user_id") or "")
+    mutation_workspace = _mutation_workspace(access)
+    if _is_inherited_global_workspace(mutation_workspace):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Global space roles inherit from the parent organization. Manage roles from the parent workspace.",
+        )
+
+    mutation_workspace_id = _mutation_workspace_id(access)
+    founder_user_id = str(mutation_workspace.get("user_id") or "")
     if founder_user_id == member_user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -938,7 +979,7 @@ async def update_workspace_member_role(
         membership = await select_one_trusted(
             "workspace_members",
             "workspace_id,user_id,role",
-            {"workspace_id": membership_workspace_id, "user_id": member_user_id},
+            {"workspace_id": mutation_workspace_id, "user_id": member_user_id},
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
@@ -970,26 +1011,37 @@ async def update_workspace_member_role(
         )
 
     try:
-        await update_one_trusted(
+        updated_membership = await update_one_trusted(
             "workspace_members",
-            {"workspace_id": membership_workspace_id, "user_id": member_user_id},
+            {"workspace_id": mutation_workspace_id, "user_id": member_user_id},
             {"role": next_role, "updated_at": utc_now_iso()},
         )
+        if updated_membership is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workspace member not found.",
+            )
         
         # Emit authority revocation event for the role change
         from app.services.realtime_service import emit_authority_revocation
-        await emit_authority_revocation(
+        emitted = await emit_authority_revocation(
             user_id=member_user_id,
-            workspace_id=membership_workspace_id,
+            workspace_id=mutation_workspace_id,
             revocation_type="role_changed",
             payload={"new_role": next_role}
         )
+        if not emitted:
+            logger.error(
+                "Authority revocation emission failed after role update | workspace_id=%s | user_id=%s",
+                mutation_workspace_id,
+                member_user_id,
+            )
         
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
     await log_workspace_activity(
-        workspace_id=membership_workspace_id,
+        workspace_id=mutation_workspace_id,
         actor_user_id=user_id,
         event_type="workspace.member_role_updated",
         summary="A workspace member role was updated.",
@@ -1097,6 +1149,11 @@ async def invite_workspace_member(
             timestamp=timestamp,
         )
     except SupabaseServiceError as exc:
+        if _is_unique_constraint_error(exc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A pending invite already exists for that email address.",
+            ) from exc
         logger.exception(
             "Failed to create workspace invite | workspace_id=%s | invited_email_domain=%s | invited_by=%s | root_error=%r",
             membership_workspace_id,
@@ -1160,9 +1217,15 @@ async def remove_workspace_member(
             detail="You do not have permission to remove members from this workspace.",
         )
 
-    membership_workspace = _membership_workspace(access)
-    membership_workspace_id = _membership_workspace_id(access)
-    founder_user_id = str(membership_workspace.get("user_id") or access.workspace.get("user_id") or "")
+    mutation_workspace = _mutation_workspace(access)
+    if _is_inherited_global_workspace(mutation_workspace):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Global space membership is inherited from the parent organization. Remove members from the parent workspace or a scoped private subspace.",
+        )
+
+    mutation_workspace_id = _mutation_workspace_id(access)
+    founder_user_id = str(mutation_workspace.get("user_id") or "")
     
     if founder_user_id == member_user_id:
         raise HTTPException(
@@ -1174,7 +1237,7 @@ async def remove_workspace_member(
         membership = await select_one_trusted(
             "workspace_members",
             "workspace_id,user_id,role",
-            {"workspace_id": membership_workspace_id, "user_id": member_user_id},
+            {"workspace_id": mutation_workspace_id, "user_id": member_user_id},
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
@@ -1211,17 +1274,21 @@ async def remove_workspace_member(
         )
 
     # Prepare for cascading removal if it is a super workspace
-    workspace_ids_to_clean = [membership_workspace_id]
+    workspace_ids_to_clean = [mutation_workspace_id]
     if is_super:
         try:
             subspaces = await select_all_trusted(
                 "workspaces",
                 "id",
-                {"parent_workspace_id": membership_workspace_id}
+                {"parent_workspace_id": mutation_workspace_id}
             )
             workspace_ids_to_clean.extend([str(s["id"]) for s in subspaces])
-        except SupabaseServiceError:
-            logger.error("Failed to fetch subspaces for cascading removal | super_workspace_id=%s", membership_workspace_id)
+        except SupabaseServiceError as exc:
+            logger.exception(
+                "Failed to fetch subspaces for cascading removal | super_workspace_id=%s",
+                mutation_workspace_id,
+            )
+            raise _database_error() from exc
 
     try:
         # Batch delete memberships
@@ -1229,15 +1296,37 @@ async def remove_workspace_member(
             "workspace_members",
             {"workspace_id": workspace_ids_to_clean, "user_id": member_user_id},
         )
+
+        remaining_membership = await select_one_trusted(
+            "workspace_members",
+            "workspace_id,user_id",
+            {"workspace_id": workspace_ids_to_clean, "user_id": member_user_id},
+        )
+        if remaining_membership is not None:
+            logger.error(
+                "Workspace member removal verification failed | workspace_ids=%s | user_id=%s",
+                workspace_ids_to_clean,
+                member_user_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Workspace member removal did not complete. Please retry.",
+            )
         
         # Emit authority revocation events for all affected workspaces
         from app.services.realtime_service import emit_authority_revocation
         for wid in workspace_ids_to_clean:
-            await emit_authority_revocation(
+            emitted = await emit_authority_revocation(
                 user_id=member_user_id,
                 workspace_id=wid,
                 revocation_type="membership_removed"
             )
+            if not emitted:
+                logger.error(
+                    "Authority revocation emission failed after member removal | workspace_id=%s | user_id=%s",
+                    wid,
+                    member_user_id,
+                )
             
             # Cleanup presence for all affected workspaces
             await leave_workspace_presence(workspace_id=wid, user_id=member_user_id)
@@ -1247,7 +1336,7 @@ async def remove_workspace_member(
         raise _database_error() from exc
 
     await log_workspace_activity(
-        workspace_id=membership_workspace_id,
+        workspace_id=mutation_workspace_id,
         actor_user_id=user_id,
         event_type="workspace.member_removed",
         summary="An organization member was removed." if is_super else "A workspace member was removed.",
