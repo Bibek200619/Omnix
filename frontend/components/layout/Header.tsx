@@ -73,7 +73,6 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
     }
 
     router.replace("/login");
-    router.refresh();
   }
 
   return (

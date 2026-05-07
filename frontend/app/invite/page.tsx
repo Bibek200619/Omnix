@@ -48,7 +48,6 @@ export default function InvitePage() {
         setAcceptedWorkspace(workspace);
         window.setTimeout(() => {
           router.replace("/chat");
-          router.refresh();
         }, 700);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unable to accept this invitation.");
