@@ -811,6 +811,7 @@ def _compact_intelligence_debug(profile: dict[str, Any] | None) -> dict[str, Any
     return {
         "workspace_id": profile.get("workspace_id"),
         "workspace_name": profile.get("workspace_name"),
+        "workspace_focus": profile.get("workspace_focus") or profile.get("ai_specialization"),
         "ai_specialization": profile.get("ai_specialization"),
         "retrieval_scope": profile.get("retrieval_scope"),
         "source_count": profile.get("source_count"),
@@ -1122,6 +1123,7 @@ async def chat(
                 "assistant_message_id": str(completed_assistant_message["id"]),
                 "source_count": len(sources),
                 "search_mode": payload.search_mode,
+                "workspace_focus": (intelligence_profile or {}).get("workspace_focus"),
                 "ai_specialization": (intelligence_profile or {}).get("ai_specialization"),
             },
         )
@@ -1351,6 +1353,7 @@ async def chat_stream(
                     "assistant_message_id": str(assistant_message["id"]),
                     "source_count": len(sources),
                     "search_mode": payload.search_mode,
+                    "workspace_focus": (intelligence_profile or {}).get("workspace_focus"),
                     "ai_specialization": (intelligence_profile or {}).get("ai_specialization"),
                 },
             )

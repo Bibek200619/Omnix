@@ -7,10 +7,10 @@ from typing import Any
 from uuid import UUID
 
 from ..services.supabase_service import select_all_trusted
+from .workspace_cognition import build_workspace_focus_prompt, normalize_workspace_focus
 from .workspace_continuity_service import list_initiatives, list_unresolved_continuity
 from .workspace_service import (
     list_workspace_members,
-    normalize_ai_specialization,
     normalize_intelligence_preferences,
     normalize_workspace_record,
     require_workspace_access,
@@ -48,7 +48,7 @@ def _domain_candidates(workspace: dict[str, Any], files: list[dict[str, Any]]) -
     text_blocks = [
         workspace.get("description") or "",
         workspace.get("expertise_area") or "",
-        workspace.get("ai_specialization") or "",
+        workspace.get("workspace_focus") or workspace.get("ai_specialization") or "",
     ]
     text_blocks.extend(str(file.get("file_name") or "") for file in files)
     text_blocks.extend(str(file.get("file_type") or "") for file in files)
@@ -109,13 +109,13 @@ def _insights(
 
 def _summary(workspace: dict[str, Any], domains: list[str], source_count: int) -> str:
     name = workspace.get("name") or "This workspace"
-    specialization = normalize_ai_specialization(workspace.get("ai_specialization"))
+    focus = normalize_workspace_focus(workspace.get("workspace_focus") or workspace.get("ai_specialization"))
     expertise = _text(workspace.get("expertise_area"))
     if expertise:
-        return f"{name} specializes in {expertise}. AI mode is {specialization}; {source_count} source(s) are active."
+        return f"{name} specializes in {expertise}. Cognitive focus is {focus}; {source_count} source(s) are active."
     if domains:
-        return f"{name} is currently oriented around {', '.join(domains[:4])}. AI mode is {specialization}; {source_count} source(s) are active."
-    return f"{name} is using {specialization} mode with workspace-scoped memory."
+        return f"{name} is currently oriented around {', '.join(domains[:4])}. Cognitive focus is {focus}; {source_count} source(s) are active."
+    return f"{name} is using {focus} focus with workspace-scoped memory."
 
 
 async def workspace_retrieval_scope_ids(
@@ -233,6 +233,7 @@ async def build_workspace_intelligence_profile(
     )
 
     retrieval_scope = "global" if workspace.get("is_global") or preferences.get("retrieval_scope") == "global" else "workspace"
+    workspace_focus = normalize_workspace_focus(workspace.get("workspace_focus") or workspace.get("ai_specialization"))
     profile = {
         "workspace_id": str(workspace["id"]),
         "workspace_name": str(workspace.get("name") or "Workspace"),
@@ -241,7 +242,8 @@ async def build_workspace_intelligence_profile(
         "parent_workspace_id": workspace.get("parent_workspace_id"),
         "description": workspace.get("description"),
         "expertise_area": workspace.get("expertise_area"),
-        "ai_specialization": normalize_ai_specialization(workspace.get("ai_specialization")),
+        "workspace_focus": workspace_focus,
+        "ai_specialization": workspace_focus,
         "ai_instructions": workspace.get("ai_instructions"),
         "intelligence_preferences": preferences,
         "source_count": len(scoped_files),
@@ -273,20 +275,34 @@ async def build_workspace_intelligence_profile(
     return profile
 
 
-def workspace_intelligence_system_prompt(profile: dict[str, Any] | None) -> str:
+def workspace_intelligence_system_prompt(
+    profile: dict[str, Any] | None,
+    *,
+    focus_override: Any | None = None,
+    include_focus: bool = True,
+) -> str:
     if not profile:
         return ""
+    workspace_focus = normalize_workspace_focus(
+        focus_override or profile.get("workspace_focus") or profile.get("ai_specialization")
+    )
     preferences = profile.get("intelligence_preferences")
-    if isinstance(preferences, Mapping) and preferences.get("memory_enabled") is False:
-        return ""
-
-    lines = [
+    lines = []
+    if include_focus:
+        lines.extend([build_workspace_focus_prompt(workspace_focus), ""])
+    lines.extend([
         "WORKSPACE INTELLIGENCE PROFILE:",
         f"- Active workspace: {profile.get('workspace_name')} ({profile.get('workspace_type')})",
-        f"- AI specialization mode: {profile.get('ai_specialization') or 'general'}",
+        f"- Workspace cognitive focus: {workspace_focus}",
         f"- Retrieval scope: {profile.get('retrieval_scope') or 'workspace'}",
         f"- Context summary: {profile.get('context_summary')}",
-    ]
+    ])
+    if isinstance(preferences, Mapping) and preferences.get("memory_enabled") is False:
+        lines.append("- Workspace memory is disabled; apply the cognitive focus but do not rely on continuity memory unless it is explicitly retrieved or provided.")
+        if profile.get("ai_instructions"):
+            lines.append(f"- Workspace instructions: {profile['ai_instructions']}")
+        return "\n".join(line for line in lines if line is not None)
+
     if profile.get("description"):
         lines.append(f"- Workspace description: {profile['description']}")
     if profile.get("expertise_area"):
