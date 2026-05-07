@@ -78,7 +78,15 @@ export default function WorkspacePage() {
   } = useWorkspace();
   const { initiatives, timeline, loading: loadingContinuity } = useWorkspaceContinuity();
   const { activity, loadingActivity, presence, statusForWorkspace } = useWorkspaceCollaboration();
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    // Only expand the active root workspace by default
+    const initial: Record<string, boolean> = {};
+    const rootId = activeWorkspace?.parent_workspace_id || activeWorkspace?.id;
+    if (rootId) {
+      initial[rootId] = true;
+    }
+    return initial;
+  });
   const [selectedId, setSelectedId] = useState<string | null>(
     activeWorkspaceId ? selectionId(activeWorkspaceId) : null,
   );

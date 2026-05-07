@@ -170,6 +170,24 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     }
   }, [activeWorkspaceId, session]);
 
+  const handleAuthorityRevocation = useCallback((workspaceId: string, type: string) => {
+     console.warn(`[authority] Revocation detected for workspace ${workspaceId}: ${type}`);
+     
+     // 1. Unsubscribe from all channels for this workspace
+     realtimeRegistry.unsubscribe({ type: "presence", workspaceId });
+     realtimeRegistry.unsubscribe({ type: "activity", workspaceId });
+     
+     // 2. If it's the active workspace, we must evacuate
+     if (workspaceId === activeWorkspaceId) {
+        if (type === "membership_removed" || type === "workspace_deleted") {
+           window.location.href = "/dashboard";
+        } else if (type === "role_changed") {
+           // Force reload or refresh to pick up new permissions
+           window.location.reload();
+        }
+     }
+  }, [activeWorkspaceId]);
+
   const sendTypingSignal = useCallback(
     async (conversationId?: string | null, isTyping = true) => {
       if (!session || !activeWorkspaceId) return;
@@ -278,11 +296,33 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
           )
     );
 
+    // Authority Revocation Subscription (User-scoped)
+    realtimeRegistry.subscribe(
+      { type: "revocation" },
+      (channel) =>
+        channel
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "authority_revocations",
+              filter: `user_id=eq.${session.user.id}`,
+            },
+            (payload: { new: { workspace_id: string; revocation_type: string } }) => {
+              console.warn("[realtime] authority revocation detected", payload);
+              const { workspace_id, revocation_type } = payload.new;
+              handleAuthorityRevocation(workspace_id, revocation_type);
+            }
+          )
+    );
+
     return () => {
       realtimeRegistry.unsubscribe({ type: "presence", workspaceId: activeWorkspaceId });
       realtimeRegistry.unsubscribe({ type: "activity", workspaceId: activeWorkspaceId });
+      realtimeRegistry.unsubscribe({ type: "revocation" });
     };
-  }, [activeWorkspaceId, refreshActivity, refreshPresence, session]);
+  }, [activeWorkspaceId, handleAuthorityRevocation, refreshActivity, refreshPresence, session]);
 
   // Periodic Refresh / Heartbeat
   useEffect(() => {

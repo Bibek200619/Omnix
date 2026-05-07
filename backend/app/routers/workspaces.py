@@ -942,6 +942,16 @@ async def update_workspace_member_role(
             {"workspace_id": membership_workspace_id, "user_id": member_user_id},
             {"role": next_role, "updated_at": utc_now_iso()},
         )
+        
+        # Emit authority revocation event for the role change
+        from app.services.realtime_service import emit_authority_revocation
+        await emit_authority_revocation(
+            user_id=member_user_id,
+            workspace_id=membership_workspace_id,
+            revocation_type="role_changed",
+            payload={"new_role": next_role}
+        )
+        
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
@@ -1187,8 +1197,16 @@ async def remove_workspace_member(
             {"workspace_id": workspace_ids_to_clean, "user_id": member_user_id},
         )
         
-        # Cleanup presence for all affected workspaces
+        # Emit authority revocation events for all affected workspaces
+        from app.services.realtime_service import emit_authority_revocation
         for wid in workspace_ids_to_clean:
+            await emit_authority_revocation(
+                user_id=member_user_id,
+                workspace_id=wid,
+                revocation_type="membership_removed"
+            )
+            
+            # Cleanup presence for all affected workspaces
             await leave_workspace_presence(workspace_id=wid, user_id=member_user_id)
             await invalidate_workspace_presence_cache(workspace_id=wid)
             
@@ -1269,7 +1287,24 @@ async def delete_workspace(
     await require_workspace_management_access(workspace_id, user_id)
 
     try:
+        # Fetch members before deletion for notification
+        members = await select_all_trusted(
+            "workspace_members", 
+            "user_id", 
+            {"workspace_id": workspace_id}
+        )
+        
         await delete_many_trusted("workspaces", {"id": workspace_id})
+        
+        # Notify all members
+        from app.services.realtime_service import emit_authority_revocation
+        for m in members:
+            await emit_authority_revocation(
+                user_id=str(m["user_id"]),
+                workspace_id=workspace_id,
+                revocation_type="workspace_deleted"
+            )
+            
     except SupabaseServiceError as exc:
         logger.exception("Failed to delete workspace")
         raise _database_error() from exc
