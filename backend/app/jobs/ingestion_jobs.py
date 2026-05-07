@@ -71,13 +71,16 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
 
             # validate embedding provider early (gives actionable error if misconfigured)
             try:
-                from ..embeddings.provider import get_default_provider  # local import to avoid cycles
+                from ..embeddings.provider import warm_up_default_provider  # local import to avoid cycles
 
-                provider = get_default_provider()
+                provider = await warm_up_default_provider()
                 logger.debug("Embedding provider available in ingestion job: %s", provider.__class__.__name__)
             except Exception as e:
                 logger.error("Embedding provider not available: %s", e)
-                raise RuntimeError("Embeddings provider misconfigured or missing API key in worker runtime.") from e
+                raise RuntimeError(
+                    "Local embeddings provider is unavailable in the worker runtime. "
+                    "Install sentence-transformers/torch and ensure the local model is cached or reachable."
+                ) from e
 
             pipeline = RAGIngestionPipeline(vector_store)
             num, chunk_ids = await pipeline.ingest_text(normalized, user_id, document_id=file_id, workspace_id=workspace_id)

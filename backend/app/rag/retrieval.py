@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from ..core.config import get_settings
+from ..embeddings.dimensions import get_expected_embedding_dimension, validate_embedding_dimension
 from ..services.supabase_service import SupabaseServiceError, select_all, select_all_trusted
 from .embedding import get_embedding
 from .vector_store_base import VectorStore
@@ -34,7 +35,7 @@ class RAGRetriever:
             user_id (str): The ID of the user requesting the search.
             workspace_id (str | None): Optional workspace to scope retrieval.
             top_k (int): The maximum number of chunks to return. Defaults to 5.
-            distance_threshold (float | None): The maximum L2 distance for a chunk to be considered relevant.
+            distance_threshold (float | None): The maximum vector distance for a chunk to be considered relevant.
 
         Returns:
             list[dict]: Relevant chunk records with metadata.
@@ -48,9 +49,8 @@ class RAGRetriever:
         if distance_threshold is None:
             distance_threshold = get_settings().SIMILARITY_THRESHOLD
 
-        logger.info("Generating embedding for query.")
+        logger.info("Generating local embedding for query.")
         try:
-            # get_embedding is async now
             query_embedding = await get_embedding(query)
         except Exception as exc:
             logger.exception("Failed to generate query embedding.")
@@ -59,38 +59,29 @@ class RAGRetriever:
         if not query_embedding:
             logger.warning("Embedding generation returned an empty vector.")
             return []
-
-        # 1) Try pgvector-based search via Supabase RPC (preferred)
-        from ..db.supabase import get_supabase
+        try:
+            validate_embedding_dimension(
+                query_embedding,
+                expected_dim=get_expected_embedding_dimension(),
+                label="query embedding",
+            )
+        except ValueError:
+            logger.exception("Query embedding dimension does not match the vector store contract.")
+            return []
 
         search_results: list[tuple[str, float]] = []
         try:
-            logger.info("Attempting pgvector RPC search for top %d matches.", top_k)
-            supabase = get_supabase()
-            rpc_params = {
-                "q": query_embedding,
-                "p_top_k": top_k,
-                "p_user": user_id,
-                "p_workspace": workspace_id,
-            }
-            resp = supabase.rpc("search_documents_vector", rpc_params).execute()
-            rows = getattr(resp, "data", None) or []
-            if rows:
-                for r in rows:
-                    # expected fields: id, distance
-                    search_results.append((str(r.get("id")), float(r.get("distance", 0.0))))
-        except Exception:
-            logger.exception("pgvector RPC search failed; falling back to vector store.")
+            logger.info("Starting semantic vector search for top %d matches.", top_k)
+            search_results = self.vector_store.search(
+                query_embedding,
+                user_id=user_id,
+                workspace_id=workspace_id,
+                top_k=top_k,
+            )
+            logger.info("Semantic vector search returned %d candidate(s).", len(search_results))
+        except Exception as exc:
+            logger.exception("Failed to search vector store.")
             search_results = []
-
-        # 2) Fallback to in-memory vector store (FAISS) if pgvector returned nothing
-        if not search_results:
-            logger.info("Falling back to in-memory vector store for similarity search.")
-            try:
-                search_results = self.vector_store.search(query_embedding, user_id=user_id, workspace_id=workspace_id, top_k=top_k)
-            except Exception as exc:
-                logger.exception("Failed to search vector store.")
-                search_results = []
 
         if not search_results:
             logger.info("No matching chunks found by vector search.")

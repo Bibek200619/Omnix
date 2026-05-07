@@ -4,6 +4,7 @@ import logging
 from typing import Any, List
 
 from ..db.supabase import get_supabase
+from .dimensions import get_expected_embedding_dimension, validate_embedding_dimension
 from .provider import get_default_provider
 
 logger = logging.getLogger(__name__)
@@ -11,7 +12,13 @@ logger = logging.getLogger(__name__)
 
 async def embed_query(text: str) -> List[float]:
     provider = get_default_provider()
-    return await provider.embed_text(text)
+    embedding = await provider.embed_text(text)
+    validate_embedding_dimension(
+        embedding,
+        expected_dim=get_expected_embedding_dimension(),
+        label="query embedding",
+    )
+    return embedding
 
 
 async def semantic_search(query: str, user_id: str, workspace_id: str | None = None, top_k: int = 5) -> List[dict[str, Any]]:
@@ -26,16 +33,15 @@ async def semantic_search(query: str, user_id: str, workspace_id: str | None = N
     supabase = get_supabase()
     try:
         params = {
-            "query_embedding": embedding,
-            "match_threshold": 0.0,
-            "match_count": top_k,
-            "filter_user_id": user_id,
+            "q": embedding,
+            "p_top_k": top_k,
+            "p_user": user_id,
+            "p_workspace": workspace_id,
         }
-        # Some migrations provide workspace filtering; include if supported (RPC will ignore unknown keys)
-        if workspace_id is not None:
-            params["filter_workspace_id"] = workspace_id
-        resp = supabase.rpc("match_documents", params).execute()
+        logger.info("Starting semantic_search RPC (top_k=%d, dimension=%d).", top_k, len(embedding))
+        resp = supabase.rpc("search_documents_vector", params).execute()
         rows = getattr(resp, "data", None) or []
+        logger.info("semantic_search RPC returned %d row(s).", len(rows))
         return rows
     except Exception:
         logger.exception("Semantic search via pgvector RPC failed.")

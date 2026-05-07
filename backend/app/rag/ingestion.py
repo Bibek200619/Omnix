@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from ..embeddings.dimensions import get_expected_embedding_dimension, validate_embeddings_dimension
 from ..services.supabase_service import insert_many
 from .chunking import split_text_into_chunks
 from .embedding import get_embeddings_async
@@ -96,27 +97,13 @@ class RAGIngestionPipeline:
             )
             raise RuntimeError("Pipeline inconsistency: chunk count does not match embedding count.")
 
-        # Validate embedding dimensionality and warn if it differs from expected env / provider
         try:
-            first_dim = len(embeddings[0]) if embeddings and embeddings[0] else 0
-            import os
-
-            expected_dim = os.environ.get("EMBEDDING_DIM")
-            if expected_dim is not None:
-                try:
-                    expected_dim = int(expected_dim)
-                except Exception:
-                    expected_dim = None
-            if expected_dim and first_dim and expected_dim != first_dim:
-                logger.warning(
-                    "Embedding dimension mismatch: expected %s (EMBEDDING_DIM) but got %s. Consider migrating DB vector size or setting EMBEDDING_DIM accordingly.",
-                    expected_dim,
-                    first_dim,
-                )
-            else:
-                logger.debug("Embeddings generated with dimension %s.", first_dim)
-        except Exception:
-            logger.exception("Failed to validate embedding dimensions")
+            expected_dim = get_expected_embedding_dimension()
+            validate_embeddings_dimension(embeddings, expected_dim=expected_dim, label="ingestion embeddings")
+            logger.info("Embeddings generated with dimension %d for %d chunks.", expected_dim, len(embeddings))
+        except ValueError as exc:
+            logger.error("Embedding dimension validation failed during ingestion: %s", exc)
+            raise RuntimeError("Ingestion pipeline failed because embedding dimensions do not match the DB contract.") from exc
 
         try:
             logger.info("Attaching embeddings to payloads and inserting %d chunks into Supabase.", num_chunks)
@@ -132,7 +119,8 @@ class RAGIngestionPipeline:
             logger.info("Adding %d vectors to the vector store.", num_chunks)
             user_ids = [user_id] * num_chunks
             workspace_ids = [workspace_id] * num_chunks if workspace_id else None
-            # best-effort mirror into in-memory vector store for faster searches
+            # Keep the configured vector store in sync. PgVectorStore updates the
+            # same persisted DB rows; FAISS/custom stores may mirror in memory.
             try:
                 self.vector_store.add_embeddings(embeddings, chunk_ids, user_ids, workspace_ids)
             except Exception:

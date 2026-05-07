@@ -205,6 +205,29 @@ async def _retrieve_prompt_context(
 
     try:
         from ..rag.context_builder import ContextBuilder
+        from ..rag.retrieval import RAGRetriever
+        from ..rag.startup import get_vector_store
+
+        context_builder = ContextBuilder()
+        retriever = RAGRetriever(get_vector_store())
+        chunks = await retriever.retrieve(
+            message_text,
+            user_id=user_id,
+            workspace_id=workspace_id,
+            top_k=5,
+        )
+
+        if chunks:
+            prompt_message = context_builder.build_context(
+                message_text,
+                [chunk["content"] for chunk in chunks],
+            )
+            return prompt_message, _build_sources(chunks)
+    except Exception as exc:
+        logger.exception("Semantic retrieval failed; falling back to keyword retrieval: %s", exc)
+
+    try:
+        from ..rag.context_builder import ContextBuilder
         from ..rag.keyword_retrieval import KeywordRetriever
 
         retriever = KeywordRetriever()
