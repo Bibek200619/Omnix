@@ -71,24 +71,24 @@ export function WorkspacePresenceCluster({
 
         <div className="flex shrink-0 items-center -space-x-2">
           {visibleMembers.length ? visibleMembers.map((member) => (
-            <div key={member.user_id} className="group relative transition-transform duration-300 hover:z-20 hover:scale-110">
+            <div key={member.user_id} className="group relative transition-transform duration-500 hover:z-20 hover:scale-105">
               <ProfileAvatar
                 name={memberName(member)}
                 email={member.email}
                 handle={member.handle}
                 avatarUrl={member.avatar_url}
                 className={cn(
-                  "h-8 w-8 rounded-lg border bg-black/40 text-xs font-bold transition-all duration-300",
+                  "h-8 w-8 rounded-lg border bg-black/40 text-xs font-medium transition-all duration-500",
                   member.is_online 
-                    ? "border-cyan-400/40 shadow-[0_0_15px_rgba(34,211,238,0.25)] ring-1 ring-cyan-400/20" 
-                    : "border-white/10"
+                    ? "border-cyan-400/20 shadow-[0_0_8px_rgba(34,211,238,0.15)] ring-1 ring-cyan-400/10" 
+                    : "border-white/5"
                 )}
               />
               <span
                 className={cn(
                   "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#06101d]",
                   member.is_online 
-                    ? "bg-[var(--omnix-green)] shadow-[0_0_8px_var(--omnix-green)]" 
+                    ? "bg-[var(--omnix-green)] shadow-[0_0_4px_var(--omnix-green)]" 
                     : "bg-[var(--omnix-amber)]",
                 )}
               />
@@ -110,8 +110,8 @@ export function WorkspacePresenceCluster({
             <Eye className="h-3.5 w-3.5 text-cyan-300/80" />
             <span className="min-w-0 flex-1 truncate">
               {activeViewer
-                ? <><span className="font-bold text-white">{memberName(activeViewer)}</span> is viewing <span className="text-cyan-200">{viewLabel(activeViewer, workspaceName)}</span></>
-                : "Operational state: Monitoring workspace activity"}
+                ? <><span className="font-medium text-white">{memberName(activeViewer)}</span> is active in <span className="text-cyan-200/80">{viewLabel(activeViewer, workspaceName)}</span></>
+                : "You are currently connected to this workspace"}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2">
