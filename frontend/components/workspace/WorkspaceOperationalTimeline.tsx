@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   Activity, 
@@ -11,7 +12,8 @@ import {
   Layers3, 
   Loader2, 
   Milestone, 
-  Zap 
+  Zap,
+  ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ClientTime } from "@/components/ui/ClientTime";
@@ -39,6 +41,8 @@ export function WorkspaceOperationalTimeline({
   loading = false,
   className
 }: OperationalTimelineProps) {
+  const [expanded, setExpanded] = useState(false);
+  
   if (loading && events.length === 0) {
     return (
       <div className={cn("flex flex-col items-center justify-center p-12 text-slate-500", className)}>
@@ -57,6 +61,9 @@ export function WorkspaceOperationalTimeline({
       </div>
     );
   }
+
+  const visibleEvents = expanded ? events : events.slice(0, 5);
+  const hasMore = events.length > 5;
 
   return (
     <section className={cn("relative space-y-6", className)}>
@@ -106,7 +113,7 @@ export function WorkspaceOperationalTimeline({
         <div className="absolute left-[17px] top-4 bottom-4 w-px bg-gradient-to-b from-cyan-500/40 via-white/5 to-transparent sm:left-[19px]" />
         
         <div className="space-y-8">
-          {events.map((event, index) => {
+          {visibleEvents.map((event, index) => {
             const Icon = EVENT_ICONS[event.event_type] || EVENT_ICONS.default;
             return (
               <motion.div
@@ -156,6 +163,18 @@ export function WorkspaceOperationalTimeline({
             );
           })}
         </div>
+        
+        {hasMore && !expanded && (
+          <div className="relative z-10 mt-8 flex justify-center">
+             <button
+                type="button"
+                onClick={() => setExpanded(true)}
+                className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-[11px] font-medium text-white/50 transition-colors hover:bg-white/[0.06] hover:text-white"
+             >
+                Show older history <ChevronDown className="h-3.5 w-3.5" />
+             </button>
+          </div>
+        )}
       </div>
     </section>
   );

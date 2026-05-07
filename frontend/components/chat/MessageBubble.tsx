@@ -154,7 +154,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
       )}
       <div
         className={cn(
-          "relative max-w-[92%] transition sm:max-w-[78%]",
+          "group/content relative max-w-[92%] transition sm:max-w-[78%]",
           failed
             ? "overflow-hidden rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-rose-50"
           : isUser
@@ -176,22 +176,25 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
           {!isUser ? (
             <span className="h-[5px] w-[5px] rounded-full bg-[var(--omnix-cyan)] opacity-70" />
           ) : null}
-          {isUser && message.senderHandle ? (
-            <span className="truncate text-[10px] font-medium text-slate-400">@{message.senderHandle}</span>
-          ) : null}
           {isUser ? (
             <span className="h-[5px] w-[5px] rounded-full opacity-60" style={{ background: roleColor }} />
           ) : null}
-          <span
-            className={cn(
-              "inline-flex shrink-0 items-center rounded px-1.5 py-px text-[9px] font-bold uppercase tracking-[0.08em]",
-              isUser
-                ? workspaceRoleBadgeClass(senderRole)
-                : "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
-            )}
-          >
-            {isUser ? workspaceRoleLabel(senderRole) : "Assistant"}
-          </span>
+          
+          <div className="flex items-center gap-2 opacity-0 transition-opacity duration-300 group-hover/content:opacity-100">
+            {isUser && message.senderHandle ? (
+              <span className="truncate text-[10px] font-medium text-slate-400/80">@{message.senderHandle}</span>
+            ) : null}
+            <span
+              className={cn(
+                "inline-flex shrink-0 items-center rounded px-1.5 py-px text-[9px] font-medium uppercase tracking-[0.08em]",
+                isUser
+                  ? workspaceRoleBadgeClass(senderRole)
+                  : "border-cyan-300/20 bg-cyan-300/5 text-cyan-200/80",
+              )}
+            >
+              {isUser ? workspaceRoleLabel(senderRole) : "Assistant"}
+            </span>
+          </div>
         </div>
 
         {isUser ? (
