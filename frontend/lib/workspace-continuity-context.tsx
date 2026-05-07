@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "./api";
 import { useWorkspace } from "./workspace-context";
 import type { 
@@ -28,27 +28,39 @@ export function WorkspaceContinuityProvider({ children }: { children: ReactNode 
   const [unresolvedContinuity, setUnresolvedContinuity] = useState<WorkspaceContinuityMemory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const activeWorkspaceIdRef = useRef<string | null>(activeWorkspaceId);
+
+  useEffect(() => {
+    activeWorkspaceIdRef.current = activeWorkspaceId;
+  }, [activeWorkspaceId]);
 
   const refreshContinuity = useCallback(async () => {
     if (!activeWorkspaceId) return;
+    const requestWorkspaceId = activeWorkspaceId;
     
     setLoading(true);
     setError(null);
     try {
       const [initData, timelineData, unresolvedData] = await Promise.all([
-        apiClient.get<WorkspaceInitiative[]>(`/workspaces/${activeWorkspaceId}/initiatives`),
-        apiClient.get<WorkspaceOperationalTimelineEvent[]>(`/workspaces/${activeWorkspaceId}/timeline`),
-        apiClient.get<WorkspaceContinuityMemory[]>(`/workspaces/${activeWorkspaceId}/continuity/unresolved`)
+        apiClient.get<WorkspaceInitiative[]>(`/workspaces/${requestWorkspaceId}/initiatives`),
+        apiClient.get<WorkspaceOperationalTimelineEvent[]>(`/workspaces/${requestWorkspaceId}/timeline`),
+        apiClient.get<WorkspaceContinuityMemory[]>(`/workspaces/${requestWorkspaceId}/continuity/unresolved`)
       ]);
-      
-      setInitiatives(initData);
-      setTimeline(timelineData);
-      setUnresolvedContinuity(unresolvedData);
+
+      if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+        setInitiatives(initData);
+        setTimeline(timelineData);
+        setUnresolvedContinuity(unresolvedData);
+      }
     } catch (err) {
       console.error("Failed to refresh operational continuity", err);
-      setError(err instanceof Error ? err.message : "Unable to load continuity data.");
+      if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+        setError(err instanceof Error ? err.message : "Unable to load continuity data.");
+      }
     } finally {
-      setLoading(false);
+      if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+        setLoading(false);
+      }
     }
   }, [activeWorkspaceId]);
 

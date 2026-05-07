@@ -326,7 +326,7 @@ function reconcileMessageLists(
 export function ChatInterface() {
   const params = useSearchParams();
   const router = useRouter();
-  const { session, user } = useAuth();
+  const { user } = useAuth();
   const { profile } = useProfile();
   const {
     activeWorkspace,
@@ -348,6 +348,7 @@ export function ChatInterface() {
     statusForWorkspace,
   } = useWorkspaceCollaboration();
   const conversationId = params.get("conversation");
+  const authenticatedUserId = user?.id ?? null;
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [responding, setResponding] = useState(false);
@@ -409,9 +410,11 @@ export function ChatInterface() {
   const respondingRef = useRef(false);
   const lastWorkspaceSyncRef = useRef(0);
   const lastMessageSyncRef = useRef(0);
-  const messageSyncInFlightRef = useRef(false);
+  const messageSyncInFlightRef = useRef<Map<string, Promise<boolean>>>(new Map());
   const loadRequestIdRef = useRef(0);
   const activeStreamAbortRef = useRef<AbortController | null>(null);
+  const senderLookupRef = useRef(senderLookup);
+  const activeWorkspaceIdRef = useRef<string | null>(activeWorkspaceId);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -433,6 +436,14 @@ export function ChatInterface() {
     respondingRef.current = responding;
   }, [responding]);
 
+  useEffect(() => {
+    senderLookupRef.current = senderLookup;
+  }, [senderLookup]);
+
+  useEffect(() => {
+    activeWorkspaceIdRef.current = activeWorkspaceId;
+  }, [activeWorkspaceId]);
+
   const reconcileConversationMessages = useCallback(
     async (
       convId: string,
@@ -451,42 +462,46 @@ export function ChatInterface() {
         return false;
       }
 
-      if (messageSyncInFlightRef.current) {
-        return false;
+      const inFlight = messageSyncInFlightRef.current.get(convId);
+      if (inFlight) {
+        return inFlight;
       }
 
-      messageSyncInFlightRef.current = true;
-      try {
-        const serverMessages = await fetchConversationSnapshot(convId, senderLookup);
-        if (!mountedRef.current) {
-          return false;
-        }
+      const request = (async () => {
+        try {
+          const serverMessages = await fetchConversationSnapshot(convId, senderLookupRef.current);
+          if (!mountedRef.current) {
+            return false;
+          }
 
-        const activeConversationRef = currentConversationRef.current;
-        if (
-          !options.allowInactiveConversation &&
-          activeConversationRef &&
-          activeConversationRef !== convId
-        ) {
-          return false;
-        }
+          const activeConversationRef = currentConversationRef.current;
+          if (!activeConversationRef) {
+            return Boolean(options.allowInactiveConversation);
+          }
+          if (activeConversationRef && activeConversationRef !== convId) {
+            return Boolean(options.allowInactiveConversation);
+          }
 
-        setMessages((current) =>
-          reconcileMessageLists(current, serverMessages),
-        );
-        setError(null);
-        lastMessageSyncRef.current = Date.now();
-        return true;
-      } catch (err) {
-        if (!options.silent && mountedRef.current) {
-          setError(err instanceof Error ? err.message : "Failed to sync conversation");
+          setMessages((current) =>
+            reconcileMessageLists(current, serverMessages),
+          );
+          setError(null);
+          lastMessageSyncRef.current = Date.now();
+          return true;
+        } catch (err) {
+          if (!options.silent && mountedRef.current) {
+            setError(err instanceof Error ? err.message : "Failed to sync conversation");
+          }
+          return false;
+        } finally {
+          messageSyncInFlightRef.current.delete(convId);
         }
-        return false;
-      } finally {
-        messageSyncInFlightRef.current = false;
-      }
+      })();
+
+      messageSyncInFlightRef.current.set(convId, request);
+      return request;
     },
-    [senderLookup],
+    [],
   );
 
   const loadConversation = useCallback(
@@ -497,14 +512,15 @@ export function ChatInterface() {
       try {
         setLoadingConversation(true);
         setError(null);
-        const serverMessages = await fetchConversationSnapshot(convId, senderLookup);
+        const serverMessages = await fetchConversationSnapshot(convId, senderLookupRef.current);
         if (!mountedRef.current || loadRequestIdRef.current !== requestId) {
           return;
         }
         setMessages(serverMessages);
         lastMessageSyncRef.current = Date.now();
+        currentConversationRef.current = convId;
         setCurrentConversation(convId);
-        setCurrentConversationWorkspaceId(activeWorkspaceId);
+        setCurrentConversationWorkspaceId(activeWorkspaceIdRef.current);
         setActiveConversation(convId);
       } catch (err) {
         if (!mountedRef.current || loadRequestIdRef.current !== requestId) {
@@ -513,9 +529,10 @@ export function ChatInterface() {
         const message =
           err instanceof Error ? err.message : "Failed to load conversation";
         setError(message);
-        setMessages([]);
 
         if (message.toLowerCase().includes("conversation not found")) {
+          setMessages([]);
+          currentConversationRef.current = null;
           setCurrentConversation(null);
           setActiveConversation(null);
           await refreshConversations();
@@ -527,11 +544,11 @@ export function ChatInterface() {
         }
       }
     },
-    [activeWorkspaceId, refreshConversations, router, senderLookup, setActiveConversation],
+    [refreshConversations, router, setActiveConversation],
   );
 
   useEffect(() => {
-    if (!session || typeof window === "undefined") {
+    if (!authenticatedUserId || typeof window === "undefined") {
       return;
     }
 
@@ -583,9 +600,9 @@ export function ChatInterface() {
       document.removeEventListener("visibilitychange", syncOnVisibility);
     };
   }, [
+    authenticatedUserId,
     reconcileConversationMessages,
     refreshActiveWorkspaceData,
-    session,
   ]);
 
   useEffect(() => {
@@ -594,6 +611,7 @@ export function ChatInterface() {
       return;
     }
 
+    currentConversationRef.current = null;
     setCurrentConversation(null);
     loadRequestIdRef.current += 1;
     lastMessageSyncRef.current = 0;
@@ -610,6 +628,7 @@ export function ChatInterface() {
     }
 
     if (currentConversationWorkspaceId !== activeWorkspaceId) {
+      currentConversationRef.current = null;
       setCurrentConversation(null);
       setCurrentConversationWorkspaceId(activeWorkspaceId);
       lastMessageSyncRef.current = 0;
@@ -814,6 +833,7 @@ export function ChatInterface() {
             // persist conversation & user message ids
             if (obj.conversation_id) {
               streamConversationId = obj.conversation_id;
+              currentConversationRef.current = obj.conversation_id;
               setCurrentConversation(obj.conversation_id);
               setCurrentConversationWorkspaceId(activeWorkspaceId);
               setActiveConversation(obj.conversation_id);

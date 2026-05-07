@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { apiClient } from "./api";
 import { useAuth } from "./auth-context";
 import { useWorkspace } from "./workspace-context";
@@ -68,8 +68,16 @@ function normalizeStatuses(statuses: WorkspaceLiveStatus[]) {
 
 export function WorkspaceCollaborationProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { session } = useAuth();
-  const { activeWorkspace, activeWorkspaceId } = useWorkspace();
+  const {
+    activeWorkspace,
+    activeWorkspaceId,
+    refreshActiveWorkspaceData,
+    refreshWorkspaceIntelligence,
+    refreshWorkspaces,
+    setActiveWorkspace,
+  } = useWorkspace();
   const [presence, setPresence] = useState<WorkspacePresenceSnapshot | null>(null);
   const [activity, setActivity] = useState<WorkspaceActivityEvent[]>([]);
   const [liveStatuses, setLiveStatuses] = useState<Record<string, WorkspaceLiveStatus>>({});
@@ -78,9 +86,25 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
   const [loadingPresence] = useState(false);
   const [loadingActivity, setLoadingActivity] = useState(false);
   const typingSentAtRef = useRef(0);
+  const lastPresenceWorkspaceIdRef = useRef<string | null>(null);
+  const activeWorkspaceIdRef = useRef<string | null>(activeWorkspaceId);
+  const userId = session?.user.id ?? null;
+  const userEmail = session?.user.email ?? null;
+  const userFullName =
+    typeof session?.user.user_metadata?.full_name === "string"
+      ? session.user.user_metadata.full_name
+      : null;
+  const userAvatarUrl =
+    typeof session?.user.user_metadata?.avatar_url === "string"
+      ? session.user.user_metadata.avatar_url
+      : undefined;
+
+  useEffect(() => {
+    activeWorkspaceIdRef.current = activeWorkspaceId;
+  }, [activeWorkspaceId]);
 
   const refreshPresence = useCallback(async () => {
-    if (!session || !activeWorkspaceId) {
+    if (!userId || !activeWorkspaceId) {
       setPresence(null);
       return null;
     }
@@ -95,10 +119,10 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       console.warn("Unable to refresh workspace presence snapshot", err);
       return null;
     }
-  }, [activeWorkspaceId, session]);
+  }, [activeWorkspaceId, userId]);
 
   const heartbeatPresence = useCallback(async () => {
-    if (!session || !activeWorkspaceId) return null;
+    if (!userId || !activeWorkspaceId) return null;
 
     try {
       const snapshot = await apiClient.post<WorkspacePresenceSnapshot>(
@@ -115,10 +139,10 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       console.warn("Unable to send workspace heartbeat", err);
       return null;
     }
-  }, [activeWorkspace?.name, activeWorkspaceId, pathname, session]);
+  }, [activeWorkspace?.name, activeWorkspaceId, pathname, userId]);
 
   const refreshActivity = useCallback(async () => {
-    if (!session || !activeWorkspaceId) {
+    if (!userId || !activeWorkspaceId) {
       setActivity([]);
       return [];
     }
@@ -137,10 +161,10 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     } finally {
       setLoadingActivity(false);
     }
-  }, [activeWorkspaceId, session]);
+  }, [activeWorkspaceId, userId]);
 
   const refreshLiveStatuses = useCallback(async () => {
-    if (!session) {
+    if (!userId) {
       setLiveStatuses({});
       return {};
     }
@@ -154,21 +178,21 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       console.warn("Unable to refresh workspace live statuses", err);
       return {};
     }
-  }, [session]);
+  }, [userId]);
 
   const leaveWorkspace = useCallback(async (wid?: string | null) => {
     const targetId = wid || activeWorkspaceId;
-    if (!session || !targetId) return;
+    if (!userId || !targetId) return;
 
     try {
       await apiClient.delete(`/workspaces/${targetId}/presence`);
-      if (targetId === activeWorkspaceId) {
+      if (targetId === activeWorkspaceIdRef.current) {
         setPresence(null);
       }
     } catch (err) {
       console.warn("Unable to leave workspace presence", err);
     }
-  }, [activeWorkspaceId, session]);
+  }, [activeWorkspaceId, userId]);
 
   const handleAuthorityRevocation = useCallback((workspaceId: string, type: string) => {
      console.warn(`[authority] Revocation detected for workspace ${workspaceId}: ${type}`);
@@ -180,17 +204,30 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
      // 2. If it's the active workspace, we must evacuate
      if (workspaceId === activeWorkspaceId) {
         if (type === "membership_removed" || type === "workspace_deleted") {
-           window.location.href = "/dashboard";
+           setPresence(null);
+           setActivity([]);
+           setTypingUsers({});
+           setActiveWorkspace(null);
+           void refreshWorkspaces({ force: true, silent: true });
+           router.replace("/dashboard");
         } else if (type === "role_changed") {
-           // Force reload or refresh to pick up new permissions
-           window.location.reload();
+           void refreshWorkspaces({ force: true, silent: true });
+           void refreshActiveWorkspaceData({ force: true, silent: true });
+           void refreshWorkspaceIntelligence({ force: true, silent: true });
         }
      }
-  }, [activeWorkspaceId]);
+  }, [
+    activeWorkspaceId,
+    refreshActiveWorkspaceData,
+    refreshWorkspaceIntelligence,
+    refreshWorkspaces,
+    router,
+    setActiveWorkspace,
+  ]);
 
   const sendTypingSignal = useCallback(
     async (conversationId?: string | null, isTyping = true) => {
-      if (!session || !activeWorkspaceId) return;
+      if (!userId || !activeWorkspaceId) return;
 
       const now = Date.now();
       if (isTyping && now - typingSentAtRef.current < TYPING_THROTTLE_MS) {
@@ -205,11 +242,10 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
 
       if (!channel) return;
 
-      const user = session.user;
       const payload: TypingSignal = {
-        userId: user.id,
-        fullName: user.user_metadata?.full_name || user.email?.split("@")[0] || "Teammate",
-        avatarUrl: user.user_metadata?.avatar_url,
+        userId,
+        fullName: userFullName || userEmail?.split("@")[0] || "Teammate",
+        avatarUrl: userAvatarUrl,
         conversationId: conversationId || null,
         isTyping,
         sentAt: new Date().toISOString(),
@@ -225,12 +261,12 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
         console.warn("Unable to broadcast typing signal", err);
       }
     },
-    [activeWorkspaceId, session],
+    [activeWorkspaceId, userAvatarUrl, userEmail, userFullName, userId],
   );
 
   // Realtime Subscriptions
   useEffect(() => {
-    if (!session || !activeWorkspaceId) {
+    if (!userId || !activeWorkspaceId) {
       setRealtimeStatus("disconnected");
       setTypingUsers({});
       return;
@@ -258,22 +294,23 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
             }
           )
           .on("broadcast", { event: "typing" }, ({ payload }: { payload: TypingSignal }) => {
-             setTypingUsers(current => {
-                if (!payload.isTyping) {
-                   const next = { ...current };
-                   delete next[payload.userId];
-                   return next;
-                }
-                return {
-                   ...current,
-                   [payload.userId]: payload
-                };
-             });
-          })
-          .subscribe((status) => {
-            if (status === "SUBSCRIBED") setRealtimeStatus("connected");
-            if (status === "CHANNEL_ERROR") setRealtimeStatus("error");
-          })
+            setTypingUsers(current => {
+              if (!payload.isTyping) {
+                const next = { ...current };
+                delete next[payload.userId];
+                return next;
+              }
+              return {
+                ...current,
+                [payload.userId]: payload,
+              };
+            });
+          }),
+      (status) => {
+        if (status === "SUBSCRIBED") setRealtimeStatus("connected");
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") setRealtimeStatus("error");
+        if (status === "CLOSED") setRealtimeStatus("disconnected");
+      },
     );
 
     // Activity Subscription
@@ -307,7 +344,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
               event: "INSERT",
               schema: "public",
               table: "authority_revocations",
-              filter: `user_id=eq.${session.user.id}`,
+              filter: `user_id=eq.${userId}`,
             },
             (payload: { new: { workspace_id: string; revocation_type: string } }) => {
               console.warn("[realtime] authority revocation detected", payload);
@@ -322,23 +359,34 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       realtimeRegistry.unsubscribe({ type: "activity", workspaceId: activeWorkspaceId });
       realtimeRegistry.unsubscribe({ type: "revocation" });
     };
-  }, [activeWorkspaceId, handleAuthorityRevocation, refreshActivity, refreshPresence, session]);
+  }, [activeWorkspaceId, handleAuthorityRevocation, refreshActivity, refreshPresence, userId]);
 
   // Periodic Refresh / Heartbeat
+  useEffect(() => {
+    const previousWorkspaceId = lastPresenceWorkspaceIdRef.current;
+    if (previousWorkspaceId && previousWorkspaceId !== activeWorkspaceId) {
+      void leaveWorkspace(previousWorkspaceId);
+    }
+    lastPresenceWorkspaceIdRef.current = activeWorkspaceId;
+  }, [activeWorkspaceId, leaveWorkspace]);
+
   useEffect(() => {
     void heartbeatPresence();
     void refreshActivity();
     void refreshLiveStatuses();
-
-    return () => {
-      if (activeWorkspaceId) {
-        void leaveWorkspace(activeWorkspaceId);
-      }
-    };
-  }, [activeWorkspaceId, leaveWorkspace, refreshActivity, refreshLiveStatuses, heartbeatPresence]);
+  }, [refreshActivity, refreshLiveStatuses, heartbeatPresence]);
 
   useEffect(() => {
-    if (!session) return;
+    return () => {
+      const workspaceId = lastPresenceWorkspaceIdRef.current;
+      if (workspaceId) {
+        void leaveWorkspace(workspaceId);
+      }
+    };
+  }, [leaveWorkspace]);
+
+  useEffect(() => {
+    if (!userId) return;
 
     const heartbeatId = window.setInterval(() => {
       if (document.visibilityState === "visible") {
@@ -367,7 +415,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleFocus);
     };
-  }, [refreshActivity, refreshLiveStatuses, heartbeatPresence, session]);
+  }, [refreshActivity, refreshLiveStatuses, heartbeatPresence, userId]);
 
   useEffect(() => {
     const timeoutId = window.setInterval(() => {
