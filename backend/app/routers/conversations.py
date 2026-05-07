@@ -226,7 +226,9 @@ async def get_conversations(
                 offset=offset,
             )
     except SupabaseServiceError as exc:
-        raise _database_error() from exc
+        # Fail gracefully for list endpoints to avoid crashing frontends
+        logger.exception("Failed to query conversations; returning empty list instead of 500.")
+        return []
 
     if not include_archived:
         conversations = [

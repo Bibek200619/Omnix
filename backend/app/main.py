@@ -132,3 +132,30 @@ app.include_router(files.router)
 app.include_router(upload.router)
 app.include_router(cache.router)
 app.include_router(workspaces.router)
+# Actions router: operational AI workflows
+from .routers import actions as actions_router
+app.include_router(actions_router.router)
+# Artifacts router
+from .routers import artifacts as artifacts_router
+app.include_router(artifacts_router.router)
+# Insights router: workspace intelligence
+from .routers import insights as insights_router
+app.include_router(insights_router.router)
+# Automations router
+from .routers import automations as automations_router
+app.include_router(automations_router.router)
+
+# Integrations: Google Drive
+from .routers import google_drive as google_drive_router
+app.include_router(google_drive_router.router)
+
+# Start AutomationScheduler after other startup tasks
+from .automation.scheduler import AutomationScheduler
+
+@app.on_event("startup")
+async def _start_automation_scheduler():
+    try:
+        scheduler = AutomationScheduler.get()
+        await scheduler.start()
+    except Exception:
+        logger.exception("Failed to start AutomationScheduler on startup.")
