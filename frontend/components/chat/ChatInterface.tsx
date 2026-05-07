@@ -207,88 +207,122 @@ export function ChatInterface() {
       setError(null);
 
       try {
-        const response = await apiClient.post<ChatApiResponse>("/chat", {
-          message: content,
-          conversation_id: currentConversation || undefined,
+        // Use streaming endpoint when available
+        const resp = await apiClient.stream("/chat/stream", {
+          method: "POST",
+          body: JSON.stringify({ message: content, conversation_id: currentConversation || undefined }),
         });
 
-        setCurrentConversation(response.conversation_id);
-        setActiveConversation(response.conversation_id);
+        const reader = resp.body?.getReader();
+        if (!reader) throw new Error("Streaming not supported by this browser.");
 
-        if (response.conversation) {
-          upsertConversation(response.conversation);
-        } else {
-          upsertConversation(optimisticConversation(response.conversation_id, content));
-          refreshConversations();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        // helper to process an SSE block (one or more data: lines)
+        const processEvent = (block: string) => {
+          const lines = block.split(/\r?\n/).filter(Boolean);
+          for (const line of lines) {
+            if (!line.startsWith("data:")) continue;
+            const payload = line.replace(/^data:\s?/, "");
+            try {
+              const obj = JSON.parse(payload);
+              handleStreamEvent(obj);
+            } catch (e) {
+              console.error("Failed to parse stream payload", payload, e);
+            }
+          }
+        };
+
+        // stateful ids for updating messages
+        let assistantId: string | null = null;
+        let persistedUserMessageId: string | null = null;
+
+        const handleStreamEvent = (obj: any) => {
+          const t = obj.type;
+          if (t === "init") {
+            // persist conversation & user message ids
+            if (obj.conversation_id) {
+              setCurrentConversation(obj.conversation_id);
+              setActiveConversation(obj.conversation_id);
+            }
+            persistedUserMessageId = obj.user_message_id ?? null;
+            assistantId = obj.assistant_message_id ?? crypto.randomUUID();
+
+            // update messages list: replace optimistic user message and add assistant placeholder
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === messageId
+                  ? {
+                      ...message,
+                      id: persistedUserMessageId ?? message.id,
+                      status: "sent",
+                    }
+                  : message,
+              ),
+            );
+
+            setMessages((current) => [
+              ...current,
+              {
+                id: assistantId as string,
+                role: "assistant",
+                content: "",
+                timestamp: formatTime(),
+                status: "streaming",
+                isStreaming: true,
+                sources: obj.sources ?? [],
+              },
+            ]);
+          } else if (t === "status") {
+            // optionally show retrieval progress
+            // we display a short status message in the assistant content
+            const st = obj.status;
+            if (assistantId && st) {
+              setMessages((current) =>
+                current.map((m) =>
+                  m.id === assistantId
+                    ? { ...m, content: `...${st}...` }
+                    : m,
+                ),
+              );
+            }
+          } else if (t === "token") {
+            if (!assistantId) return;
+            const txt = obj.text ?? "";
+            setMessages((current) =>
+              current.map((m) => (m.id === assistantId ? { ...m, content: (m.content || "") + txt } : m)),
+            );
+          } else if (t === "error") {
+            const detail = obj.detail ?? "Unknown error";
+            if (assistantId) {
+              setMessages((current) =>
+                current.map((m) => (m.id === assistantId ? { ...m, status: "failed", isStreaming: false, error: detail } : m)),
+              );
+            }
+          } else if (t === "done") {
+            if (assistantId) {
+              setMessages((current) =>
+                current.map((m) => (m.id === assistantId ? { ...m, status: "sent", isStreaming: false } : m)),
+              );
+            }
+            // update conversation url
+            if (!conversationId && obj.conversation_id) {
+              router.replace(`/chat?conversation=${obj.conversation_id}`, { scroll: false });
+            }
+          }
+        };
+
+        // read loop
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let parts = buffer.split(/\n\n/);
+          buffer = parts.pop() || "";
+          for (const part of parts) processEvent(part);
         }
 
-        const persistedUserMessage = response.user_message
-          ? normalizeMessage(response.user_message, 0)
-          : null;
-
-        // create assistant placeholder that will stream progressively
-        const assistantId = response.assistant_message_id ?? crypto.randomUUID();
-
-        // Insert persisted user message (if any) and streaming assistant placeholder
-        setMessages((current) => [
-          ...current.map((message) =>
-            message.id === messageId
-              ? {
-                  ...(persistedUserMessage ?? message),
-                  id: persistedUserMessage?.id ?? response.user_message_id ?? message.id,
-                  status: "sent" as const,
-                  error: undefined,
-                }
-              : message,
-          ),
-          {
-            id: assistantId,
-            role: "assistant",
-            content: "",
-            timestamp: formatTime(),
-            status: "streaming",
-            isStreaming: true,
-            sources: (response.sources as Record<string, unknown>[]) ?? [],
-          },
-        ]);
-
-        // scroll to end while we stream
-        // simulate tokenized streaming (word-level with small random delays)
-        const finalText = response.response || "";
-        const tokens = finalText.split(/(\s+|[^\s\w]+|\w+)/).filter(Boolean);
-
-        for (let i = 0; i < tokens.length; i++) {
-          const token = tokens[i];
-          // append next token
-          setMessages((current) =>
-            current.map((m) =>
-              m.id === assistantId
-                ? { ...m, content: (m.content || "") + token }
-                : m,
-            ),
-          );
-
-          // realistic variable delay between 12-70ms per token
-          // slightly longer at punctuation
-          const base = token.trim().length > 0 && /[.!?]/.test(token) ? 70 : 28;
-          const jitter = Math.random() * 40;
-          await new Promise((r) => setTimeout(r, base + jitter));
-        }
-
-        // finalize assistant message
-        setMessages((current) =>
-          current.map((m) =>
-            m.id === assistantId
-              ? { ...m, status: "sent", isStreaming: false }
-              : m,
-          ),
-        );
-
-        if (!conversationId) {
-          router.replace(`/chat?conversation=${response.conversation_id}`, {
-            scroll: false,
-          });
-        }
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Failed to send message";
