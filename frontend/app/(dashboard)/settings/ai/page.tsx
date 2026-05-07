@@ -1,26 +1,39 @@
 "use client";
 
-import { useState } from "react";
-import { BrainCircuit, CheckCircle2, Globe, Server, SlidersHorizontal, Zap } from "lucide-react";
+import Link from "next/link";
+import { BrainCircuit, CheckCircle2, Database, Server, ShieldCheck } from "lucide-react";
 import { SettingsShell } from "@/components/settings/SettingsShell";
-import { Toggle } from "@/components/ui/Toggle";
+import { useWorkspace } from "@/lib/workspace-context";
+import type { WorkspaceFocus } from "@/lib/workspace-types";
 
-const modes = [
-  { id: "deep", name: "Deep Think", desc: "Complex reasoning and multi-step analysis", icon: BrainCircuit, color: "var(--omnix-purple)" },
-  { id: "fast", name: "Fast", desc: "Quick responses and standard workspace logic", icon: Zap, color: "var(--omnix-cyan)" },
-  { id: "balanced", name: "Balanced", desc: "Default speed and quality balance", icon: SlidersHorizontal, color: "var(--omnix-green)" },
-];
+const focusLabels: Record<WorkspaceFocus, string> = {
+  general: "General",
+  engineering: "Engineering",
+  design: "Design",
+  research: "Research",
+  strategy: "Strategy",
+};
+
+function StatRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-[var(--omnix-border)] bg-black/20 px-3 py-2">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">{label}</div>
+      <div className="mt-1 text-sm font-semibold text-white">{value}</div>
+    </div>
+  );
+}
 
 export default function AISettingsPage() {
-  const [mode, setMode] = useState("balanced");
-  const [webSearch, setWebSearch] = useState(true);
-  const [memory, setMemory] = useState(true);
-  const [temperature, setTemperature] = useState(0.7);
+  const { activeWorkspace, activeWorkspaceIntelligence } = useWorkspace();
+  const focus = activeWorkspace?.workspace_focus ?? activeWorkspace?.ai_specialization ?? "general";
+  const preferences = activeWorkspace?.intelligence_preferences ?? {};
+  const memoryEnabled = preferences.memory_enabled !== false;
+  const retrievalScope = activeWorkspace?.is_global ? "Global" : "Workspace";
 
   return (
     <SettingsShell
       title="AI Settings"
-      description="Configure how Omnix reasons, uses context, and responds inside your workspace."
+      description="Review the active workspace intelligence surface. Cognitive posture changes are saved on the workspace record."
     >
       <div className="mx-auto max-w-3xl space-y-5">
         <section className="omnix-cinematic-card border-[var(--omnix-border-active)] bg-cyan-300/[0.04] p-5 shadow-[var(--omnix-glow-xs)]">
@@ -40,82 +53,51 @@ export default function AISettingsPage() {
             </div>
           </div>
           <div className="relative z-10 mt-4 grid gap-3 sm:grid-cols-3">
-            {["Provider: Omnix API", "Context: Workspace + Web", "Streaming: Enabled"].map((item) => (
-              <div key={item} className="rounded-lg border border-[var(--omnix-border)] bg-black/20 px-3 py-2 text-xs text-[var(--omnix-text-2)]">
-                {item}
-              </div>
-            ))}
+            <StatRow label="Provider" value="Omnix API" />
+            <StatRow label="Streaming" value="Enabled" />
+            <StatRow label="Workspace" value={activeWorkspace?.name ?? "No active workspace"} />
           </div>
         </section>
 
         <section className="omnix-cinematic-card p-5">
-          <p className="relative z-10 mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Default Mode</p>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {modes.map((item) => {
-              const Icon = item.icon;
-              const active = mode === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setMode(item.id)}
-                  className="rounded-xl border p-4 text-left transition hover:-translate-y-0.5"
-                  style={{
-                    background: active ? `${item.color}12` : "var(--omnix-surface)",
-                    borderColor: active ? `${item.color}66` : "var(--omnix-border)",
-                    boxShadow: active ? `0 0 18px ${item.color}22` : "none",
-                  }}
-                >
-                  <span className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--omnix-border)]" style={{ background: `${item.color}18` }}>
-                    <Icon className="h-4 w-4" style={{ color: item.color }} />
-                  </span>
-                  <span className="block text-sm font-semibold text-white">{item.name}</span>
-                  <span className="mt-1 block text-xs leading-5 text-[var(--omnix-text-3)]">{item.desc}</span>
-                </button>
-              );
-            })}
+          <div className="relative z-10 mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                <BrainCircuit className="h-4 w-4 text-cyan-200" />
+                Workspace Cognition
+              </div>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--omnix-text-3)]">
+                Focus is stored per workspace and applied inside the chat system prompt and streaming pipeline.
+              </p>
+            </div>
+            <Link
+              href="/settings/workspace"
+              className="inline-flex h-9 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/15"
+            >
+              Edit workspace
+            </Link>
+          </div>
+          <div className="relative z-10 grid gap-3 sm:grid-cols-2">
+            <StatRow label="Cognitive focus" value={focusLabels[focus]} />
+            <StatRow label="Retrieval scope" value={retrievalScope} />
+            <StatRow label="Workspace memory" value={memoryEnabled ? "Enabled" : "Disabled"} />
+            <StatRow label="Authorized sources" value={String(activeWorkspaceIntelligence?.source_count ?? 0)} />
           </div>
         </section>
 
-        <section className="omnix-cinematic-card overflow-hidden">
-          <div className="relative z-10">
-          <Toggle
-            label="Web Search"
-            description="Allow Omnix to request live web context when a conversation asks for current information."
-            checked={webSearch}
-            onChange={(event) => setWebSearch(event.target.checked)}
-            className="rounded-none border-0 border-b border-[var(--omnix-border)] bg-transparent"
-          />
-          <Toggle
-            label="Context Memory"
-            description="Use workspace conversation history and uploaded files as retrieval context."
-            checked={memory}
-            onChange={(event) => setMemory(event.target.checked)}
-            className="rounded-none border-0 border-b border-[var(--omnix-border)] bg-transparent"
-          />
-          <div className="p-5">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-medium text-white">
-                  <Globe className="h-4 w-4 text-[var(--omnix-green)]" />
-                  Creativity / Temperature
-                </div>
-                <p className="mt-1 text-xs text-[var(--omnix-text-3)]">Higher values make output more exploratory.</p>
-              </div>
-              <span className="rounded-md border border-[var(--omnix-border)] bg-black/25 px-2 py-1 font-mono text-xs text-cyan-100">
-                {temperature.toFixed(2)}
-              </span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={2}
-              step={0.1}
-              value={temperature}
-              onChange={(event) => setTemperature(Number(event.target.value))}
-              className="w-full accent-cyan-300"
-            />
+        <section className="omnix-cinematic-card p-5">
+          <div className="relative z-10 mb-4 flex items-center gap-2 text-sm font-semibold text-white">
+            <ShieldCheck className="h-4 w-4 text-emerald-200" />
+            Context Integrity
           </div>
+          <div className="relative z-10 grid gap-3 sm:grid-cols-3">
+            <StatRow label="Profile" value={activeWorkspaceIntelligence ? "Loaded" : "Syncing"} />
+            <StatRow label="Sources" value={`${activeWorkspaceIntelligence?.connected_sources.length ?? 0} visible`} />
+            <StatRow label="Domains" value={`${activeWorkspaceIntelligence?.active_domains.length ?? 0} detected`} />
+          </div>
+          <div className="relative z-10 mt-4 rounded-lg border border-[var(--omnix-border)] bg-black/15 px-3 py-3 text-xs leading-5 text-[var(--omnix-text-2)]">
+            <Database className="mr-2 inline h-3.5 w-3.5 text-cyan-200" />
+            These values reflect the active workspace record and backend intelligence profile.
           </div>
         </section>
       </div>

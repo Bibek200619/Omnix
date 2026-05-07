@@ -38,7 +38,9 @@ const eventIcon = {
 } satisfies Record<string, typeof Activity>;
 
 function actorName(item: WorkspaceActivityEvent) {
-  return item.actor_name || item.actor_email || "Omnix";
+  const name = item.actor_name || item.actor_email || "Omnix";
+  if (name === "Omnix AI") return "Omnix";
+  return name;
 }
 
 function formatRelativeTime(value?: string | null) {
