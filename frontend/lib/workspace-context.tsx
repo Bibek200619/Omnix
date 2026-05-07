@@ -119,7 +119,16 @@ type WorkspaceApiRecord = Omit<Partial<Workspace>, "workspace_focus" | "ai_speci
 };
 
 function normalizeWorkspaceRole(role: unknown): WorkspaceRole {
-  if (role === "founder" || role === "owner" || role === "co_owner" || role === "member") {
+  if (
+    role === "founder" ||
+    role === "owner" ||
+    role === "co_owner" ||
+    role === "member" ||
+    role === "super_founder" ||
+    role === "sub_leader" ||
+    role === "team_lead" ||
+    role === "sub_member"
+  ) {
     return role;
   }
   return "member";
@@ -921,19 +930,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         throw new Error("Select a workspace first.");
       }
 
-      const invite = await apiClient.post<WorkspaceInvite>(`/workspaces/${activeWorkspaceId}/invites`, {
+      const requestWorkspaceId = activeWorkspaceId;
+      const invite = await apiClient.post<WorkspaceInvite>(`/workspaces/${requestWorkspaceId}/invites`, {
         email: target,
         role,
       });
       const nextInviteId = getWorkspaceInviteId(invite);
-      setActiveInvites((current) =>
-        sortWorkspaceInvites([
-          invite,
-          ...current.filter((item) => getWorkspaceInviteId(item) !== nextInviteId),
-        ]),
-      );
+      if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+        setActiveInvites((current) =>
+          sortWorkspaceInvites([
+            invite,
+            ...current.filter((item) => getWorkspaceInviteId(item) !== nextInviteId),
+          ]),
+        );
+        await refreshActiveWorkspaceData({ force: true, silent: true });
+      }
     },
-    [activeWorkspaceId],
+    [activeWorkspaceId, refreshActiveWorkspaceData],
   );
 
   const removeWorkspaceMember = useCallback(
@@ -942,11 +955,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         throw new Error("Select a workspace first.");
       }
 
-      await apiClient.delete(`/workspaces/${activeWorkspaceId}/members/${userId}`);
+      const requestWorkspaceId = activeWorkspaceId;
+      const previousMembers = activeMembers;
+
       setActiveMembers((current) => current.filter((member) => member.user_id !== userId));
-      await refreshWorkspaces({ force: true });
+
+      try {
+        await apiClient.delete(`/workspaces/${requestWorkspaceId}/members/${userId}`);
+        await refreshWorkspaces({ force: true, silent: true });
+        if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+          await refreshActiveWorkspaceData({ force: true, silent: true });
+        }
+      } catch (err) {
+        if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+          setActiveMembers(previousMembers);
+          await refreshActiveWorkspaceData({ force: true, silent: true });
+        }
+        throw err;
+      }
     },
-    [activeWorkspaceId, refreshWorkspaces],
+    [activeMembers, activeWorkspaceId, refreshActiveWorkspaceData, refreshWorkspaces],
   );
 
   const updateWorkspaceMemberRole = useCallback(
@@ -955,31 +983,40 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         throw new Error("Select a workspace first.");
       }
 
+      const requestWorkspaceId = activeWorkspaceId;
       const previousMembers = activeMembers;
-      setActiveMembers((current) =>
-        current.map((member) =>
-          member.user_id === userId
-            ? { ...member, role, updated_at: new Date().toISOString() }
-            : member,
-        ),
-      );
+      if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+        setActiveMembers((current) =>
+          current.map((member) =>
+            member.user_id === userId
+              ? { ...member, role, updated_at: new Date().toISOString() }
+              : member,
+          ),
+        );
+      }
 
       try {
         const updated = await apiClient.patch<WorkspaceMember>(
-          `/workspaces/${activeWorkspaceId}/members/${userId}`,
+          `/workspaces/${requestWorkspaceId}/members/${userId}`,
           { role },
         );
-        setActiveMembers((current) =>
-          current.map((member) => (member.user_id === userId ? updated : member)),
-        );
+        if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+          setActiveMembers((current) =>
+            current.map((member) => (member.user_id === userId ? updated : member)),
+          );
+          await refreshActiveWorkspaceData({ force: true, silent: true });
+        }
         await refreshWorkspaces({ force: true, silent: true });
         return updated;
       } catch (err) {
-        setActiveMembers(previousMembers);
+        if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+          setActiveMembers(previousMembers);
+          await refreshActiveWorkspaceData({ force: true, silent: true });
+        }
         throw err;
       }
     },
-    [activeMembers, activeWorkspaceId, refreshWorkspaces],
+    [activeMembers, activeWorkspaceId, refreshActiveWorkspaceData, refreshWorkspaces],
   );
 
   const assignWorkspaceMember = useCallback(
@@ -988,12 +1025,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         throw new Error("Select a workspace first.");
       }
 
+      const requestWorkspaceId = activeWorkspaceId;
       const previousMembers = activeMembers;
-      const previousWorkspaces = workspaces;
+      const shouldApplyActiveUpdate = activeWorkspaceIdRef.current === requestWorkspaceId;
 
       // Optimistic member count update in tree
       setWorkspaces((current) =>
-        patchWorkspaceInTree(current, activeWorkspaceId, (workspace) => ({
+        patchWorkspaceInTree(current, requestWorkspaceId, (workspace) => ({
           ...workspace,
           member_count: workspace.member_count + 1,
         })),
@@ -1001,27 +1039,37 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
       try {
         const member = await apiClient.post<WorkspaceMember>(
-          `/workspaces/${activeWorkspaceId}/members/assign`,
+          `/workspaces/${requestWorkspaceId}/members/assign`,
           payload,
         );
 
-        setActiveMembers((current) => {
-          const exists = current.some((m) => m.user_id === member.user_id);
-          if (exists) return current;
-          return [...current, member];
-        });
+        if (activeWorkspaceIdRef.current === requestWorkspaceId) {
+          setActiveMembers((current) => {
+            const exists = current.some((m) => m.user_id === member.user_id);
+            if (exists) return current;
+            return [...current, member];
+          });
+          await refreshActiveWorkspaceData({ force: true, silent: true });
+        }
 
-        // Trigger silent refresh to sync full state
-        void refreshWorkspaces({ silent: true });
+        await refreshWorkspaces({ force: true, silent: true });
         return member;
       } catch (err) {
         // Rollback on failure
-        setWorkspaces(previousWorkspaces);
-        setActiveMembers(previousMembers);
+        setWorkspaces((current) =>
+          patchWorkspaceInTree(current, requestWorkspaceId, (workspace) => ({
+            ...workspace,
+            member_count: Math.max(0, workspace.member_count - 1),
+          })),
+        );
+        if (shouldApplyActiveUpdate && activeWorkspaceIdRef.current === requestWorkspaceId) {
+          setActiveMembers(previousMembers);
+          await refreshActiveWorkspaceData({ force: true, silent: true });
+        }
         throw err;
       }
     },
-    [activeWorkspaceId, activeMembers, workspaces, refreshWorkspaces],
+    [activeWorkspaceId, activeMembers, refreshActiveWorkspaceData, refreshWorkspaces],
   );
 
   const revokeInvite = useCallback(
