@@ -384,16 +384,13 @@ async def _accept_workspace_invite(invite_id: str, current_user: Any) -> dict[st
         except SupabaseServiceError as exc:
             if _is_unique_constraint_error(exc):
                 logger.info(
-                    "Workspace invite accept observed existing membership during insert | invite_id=%s | workspace_id=%s | user_id=%s",
+                    "Workspace invite accept observed existing membership during insert | invite_id=%s",
                     invite_id,
-                    workspace_id,
-                    user_id,
                 )
             else:
                 logger.exception(
-                    "Failed to create workspace membership from invite | workspace_id=%s | user_id=%s",
-                    workspace_id,
-                    user_id,
+                    "Failed to create workspace membership from invite | invite_id=%s",
+                    invite_id,
                 )
                 raise _database_error() from exc
         else:
