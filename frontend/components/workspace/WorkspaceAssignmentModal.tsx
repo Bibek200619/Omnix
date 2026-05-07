@@ -79,7 +79,7 @@ export function WorkspaceAssignmentModal({
     if (!query) return potentialMembers;
     return potentialMembers.filter(
       (m) =>
-        m.email.toLowerCase().includes(query) ||
+        (m.email || "").toLowerCase().includes(query) ||
         (m.full_name || "").toLowerCase().includes(query) ||
         (m.handle || "").toLowerCase().includes(query)
     );
@@ -171,16 +171,16 @@ export function WorkspaceAssignmentModal({
                   >
                     <div className="flex items-center gap-3">
                       <ProfileAvatar
-                        name={member.full_name || member.email}
+                        name={member.full_name || member.email || member.handle || member.user_id}
                         email={member.email}
                         avatarUrl={member.avatar_url}
                         className="h-10 w-10 text-xs"
                       />
                       <div className="text-left">
                         <div className="text-sm font-semibold text-white">
-                          {member.full_name || member.email.split("@")[0]}
+                          {member.full_name || member.email?.split("@")[0] || member.handle || member.user_id}
                         </div>
-                        <div className="text-[11px] text-slate-500">{member.email}</div>
+                        <div className="text-[11px] text-slate-500">{member.email || member.handle || member.user_id}</div>
                       </div>
                     </div>
                     {selectedUserId === member.user_id && (
