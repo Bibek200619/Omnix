@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Ban,
   CheckCircle2,
@@ -18,6 +18,7 @@ import {
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
+import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { useWorkspace } from "@/lib/workspace-context";
 import {
@@ -84,6 +85,117 @@ function roleIcon(role: WorkspaceMember["role"]) {
   if (isWorkspaceFounderRole(role)) return Crown;
   if (role === "co_owner") return ShieldCheck;
   return UserRound;
+}
+
+function MemberActionsMenu({
+  canManageRoles,
+  isOpen,
+  isSuper,
+  isSubspace,
+  member,
+  onChooseAction,
+  onToggle,
+}: {
+  canManageRoles: boolean;
+  isOpen: boolean;
+  isSuper: boolean;
+  isSubspace: boolean;
+  member: WorkspaceMember;
+  onChooseAction: (action: ConfirmAction) => void;
+  onToggle: () => void;
+}) {
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (!triggerRef.current?.contains(target) && !menuRef.current?.contains(target)) {
+        onToggle();
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onToggle();
+      }
+    }
+
+    window.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onToggle]);
+
+  function choose(action: ConfirmAction) {
+    onChooseAction(action);
+  }
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-label={`Open actions for ${workspaceMemberName(member)}`}
+        onClick={onToggle}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-slate-300 transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
+
+      {isOpen ? (
+        <FloatingMenuLayer anchorRef={triggerRef} contentRef={menuRef} placement="bottom-end" width={176} zIndex={145}>
+          <div
+            role="menu"
+            className="w-full overflow-hidden rounded-lg border border-[var(--omnix-border-2)] bg-[#07131f] p-1.5 shadow-[0_18px_54px_rgba(0,0,0,0.58),var(--omnix-glow-xs)] ring-1 ring-black/40"
+          >
+            {canManageRoles && member.role !== (isSubspace ? "team_lead" : "co_owner") && member.role !== "sub_leader" ? (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => choose({ type: "role", member, role: isSubspace ? "team_lead" : "co_owner" })}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition",
+                  isSubspace
+                    ? "text-indigo-200 hover:bg-indigo-400/10"
+                    : "text-amber-100 hover:bg-amber-300/10",
+                )}
+              >
+                <Shield className="h-4 w-4" />
+                Make {isSubspace ? "team lead" : "co-owner"}
+              </button>
+            ) : null}
+            {canManageRoles && member.role !== "member" && member.role !== "sub_member" ? (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => choose({ type: "role", member, role: isSubspace ? "sub_member" : "member" })}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-sky-100 transition hover:bg-sky-300/10"
+              >
+                <UserRound className="h-4 w-4" />
+                Make member
+              </button>
+            ) : null}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => choose({ type: "remove", member })}
+              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-rose-100 transition hover:bg-rose-400/10"
+            >
+              <Ban className="h-4 w-4" />
+              {isSuper ? "Remove from organization" : "Remove from workspace"}
+            </button>
+          </div>
+        </FloatingMenuLayer>
+      ) : null}
+    </>
+  );
 }
 
 export function WorkspaceAccessPanel() {
@@ -328,64 +440,22 @@ export function WorkspaceAccessPanel() {
                       </div>
                       {canActOnMember ? (
                         <div className="relative">
-                          <button
-                            type="button"
-                            aria-haspopup="menu"
-                            aria-expanded={openMemberMenu === member.user_id}
-                            aria-label={`Open actions for ${workspaceMemberName(member)}`}
-                            onClick={() =>
+                          <MemberActionsMenu
+                            canManageRoles={canManageRoles}
+                            isOpen={openMemberMenu === member.user_id}
+                            isSuper={isSuper}
+                            isSubspace={Boolean(isSubspace)}
+                            member={member}
+                            onChooseAction={(action) => {
+                              setConfirmAction(action);
+                              setOpenMemberMenu(null);
+                            }}
+                            onToggle={() =>
                               setOpenMemberMenu((current) =>
                                 current === member.user_id ? null : member.user_id,
                               )
                             }
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-slate-300 transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </button>
-
-                          {openMemberMenu === member.user_id ? (
-                            <div
-                              role="menu"
-                              className="absolute right-0 top-full z-40 mt-2 w-44 overflow-hidden rounded-lg border border-[var(--omnix-border-2)] bg-[#07131f] p-1.5 shadow-[0_18px_54px_rgba(0,0,0,0.58),var(--omnix-glow-xs)] ring-1 ring-black/40"
-                            >
-                              {canManageRoles && member.role !== (isSubspace ? "team_lead" : "co_owner") && member.role !== "sub_leader" ? (
-                                <button
-                                  type="button"
-                                  role="menuitem"
-                                  onClick={() => setConfirmAction({ type: "role", member, role: isSubspace ? "team_lead" : "co_owner" })}
-                                  className={cn(
-                                    "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition",
-                                    isSubspace 
-                                      ? "text-indigo-200 hover:bg-indigo-400/10"
-                                      : "text-amber-100 hover:bg-amber-300/10"
-                                  )}
-                                >
-                                  <Shield className="h-4 w-4" />
-                                  Make {isSubspace ? "team lead" : "co-owner"}
-                                </button>
-                              ) : null}
-                              {canManageRoles && member.role !== "member" && member.role !== "sub_member" ? (
-                                <button
-                                  type="button"
-                                  role="menuitem"
-                                  onClick={() => setConfirmAction({ type: "role", member, role: isSubspace ? "sub_member" : "member" })}
-                                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-sky-100 transition hover:bg-sky-300/10"
-                                >
-                                  <UserRound className="h-4 w-4" />
-                                  Make member
-                                </button>
-                              ) : null}
-                              <button
-                                type="button"
-                                role="menuitem"
-                                onClick={() => setConfirmAction({ type: "remove", member })}
-                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-rose-100 transition hover:bg-rose-400/10"
-                              >
-                                <Ban className="h-4 w-4" />
-                                {isSuper ? "Remove from organization" : "Remove from workspace"}
-                              </button>
-                            </div>
-                          ) : null}
+                          />
                         </div>
                       ) : null}
                     </div>

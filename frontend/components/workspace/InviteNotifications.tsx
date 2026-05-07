@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bell, Check, ChevronDown, Loader2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { useWorkspace } from "@/lib/workspace-context";
 import { getWorkspaceInviteId, type WorkspaceInvite } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
@@ -169,12 +170,14 @@ export function InviteNotificationBell() {
   const { pendingInvites, pendingInvitesLoading, refreshPendingInvites } = useWorkspace();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const panelContentRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
 
     function handlePointerDown(event: MouseEvent) {
-      if (!panelRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (!panelRef.current?.contains(target) && !panelContentRef.current?.contains(target)) {
         setOpen(false);
       }
     }
@@ -217,12 +220,13 @@ export function InviteNotificationBell() {
 
       <AnimatePresence>
         {open ? (
+          <FloatingMenuLayer anchorRef={panelRef} contentRef={panelContentRef} placement="bottom-end" width={352} zIndex={150}>
           <motion.div
             initial={{ opacity: 0, y: -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ duration: 0.16, ease: "easeOut" }}
-            className="omnix-floating-card absolute right-0 top-full z-[100] mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden ring-1 ring-black/40"
+            className="omnix-floating-card w-full overflow-hidden ring-1 ring-black/40"
           >
             <div className="flex items-center justify-between gap-3 border-b border-[var(--omnix-border)] px-4 py-3">
               <div>
@@ -234,7 +238,7 @@ export function InviteNotificationBell() {
               <ChevronDown className={cn("h-4 w-4 text-slate-500 transition", open && "rotate-180")} />
             </div>
 
-            <div className="omnix-scrollbar max-h-[70vh] overflow-y-auto p-2">
+            <div className="omnix-scrollbar overflow-y-auto p-2" style={{ maxHeight: "min(70vh, var(--omnix-floating-max-h))" }}>
               {pendingInvites.length ? (
                 <div className="space-y-2">
                   {pendingInvites.map((invite) => (
@@ -274,6 +278,7 @@ export function InviteNotificationBell() {
               )}
             </div>
           </motion.div>
+          </FloatingMenuLayer>
         ) : null}
       </AnimatePresence>
     </div>
