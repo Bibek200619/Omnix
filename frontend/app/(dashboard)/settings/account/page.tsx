@@ -24,7 +24,6 @@ export default function AccountSettingsPage() {
       return;
     }
     router.replace("/login");
-    router.refresh();
   }
 
   return (
