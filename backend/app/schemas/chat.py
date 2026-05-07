@@ -7,7 +7,17 @@ from pydantic import BaseModel, ConfigDict, Field
 
 MAX_INPUT_SIZE = 4000
 WorkspaceType = Literal["workspace", "super_workspace", "subworkspace", "global_workspace"]
-WorkspaceAIMode = Literal["research", "coding", "design", "strategy", "analytics", "general"]
+WorkspaceFocus = Literal["general", "engineering", "design", "research", "strategy"]
+WorkspaceFocusInput = Literal[
+    "general",
+    "engineering",
+    "design",
+    "research",
+    "strategy",
+    "coding",
+    "analytics",
+]
+WorkspaceAIMode = WorkspaceFocus
 
 
 class ConversationCreate(BaseModel):
@@ -133,13 +143,15 @@ class WorkspaceCreate(BaseModel):
     parent_workspace_id: str | None = None
     workspace_type: WorkspaceType = "super_workspace"
     is_global: bool = False
+    workspace_focus: WorkspaceFocusInput = "general"
 
 
 class WorkspaceUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
     expertise_area: str | None = Field(default=None, max_length=1000)
-    ai_specialization: WorkspaceAIMode | None = None
+    workspace_focus: WorkspaceFocusInput | None = None
+    ai_specialization: WorkspaceFocusInput | None = None
     ai_instructions: str | None = Field(default=None, max_length=4000)
     intelligence_preferences: dict[str, Any] | None = None
 
@@ -155,6 +167,7 @@ class WorkspaceRead(BaseModel):
     workspace_type: WorkspaceType = "super_workspace"
     is_global: bool = False
     expertise_area: str | None = None
+    workspace_focus: WorkspaceFocus = "general"
     ai_specialization: WorkspaceAIMode = "general"
     ai_instructions: str | None = None
     intelligence_preferences: dict[str, Any] = Field(default_factory=dict)
@@ -169,6 +182,7 @@ class WorkspaceRead(BaseModel):
 class WorkspaceSubspaceCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: str | None = None
+    workspace_focus: WorkspaceFocusInput = "general"
 
 
 class WorkspaceTreeRead(WorkspaceRead):
@@ -186,7 +200,8 @@ class WorkspaceRelationshipValidation(BaseModel):
 
 class WorkspaceIntelligenceUpdate(BaseModel):
     expertise_area: str | None = Field(default=None, max_length=1000)
-    ai_specialization: WorkspaceAIMode = "general"
+    workspace_focus: WorkspaceFocusInput | None = None
+    ai_specialization: WorkspaceFocusInput | None = None
     ai_instructions: str | None = Field(default=None, max_length=4000)
     intelligence_preferences: dict[str, Any] = Field(default_factory=dict)
 
@@ -199,6 +214,7 @@ class WorkspaceIntelligenceRead(BaseModel):
     parent_workspace_id: str | None = None
     description: str | None = None
     expertise_area: str | None = None
+    workspace_focus: WorkspaceFocus = "general"
     ai_specialization: WorkspaceAIMode = "general"
     ai_instructions: str | None = None
     intelligence_preferences: dict[str, Any] = Field(default_factory=dict)
@@ -276,6 +292,7 @@ class WorkspaceLiveStatusRead(BaseModel):
     recently_active_count: int = 0
     typing_count: int = 0
     source_count: int = 0
+    workspace_focus: WorkspaceFocus = "general"
     ai_specialization: WorkspaceAIMode = "general"
     ai_status: Literal["ready", "learning", "active"] = "ready"
     health: Literal["quiet", "warming", "alive"] = "quiet"

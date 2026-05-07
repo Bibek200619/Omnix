@@ -16,6 +16,7 @@ import {
   type WorkspaceRole,
   type WorkspaceSubspaceCreatePayload,
   type WorkspaceType,
+  type WorkspaceFocus,
 } from "./workspace-types";
 
 type RefreshOptions = {
@@ -109,9 +110,12 @@ function reconcileWorkspaceInvites(current: WorkspaceInvite[], incoming: Workspa
   return sortWorkspaceInvites(Array.from(byId.values()));
 }
 
-type WorkspaceApiRecord = Partial<Workspace> & {
+type WorkspaceApiRecord = Omit<Partial<Workspace>, "workspace_focus" | "ai_specialization" | "subspaces"> & {
   id: string;
   name?: string | null;
+  workspace_focus?: unknown;
+  ai_specialization?: unknown;
+  subspaces?: WorkspaceApiRecord[];
 };
 
 function normalizeWorkspaceRole(role: unknown): WorkspaceRole {
@@ -129,6 +133,29 @@ function normalizeWorkspaceType(value: unknown, parentWorkspaceId?: string | nul
   return parentWorkspaceId ? "subworkspace" : "super_workspace";
 }
 
+function normalizeWorkspaceFocus(value: unknown): WorkspaceFocus {
+  const normalized = String(value || "").trim().toLowerCase().replace(/[-\s]/g, "_");
+  if (
+    normalized === "general" ||
+    normalized === "engineering" ||
+    normalized === "design" ||
+    normalized === "research" ||
+    normalized === "strategy"
+  ) {
+    return normalized;
+  }
+  if (["coding", "code", "dev", "development", "technical"].includes(normalized)) {
+    return "engineering";
+  }
+  if (["analytics", "analysis", "data"].includes(normalized)) {
+    return "research";
+  }
+  if (["product", "planning"].includes(normalized)) {
+    return "strategy";
+  }
+  return "general";
+}
+
 function normalizeWorkspaceRecord(record: WorkspaceApiRecord, parentFromTree?: string | null): Workspace {
   const parentWorkspaceId =
     record.parent_workspace_id === undefined
@@ -139,6 +166,7 @@ function normalizeWorkspaceRecord(record: WorkspaceApiRecord, parentFromTree?: s
     typeof record.member_count === "number"
       ? record.member_count
       : membersPreview.length;
+  const workspaceFocus = normalizeWorkspaceFocus(record.workspace_focus ?? record.ai_specialization);
 
   return {
     id: String(record.id),
@@ -149,15 +177,8 @@ function normalizeWorkspaceRecord(record: WorkspaceApiRecord, parentFromTree?: s
     workspace_type: normalizeWorkspaceType(record.workspace_type, parentWorkspaceId),
     is_global: Boolean(record.is_global),
     expertise_area: record.expertise_area ?? null,
-    ai_specialization:
-      record.ai_specialization === "research" ||
-      record.ai_specialization === "coding" ||
-      record.ai_specialization === "design" ||
-      record.ai_specialization === "strategy" ||
-      record.ai_specialization === "analytics" ||
-      record.ai_specialization === "general"
-        ? record.ai_specialization
-        : "general",
+    workspace_focus: workspaceFocus,
+    ai_specialization: workspaceFocus,
     ai_instructions: record.ai_instructions ?? null,
     intelligence_preferences:
       record.intelligence_preferences && typeof record.intelligence_preferences === "object"
@@ -688,6 +709,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       patchWorkspaceInTree(current, activeWorkspaceId, (workspace) => ({
         ...workspace,
         expertise_area: profile.expertise_area ?? null,
+        workspace_focus: profile.workspace_focus,
         ai_specialization: profile.ai_specialization,
         ai_instructions: profile.ai_instructions ?? null,
         intelligence_preferences: profile.intelligence_preferences ?? {},

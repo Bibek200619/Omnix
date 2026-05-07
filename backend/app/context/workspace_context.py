@@ -17,6 +17,7 @@ class WorkspaceContextManager:
 
     async def fetch_workspace_context(self, payload: ContextPayload) -> List[Citation]:
         citations = []
+        profile = None
         
         if not payload.workspace_id:
             return citations
@@ -28,7 +29,10 @@ class WorkspaceContextManager:
             )
             
             # Convert profile to a structured system prompt fragment
-            intelligence_context = workspace_intelligence_service.workspace_intelligence_system_prompt(profile)
+            intelligence_context = workspace_intelligence_service.workspace_intelligence_system_prompt(
+                profile,
+                include_focus=False,
+            )
             
             citations.append(
                 Citation(

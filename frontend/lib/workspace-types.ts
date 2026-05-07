@@ -60,7 +60,8 @@ export function getWorkspaceInviteId(invite: Pick<WorkspaceInvite, "id" | "invit
 }
 
 export type WorkspaceType = "workspace" | "super" | "sub" | "super_workspace" | "subworkspace" | "global_workspace";
-export type WorkspaceAIMode = "research" | "coding" | "design" | "strategy" | "analytics" | "general";
+export type WorkspaceFocus = "general" | "engineering" | "design" | "research" | "strategy";
+export type WorkspaceAIMode = WorkspaceFocus;
 
 export type WorkspaceIntelligencePreferences = {
   retrieval_scope?: "workspace" | "global";
@@ -75,11 +76,13 @@ export type WorkspaceCreatePayload = {
   parent_workspace_id?: string | null;
   workspace_type?: WorkspaceType;
   is_global?: boolean;
+  workspace_focus?: WorkspaceFocus;
 };
 
 export type WorkspaceSubspaceCreatePayload = {
   name: string;
   description?: string;
+  workspace_focus?: WorkspaceFocus;
 };
 
 export type Workspace = {
@@ -91,6 +94,7 @@ export type Workspace = {
   workspace_type: WorkspaceType;
   is_global: boolean;
   expertise_area?: string | null;
+  workspace_focus: WorkspaceFocus;
   ai_specialization: WorkspaceAIMode;
   ai_instructions?: string | null;
   intelligence_preferences: WorkspaceIntelligencePreferences;
@@ -111,6 +115,7 @@ export type WorkspaceIntelligenceProfile = {
   parent_workspace_id?: string | null;
   description?: string | null;
   expertise_area?: string | null;
+  workspace_focus: WorkspaceFocus;
   ai_specialization: WorkspaceAIMode;
   ai_instructions?: string | null;
   intelligence_preferences: WorkspaceIntelligencePreferences;
@@ -133,6 +138,7 @@ export type WorkspaceIntelligenceProfile = {
 
 export type WorkspaceIntelligenceUpdatePayload = {
   expertise_area?: string | null;
+  workspace_focus: WorkspaceFocus;
   ai_specialization: WorkspaceAIMode;
   ai_instructions?: string | null;
   intelligence_preferences: WorkspaceIntelligencePreferences;
@@ -229,6 +235,7 @@ export type WorkspaceLiveStatus = {
   recently_active_count: number;
   typing_count: number;
   source_count: number;
+  workspace_focus: WorkspaceFocus;
   ai_specialization: WorkspaceAIMode;
   ai_status: "ready" | "learning" | "active";
   health: "quiet" | "warming" | "alive";
