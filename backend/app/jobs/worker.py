@@ -32,6 +32,10 @@ async def _process_job(job_id: str):
             result = await handle_ingest_file(job_row)
         elif job_type == "run_automation":
             result = await handle_run_automation(job_row)
+        elif job_type == "reembed_batch":
+            from .reembed_jobs import handle_reembed_batch
+
+            result = await handle_reembed_batch(job_row)
         else:
             logger.error("Unknown job type %s for job %s", job_type, job_id)
             result = {"status": "failed", "error": "unknown job type"}
