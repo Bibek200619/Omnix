@@ -171,29 +171,6 @@ async def _touch_conversation(
         raise _database_error() from exc
 
 
-def _build_sources(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    sources: list[dict[str, Any]] = []
-    for chunk in chunks:
-        try:
-            score_value = float(chunk.get("score", 0.0))
-        except Exception:
-            score_value = 0.0
-
-        preview = (chunk.get("content") or "")[:200]
-        sources.append(
-            {
-                "id": chunk.get("chunk_id"),
-                "title": chunk.get("file_name", "Unknown File"),
-                "excerpt": f"[Score: {score_value:.2f}] " + preview[:100] + ("..." if len(preview) > 100 else ""),
-                "score": score_value,
-                "chunk_index": chunk.get("chunk_index"),
-                "file_id": chunk.get("file_id"),
-                "chunk_preview": preview,
-            }
-        )
-    return sources
-
-
 async def _retrieve_prompt_context(
     message_text: str,
     user_id: str,
@@ -201,54 +178,24 @@ async def _retrieve_prompt_context(
     workspace_id: str | None,
 ) -> tuple[str, list[dict[str, Any]]]:
     prompt_message = message_text
-    chunks: list[dict[str, Any]] = []
 
     try:
-        from ..rag.context_builder import ContextBuilder
-        from ..rag.retrieval import RAGRetriever
         from ..rag.startup import get_vector_store
+        from ..retrieval.hybrid_search import HybridSearchEngine
 
-        context_builder = ContextBuilder()
-        retriever = RAGRetriever(get_vector_store())
-        chunks = await retriever.retrieve(
+        engine = HybridSearchEngine(get_vector_store())
+        _, built_context = await engine.build_context(
             message_text,
             user_id=user_id,
             workspace_id=workspace_id,
-            top_k=5,
         )
 
-        if chunks:
-            prompt_message = context_builder.build_context(
-                message_text,
-                [chunk["content"] for chunk in chunks],
-            )
-            return prompt_message, _build_sources(chunks)
+        if built_context.sources:
+            return built_context.prompt, built_context.sources
     except Exception as exc:
-        logger.exception("Semantic retrieval failed; falling back to keyword retrieval: %s", exc)
+        logger.exception("Hybrid retrieval failed for conversation %s: %s", conversation_id, exc)
 
-    try:
-        from ..rag.context_builder import ContextBuilder
-        from ..rag.keyword_retrieval import KeywordRetriever
-
-        retriever = KeywordRetriever()
-        context_builder = ContextBuilder()
-        chunks = await retriever.retrieve(
-            message_text,
-            user_id=user_id,
-            conversation_id=conversation_id if workspace_id is None else None,
-            workspace_id=workspace_id,
-            top_k=5,
-        )
-
-        if chunks:
-            prompt_message = context_builder.build_context(
-                message_text,
-                [chunk["content"] for chunk in chunks],
-            )
-    except Exception as exc:
-        logger.exception("Failed to retrieve chunks for context: %s", exc)
-
-    return prompt_message, _build_sources(chunks)
+    return prompt_message, []
 
 
 @router.get(
