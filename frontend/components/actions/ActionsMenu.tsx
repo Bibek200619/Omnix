@@ -21,13 +21,13 @@ export function ActionsMenu({ className }: { className?: string }) {
     try {
       // progress stages
       setTimeout(() => setStep("analyzing"), 250);
-      const resp = await apiClient.post<{ status: string; steps: string[]; result: any }>("/actions/run", { action });
+      const resp = await apiClient.post<{ status: string; steps: string[]; result: { markdown?: string, [key: string]: unknown } }>("/actions/run", { action });
       setStep("generating");
       setResult(resp.result?.markdown ?? JSON.stringify(resp.result, null, 2));
       setStep("finalizing");
       setTimeout(() => setStep("done"), 300);
-    } catch (err: any) {
-      setError(err?.message || String(err));
+    } catch (err: unknown) {
+      setError((err as Error)?.message || String(err));
       setStep("error");
     }
   }
