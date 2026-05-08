@@ -1,28 +1,54 @@
 from __future__ import annotations
 
 import os
-import json
 import uuid
 import logging
-import asyncio
 from typing import Any, Dict
 
-import redis.asyncio as aioredis
+try:
+    import redis.asyncio as aioredis
+except ModuleNotFoundError as exc:
+    aioredis = None  # type: ignore[assignment]
+    _redis_import_error: ModuleNotFoundError | None = exc
+else:
+    _redis_import_error = None
 
+from ..settings import get_settings
 from ..services.supabase_service import insert_one_trusted
 
 logger = logging.getLogger(__name__)
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+DEFAULT_REDIS_URL = "redis://localhost:6379/0"
+REDIS_URL = os.environ.get("REDIS_URL", DEFAULT_REDIS_URL)
 _QUEUE_KEY = os.environ.get("OMNIX_JOB_QUEUE", "omnix:jobs")
 
-_redis_client: aioredis.Redis | None = None
+_redis_client: Any | None = None
 
 
-def get_redis() -> aioredis.Redis:
+def _configured_redis_url() -> str:
+    try:
+        return get_settings().REDIS_URL
+    except Exception:
+        logger.warning("Unable to load configured REDIS_URL; falling back to %s", REDIS_URL)
+        return REDIS_URL
+
+
+def _missing_redis_dependency_error() -> RuntimeError:
+    return RuntimeError(
+        "The Python package 'redis' is required for Omnix background jobs. "
+        "Install backend dependencies with `pip install -r backend/requirements.txt` "
+        "or `pip install redis>=5.0.0` in the active backend environment."
+    )
+
+
+def get_redis() -> Any:
     global _redis_client
+    if aioredis is None:
+        raise _missing_redis_dependency_error() from _redis_import_error
+
     if _redis_client is None:
-        _redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
+        redis_url = _configured_redis_url()
+        _redis_client = aioredis.from_url(redis_url, decode_responses=True)
     return _redis_client
 
 
