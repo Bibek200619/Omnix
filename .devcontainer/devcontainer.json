@@ -1,0 +1,17 @@
+{
+    "name": "Omnix AI Platform",
+    "dockerComposeFile": "../docker-compose.yml",
+    "service": "backend",
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "charliermarsh.ruff",
+                "dbaeumer.vscode-eslint"
+            ]
+        }
+    },
+    "remoteUser": "root"
+}
