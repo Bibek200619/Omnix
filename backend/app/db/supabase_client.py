@@ -10,9 +10,14 @@ from ..core.config import get_settings
 @lru_cache
 def get_supabase() -> Client:
     settings = get_settings()
+    key = settings.SUPABASE_SERVICE_ROLE_KEY
+    if not key:
+        raise ValueError(
+            "SUPABASE_SERVICE_ROLE_KEY must be set for trusted backend database operations."
+        )
     return create_client(
         settings.supabase_base_url,
-        settings.SUPABASE_SERVICE_ROLE_KEY,
+        key,
     )
 
 

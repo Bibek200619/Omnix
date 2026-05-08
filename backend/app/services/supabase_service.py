@@ -2,18 +2,60 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import logging
-from typing import Any
+from typing import Any, NoReturn
 
 from starlette.concurrency import run_in_threadpool
 
-from ..db.supabase import get_supabase
+from ..db.supabase_client import get_supabase
 
 logger = logging.getLogger(__name__)
 INTERNAL_DB_ERROR = "Internal server error"
+SUPABASE_AUTH_ERROR = (
+    "Supabase rejected the backend API key. Verify backend/.env "
+    "SUPABASE_SERVICE_ROLE_KEY belongs to the configured SUPABASE_URL project."
+)
+SUPABASE_NETWORK_ERROR = (
+    "Supabase is unreachable. Verify SUPABASE_URL, DNS/network access, and that "
+    "the Supabase project is available."
+)
 
 
 class SupabaseServiceError(RuntimeError):
     pass
+
+
+def _is_supabase_auth_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "invalid api key" in message or (
+        "401" in message and ("api key" in message or "service_role" in message)
+    )
+
+
+def _is_supabase_network_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return any(
+        marker in message
+        for marker in (
+            "connecterror",
+            "nodename nor servname",
+            "name or service not known",
+            "temporary failure in name resolution",
+            "network is unreachable",
+        )
+    )
+
+
+def _raise_supabase_error(operation: str, table: str, exc: Exception) -> NoReturn:
+    if _is_supabase_auth_error(exc):
+        logger.error("%s on '%s' failed: %s", operation, table, SUPABASE_AUTH_ERROR)
+        raise SupabaseServiceError(SUPABASE_AUTH_ERROR) from exc
+
+    if _is_supabase_network_error(exc):
+        logger.warning("%s on '%s' failed: %s", operation, table, SUPABASE_NETWORK_ERROR)
+        raise SupabaseServiceError(SUPABASE_NETWORK_ERROR) from exc
+
+    logger.exception("%s on '%s' failed.", operation, table)
+    raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
 
 
 def _apply_filters(
@@ -360,8 +402,7 @@ async def insert_one(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
     except SupabaseServiceError:
         raise
     except Exception as exc:
-        logger.exception("Failed to insert into '%s'.", table)
-        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+        _raise_supabase_error("Insert", table, exc)
 
 
 async def insert_one_trusted(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -370,8 +411,7 @@ async def insert_one_trusted(table: str, payload: Mapping[str, Any]) -> dict[str
     except SupabaseServiceError:
         raise
     except Exception as exc:
-        logger.exception("Failed trusted insert into '%s'.", table)
-        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+        _raise_supabase_error("Trusted insert", table, exc)
 
 
 async def insert_many(table: str, payloads: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -380,8 +420,7 @@ async def insert_many(table: str, payloads: list[Mapping[str, Any]]) -> list[dic
     except SupabaseServiceError:
         raise
     except Exception as exc:
-        logger.exception("Failed to batch insert into '%s'.", table)
-        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+        _raise_supabase_error("Batch insert", table, exc)
 
 
 async def insert_many_trusted(table: str, payloads: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -390,8 +429,7 @@ async def insert_many_trusted(table: str, payloads: list[Mapping[str, Any]]) -> 
     except SupabaseServiceError:
         raise
     except Exception as exc:
-        logger.exception("Failed trusted batch insert into '%s'.", table)
-        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+        _raise_supabase_error("Trusted batch insert", table, exc)
 
 
 async def select_all(
@@ -417,8 +455,7 @@ async def select_all(
     except SupabaseServiceError:
         raise
     except Exception as exc:
-        logger.exception("Failed to query '%s'.", table)
-        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+        _raise_supabase_error("Query", table, exc)
 
 
 async def select_all_trusted(
@@ -448,8 +485,7 @@ async def select_all_trusted(
         if "does not exist" in msg:
             logger.warning("Trusted query on '%s' failed due to missing column: %s. Returning empty list.", table, msg)
             return []
-        logger.exception("Failed trusted query on '%s'.", table)
-        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+        _raise_supabase_error("Trusted query", table, exc)
 
 
 async def select_one(
@@ -462,8 +498,7 @@ async def select_one(
     except SupabaseServiceError:
         raise
     except Exception as exc:
-        logger.exception("Failed to query '%s'.", table)
-        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+        _raise_supabase_error("Query", table, exc)
 
 
 async def select_one_trusted(
@@ -482,8 +517,7 @@ async def select_one_trusted(
         if "does not exist" in msg:
             logger.warning("Trusted query on '%s' failed due to missing column: %s. Returning None.", table, msg)
             return None
-        logger.exception("Failed trusted query on '%s'.", table)
-        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+        _raise_supabase_error("Trusted query", table, exc)
 
 
 async def update_one(
@@ -496,8 +530,7 @@ async def update_one(
     except SupabaseServiceError:
         raise
     except Exception as exc:
-        logger.exception("Failed to update '%s'.", table)
-        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+        _raise_supabase_error("Update", table, exc)
 
 
 async def update_one_trusted(
@@ -510,8 +543,7 @@ async def update_one_trusted(
     except SupabaseServiceError:
         raise
     except Exception as exc:
-        logger.exception("Failed trusted update on '%s'.", table)
-        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+        _raise_supabase_error("Trusted update", table, exc)
 
 
 async def upsert_one(table: str, payload: Mapping[str, Any], on_conflict: str) -> dict[str, Any]:
@@ -520,8 +552,7 @@ async def upsert_one(table: str, payload: Mapping[str, Any], on_conflict: str) -
     except SupabaseServiceError:
         raise
     except Exception as exc:
-        logger.exception("Failed to upsert into '%s'.", table)
-        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+        _raise_supabase_error("Upsert", table, exc)
 
 
 async def delete_many_trusted(
@@ -533,5 +564,4 @@ async def delete_many_trusted(
     except SupabaseServiceError:
         raise
     except Exception as exc:
-        logger.exception("Failed trusted delete on '%s'.", table)
-        raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+        _raise_supabase_error("Trusted delete", table, exc)

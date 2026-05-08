@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from ..embeddings.dimensions import get_expected_embedding_dimension, validate_embedding_dimension, validate_embeddings_dimension
-from ..db.supabase import get_supabase
+from ..db.supabase_client import get_supabase
 from .vector_store_base import VectorStore
 
 logger = logging.getLogger(__name__)

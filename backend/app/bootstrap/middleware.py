@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any
 from fastapi import Request, Response
-from ..db.supabase import get_supabase
+from ..db.supabase_client import get_supabase
 
 logger = logging.getLogger(__name__)
 

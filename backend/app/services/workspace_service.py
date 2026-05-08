@@ -8,7 +8,7 @@ from typing import Any, Literal
 from fastapi import HTTPException, Request, status
 from starlette.concurrency import run_in_threadpool
 
-from ..db.supabase import get_supabase
+from ..db.supabase_client import get_supabase
 from .supabase_service import (
     SupabaseServiceError,
     select_all,

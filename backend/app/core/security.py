@@ -15,7 +15,7 @@ from starlette.concurrency import run_in_threadpool
 from supabase_auth.errors import AuthApiError, AuthError, AuthInvalidJwtError, AuthRetryableError
 
 from .config import get_settings
-from ..db.supabase import get_supabase_auth_client
+from ..db.supabase_client import get_supabase_auth_client
 
 AUTH_EXEMPT_PATHS = {
     "/health",
@@ -25,6 +25,7 @@ AUTH_EXEMPT_PATHS = {
     "/openapi.json",
     "/redoc",
 }
+AUTH_EXEMPT_PREFIXES = ("/health/",)
 ALLOWED_JWT_ALGORITHMS = {"RS256", "ES256"}
 SUPABASE_LEGACY_JWT_ALGORITHMS = {"HS256"}
 REQUIRED_JWT_CLAIMS = ("iss", "aud", "exp", "iat", "sub", "role")
@@ -78,7 +79,10 @@ def _error_response(
 def _is_exempt_path(path: str) -> bool:
     # Normalize trailing slashes so auth does not block FastAPI's built-in redirects.
     normalized_path = path.rstrip("/") or "/"
-    return normalized_path in AUTH_EXEMPT_PATHS
+    return normalized_path in AUTH_EXEMPT_PATHS or any(
+        normalized_path.startswith(prefix)
+        for prefix in AUTH_EXEMPT_PREFIXES
+    )
 
 
 def _extract_bearer_token(request: Request) -> str | None:
