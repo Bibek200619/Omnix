@@ -2,7 +2,7 @@ from typing import Any
 import logging
 from datetime import datetime, timezone
 
-from ..context.context_engine import ContextEngine
+from ..context.engine import ContextEngine
 from ..insights import workspace_summary, topic_detection
 from ..services.supabase_service import insert_one_trusted
 

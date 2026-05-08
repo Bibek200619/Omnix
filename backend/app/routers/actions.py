@@ -6,7 +6,7 @@ from typing import Any
 
 from ..rag.startup import get_vector_store
 
-from ..context.context_engine import ContextEngine
+from ..context.engine import ContextEngine
 
 from ..actions import summarize as summarize_action
 from ..actions import tasks as tasks_action
