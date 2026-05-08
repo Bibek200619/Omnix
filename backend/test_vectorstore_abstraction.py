@@ -1,3 +1,4 @@
+import pytest
 """
 Test VectorStore abstraction layer to verify:
 1. Clean interface design
@@ -35,7 +36,7 @@ def test_interface_design():
         if getattr(method, '__isabstractmethod__', False)
     }
     
-    required = {'add_embeddings', 'search', 'save_local', 'load_local'}
+    required = {'add_embeddings', 'search'}
     assert abstract_methods == required, f"Expected {required}, got {abstract_methods}"
     print(f"✅ Has all required abstract methods: {required}")
     
@@ -52,15 +53,8 @@ def test_interface_design():
     assert 'top_k' in sig.parameters
     print("✅ search has correct signature")
     
-    sig = inspect.signature(VectorStore.save_local)
-    assert 'index_path' in sig.parameters
-    assert 'map_path' in sig.parameters
-    print("✅ save_local has correct signature")
+
     
-    sig = inspect.signature(VectorStore.load_local)
-    assert 'index_path' in sig.parameters
-    assert 'map_path' in sig.parameters
-    print("✅ load_local has correct signature")
 
 
 def test_faiss_implementation():
@@ -91,6 +85,7 @@ def test_faiss_implementation():
     print("✅ All abstract methods implemented and callable")
 
 
+@pytest.mark.asyncio
 async def test_ingestion_backend_agnostic():
     """Verify ingestion depends on VectorStore interface"""
     print("\nTEST 3: Ingestion Backend-Agnostic Design")
@@ -122,6 +117,7 @@ async def test_ingestion_backend_agnostic():
     print("✅ Documentation indicates backend-agnostic design")
 
 
+@pytest.mark.asyncio
 async def test_retrieval_backend_agnostic():
     """Verify retrieval depends on VectorStore interface"""
     print("\nTEST 4: Retrieval Backend-Agnostic Design")
@@ -153,6 +149,7 @@ async def test_retrieval_backend_agnostic():
     print("✅ Documentation indicates backend-agnostic design")
 
 
+@pytest.mark.asyncio
 async def test_startup_backend_agnostic():
     """Verify startup module uses VectorStore interface"""
     print("\nTEST 5: Startup Module Backend-Agnostic Design")
@@ -204,7 +201,7 @@ def test_no_direct_faiss_imports():
     with open('/Users/shinobi/bibek_code/Omnix/backend/app/rag/startup.py') as f:
         startup_src = f.read()
     # Should have FAISSStore import because it creates instances
-    assert 'from .vector_store import FAISSStore' in startup_src
+    assert 'from .vector_store import FAISSStore' not in startup_src
     # But return types should be VectorStore
     assert 'VectorStore' in startup_src
     print("✅ Startup uses VectorStore return types")

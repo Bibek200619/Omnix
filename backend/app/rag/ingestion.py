@@ -115,18 +115,5 @@ class RAGIngestionPipeline:
             logger.exception("Failed to save chunks to Supabase.")
             raise RuntimeError("Ingestion pipeline failed at the database stage.") from exc
 
-        try:
-            logger.info("Adding %d vectors to the vector store.", num_chunks)
-            user_ids = [user_id] * num_chunks
-            workspace_ids = [workspace_id] * num_chunks if workspace_id else None
-            # Keep the configured vector store in sync. PgVectorStore updates the
-            # same persisted DB rows; FAISS/custom stores may mirror in memory.
-            try:
-                self.vector_store.add_embeddings(embeddings, chunk_ids, user_ids, workspace_ids)
-            except Exception:
-                logger.exception("Non-fatal: failed to mirror vectors into in-memory store.")
-        except Exception as exc:
-            logger.exception("Failed during vector store mirroring.")
-
         logger.info("Successfully ingested %d chunks.", num_chunks)
         return num_chunks, chunk_ids

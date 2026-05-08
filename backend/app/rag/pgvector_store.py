@@ -18,37 +18,9 @@ class PgVectorStore(VectorStore):
     """
 
     def add_embeddings(self, embeddings: list[list[float]], ids: list[str], user_ids: list[str], workspace_ids: list[str] | None = None) -> None:
-        if not embeddings or not ids or not user_ids:
-            return
-
-        if len(embeddings) != len(ids) or len(embeddings) != len(user_ids):
-            raise ValueError("The number of embeddings must match the number of IDs and user_ids.")
-        if workspace_ids is not None and len(workspace_ids) != len(embeddings):
-            raise ValueError("workspace_ids must match the number of embeddings when provided.")
-
-        validate_embeddings_dimension(embeddings, expected_dim=EMBEDDING_DIMENSION, label="pgvector embeddings")
-
-        supabase = get_supabase()
-
-        # Iterate and update each document's embedding. Workspace filtering is optional.
-        for idx, (emb, doc_id, user_id) in enumerate(zip(embeddings, ids, user_ids)):
-            try:
-                query = supabase.table("documents").update({"embedding": emb}).eq("id", doc_id).eq("user_id", user_id)
-                # If workspace_ids provided, ensure the document belongs to the workspace
-                if workspace_ids:
-                    workspace_id = workspace_ids[idx]
-                    if workspace_id:
-                        query = query.eq("workspace_id", workspace_id)
-                query.execute()
-            except Exception:
-                logger.exception(
-                    "Failed to update document %s with local embedding (dimension=%d). "
-                    "Check that documents.embedding is vector(%d) and re-run the migration if needed.",
-                    doc_id,
-                    len(emb),
-                    EMBEDDING_DIMENSION,
-                )
-                raise
+        # Embeddings are now inserted directly via the ingestion pipeline.
+        # This method is retained for interface compatibility.
+        pass
 
     def search(self, query_embedding: list[float], user_id: str, workspace_id: str | None = None, top_k: int = 5) -> list[tuple[str, float]]:
         if not query_embedding:
@@ -88,9 +60,3 @@ class PgVectorStore(VectorStore):
                 EMBEDDING_DIMENSION,
             )
             return []
-
-    def save_local(self, index_path: str, map_path: str) -> None:
-        pass
-
-    def load_local(self, index_path: str, map_path: str) -> None:
-        pass
