@@ -18,7 +18,6 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy Backend
@@ -30,10 +29,6 @@ jobs:
 
             git pull origin main
 
-            cd backend
-
-            source venv/bin/activate
-	    sudo systemctl restart omnixart omnix
-
+            sudo systemctl restart omnix
 
           EOF
