@@ -1,2 +1,44 @@
+# Environment variables
 .env
-.env
+.env.*
+!.env.example
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Python / Backend
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+backend/data/
+
+# Node.js / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.next/
+out/
+dist/
+
+# Uploads and User Data
+uploads/
