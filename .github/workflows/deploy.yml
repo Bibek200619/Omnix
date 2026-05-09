@@ -1,0 +1,44 @@
+name: Deploy Backend to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy Backend
+        run: |
+          ssh -i ~/.ssh/id_ed25519 \
+          ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
+
+            cd ~/Omnix
+
+            git pull origin main
+
+            cd backend
+
+            source venv/bin/activate
+
+            pkill -f uvicorn || true
+
+            nohup uvicorn app.main:app \
+              --host 0.0.0.0 \
+              --port 8000 \
+              > backend.log 2>&1 &
+
+          EOF
