@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from typing import List
 
 from .schemas import ContextPayload, Citation, ContextSourceType
 from ..rag.startup import get_vector_store

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
-from typing import Any
 
 from .queue import get_redis
 from .ingestion_jobs import handle_ingest_file

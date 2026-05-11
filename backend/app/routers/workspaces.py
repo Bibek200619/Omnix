@@ -25,7 +25,6 @@ from ..schemas.chat import (
     WorkspaceRead,
     WorkspaceRelationshipValidation,
     WorkspaceSubspaceCreate,
-    WorkspaceTypingUpdate,
     WorkspaceTreeRead,
     WorkspaceUpdate,
 )
