@@ -54,6 +54,12 @@ class WorkspaceChannelMessageCreate(BaseModel):
     context_links: list[ExecutionContextLink] = Field(default_factory=list, max_length=12)
 
 
+class WorkspaceConversationAuthorIdentity(BaseModel):
+    role_label: str | None = None
+    operational_label: str | None = None
+    display_label: str | None = None
+
+
 class WorkspaceChannelMessageRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -73,6 +79,7 @@ class WorkspaceChannelMessageRead(BaseModel):
     author_email: str | None = None
     author_avatar_url: str | None = None
     author_avatar_label: str = "U"
+    author_identity: WorkspaceConversationAuthorIdentity | None = None
     thread_reply_count: int = 0
 
 
