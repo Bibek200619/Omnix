@@ -1,4 +1,35 @@
-import type { WorkspaceRole } from "@/lib/workspace-types";
+import type { WorkspaceConversationAuthorIdentity, WorkspaceRole } from "@/lib/workspace-types";
+
+export function workspaceConversationRoleLabel(role?: WorkspaceRole | string | null) {
+  switch (role) {
+    case "super_founder":
+    case "founder":
+    case "owner":
+      return "Founder";
+    case "sub_leader":
+    case "co_owner":
+      return "Operational Lead";
+    case "team_lead":
+      return "Team Lead";
+    default:
+      return null;
+  }
+}
+
+export function ambientConversationIdentity(
+  role?: WorkspaceRole | string | null,
+  operationalLabel?: string | null,
+): WorkspaceConversationAuthorIdentity | null {
+  const roleLabel = workspaceConversationRoleLabel(role);
+  const cleanOperationalLabel = operationalLabel?.trim() || null;
+  const labels = [roleLabel, cleanOperationalLabel].filter((label): label is string => Boolean(label));
+  if (!labels.length) return null;
+  return {
+    role_label: roleLabel,
+    operational_label: cleanOperationalLabel,
+    display_label: labels.join(" \u2022 "),
+  };
+}
 
 export function workspaceRoleLabel(role?: WorkspaceRole | string | null) {
   switch (role) {

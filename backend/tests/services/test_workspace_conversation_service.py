@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from app.services import workspace_conversation_service as conversations
@@ -13,7 +15,7 @@ def test_channel_slug_is_operational_and_stable() -> None:
 @pytest.mark.asyncio
 async def test_list_messages_loads_latest_roots_and_reply_counts(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_require_channel_access(**kwargs):
-        return {"id": kwargs["channel_id"], "visibility": "workspace"}, object()
+        return {"id": kwargs["channel_id"], "visibility": "workspace"}, SimpleNamespace(workspace={"id": "workspace-1"})
 
     async def fake_select_all(table: str, columns: str, filters: dict[str, object], **kwargs):
         assert table == "workspace_channel_messages"
@@ -43,12 +45,25 @@ async def test_list_messages_loads_latest_roots_and_reply_counts(monkeypatch: py
             ]
         return [{"id": "reply-1", "parent_message_id": "root-old"}]
 
+    async def fake_list_workspace_members(workspace: dict[str, object]):
+        assert workspace == {"id": "workspace-1"}
+        return [
+            {
+                "user_id": "user-1",
+                "role": "team_lead",
+                "operational_label": "Backend",
+                "full_name": "Rhea",
+                "avatar_label": "R",
+            }
+        ]
+
     async def fake_get_profiles(user_ids: list[str]):
-        assert user_ids == ["user-1"]
-        return {"user-1": {"full_name": "Rhea", "avatar_label": "R"}}
+        assert user_ids == []
+        return {}
 
     monkeypatch.setattr(conversations, "_require_channel_access", fake_require_channel_access)
     monkeypatch.setattr(conversations, "select_all_trusted", fake_select_all)
+    monkeypatch.setattr(conversations, "list_workspace_members", fake_list_workspace_members)
     monkeypatch.setattr(conversations, "get_profiles", fake_get_profiles)
 
     result = await conversations.list_messages(
@@ -62,6 +77,7 @@ async def test_list_messages_loads_latest_roots_and_reply_counts(monkeypatch: py
     assert [row["id"] for row in result] == ["root-old", "root-new"]
     assert result[0]["thread_reply_count"] == 1
     assert result[0]["author_name"] == "Rhea"
+    assert result[0]["author_identity"]["display_label"] == "Team Lead \u2022 Backend"
 
 
 @pytest.mark.asyncio
@@ -80,7 +96,10 @@ async def test_create_message_reconciles_repeated_client_nonce(monkeypatch: pyte
     insert_called = False
 
     async def fake_require_channel_access(**kwargs):
-        return {"id": kwargs["channel_id"], "posting_policy": "members"}, type("Access", (), {"role": "member"})()
+        return {
+            "id": kwargs["channel_id"],
+            "posting_policy": "members",
+        }, SimpleNamespace(role="member", workspace={"id": "workspace-1"})
 
     async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
         assert filters["client_nonce"] == "nonce-1"
@@ -91,12 +110,17 @@ async def test_create_message_reconciles_repeated_client_nonce(monkeypatch: pyte
         insert_called = True
         return existing
 
+    async def fake_list_workspace_members(workspace: dict[str, object]):
+        return [{"user_id": "user-1", "role": "member", "avatar_label": "U"}]
+
     async def fake_get_profiles(user_ids: list[str]):
-        return {"user-1": {"avatar_label": "U"}}
+        assert user_ids == []
+        return {}
 
     monkeypatch.setattr(conversations, "_require_channel_access", fake_require_channel_access)
     monkeypatch.setattr(conversations, "select_one_trusted", fake_select_one)
     monkeypatch.setattr(conversations, "insert_one_trusted", fake_insert)
+    monkeypatch.setattr(conversations, "list_workspace_members", fake_list_workspace_members)
     monkeypatch.setattr(conversations, "get_profiles", fake_get_profiles)
 
     result = await conversations.create_message(
@@ -113,7 +137,7 @@ async def test_create_message_reconciles_repeated_client_nonce(monkeypatch: pyte
 @pytest.mark.asyncio
 async def test_channel_assistance_transcript_includes_thread_replies(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_require_channel_access(**kwargs):
-        return {"id": kwargs["channel_id"], "visibility": "workspace"}, object()
+        return {"id": kwargs["channel_id"], "visibility": "workspace"}, SimpleNamespace(workspace={"id": "workspace-1"})
 
     async def fake_select_all(table: str, columns: str, filters: dict[str, object], **kwargs):
         assert kwargs["desc"] is True
@@ -140,11 +164,16 @@ async def test_channel_assistance_transcript_includes_thread_replies(monkeypatch
             },
         ]
 
+    async def fake_list_workspace_members(workspace: dict[str, object]):
+        return []
+
     async def fake_get_profiles(user_ids: list[str]):
+        assert user_ids == ["user-1", "user-2"]
         return {}
 
     monkeypatch.setattr(conversations, "_require_channel_access", fake_require_channel_access)
     monkeypatch.setattr(conversations, "select_all_trusted", fake_select_all)
+    monkeypatch.setattr(conversations, "list_workspace_members", fake_list_workspace_members)
     monkeypatch.setattr(conversations, "get_profiles", fake_get_profiles)
 
     result = await conversations.channel_transcript_for_assistance(
@@ -155,3 +184,12 @@ async def test_channel_assistance_transcript_includes_thread_replies(monkeypatch
     )
 
     assert [message["id"] for message in result] == ["root-1", "reply-1"]
+
+
+def test_ambient_identity_omits_generic_role_and_keeps_operational_label() -> None:
+    assert conversations._author_identity({"role": "member"}) is None
+    assert conversations._author_identity({"role": "member", "operational_label": "Design"}) == {
+        "role_label": None,
+        "operational_label": "Design",
+        "display_label": "Design",
+    }

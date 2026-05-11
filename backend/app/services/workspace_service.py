@@ -28,7 +28,7 @@ WORKSPACE_COLUMNS = (
     "expertise_area,workspace_focus,ai_specialization,ai_instructions,intelligence_preferences,"
     "created_at,updated_at"
 )
-WORKSPACE_MEMBER_COLUMNS = "workspace_id,user_id,role,created_at,updated_at"
+WORKSPACE_MEMBER_COLUMNS = "workspace_id,user_id,role,operational_label,created_at,updated_at"
 WORKSPACE_INVITE_COLUMNS = (
     "id,workspace_id,email,role,status,invited_by,accepted_by_user_id,"
     "created_at,updated_at,accepted_at"
@@ -145,6 +145,11 @@ def _clean_optional_text(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def normalize_operational_label(value: Any) -> str | None:
+    label = _clean_optional_text(value)
+    return label[:80] if label else None
 
 
 def normalize_ai_specialization(value: Any) -> WorkspaceAIMode:
@@ -493,6 +498,7 @@ def _hydrate_member_records(
                 "handle": profile.get("handle"),
                 "avatar_url": profile.get("avatar_url"),
                 "avatar_label": profile.get("avatar_label") or _avatar_label(None, None, member_user_id),
+                "operational_label": normalize_operational_label(row.get("operational_label")),
                 "created_at": row.get("created_at"),
                 "updated_at": row.get("updated_at"),
             }
@@ -729,6 +735,7 @@ async def assign_member_to_subspace(
         "handle": profile.get("handle"),
         "avatar_url": profile.get("avatar_url"),
         "avatar_label": profile.get("avatar_label") or "U",
+        "operational_label": None,
         "created_at": timestamp,
         "updated_at": timestamp,
     }

@@ -21,8 +21,10 @@ import { useAuth } from "@/lib/auth-context";
 import { realtimeRegistry } from "@/lib/realtime-registry";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
+import { ambientConversationIdentity } from "@/lib/workspace-roles";
 import { cn } from "@/lib/utils";
 import type {
+  WorkspaceActivityEvent,
   WorkspaceChannel,
   WorkspaceChannelMessage,
   WorkspaceConversationAssistance,
@@ -64,6 +66,10 @@ function messageAuthor(message: WorkspaceChannelMessage) {
   return message.author_name || message.author_email || "Teammate";
 }
 
+function messageIdentity(message: WorkspaceChannelMessage) {
+  return message.author_identity?.display_label || null;
+}
+
 function readableTime(value?: string | null) {
   if (!value) return "";
   return new Intl.DateTimeFormat(undefined, {
@@ -78,8 +84,8 @@ function canCreateOperationalChannel(role?: string | null) {
 
 export function WorkspaceConversationSurface() {
   const { session } = useAuth();
-  const { activeWorkspace, activeWorkspaceId } = useWorkspace();
-  const { presence, realtimeStatus, sendTypingSignal, typingUsers } = useWorkspaceCollaboration();
+  const { activeMembers, activeWorkspace, activeWorkspaceId } = useWorkspace();
+  const { activity, presence, realtimeStatus, sendTypingSignal, typingUsers } = useWorkspaceCollaboration();
   const [channels, setChannels] = useState<WorkspaceChannel[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -109,11 +115,19 @@ export function WorkspaceConversationSurface() {
   const channelRequestRef = useRef(0);
   const messageRequestRef = useRef(0);
   const threadRequestRef = useRef(0);
+  const threadRootRef = useRef(threadRoot);
+  const lastIdentityActivityRef = useRef<string | null>(null);
 
   workspaceRef.current = activeWorkspaceId;
   selectedChannelRef.current = selectedChannelId;
+  threadRootRef.current = threadRoot;
   const selectedChannel = channels.find((channel) => channel.id === selectedChannelId) ?? null;
   const currentUserId = session?.user.id ?? "";
+  const currentMember = activeMembers.find((member) => member.user_id === currentUserId);
+  const inheritedIdentityWorkspaceId =
+    activeWorkspace?.is_global && activeWorkspace.parent_workspace_id
+      ? activeWorkspace.parent_workspace_id
+      : null;
   const mayCreateChannel = canCreateOperationalChannel(activeWorkspace?.current_user_role);
   const mayPost = Boolean(
     selectedChannel &&
@@ -194,6 +208,16 @@ export function WorkspaceConversationSurface() {
     }
   }, [activeWorkspaceId]);
 
+  const refreshVisibleMessageIdentities = useCallback(() => {
+    const channelId = selectedChannelRef.current;
+    if (!channelId) return;
+    void loadMessages(channelId);
+    const openThread = threadRootRef.current;
+    if (openThread) {
+      void loadThread(channelId, openThread);
+    }
+  }, [loadMessages, loadThread]);
+
   useEffect(() => {
     setSelectedChannelId(null);
     setMessages([]);
@@ -252,7 +276,6 @@ export function WorkspaceConversationSurface() {
             const incoming = payload.new;
             if (incoming.parent_message_id) {
               if (threadRoot?.id === incoming.parent_message_id) {
-                setThreadMessages((current) => mergeMessage(current, incoming));
                 void loadThread(selectedChannelId, threadRoot);
               }
               setMessages((current) =>
@@ -264,7 +287,6 @@ export function WorkspaceConversationSurface() {
               );
               return;
             }
-            setMessages((current) => mergeMessage(current, incoming));
             void loadMessages(selectedChannelId);
           },
         ),
@@ -276,6 +298,45 @@ export function WorkspaceConversationSurface() {
         conversationId: selectedChannelId,
       });
   }, [activeWorkspaceId, loadMessages, loadThread, selectedChannelId, session?.user.id, threadRoot]);
+
+  useEffect(() => {
+    const identityEvent = activity.find((event) => event.event_type === "workspace.member_role_updated");
+    if (!identityEvent || identityEvent.id === lastIdentityActivityRef.current) return;
+    lastIdentityActivityRef.current = identityEvent.id;
+    refreshVisibleMessageIdentities();
+  }, [activity, refreshVisibleMessageIdentities]);
+
+  useEffect(() => {
+    if (!activeWorkspaceId || !inheritedIdentityWorkspaceId || !session?.user.id) return;
+    realtimeRegistry.subscribe(
+      {
+        type: "conversation_identity",
+        workspaceId: inheritedIdentityWorkspaceId,
+        conversationId: activeWorkspaceId,
+      },
+      (channel) =>
+        channel.on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "workspace_activity_events",
+            filter: `workspace_id=eq.${inheritedIdentityWorkspaceId}`,
+          },
+          (payload: { new: WorkspaceActivityEvent }) => {
+            if (payload.new.event_type === "workspace.member_role_updated") {
+              refreshVisibleMessageIdentities();
+            }
+          },
+        ),
+    );
+    return () =>
+      realtimeRegistry.unsubscribe({
+        type: "conversation_identity",
+        workspaceId: inheritedIdentityWorkspaceId,
+        conversationId: activeWorkspaceId,
+      });
+  }, [activeWorkspaceId, inheritedIdentityWorkspaceId, refreshVisibleMessageIdentities, session?.user.id]);
 
   const channelTyping = useMemo(
     () =>
@@ -299,6 +360,10 @@ export function WorkspaceConversationSurface() {
       created_at: new Date().toISOString(),
       author_name: session?.user.user_metadata?.full_name || session?.user.email || "You",
       author_avatar_label: (session?.user.email || "Y")[0].toUpperCase(),
+      author_identity: ambientConversationIdentity(
+        currentMember?.role || activeWorkspace?.current_user_role,
+        currentMember?.operational_label,
+      ),
       thread_reply_count: 0,
       delivery: "sending" as const,
     };
@@ -449,6 +514,7 @@ export function WorkspaceConversationSurface() {
   }
 
   function MessageRow({ message, threaded = false }: { message: DisplayMessage; threaded?: boolean }) {
+    const identity = messageIdentity(message);
     return (
       <article
         className={cn(
@@ -461,8 +527,13 @@ export function WorkspaceConversationSurface() {
             {message.author_avatar_label || "U"}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-baseline gap-2">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <span className="text-sm font-semibold text-white">{messageAuthor(message)}</span>
+              {identity ? (
+                <span className="max-w-full break-words text-[11px] font-medium tracking-[0.01em] text-cyan-100/48">
+                  {identity}
+                </span>
+              ) : null}
               <time className="text-[11px] text-[var(--omnix-text-3)]">{readableTime(message.created_at)}</time>
               {message.delivery === "sending" ? <span className="text-[10px] text-cyan-200/60">sending</span> : null}
               {message.delivery === "failed" ? <span className="text-[10px] text-rose-200">delivery failed</span> : null}

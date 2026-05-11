@@ -55,6 +55,7 @@ from ..services.workspace_service import (
     list_user_workspaces,
     list_workspace_invites,
     list_workspace_members,
+    normalize_operational_label,
     normalize_workspace_record,
     normalize_workspace_focus,
     normalize_email,
@@ -977,7 +978,7 @@ async def update_workspace_member_role(
     try:
         membership = await select_one_trusted(
             "workspace_members",
-            "workspace_id,user_id,role",
+            "workspace_id,user_id,role,operational_label",
             {"workspace_id": mutation_workspace_id, "user_id": member_user_id},
         )
     except SupabaseServiceError as exc:
@@ -1010,10 +1011,13 @@ async def update_workspace_member_role(
         )
 
     try:
+        updates: dict[str, Any] = {"role": next_role, "updated_at": utc_now_iso()}
+        if "operational_label" in role_payload.model_fields_set:
+            updates["operational_label"] = normalize_operational_label(role_payload.operational_label)
         updated_membership = await update_one_trusted(
             "workspace_members",
             {"workspace_id": mutation_workspace_id, "user_id": member_user_id},
-            {"role": next_role, "updated_at": utc_now_iso()},
+            updates,
         )
         if updated_membership is None:
             raise HTTPException(
@@ -1044,7 +1048,11 @@ async def update_workspace_member_role(
         actor_user_id=user_id,
         event_type="workspace.member_role_updated",
         summary="A workspace member role was updated.",
-        metadata={"member_user_id": member_user_id, "role": next_role},
+        metadata={
+            "member_user_id": member_user_id,
+            "role": next_role,
+            "identity_updated": "operational_label" in role_payload.model_fields_set,
+        },
     )
     members = await list_workspace_members(access.workspace)
     for member in members:

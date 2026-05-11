@@ -13,7 +13,13 @@ from .supabase_service import (
     select_all_trusted,
     select_one_trusted,
 )
-from .workspace_service import get_profiles, require_workspace_access, utc_now_iso
+from .workspace_service import (
+    get_profiles,
+    list_workspace_members,
+    normalize_operational_label,
+    require_workspace_access,
+    utc_now_iso,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +50,33 @@ DEFAULT_CHANNELS = (
 )
 LEADER_ROLES = {"founder", "owner", "co_owner", "team_lead", "sub_leader", "super_founder"}
 MESSAGE_LIST_LIMIT = 100
+
+
+def _ambient_role_label(role: Any) -> str | None:
+    normalized = str(role or "").strip().lower().replace("-", "_")
+    return {
+        "super_founder": "Founder",
+        "founder": "Founder",
+        "owner": "Founder",
+        "co_owner": "Operational Lead",
+        "sub_leader": "Operational Lead",
+        "team_lead": "Team Lead",
+    }.get(normalized)
+
+
+def _author_identity(member: Mapping[str, Any] | None) -> dict[str, str | None] | None:
+    if member is None:
+        return None
+    role_label = _ambient_role_label(member.get("role"))
+    operational_label = normalize_operational_label(member.get("operational_label"))
+    labels = [label for label in (role_label, operational_label) if label]
+    if not labels:
+        return None
+    return {
+        "role_label": role_label,
+        "operational_label": operational_label,
+        "display_label": " \u2022 ".join(labels),
+    }
 
 
 def _database_error() -> HTTPException:
@@ -217,11 +250,16 @@ async def create_channel(
 
 async def _hydrate_messages(
     rows: list[dict[str, Any]],
+    workspace: dict[str, Any],
     reply_rows: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    profiles = await get_profiles(
-        sorted({str(row.get("author_user_id")) for row in rows if row.get("author_user_id")})
-    )
+    members = await list_workspace_members(workspace)
+    members_by_user_id = {
+        str(member.get("user_id")): member for member in members if member.get("user_id")
+    }
+    author_ids = {str(row.get("author_user_id")) for row in rows if row.get("author_user_id")}
+    missing_author_ids = sorted(author_ids - set(members_by_user_id))
+    profiles = await get_profiles(missing_author_ids)
     reply_counts: dict[str, int] = {}
     for row in reply_rows if reply_rows is not None else rows:
         parent_id = str(row.get("parent_message_id") or "")
@@ -231,7 +269,8 @@ async def _hydrate_messages(
     hydrated: list[dict[str, Any]] = []
     for row in rows:
         user_id = str(row.get("author_user_id") or "")
-        profile = profiles.get(user_id, {})
+        member = members_by_user_id.get(user_id)
+        profile = member or profiles.get(user_id, {})
         hydrated.append(
             {
                 **row,
@@ -241,6 +280,7 @@ async def _hydrate_messages(
                 "author_email": profile.get("email"),
                 "author_avatar_url": profile.get("avatar_url"),
                 "author_avatar_label": profile.get("avatar_label") or (user_id[:1].upper() if user_id else "U"),
+                "author_identity": _author_identity(member),
                 "thread_reply_count": reply_counts.get(str(row.get("id")), 0),
             }
         )
@@ -256,7 +296,7 @@ async def list_messages(
     offset: int,
     thread_root_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    await _require_channel_access(workspace_id=workspace_id, channel_id=channel_id, user_id=user_id)
+    _, access = await _require_channel_access(workspace_id=workspace_id, channel_id=channel_id, user_id=user_id)
     query_limit = min(max(limit, 1), MESSAGE_LIST_LIMIT)
     if thread_root_id:
         try:
@@ -278,7 +318,7 @@ async def list_messages(
         if root is None or root.get("parent_message_id"):
             raise _not_found("Thread message not found.")
         selected = [root, *replies]
-        return await _hydrate_messages(selected, replies)
+        return await _hydrate_messages(selected, access.workspace, replies)
     else:
         try:
             roots = await select_all_trusted(
@@ -299,7 +339,7 @@ async def list_messages(
         except SupabaseServiceError as exc:
             raise _database_error() from exc
         roots.reverse()
-        return await _hydrate_messages(roots, replies)
+        return await _hydrate_messages(roots, access.workspace, replies)
 
 
 async def create_message(
@@ -343,7 +383,7 @@ async def create_message(
         except SupabaseServiceError as exc:
             raise _database_error() from exc
         if existing is not None:
-            return (await _hydrate_messages([existing]))[0]
+            return (await _hydrate_messages([existing], access.workspace))[0]
 
     timestamp = utc_now_iso()
     try:
@@ -364,7 +404,7 @@ async def create_message(
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
-    return (await _hydrate_messages([created]))[0]
+    return (await _hydrate_messages([created], access.workspace))[0]
 
 
 async def channel_transcript_for_assistance(
@@ -383,7 +423,7 @@ async def channel_transcript_for_assistance(
             offset=0,
             thread_root_id=thread_root_id,
         )
-    await _require_channel_access(workspace_id=workspace_id, channel_id=channel_id, user_id=user_id)
+    _, access = await _require_channel_access(workspace_id=workspace_id, channel_id=channel_id, user_id=user_id)
     try:
         messages = await select_all_trusted(
             "workspace_channel_messages",
@@ -396,4 +436,4 @@ async def channel_transcript_for_assistance(
     except SupabaseServiceError as exc:
         raise _database_error() from exc
     messages.reverse()
-    return await _hydrate_messages(messages)
+    return await _hydrate_messages(messages, access.workspace)
