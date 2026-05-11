@@ -78,9 +78,9 @@ export default function DashboardPage() {
 
   return (
     <section className="omnix-page-frame omnix-scrollbar">
-      <div className="omnix-content-max flex flex-col gap-6">
+      <div className="omnix-content-max flex flex-col gap-4 sm:gap-6">
 
-        <div className="relative overflow-hidden rounded-[28px] border border-[rgba(0,255,255,0.12)] bg-[radial-gradient(circle_at_12%_0%,rgba(0,255,255,0.16),transparent_32%),linear-gradient(145deg,rgba(8,20,36,0.94),rgba(6,9,18,0.86))] p-6 shadow-[0_30px_110px_rgba(0,0,0,0.38),var(--omnix-glow-xs)] sm:p-7">
+        <div className="relative overflow-hidden rounded-[18px] border border-[rgba(0,255,255,0.12)] bg-[radial-gradient(circle_at_12%_0%,rgba(0,255,255,0.16),transparent_32%),linear-gradient(145deg,rgba(8,20,36,0.94),rgba(6,9,18,0.86))] p-4 shadow-[0_30px_110px_rgba(0,0,0,0.38),var(--omnix-glow-xs)] sm:rounded-[28px] sm:p-7">
           <div className="pointer-events-none absolute right-[-7rem] top-[-8rem] h-80 w-80 rounded-full bg-purple-400/10 blur-[95px]" />
           <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
@@ -98,7 +98,7 @@ export default function DashboardPage() {
               A real-time operating surface for workspace knowledge, AI sessions, hierarchy, and team access.
             </p>
             </div>
-            <div className="grid min-w-[18rem] gap-2 sm:grid-cols-3 xl:min-w-[28rem]">
+            <div className="grid w-full min-w-0 gap-2 min-[380px]:grid-cols-3 xl:min-w-[28rem] xl:w-auto">
               {[
                 { label: "Role", value: workspaceRoleLabel(activeWorkspace?.current_user_role), icon: ShieldCheck },
                 { label: "Access", value: activeWorkspace?.is_shared ? "Shared" : "Private", icon: Users },
@@ -151,7 +151,7 @@ export default function DashboardPage() {
               workspaceName={activeWorkspace?.name}
             />
 
-            <section className="omnix-section-card p-6" style={{ animation: "omnix-card-enter 0.45s ease-out 0.18s both" }}>
+            <section className="omnix-section-card p-4 sm:p-6" style={{ animation: "omnix-card-enter 0.45s ease-out 0.18s both" }}>
               {/* Top beam */}
               <div className="omnix-top-line" />
               <div className="relative z-10 mb-5 flex items-center justify-between">
@@ -201,7 +201,7 @@ export default function DashboardPage() {
             </section>
 
             {/* Recent AI Sessions */}
-            <section className="omnix-section-card p-6" style={{ animation: "omnix-card-enter 0.45s ease-out 0.26s both" }}>
+            <section className="omnix-section-card p-4 sm:p-6" style={{ animation: "omnix-card-enter 0.45s ease-out 0.26s both" }}>
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="flex items-center gap-2.5 text-lg font-semibold text-white">
                   <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10">
@@ -260,7 +260,7 @@ export default function DashboardPage() {
 
           {/* ── Sidebar panels ── */}
           <aside className="space-y-6">
-            <section className="omnix-section-card p-6" style={{ animation: "omnix-card-enter 0.45s ease-out 0.28s both" }}>
+            <section className="omnix-section-card p-4 sm:p-6" style={{ animation: "omnix-card-enter 0.45s ease-out 0.28s both" }}>
               <div className="omnix-top-line" />
               <h2 className="relative z-10 mb-5 flex items-center gap-2 text-lg font-semibold text-white">
                 <Layers3 className="h-4 w-4 text-[var(--omnix-purple)]" />

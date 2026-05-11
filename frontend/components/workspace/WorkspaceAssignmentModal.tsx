@@ -110,7 +110,7 @@ export function WorkspaceAssignmentModal({
       <div className="omnix-modal-card relative flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-[var(--omnix-border-2)] bg-[#0a0d14]/90 shadow-[0_32px_128px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
         <div className="pointer-events-none absolute left-1/2 top-0 h-48 w-full -translate-x-1/2 bg-[var(--omnix-cyan)] opacity-5 blur-[80px]" />
         
-        <div className="relative z-10 flex shrink-0 items-center justify-between border-b border-[var(--omnix-border)] px-6 py-5">
+        <div className="relative z-10 flex shrink-0 items-center justify-between border-b border-[var(--omnix-border)] px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--omnix-grad-primary)] text-white shadow-[var(--omnix-glow-sm)]">
               <UserPlus className="h-5 w-5" />
@@ -248,8 +248,8 @@ export function WorkspaceAssignmentModal({
           )}
         </div>
 
-        <div className="relative z-10 flex shrink-0 items-center justify-end gap-3 border-t border-[var(--omnix-border)] bg-black/20 px-6 py-4 pb-safe">
-          <Button variant="ghost" onClick={onClose} disabled={Boolean(assigningId)}>
+        <div className="relative z-10 flex shrink-0 items-center gap-3 border-t border-[var(--omnix-border)] bg-black/20 px-4 py-4 pb-safe sm:justify-end sm:px-6">
+          <Button variant="ghost" className="flex-1 sm:flex-none" onClick={onClose} disabled={Boolean(assigningId)}>
             Cancel
           </Button>
           <Button
@@ -257,7 +257,7 @@ export function WorkspaceAssignmentModal({
             onClick={handleAssign}
             disabled={!selectedUserId}
             isLoading={Boolean(assigningId)}
-            className="rounded-xl px-6"
+            className="flex-1 rounded-xl px-4 sm:flex-none sm:px-6"
           >
             Add to workspace
           </Button>

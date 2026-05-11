@@ -210,7 +210,7 @@ export function AuthCard({
 
   return (
     <main
-      className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-6 text-white sm:px-6 lg:px-8"
+      className="relative flex min-h-[100dvh] items-stretch justify-center overflow-hidden text-white sm:items-center sm:px-6 sm:py-6 lg:px-8"
       style={{
         background: AUTH_C.navyDark,
         fontFamily: "'Inter','DM Sans',system-ui,sans-serif",
@@ -227,17 +227,17 @@ export function AuthCard({
         initial={{ opacity: 0, y: 18, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.42, ease: authEase }}
-        className="relative z-10 flex w-full max-w-6xl overflow-hidden rounded-[28px] border border-white/[0.07] bg-[#061020]/95 shadow-[0_60px_160px_rgba(0,0,0,0.7),0_0_80px_rgba(0,255,255,0.08)]"
+        className="relative z-10 flex w-full max-w-6xl overflow-hidden bg-[#061020]/95 shadow-[0_60px_160px_rgba(0,0,0,0.7),0_0_80px_rgba(0,255,255,0.08)] sm:rounded-[28px] sm:border sm:border-white/[0.07]"
       >
         <LeftPanel mode={mode} />
 
-        <section className="relative flex min-h-[680px] flex-1 flex-col overflow-hidden">
+        <section className="relative flex min-h-[100dvh] flex-1 flex-col overflow-hidden sm:min-h-[680px]">
           <div className="absolute inset-0">
             <AuthDriftOrb x="76%" y="10%" size={420} color="rgba(0,255,255,0.045)" />
             <AuthMovingGrid />
           </div>
 
-          <div className="relative z-10 flex items-center justify-between px-6 py-6 lg:hidden">
+          <div className="relative z-10 flex items-center justify-between px-5 pb-2 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-6 lg:hidden">
             <AuthBrand compact />
             <div
               className="flex h-9 w-9 items-center justify-center rounded-xl"
@@ -247,11 +247,11 @@ export function AuthCard({
             </div>
           </div>
 
-          <div className="relative z-10 flex flex-1 items-center justify-center overflow-y-auto px-5 py-8 sm:px-8 lg:px-10">
+          <div className="relative z-10 flex flex-1 items-start justify-center overflow-y-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5 sm:items-center sm:px-8 sm:py-8 lg:px-10">
             <div className="w-full max-w-[480px]">
-              <div className="mb-7">
+              <div className="mb-5 sm:mb-7">
                 <div
-                  className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl"
+                  className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl sm:mb-5 sm:h-14 sm:w-14"
                   style={{
                     background: "rgba(0,255,255,0.1)",
                     border: "1px solid rgba(0,255,255,0.24)",
@@ -267,7 +267,7 @@ export function AuthCard({
                   <span className="h-1.5 w-1.5 rounded-full" style={{ background: AUTH_C.cyan }} />
                   {mode === "register" ? "Start your workspace" : "Welcome back"}
                 </div>
-                <h1 className="mb-3 text-3xl font-black leading-tight tracking-normal sm:text-4xl" style={{ color: AUTH_C.white }}>
+                <h1 className="mb-3 text-[1.7rem] font-black leading-tight tracking-normal sm:text-4xl" style={{ color: AUTH_C.white }}>
                   {title}
                 </h1>
                 <p className="text-sm leading-7 sm:text-base" style={{ color: AUTH_C.muted }}>
