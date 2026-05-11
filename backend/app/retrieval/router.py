@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from ..services import workspace_intelligence_service, workspace_service
 from ..context.schemas import ContextPayload

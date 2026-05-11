@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any
 from .tracing import ContextTrace
 from .serializers import EventSerializer
 

@@ -1,7 +1,7 @@
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
-type SubscriptionType = "presence" | "activity" | "status" | "typing" | "revocation" | "channels" | "channel_messages" | "tasks";
+type SubscriptionType = "presence" | "activity" | "status" | "typing" | "revocation" | "channels" | "channel_messages" | "tasks" | "initiatives";
 type RealtimeStatus = "SUBSCRIBED" | "CHANNEL_ERROR" | "TIMED_OUT" | "CLOSED" | string;
 
 interface SubscriptionKey {

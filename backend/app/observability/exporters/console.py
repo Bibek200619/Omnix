@@ -1,5 +1,4 @@
 import logging
-from typing import Any
 from ..schemas import ObservabilityEvent
 from ..serializers import EventSerializer
 

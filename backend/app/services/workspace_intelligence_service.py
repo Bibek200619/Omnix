@@ -4,11 +4,9 @@ import re
 import time
 from collections.abc import Mapping
 from typing import Any
-from uuid import UUID
 
 from ..services.supabase_service import select_all_trusted
 from .workspace_cognition import build_workspace_focus_prompt, normalize_workspace_focus
-from .workspace_continuity_service import list_initiatives, list_unresolved_continuity
 from .workspace_service import (
     list_workspace_members,
     normalize_intelligence_preferences,
@@ -131,7 +129,7 @@ async def workspace_retrieval_scope_ids(
     Future agents will utilize these scope IDs to navigate the organizational 
     intelligence graph safely.
     """
-    from app.services.workspace_service import resolve_workspace_access, list_user_workspaces
+    from app.services.workspace_service import list_user_workspaces
     
     normalized = normalize_workspace_record(workspace)
     workspace_id = str(normalized["id"])
@@ -204,12 +202,12 @@ async def build_workspace_intelligence_profile(
 
     members = await list_workspace_members(workspace)
 
-    # Operational Continuity (Phases 2, 3, 6)
+    # Initiative direction is injected as recorded context only; health is derived at the initiative surface.
     initiatives = await select_all_trusted(
         "workspace_initiatives",
         "*",
-        filters={"workspace_id": scope_ids, "status": "active"},
-        order_by="momentum_score",
+        filters={"workspace_id": scope_ids, "status": ["active", "focused", "at_risk"]},
+        order_by="updated_at",
         desc=True,
         limit=5,
     )
@@ -254,7 +252,7 @@ async def build_workspace_intelligence_profile(
         "retrieval_scope": retrieval_scope,
         "scope_workspace_ids": scope_ids,
         "active_initiatives": [
-            {"id": str(i["id"]), "name": i["name"], "status": i["status"]}
+            {"id": str(i["id"]), "title": i.get("title") or i.get("name"), "status": i["status"]}
             for i in initiatives
         ],
         "unresolved_continuity": [
@@ -314,7 +312,7 @@ def workspace_intelligence_system_prompt(
 
     # Inject Continuity Intelligence (Phase 8)
     if profile.get("active_initiatives"):
-        initiatives_str = ", ".join(i["name"] for i in profile["active_initiatives"])
+        initiatives_str = ", ".join(i["title"] for i in profile["active_initiatives"])
         lines.append(f"- Active initiatives: {initiatives_str}")
     
     if profile.get("unresolved_continuity"):

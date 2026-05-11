@@ -191,18 +191,71 @@ export type WorkspaceActivityEvent = {
   actor_avatar_label: string;
 };
 
-export type WorkspaceInitiativeStatus = "active" | "paused" | "completed";
+export type WorkspaceInitiativeStatus = "draft" | "active" | "focused" | "at_risk" | "complete";
+export type WorkspaceInitiativeMomentumHealth = "quiet" | "active_movement" | "blocked_execution" | "dormant" | "completion_flow";
+export type WorkspaceInitiativeAssistanceMode = "state" | "blockers" | "momentum" | "decisions";
+
+export type WorkspaceInitiativeResource = {
+  resource_type: "file" | "decision" | "ai_session" | "reference";
+  resource_id: string;
+  label?: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type WorkspaceInitiativeChannel = {
+  id: string;
+  name: string;
+  purpose?: string | null;
+  message_count: number;
+  last_message_at?: string | null;
+};
+
+export type WorkspaceInitiativeMomentum = {
+  health: WorkspaceInitiativeMomentumHealth;
+  summary: string;
+  task_count: number;
+  open_task_count: number;
+  complete_task_count: number;
+  blocked_task_count: number;
+  due_soon_count: number;
+  overdue_count: number;
+  channel_count: number;
+  discussion_message_count: number;
+  last_movement_at?: string | null;
+};
 
 export type WorkspaceInitiative = {
   id: string;
   workspace_id: string;
-  name: string;
+  title: string;
   description?: string | null;
   status: WorkspaceInitiativeStatus;
-  momentum_score: number;
-  metadata: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
+  owner_user_id?: string | null;
+  created_by?: string | null;
+  target_date?: string | null;
+  initiative_context?: string | null;
+  linked_resources: WorkspaceInitiativeResource[];
+  activity_metadata: Record<string, unknown>;
+  client_nonce?: string | null;
+  completed_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  owner_name?: string | null;
+  owner_email?: string | null;
+  owner_avatar_label?: string | null;
+  creator_name?: string | null;
+  linked_tasks: WorkspaceTask[];
+  linked_channels: WorkspaceInitiativeChannel[];
+  momentum: WorkspaceInitiativeMomentum;
+};
+
+export type WorkspaceInitiativeAssistance = {
+  mode: WorkspaceInitiativeAssistanceMode;
+  content: string;
+  source_task_count: number;
+  source_channel_count: number;
+  source_message_count: number;
+  generated_at: string;
 };
 
 export type WorkspaceOperationalTimelineEvent = {

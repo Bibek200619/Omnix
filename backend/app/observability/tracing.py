@@ -15,9 +15,12 @@ class ContextTrace:
     
     def __init__(self, trace_id: Optional[str] = None, workspace_id: Optional[str] = None, request_id: Optional[str] = None):
         kwargs = {}
-        if trace_id: kwargs["trace_id"] = trace_id
-        if workspace_id: kwargs["workspace_id"] = workspace_id
-        if request_id: kwargs["request_id"] = request_id
+        if trace_id:
+            kwargs["trace_id"] = trace_id
+        if workspace_id:
+            kwargs["workspace_id"] = workspace_id
+        if request_id:
+            kwargs["request_id"] = request_id
         
         self.context = TraceContext(**kwargs)
         self.metrics = MetricsCollector()

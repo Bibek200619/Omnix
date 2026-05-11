@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from ..embeddings.dimensions import get_expected_embedding_dimension, validate_embedding_dimension, validate_embeddings_dimension
+from ..embeddings.dimensions import get_expected_embedding_dimension, validate_embedding_dimension
 from ..db.supabase_client import get_supabase
 from ..services.supabase_service import execute_query_sync
 from .vector_store_base import VectorStore
@@ -70,7 +70,7 @@ class PgVectorStore(VectorStore):
                 results.append((str(row["id"]), distance))
             logger.info("pgvector semantic search completed with %d result(s).", len(results))
             return results
-        except Exception as exc:
+        except Exception:
             logger.exception(
                 "pgvector search failed. Ensure search_documents_vector accepts %d-dimensional local embeddings.",
                 EMBEDDING_DIMENSION,
