@@ -1,5 +1,4 @@
 from typing import Dict, Any, List, Optional
-import json
 
 class PromptTrace:
     """Captures prompt assembly and injection states securely."""

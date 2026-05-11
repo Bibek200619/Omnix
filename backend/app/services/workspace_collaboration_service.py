@@ -14,7 +14,6 @@ from ..services.supabase_service import (
     upsert_one,
 )
 from .workspace_service import (
-    WORKSPACE_COLUMNS,
     get_profiles,
     list_user_workspaces,
     normalize_ai_specialization,

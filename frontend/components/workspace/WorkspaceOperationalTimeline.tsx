@@ -35,6 +35,14 @@ const EVENT_ICONS: Record<string, React.ElementType> = {
   default: Activity
 };
 
+const momentumLabels = {
+  quiet: "Awaiting linkage",
+  active_movement: "Active movement",
+  blocked_execution: "Blocked execution",
+  dormant: "Dormant",
+  completion_flow: "Completion flow",
+};
+
 export function WorkspaceOperationalTimeline({
   events,
   initiatives = [],
@@ -84,23 +92,19 @@ export function WorkspaceOperationalTimeline({
                     <span className="text-[10px] font-medium uppercase tracking-widest text-emerald-400/60">Focus Area</span>
                   </div>
                   <h4 className="text-sm font-medium text-white/90 group-hover:text-white transition-colors truncate">
-                    {initiative.name}
+                    {initiative.title}
                   </h4>
                 </div>
                 <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center">
                   <Compass className="h-4 w-4 text-cyan-400/80" />
                 </div>
               </div>
-              <div className="mt-4 flex items-center gap-3">
-                <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min(initiative.momentum_score * 10, 100)}%` }}
-                    className="h-full bg-gradient-to-r from-cyan-500/80 to-emerald-500/80"
-                  />
-                </div>
-                <span className="text-[10px] font-medium text-white/40">
-                  {Math.round(initiative.momentum_score * 10)}% Activity
+              <div className="mt-4 flex items-center justify-between gap-3 text-[10px]">
+                <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-medium text-white/50">
+                  {momentumLabels[initiative.momentum.health]}
+                </span>
+                <span className="text-white/35">
+                  {initiative.momentum.open_task_count} open tasks
                 </span>
               </div>
             </motion.div>
@@ -138,7 +142,7 @@ export function WorkspaceOperationalTimeline({
                     <span className="hidden sm:inline-block h-1 w-1 rounded-full bg-white/10" />
                     <span className="inline-flex w-fit items-center gap-1.5 px-2 py-0.5 rounded-full border border-white/5 bg-white/[0.03] text-[8px] sm:text-[9px] font-medium text-cyan-200/50 uppercase tracking-tight">
                       {event.event_type === 'momentum_spike' ? 'High Activity' : 
-                       event.event_type === 'initiative_started' ? 'Project Started' :
+                       event.event_type === 'initiative_started' ? 'Initiative Opened' :
                        event.event_type === 'decision_made' ? 'Decision' :
                        event.event_type === 'synthesis' ? 'Summary' :
                        event.event_type.replace(/_/g, ' ')}

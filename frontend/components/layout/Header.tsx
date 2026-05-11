@@ -19,6 +19,9 @@ import { ProfileMenu } from "@/components/layout/ProfileMenu";
 const routeTitles = [
   { match: "/dashboard", title: "Dashboard", subtitle: "Welcome back" },
   { match: "/chat", title: "AI Chat", subtitle: "Omnix Intelligence" },
+  { match: "/conversations", title: "Conversations", subtitle: "Operational discussion" },
+  { match: "/tasks", title: "Tasks", subtitle: "Shared execution" },
+  { match: "/initiatives", title: "Initiatives", subtitle: "Shared operational direction" },
   { match: "/workspace", title: "Workspaces", subtitle: "Manage your super workspaces and sub-spaces" },
   { match: "/team", title: "Team", subtitle: "Manage workspace members" },
   { match: "/sources", title: "Sources", subtitle: "Manage your connected data" },

@@ -50,6 +50,9 @@ const TYPING_TIMEOUT_MS = 8_000;
 function currentViewFromPath(pathname: string | null) {
   if (!pathname) return "workspace";
   if (pathname.includes("/chat")) return "chat";
+  if (pathname.includes("/conversations")) return "conversations";
+  if (pathname.includes("/tasks")) return "tasks";
+  if (pathname.includes("/initiatives")) return "initiatives";
   if (pathname.includes("/workspace")) return "workspace";
   if (pathname.includes("/team")) return "team";
   if (pathname.includes("/sources")) return "sources";
