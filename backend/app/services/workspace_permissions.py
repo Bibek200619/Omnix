@@ -1,4 +1,4 @@
-from typing import Any, Mapping
+from typing import Any
 
 from app.core.rbac import (
     ROLE_SUPER_FOUNDER,
@@ -22,8 +22,6 @@ from app.core.rbac import (
     PERMISSION_MANAGE_AI,
     PERMISSION_ACCESS_MEMORY,
     PERMISSION_ACCESS_SOURCES,
-    PERMISSION_CREATE_SUBSPACE,
-    PERMISSION_DELETE_WORKSPACE,
 )
 
 class OrganizationalAccessAuthority:
