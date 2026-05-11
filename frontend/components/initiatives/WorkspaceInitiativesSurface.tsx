@@ -373,14 +373,14 @@ export function WorkspaceInitiativesSurface() {
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
-      <header className="mb-3 flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-4 sm:px-5">
+    <section className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
+      <header className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
             <Compass className="h-3.5 w-3.5" /> Execution layer
           </p>
           <h1 className="omnix-display text-xl font-semibold text-white">Initiatives</h1>
-          <p className="mt-1 text-sm text-[var(--omnix-text-2)]">{activeWorkspace?.name} shared operational direction and movement.</p>
+          <p className="mt-1 hidden text-sm text-[var(--omnix-text-2)] md:block">{activeWorkspace?.name} shared operational direction and movement.</p>
         </div>
         <div className="flex items-center gap-2 rounded-full border border-[var(--omnix-border)] bg-black/15 px-3 py-1.5 text-xs text-[var(--omnix-text-2)]">
           <CircleDot className={cn("h-3.5 w-3.5", realtimeStatus === "connected" ? "text-emerald-300" : "text-amber-200")} />
@@ -395,8 +395,8 @@ export function WorkspaceInitiativesSurface() {
         </div>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[19rem_minmax(0,1fr)] xl:grid-cols-[20rem_minmax(0,1fr)_19rem]">
-        <aside className="omnix-panel flex min-h-[16rem] flex-col rounded-xl p-3">
+      <div className="grid shrink-0 gap-3 lg:grid-cols-[19rem_minmax(0,1fr)] xl:min-h-0 xl:flex-1 xl:grid-cols-[20rem_minmax(0,1fr)_19rem]">
+        <aside className="omnix-panel order-1 flex shrink-0 flex-col rounded-xl p-3 lg:order-none lg:min-h-[16rem]">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Direction</p>
             <Button size="sm" variant="ghost" onClick={() => setCreateOpen((open) => !open)} leftIcon={<Plus className="h-3.5 w-3.5" />}>Open</Button>
@@ -414,7 +414,7 @@ export function WorkspaceInitiativesSurface() {
               <Button type="submit" size="sm" className="w-full" isLoading={creating} disabled={!title.trim()}>Create initiative</Button>
             </form>
           ) : null}
-          <div className="omnix-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto">
+          <div className="omnix-scrollbar flex min-h-0 gap-2 overflow-x-auto pb-1 lg:block lg:flex-1 lg:space-y-2 lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0">
             {loading ? <Loader2 className="mx-auto mt-8 h-5 w-5 animate-spin text-cyan-100/50" /> : null}
             {!loading && initiatives.length === 0 ? (
               <div className="px-3 py-10 text-center">
@@ -424,7 +424,7 @@ export function WorkspaceInitiativesSurface() {
               </div>
             ) : null}
             {initiatives.map((initiative) => (
-              <button key={initiative.id} type="button" onClick={() => { setSelectedId(initiative.id); setAssistance(null); }} className={cn("w-full rounded-xl border p-3 text-left transition", selected?.id === initiative.id ? "border-cyan-300/25 bg-cyan-300/[0.07]" : "border-[var(--omnix-border)] bg-black/10 hover:bg-white/[0.025]")}>
+              <button key={initiative.id} type="button" onClick={() => { setSelectedId(initiative.id); setAssistance(null); }} className={cn("w-[min(15rem,78vw)] shrink-0 rounded-xl border p-3 text-left transition lg:w-full", selected?.id === initiative.id ? "border-cyan-300/25 bg-cyan-300/[0.07]" : "border-[var(--omnix-border)] bg-black/10 hover:bg-white/[0.025]")}>
                 <p className="truncate text-sm font-medium text-white">{initiative.title}</p>
                 <div className="mt-2 flex items-center justify-between gap-2 text-[10px]">
                   <span className="rounded-full border border-[var(--omnix-border)] px-2 py-0.5 uppercase tracking-[0.1em] text-cyan-100/75">{initiative.status.replace("_", " ")}</span>
@@ -435,7 +435,7 @@ export function WorkspaceInitiativesSurface() {
           </div>
         </aside>
 
-        <main className="omnix-panel min-h-[30rem] min-w-0 overflow-y-auto rounded-xl p-4 sm:p-5">
+        <main className="omnix-panel order-3 min-w-0 rounded-xl p-4 sm:p-5 lg:order-none xl:min-h-[30rem] xl:overflow-y-auto">
           {!selected ? (
             <div className="flex h-full min-h-[24rem] items-center justify-center text-sm text-[var(--omnix-text-2)]">Select or open an initiative.</div>
           ) : (
@@ -549,7 +549,7 @@ export function WorkspaceInitiativesSurface() {
           )}
         </main>
 
-        <aside className="space-y-3 lg:col-span-2 xl:col-span-1">
+        <aside className="order-2 space-y-3 lg:order-none lg:col-span-2 xl:col-span-1">
           <section className="omnix-panel rounded-xl p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Momentum</p>
             <p className="mt-2 text-sm leading-6 text-[var(--omnix-text)]">{selected?.momentum.summary || "Select an initiative for recorded movement."}</p>
