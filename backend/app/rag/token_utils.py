@@ -77,7 +77,7 @@ def trim_to_token_budget(text: str, max_tokens: int) -> str:
 
     low = max(1, bound // 2)
     high = min(bound, len(spans))
-    best_end = 0
+    best_end = low
     
     while low <= high:
         mid = (low + high) // 2
@@ -88,9 +88,6 @@ def trim_to_token_budget(text: str, max_tokens: int) -> str:
         else:
             high = mid - 1
             
-    if best_end == 0:
-        return ""
-        
     char_end = spans[best_end - 1][1]
     return text[:char_end].strip()
 
@@ -116,7 +113,7 @@ def tail_tokens(text: str, max_tokens: int) -> str:
 
     low = max(0, len(spans) - bound)
     high = min(len(spans) - 1, len(spans) - max(1, bound // 2))
-    best_start = len(spans)
+    best_start = high
     
     while low <= high:
         mid = (low + high) // 2
@@ -127,9 +124,6 @@ def tail_tokens(text: str, max_tokens: int) -> str:
         else:
             low = mid + 1
             
-    if best_start == len(spans):
-        return ""
-        
     char_start = spans[best_start][0]
     return text[char_start:].strip()
 
@@ -201,7 +195,7 @@ def split_by_token_window(
             
         o_low = max(start_idx + 1, best_end - o_bound)
         o_high = min(best_end - 1, best_end - max(1, o_bound // 2))
-        next_start = best_end - 1
+        next_start = best_end
         
         while o_low <= o_high:
             o_mid = (o_low + o_high) // 2

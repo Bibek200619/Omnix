@@ -1,6 +1,4 @@
 import pytest
-import asyncio
-import logging
 
 from app.rag.pgvector_store import PgVectorStore
 from app.rag.ingestion import RAGIngestionPipeline

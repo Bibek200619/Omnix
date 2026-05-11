@@ -1,5 +1,4 @@
 from typing import Dict, Any, Optional
-from datetime import datetime
 
 class ProviderTrace:
     """Captures execution metrics and failure states for model providers."""
