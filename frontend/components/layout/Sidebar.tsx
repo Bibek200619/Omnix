@@ -1198,7 +1198,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                   <OmnixMark size={34} />
                 </div>
                 <div>
-                  <span className="omnix-display block text-base font-bold uppercase leading-tight tracking-[0.06em] text-white drop-shadow-[0_0_12px_rgba(0,255,255,0.45)]">OMNIX</span>
+                  <span className="omnix-display block text-lg font-semibold leading-tight tracking-[-0.045em] text-white">Omnix</span>
                   <span className="text-[10px] leading-tight tracking-[0.05em] text-[var(--omnix-cyan)] opacity-60">AI Workspace</span>
                 </div>
               </Link>
