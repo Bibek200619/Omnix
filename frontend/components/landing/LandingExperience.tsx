@@ -213,7 +213,7 @@ function Label({ children }:{ children:ReactNode }) {
 
 function H2({ children }:{ children:ReactNode }) {
   return (
-    <motion.h2 variants={fadeUp} className="text-5xl font-black leading-tight tracking-tight mb-4" style={{color:C.white}}>
+    <motion.h2 variants={fadeUp} className="mb-4 text-3xl font-black leading-tight tracking-tight sm:text-5xl" style={{color:C.white}}>
       {children}
     </motion.h2>
   );
@@ -229,7 +229,7 @@ function GradText({ children }:{ children:ReactNode }) {
 
 function CyanBtn({ children, large=false, href, onClick }:{ children:ReactNode; large?:boolean; href?: string; onClick?:()=>void }) {
   const [hov,setHov]=useState(false);
-  const className = `inline-flex items-center gap-2 rounded-xl font-black tracking-wide transition-all duration-200 ${large?"px-9 py-4 text-base":"px-7 py-3.5 text-sm"}`;
+  const className = `inline-flex w-full items-center justify-center gap-2 rounded-xl font-black tracking-wide transition-all duration-200 sm:w-auto ${large?"px-7 py-3.5 text-sm sm:px-9 sm:py-4 sm:text-base":"px-7 py-3.5 text-sm"}`;
   const style = {background:C.cyan,color:C.navyDark,boxShadow:hov?`0 0 60px rgba(0,255,255,0.6)`:`0 0 32px rgba(0,255,255,0.35)`,transform:hov?"translateY(-2px)":"translateY(0)"};
   const events = { onMouseEnter:()=>setHov(true), onMouseLeave:()=>setHov(false) };
 
@@ -250,7 +250,7 @@ function CyanBtn({ children, large=false, href, onClick }:{ children:ReactNode; 
 
 function GhostBtn({ children, large=false, href }:{ children:ReactNode; large?:boolean; href?: string }) {
   const [hov,setHov]=useState(false);
-  const className = `inline-flex items-center gap-2 rounded-xl font-semibold transition-all duration-200 ${large?"px-9 py-4 text-base":"px-7 py-3.5 text-sm"}`;
+  const className = `inline-flex w-full items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-200 sm:w-auto ${large?"px-7 py-3.5 text-sm sm:px-9 sm:py-4 sm:text-base":"px-7 py-3.5 text-sm"}`;
   const style = {background:hov?"rgba(255,255,255,0.08)":C.card,border:`1px solid ${hov?"rgba(255,255,255,0.18)":C.border}`,color:hov?C.white:C.muted};
   const events = { onMouseEnter:()=>setHov(true), onMouseLeave:()=>setHov(false) };
 
@@ -279,7 +279,7 @@ function Navbar() {
   },[]);
   return (
     <motion.nav initial={{y:-24,opacity:0}} animate={{y:0,opacity:1}} transition={{duration:0.5}}
-      className="sticky top-0 z-50 flex items-center justify-between px-8 py-4 transition-all duration-300"
+      className="sticky top-0 z-50 flex items-center justify-between gap-2 px-4 py-3 transition-all duration-300 sm:px-8 sm:py-4"
       style={{background:sc?"rgba(10,25,47,0.92)":"transparent",backdropFilter:sc?"blur(24px)":"none",borderBottom:sc?`1px solid rgba(0,255,255,0.08)`:"1px solid transparent"}}>
       <div className="flex items-center gap-3">
         <OmnixMark size={32}/>
@@ -300,10 +300,10 @@ function Navbar() {
         ))}
       </div>
       <div className="flex items-center gap-3">
-        <Link href="/login" className="text-sm font-medium px-4 py-2 rounded-lg transition-colors" style={{color:C.muted}}
+        <Link href="/login" className="hidden rounded-lg px-4 py-2 text-sm font-medium transition-colors sm:inline-flex" style={{color:C.muted}}
           onMouseEnter={e=>(e.currentTarget.style.color=C.white)}
           onMouseLeave={e=>(e.currentTarget.style.color=C.muted)}>Sign in</Link>
-        <Link href="/register" className="text-sm font-black px-5 py-2.5 rounded-xl transition-all duration-200"
+        <Link href="/register" className="rounded-xl px-3.5 py-2.5 text-xs font-black transition-all duration-200 sm:px-5 sm:text-sm"
           style={{background:C.cyan,color:C.navyDark,boxShadow:`0 0 24px rgba(0,255,255,0.35)`}}
           onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.transform="translateY(-1px)";(e.currentTarget as HTMLElement).style.boxShadow=`0 0 40px rgba(0,255,255,0.55)`;}}
           onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.transform="translateY(0)";(e.currentTarget as HTMLElement).style.boxShadow=`0 0 24px rgba(0,255,255,0.35)`;}}>
@@ -337,7 +337,7 @@ function HeroChat() {
   return (
     <motion.div initial={{opacity:0,y:56,scale:0.96}} animate={{opacity:1,y:0,scale:1}}
       transition={{duration:0.9,delay:0.5,ease:easeOutExpo}}
-      className="relative mx-auto mt-14" style={{maxWidth:900}}>
+      className="relative mx-auto mt-10 w-full sm:mt-14" style={{maxWidth:900}}>
 
       <FloatTag text="Runbooks retrieved" icon="↗" style={{top:"12%",left:"-10%"}}/>
       <FloatTag text="SOC 2 verified" icon="✓" style={{top:"38%",right:"-10%"}}/>
@@ -347,18 +347,18 @@ function HeroChat() {
       <div className="absolute inset-0 rounded-2xl" style={{boxShadow:`0 0 80px rgba(0,255,255,0.1),0 50px 130px rgba(0,0,0,0.8)`,borderRadius:20}}/>
       <div className="relative rounded-2xl overflow-hidden"
         style={{border:`1px solid rgba(0,255,255,0.14)`,background:"rgba(6,18,32,0.98)",backdropFilter:"blur(20px)"}}>
-        <div className="flex items-center gap-2 px-5 py-3.5"
+        <div className="flex items-center gap-2 px-3 py-3 sm:px-5 sm:py-3.5"
           style={{borderBottom:`1px solid rgba(255,255,255,0.05)`,background:"rgba(255,255,255,0.02)"}}>
           <div className="flex gap-1.5">
             {["#ff5f57","#febc2e","#28c840"].map(c=><div key={c} className="w-3 h-3 rounded-full" style={{background:c}}/>)}
           </div>
           <div className="flex-1 text-center text-xs" style={{color:"rgba(255,255,255,0.25)"}}>OMNIX — Enterprise Workspace</div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs" style={{background:"rgba(34,197,94,0.12)",color:"#4ade80"}}>
+          <div className="hidden items-center gap-1.5 rounded-md px-2.5 py-1 text-xs sm:flex" style={{background:"rgba(34,197,94,0.12)",color:"#4ade80"}}>
             <span className="w-1.5 h-1.5 rounded-full" style={{background:"#22c55e"}}/>Synced
           </div>
         </div>
         <div className="flex" style={{height:400}}>
-          <div className="w-52 flex-shrink-0 flex flex-col" style={{borderRight:`1px solid rgba(255,255,255,0.05)`,background:"rgba(255,255,255,0.01)"}}>
+          <div className="hidden w-52 flex-shrink-0 flex-col sm:flex" style={{borderRight:`1px solid rgba(255,255,255,0.05)`,background:"rgba(255,255,255,0.01)"}}>
             <div className="p-4">
               <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl mb-4"
                 style={{background:"rgba(0,255,255,0.06)",border:`1px solid rgba(0,255,255,0.14)`}}>
@@ -389,9 +389,9 @@ function HeroChat() {
             </div>
           </div>
           <div className="flex-1 flex flex-col">
-            <div className="flex items-center justify-between px-5 py-3" style={{borderBottom:`1px solid rgba(255,255,255,0.04)`}}>
-              <div className="text-sm font-bold" style={{color:C.white}}>Enterprise rollout blockers</div>
-              <div className="flex gap-1.5">
+            <div className="flex items-center justify-between gap-2 px-3 py-3 sm:px-5" style={{borderBottom:`1px solid rgba(255,255,255,0.04)`}}>
+              <div className="truncate text-sm font-bold" style={{color:C.white}}>Enterprise rollout blockers</div>
+              <div className="hidden gap-1.5 sm:flex">
                 {["Auto","Workspace","Web","Hybrid"].map((m,i)=>(
                   <span key={m} className="px-2.5 py-1 rounded-lg text-xs font-semibold"
                     style={{background:i===0?"rgba(0,255,255,0.14)":C.card,color:i===0?C.cyan:C.faint,border:i===0?`1px solid rgba(0,255,255,0.25)`:`1px solid ${C.border}`}}>
@@ -400,7 +400,7 @@ function HeroChat() {
                 ))}
               </div>
             </div>
-            <div className="flex-1 p-5 space-y-4 overflow-hidden">
+            <div className="flex-1 space-y-4 overflow-hidden p-3 sm:p-5">
               {msgs.map((msg,i)=>(
                 <motion.div key={i}
                   initial={{opacity:0,x:msg.role==="user"?16:-16}}
@@ -445,8 +445,8 @@ function HeroChat() {
                 </motion.div>
               ))}
             </div>
-            <div className="px-5 py-4" style={{borderTop:`1px solid rgba(255,255,255,0.05)`}}>
-              <div className="flex items-center gap-3 px-4 py-3 rounded-2xl"
+            <div className="px-3 py-3 sm:px-5 sm:py-4" style={{borderTop:`1px solid rgba(255,255,255,0.05)`}}>
+              <div className="flex items-center gap-3 rounded-2xl px-3 py-3 sm:px-4"
                 style={{background:"rgba(255,255,255,0.04)",border:`1px solid rgba(255,255,255,0.08)`}}>
                 <span className="text-sm flex-1" style={{color:"rgba(255,255,255,0.25)"}}>Ask OMNIX anything about your knowledge base…</span>
                 <button className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -464,7 +464,7 @@ function HeroChat() {
 
 function Hero() {
   return (
-    <section className="relative overflow-hidden pb-28 pt-8">
+    <section className="relative overflow-hidden pb-16 pt-5 sm:pb-28 sm:pt-8">
       <SectionBg>
         <ParticleField/>
         <DriftingOrb x="50%" y="28%" size={900} color="rgba(0,255,255,0.07)" dur={20}/>
@@ -474,7 +474,7 @@ function Hero() {
         <div className="absolute inset-0"
           style={{background:"linear-gradient(180deg,rgba(10,25,47,0) 0%,rgba(10,25,47,0) 60%,rgba(6,16,32,1) 100%)"}}/>
       </SectionBg>
-      <div className="relative z-10 flex flex-col items-center text-center px-6 pt-14">
+      <div className="relative z-10 flex flex-col items-center px-4 pt-10 text-center sm:px-6 sm:pt-14">
         <motion.div initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{duration:0.45,delay:0.08}}>
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black mb-8"
             style={{background:"rgba(0,255,255,0.07)",border:`1px solid rgba(0,255,255,0.24)`,color:C.cyan,letterSpacing:"0.1em"}}>
@@ -485,25 +485,25 @@ function Hero() {
         <motion.h1 initial={{opacity:0,y:36}} animate={{opacity:1,y:0}}
           transition={{duration:0.75,delay:0.2,ease:easeOutExpo}}
           className="font-black leading-[1.05] tracking-tight"
-          style={{fontSize:"clamp(52px,6.8vw,88px)",color:C.white,maxWidth:900}}>
+          style={{fontSize:"clamp(2.5rem,6.8vw,5.5rem)",color:C.white,maxWidth:900}}>
           Turn private knowledge{" "}
           <span style={{background:`linear-gradient(135deg,${C.cyan} 0%,#00aaff 50%,${C.blue} 100%)`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
             into precise AI
           </span>{" "}answers
         </motion.h1>
         <motion.p initial={{opacity:0,y:22}} animate={{opacity:1,y:0}} transition={{duration:0.6,delay:0.36}}
-          className="mt-7 text-lg leading-relaxed" style={{color:C.muted,maxWidth:540}}>
+          className="mt-6 text-base leading-relaxed sm:mt-7 sm:text-lg" style={{color:C.muted,maxWidth:540}}>
           OMNIX gives operators, support teams, and builders a secure place to ask questions
           against private knowledge — with searchable history, workspaces built for real operations,
           and enterprise-grade security.
         </motion.p>
         <motion.div initial={{opacity:0,y:22}} animate={{opacity:1,y:0}} transition={{duration:0.5,delay:0.5}}
-          className="flex items-center gap-4 mt-10">
+          className="mt-8 flex w-full max-w-sm flex-col items-center gap-3 sm:mt-10 sm:w-auto sm:max-w-none sm:flex-row sm:gap-4">
           <CyanBtn large href="/register">Start working free <Icon d={ICONS.arrow} size={18} stroke={C.navyDark} sw={2.5}/></CyanBtn>
           <GhostBtn large><Icon d={ICONS.play} size={18} stroke={C.muted} sw={1.8}/>Watch demo</GhostBtn>
         </motion.div>
         <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.75}}
-          className="flex items-center gap-6 mt-6">
+          className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
           {["No credit card","Free for small teams","GDPR & SOC 2"].map(t=>(
             <span key={t} className="text-xs flex items-center gap-1.5" style={{color:"rgba(255,255,255,0.28)"}}>
               <Icon d={ICONS.check} size={11} stroke="rgba(0,255,255,0.5)" sw={2.5}/>{t}
@@ -561,7 +561,7 @@ function Stats() {
     {value:"SOC 2",  label:"Type II certified",   icon:ICONS.check   },
   ];
   return (
-    <Sec className="py-20 px-6">
+    <Sec className="px-4 py-14 sm:px-6 sm:py-20">
       <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5">
         {stats.map(s=>(
           <motion.div key={s.label} variants={fadeUp}
@@ -600,7 +600,7 @@ const FEATS=[
 function Features() {
   const [hov,setHov]=useState<number|null>(null);
   return (
-    <section id="features" className="relative py-28 px-6 overflow-hidden scroll-mt-24">
+    <section id="features" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
       <SectionBg>
         <DriftingOrb x="14%" y="55%" size={600} color="rgba(0,51,255,0.07)" dur={28} delay={-6}/>
         <DriftingOrb x="88%" y="35%" size={480} color="rgba(0,255,255,0.06)" dur={22} delay={-3}/>
@@ -812,13 +812,13 @@ function AppScreenshots() {
   ];
 
   return (
-    <section id="inside-app" className="relative py-28 px-6 overflow-hidden scroll-mt-24">
+    <section id="inside-app" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
       <SectionBg>
         <DriftingOrb x="50%" y="50%" size={700} color="rgba(0,255,255,0.06)" dur={24} delay={-8}/>
         <AnimatedGrid opacity={0.03}/>
       </SectionBg>
       <Sec className="max-w-6xl mx-auto relative z-10">
-        <motion.div variants={fadeUp} className="text-center mb-12">
+        <motion.div variants={fadeUp} className="mb-8 text-center sm:mb-12">
           <Label>INSIDE THE APP</Label>
           <H2>A workspace built for <GradText>real operations</GradText></H2>
           <motion.p variants={fadeUp} className="text-lg" style={{color:C.muted,maxWidth:520,margin:"0 auto"}}>
@@ -826,10 +826,10 @@ function AppScreenshots() {
           </motion.p>
         </motion.div>
         <motion.div variants={fadeUp} className="flex justify-center mb-8">
-          <div className="inline-flex items-center gap-1 p-1.5 rounded-2xl" style={{background:C.card,border:`1px solid ${C.border}`}}>
+          <div className="omnix-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl p-1.5" style={{background:C.card,border:`1px solid ${C.border}`}}>
             {tabs.map((t,i)=>(
               <button key={t.label} onClick={()=>setActive(i)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200"
+                className="flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 sm:px-5"
                 style={{background:active===i?"rgba(0,255,255,0.14)":"transparent",color:active===i?C.cyan:C.faint,border:active===i?`1px solid rgba(0,255,255,0.25)`:"1px solid transparent"}}>
                 <Icon d={t.icon} size={15} stroke={active===i?C.cyan:C.faint} sw={active===i?2:1.7}/>{t.label}
               </button>
@@ -868,21 +868,21 @@ function HowItWorks() {
     {num:"04",title:"Share across your team",   desc:"Teammates can ask their own questions, see shared history, and build on what others have already asked and learned.", icon:ICONS.team},
   ];
   return (
-    <section id="how-it-works" className="relative py-28 px-6 overflow-hidden scroll-mt-24">
+    <section id="how-it-works" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
       <SectionBg>
         <DriftingOrb x="50%" y="30%" size={700} color="rgba(0,51,255,0.07)" dur={26} delay={-7}/>
         <DriftingOrb x="80%" y="70%" size={500} color="rgba(0,255,255,0.06)" dur={20} delay={-3}/>
         <AnimatedGrid opacity={0.03}/>
       </SectionBg>
       <Sec className="max-w-5xl mx-auto relative z-10">
-        <motion.div variants={fadeUp} className="text-center mb-16">
+        <motion.div variants={fadeUp} className="mb-10 text-center sm:mb-16">
           <Label>HOW IT WORKS</Label>
           <H2>Set up in minutes, <GradText>value in seconds</GradText></H2>
         </motion.div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {steps.map((s,i)=>(
             <motion.div key={s.num} variants={fadeUp}
-              className="relative p-7 rounded-2xl overflow-hidden"
+              className="relative overflow-hidden rounded-2xl p-5 sm:p-7"
               style={{background:C.card,border:`1px solid ${C.border}`}}>
               <div className="absolute top-5 right-5 text-6xl font-black select-none"
                 style={{color:"rgba(0,255,255,0.04)"}}>{s.num}</div>
@@ -919,7 +919,7 @@ function RetrievalModes() {
   ];
   const m=modes[active];
   return (
-    <section id="retrieval" className="relative py-28 px-6 overflow-hidden scroll-mt-24">
+    <section id="retrieval" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
       <SectionBg>
         <DriftingOrb x="25%" y="50%" size={600} color="rgba(0,255,255,0.06)" dur={22} delay={-5}/>
         <DriftingOrb x="80%" y="40%" size={500} color="rgba(0,51,255,0.07)" dur={28} delay={-12}/>
@@ -949,7 +949,7 @@ function RetrievalModes() {
             <motion.div key={active}
               initial={{opacity:0,x:20}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-20}}
               transition={{duration:0.28}}
-              className="flex-1 p-8 rounded-2xl"
+              className="flex-1 rounded-2xl p-5 sm:p-8"
               style={{background:`${m.color}06`,border:`1px solid ${m.color}28`,boxShadow:`0 0 40px ${m.color}10`}}>
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center"
@@ -987,14 +987,14 @@ function Security() {
     {label:"Audit Logs",       color:C.cyan   },
   ];
   return (
-    <section id="security" className="relative py-28 px-6 overflow-hidden scroll-mt-24">
+    <section id="security" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
       <SectionBg>
         <DriftingOrb x="88%" y="30%" size={600} color="rgba(0,255,255,0.07)" dur={24} delay={-5}/>
         <DriftingOrb x="10%" y="70%" size={480} color="rgba(0,51,255,0.06)" dur={20} delay={-9}/>
         <ParticleField/>
       </SectionBg>
       <Sec className="max-w-5xl mx-auto relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+        <div className="grid grid-cols-1 items-center gap-10 md:grid-cols-2 md:gap-16">
           <motion.div variants={fadeUp} className="flex flex-wrap gap-3">
             {badges.map(b=>(
               <motion.div key={b.label} variants={fadeUp}
@@ -1063,7 +1063,7 @@ function Pricing() {
      cta:"Contact sales"},
   ];
   return (
-    <section id="pricing" className="relative py-28 px-6 overflow-hidden scroll-mt-24">
+    <section id="pricing" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
       <SectionBg>
         <DriftingOrb x="50%" y="40%" size={800} color="rgba(0,255,255,0.07)" dur={30} delay={-10}/>
         <DriftingOrb x="15%" y="60%" size={500} color="rgba(0,51,255,0.06)" dur={22} delay={-6}/>
@@ -1144,7 +1144,7 @@ function Testimonials() {
     {text:"Security was our biggest concern. OMNIX's SOC 2 certification and identity-first approach gave us the confidence to roll it out to 200+ team members enterprise-wide.",              author:"David Park",    role:"CISO · Orbit Health",                       color:C.cyan,   av:"DP"},
   ];
   return (
-    <section className="relative py-28 px-6 overflow-hidden">
+    <section className="relative overflow-hidden px-4 py-16 sm:px-6 sm:py-28">
       <SectionBg>
         <DriftingOrb x="28%" y="50%" size={600} color="rgba(0,51,255,0.06)" dur={28} delay={-8}/>
         <DriftingOrb x="76%" y="50%" size={500} color="rgba(0,255,255,0.05)" dur={22} delay={-3}/>
@@ -1201,7 +1201,7 @@ const FAQS=[
 function FAQ() {
   const [open,setOpen]=useState<number|null>(null);
   return (
-    <section className="relative py-28 px-6 overflow-hidden">
+    <section className="relative overflow-hidden px-4 py-16 sm:px-6 sm:py-28">
       <SectionBg>
         <DriftingOrb x="80%" y="50%" size={500} color="rgba(0,255,255,0.06)" dur={20} delay={-4}/>
         <DriftingOrb x="20%" y="40%" size={400} color="rgba(0,51,255,0.05)" dur={26} delay={-11}/>
@@ -1244,7 +1244,7 @@ function FAQ() {
 // ─── CTA ──────────────────────────────────────────────────────────────────────
 function CTA() {
   return (
-    <section id="get-started" className="relative py-28 px-6 overflow-hidden scroll-mt-24">
+    <section id="get-started" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
       <SectionBg>
         <DriftingOrb x="50%" y="50%" size={1000} color="rgba(0,255,255,0.09)" dur={35} delay={-15}/>
         <DriftingOrb x="20%" y="75%" size={500} color="rgba(0,51,255,0.07)" dur={22} delay={-8}/>
@@ -1254,7 +1254,7 @@ function CTA() {
       <Sec className="max-w-5xl mx-auto relative z-10">
         <motion.div variants={fadeUp} className="rounded-3xl p-px"
           style={{background:`linear-gradient(135deg,rgba(0,255,255,0.35),rgba(0,51,255,0.2),transparent 70%)`}}>
-          <div className="rounded-3xl px-12 py-24 text-center relative overflow-hidden"
+          <div className="relative overflow-hidden rounded-3xl px-5 py-14 text-center sm:px-12 sm:py-24"
             style={{background:`linear-gradient(145deg,rgba(6,20,38,0.99),rgba(5,14,26,0.99))`}}>
             <SectionBg>
               <AnimatedGrid opacity={0.03}/>
@@ -1267,13 +1267,13 @@ function CTA() {
                 <span className="w-1.5 h-1.5 rounded-full" style={{background:C.cyan}}/>
                 START WITH OMNIX
               </motion.div>
-              <motion.h2 variants={fadeUp} className="text-6xl font-black leading-tight tracking-tight mb-6" style={{color:C.white}}>
-                Bring a secure AI workspace<br/><GradText>to your team today.</GradText>
+              <motion.h2 variants={fadeUp} className="mb-6 text-3xl font-black leading-tight tracking-tight sm:text-6xl" style={{color:C.white}}>
+                Bring a secure AI workspace<br className="hidden sm:block"/><GradText> to your team today.</GradText>
               </motion.h2>
-              <motion.p variants={fadeUp} className="text-xl mb-12" style={{color:C.muted,maxWidth:500,margin:"0 auto 3rem"}}>
+              <motion.p variants={fadeUp} className="mb-8 text-base sm:mb-12 sm:text-xl" style={{color:C.muted,maxWidth:500,marginInline:"auto"}}>
                 Sign in to continue an existing workspace, or create a new account and get started in minutes — no credit card required.
               </motion.p>
-              <motion.div variants={fadeUp} className="flex items-center justify-center gap-4 flex-wrap">
+              <motion.div variants={fadeUp} className="mx-auto flex max-w-sm flex-col items-center justify-center gap-3 sm:max-w-none sm:flex-row sm:flex-wrap sm:gap-4">
                 <CyanBtn large href="/register">Start working free <Icon d={ICONS.arrow} size={18} stroke={C.navyDark} sw={2.5}/></CyanBtn>
                 <GhostBtn large href="/login">Sign in to workspace</GhostBtn>
               </motion.div>
@@ -1307,7 +1307,7 @@ function Footer() {
     {icon:ICONS.play,  label:"YouTube"},
   ];
   return (
-    <footer className="relative px-8 pt-20 pb-10" style={{borderTop:`1px solid rgba(255,255,255,0.05)`}}>
+    <footer className="relative px-4 pb-8 pt-14 sm:px-8 sm:pb-10 sm:pt-20" style={{borderTop:`1px solid rgba(255,255,255,0.05)`}}>
       <SectionBg>
         <DriftingOrb x="50%" y="50%" size={600} color="rgba(0,255,255,0.04)" dur={32} delay={-6}/>
       </SectionBg>
@@ -1318,9 +1318,9 @@ function Footer() {
             <h3 className="font-black text-xl mb-1" style={{color:C.white}}>Stay in the loop</h3>
             <p className="text-sm" style={{color:C.faint}}>Product updates, security advisories, and team tips — monthly.</p>
           </div>
-          <div className="flex gap-3 w-full md:w-auto">
+          <div className="flex w-full flex-col gap-3 min-[380px]:flex-row md:w-auto">
             <input type="email" placeholder="you@company.com"
-              className="flex-1 md:w-64 px-4 py-3 rounded-xl text-sm outline-none"
+              className="min-w-0 flex-1 rounded-xl px-4 py-3 text-sm outline-none md:w-64"
               style={{background:C.card,border:`1px solid ${C.border}`,color:C.white}}/>
             <button className="px-5 py-3 rounded-xl text-sm font-black flex items-center gap-2"
               style={{background:C.cyan,color:C.navyDark}}>

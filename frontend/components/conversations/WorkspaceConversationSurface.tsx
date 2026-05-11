@@ -810,8 +810,8 @@ export function WorkspaceConversationSurface() {
         ) : null}
       </div>
       {taskSource ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6">
-          <form onSubmit={createTaskFromContext} className="omnix-panel-strong max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-cyan-300/15 p-4 shadow-2xl sm:p-5">
+        <div className="omnix-mobile-sheet-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6">
+          <form onSubmit={createTaskFromContext} className="omnix-mobile-sheet omnix-panel-strong max-h-[calc(100dvh_-_2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-cyan-300/15 p-4 shadow-2xl sm:p-5">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Discussion to execution</p>

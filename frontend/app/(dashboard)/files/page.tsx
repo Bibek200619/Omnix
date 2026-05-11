@@ -267,7 +267,7 @@ export default function FilesPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2.5">
-        <div className="relative min-w-[220px] flex-1">
+        <div className="relative w-full min-w-0 flex-1 sm:min-w-[220px]">
           <Search className="absolute left-[11px] top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-white/25" />
           <input
             value={searchQuery}

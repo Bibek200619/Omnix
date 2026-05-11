@@ -88,13 +88,13 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[var(--omnix-background)] p-4 text-white">
-      <div className="w-full max-w-md space-y-6">
+    <main className="omnix-app-bg flex min-h-[100dvh] items-start justify-center overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] text-white sm:items-center sm:py-8">
+      <div className="relative z-10 w-full max-w-md space-y-5 sm:space-y-6">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 text-[var(--omnix-cyan)] shadow-[0_0_24px_rgba(0,255,255,0.15)]">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 text-[var(--omnix-cyan)] shadow-[0_0_24px_rgba(0,255,255,0.15)] sm:h-16 sm:w-16">
             <Layers3 className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Welcome to Omnix</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Welcome to Omnix</h1>
           <p className="mt-2 text-sm text-[var(--omnix-text-2)]">
             Join or create a workspace to get started.
           </p>
@@ -161,7 +161,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
         ) : null}
 
         {!error && (
-          <form onSubmit={handleCreate} className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5 space-y-4 shadow-[var(--omnix-glow-sm)]">
+          <form onSubmit={handleCreate} className="space-y-4 rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-4 shadow-[var(--omnix-glow-sm)] sm:p-5">
             <div>
               <h2 className="text-sm font-semibold text-[var(--omnix-text)]">Create a new workspace</h2>
               <p className="text-xs text-[var(--omnix-text-3)] mt-1">Your personal area for collaboration and AI workflows.</p>

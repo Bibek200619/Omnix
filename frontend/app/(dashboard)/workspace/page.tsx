@@ -211,7 +211,7 @@ export default function WorkspacePage() {
           </div>
           <Button
             type="button"
-            className="omnix-primary-action h-11 rounded-[9px] px-4"
+            className="omnix-primary-action h-11 w-full rounded-[9px] px-4 sm:w-auto"
             leftIcon={<Plus className="h-4 w-4" />}
             onClick={() => {
               setCreateError(null);
@@ -223,7 +223,7 @@ export default function WorkspacePage() {
           <Button
             type="button"
             variant="secondary"
-            className="h-11 rounded-[9px] border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-4"
+            className="h-11 w-full rounded-[9px] border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-4 sm:w-auto"
             leftIcon={<Layers3 className="h-4 w-4" />}
             disabled={workspaces.length === 0}
             onClick={() => openSubspaceCreator()}
@@ -358,7 +358,7 @@ export default function WorkspacePage() {
 
             <section className="omnix-glass-band p-5 sm:p-6">
               <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                <div className="flex min-w-0 gap-4">
+                <div className="flex min-w-0 flex-col gap-4 min-[390px]:flex-row">
                   <span
                     className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border shadow-[var(--omnix-glow-md)]"
                     style={{ borderColor: selectedColor, background: `${selectedColor}15`, color: selectedColor }}
@@ -367,7 +367,7 @@ export default function WorkspacePage() {
                   </span>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="omnix-display text-2xl font-semibold text-white">
+                      <h2 className="omnix-display text-xl font-semibold text-white sm:text-2xl">
                         {selected?.name ?? "Workspace"}
                       </h2>
                       <span
@@ -407,18 +407,19 @@ export default function WorkspacePage() {
                     ) : null}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
+                <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="flex-1 sm:flex-none"
                     leftIcon={<Settings className="h-4 w-4" />}
                     onClick={() => router.push("/settings/workspace")}
                   >
                     Settings
                   </Button>
-                  <Button
-                    type="button"
-                    className="omnix-primary-action"
+                    <Button
+                      type="button"
+                      className="omnix-primary-action flex-1 sm:flex-none"
                     leftIcon={<MessageSquare className="h-4 w-4" />}
                     onClick={() => router.push("/chat")}
                   >
@@ -451,7 +452,7 @@ export default function WorkspacePage() {
             <WorkspaceActivityFeed activity={activity} loading={loadingActivity} compact />
 
             <section className="omnix-glass-band p-5 sm:p-6">
-              <div className="mb-6 flex items-center justify-between">
+                <div className="mb-6 flex items-start justify-between gap-3">
                 <div>
                   <h3 className="omnix-display flex items-center gap-2 text-lg font-semibold text-white">
                     <History className="h-4 w-4 text-[var(--omnix-cyan)]" />
