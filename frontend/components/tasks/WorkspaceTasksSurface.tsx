@@ -6,6 +6,7 @@ import {
   CalendarDays,
   CircleDot,
   ClipboardCheck,
+  Compass,
   Link2,
   Loader2,
   Plus,
@@ -23,6 +24,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type {
   WorkspaceMember,
+  WorkspaceInitiative,
   WorkspaceTask,
   WorkspaceTaskAssistance,
   WorkspaceTaskAssistanceMode,
@@ -60,6 +62,7 @@ export function WorkspaceTasksSurface() {
   const { presence, realtimeStatus } = useWorkspaceCollaboration();
   const [tasks, setTasks] = useState<WorkspaceTask[]>([]);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [initiatives, setInitiatives] = useState<WorkspaceInitiative[]>([]);
   const [momentum, setMomentum] = useState<WorkspaceTaskMomentum | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +74,7 @@ export function WorkspaceTasksSurface() {
   const [ownerId, setOwnerId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [initialBlocker, setInitialBlocker] = useState("");
+  const [initiativeId, setInitiativeId] = useState("");
   const [creating, setCreating] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [blockerDrafts, setBlockerDrafts] = useState<Record<string, string>>({});
@@ -86,6 +90,7 @@ export function WorkspaceTasksSurface() {
       setTasks([]);
       setMomentum(null);
       setMembers([]);
+      setInitiatives([]);
       setLoading(false);
       return;
     }
@@ -95,20 +100,24 @@ export function WorkspaceTasksSurface() {
       const requests: [
         Promise<WorkspaceTask[]>,
         Promise<WorkspaceTaskMomentum>,
+        Promise<WorkspaceInitiative[]>,
         Promise<WorkspaceMember[]> | null,
       ] = [
         apiClient.get<WorkspaceTask[]>(`/workspaces/${activeWorkspaceId}/tasks`),
         apiClient.get<WorkspaceTaskMomentum>(`/workspaces/${activeWorkspaceId}/tasks/momentum`),
+        apiClient.get<WorkspaceInitiative[]>(`/workspaces/${activeWorkspaceId}/initiatives`),
         withMembers ? apiClient.get<WorkspaceMember[]>(`/workspaces/${activeWorkspaceId}/members`) : null,
       ];
-      const [incomingTasks, incomingMomentum, incomingMembers] = await Promise.all([
+      const [incomingTasks, incomingMomentum, incomingInitiatives, incomingMembers] = await Promise.all([
         requests[0],
         requests[1],
         requests[2] ?? Promise.resolve(null),
+        requests[3] ?? Promise.resolve(null),
       ]);
       if (requestId !== requestRef.current || workspaceRef.current !== activeWorkspaceId) return;
       setTasks(incomingTasks);
       setMomentum(incomingMomentum);
+      setInitiatives(incomingInitiatives);
       if (incomingMembers) setMembers(incomingMembers);
       setError(null);
     } catch (err) {
@@ -123,6 +132,7 @@ export function WorkspaceTasksSurface() {
   useEffect(() => {
     setTasks([]);
     setMomentum(null);
+    setInitiatives([]);
     setAssistance(null);
     setFilter("open");
     void loadExecution(true);
@@ -169,6 +179,7 @@ export function WorkspaceTasksSurface() {
       linked_context: [],
       activity_metadata: { origin: "manual" },
       momentum_metadata: {},
+      initiative_id: initiativeId || null,
       client_nonce: nonce,
       owner_name: members.find((member) => member.user_id === ownerId)?.full_name ?? null,
     };
@@ -183,6 +194,7 @@ export function WorkspaceTasksSurface() {
         due_date: optimistic.due_date,
         blockers: optimistic.blockers,
         linked_context: [],
+        initiative_id: optimistic.initiative_id,
         client_nonce: nonce,
       });
       setTasks((current) => mergeTask(current, created));
@@ -192,6 +204,7 @@ export function WorkspaceTasksSurface() {
       setOwnerId("");
       setDueDate("");
       setInitialBlocker("");
+      setInitiativeId("");
       setCreateOpen(false);
       void loadExecution();
     } catch (err) {
@@ -314,6 +327,10 @@ export function WorkspaceTasksSurface() {
               </select>
               <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="omnix-input h-10 rounded-lg px-2 text-sm" />
               <Input value={initialBlocker} onChange={(event) => setInitialBlocker(event.target.value)} placeholder="Recorded blocker, optional" className="h-10 text-sm" />
+              <select value={initiativeId} onChange={(event) => setInitiativeId(event.target.value)} className="omnix-input h-10 rounded-lg px-2 text-sm sm:col-span-2">
+                <option value="">No initiative link</option>
+                {initiatives.map((initiative) => <option key={initiative.id} value={initiative.id}>{initiative.title}</option>)}
+              </select>
               <div className="flex justify-end gap-2 sm:col-span-2">
                 <Button type="button" size="sm" variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
                 <Button type="submit" size="sm" isLoading={creating} disabled={!title.trim()}>Create record</Button>
@@ -377,6 +394,19 @@ export function WorkspaceTasksSurface() {
                       <Link2 className="h-3 w-3" /> {link.label || link.context_type}
                     </span>
                   ))}
+                  <label className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.045] px-2 py-1 text-[11px] text-cyan-100/80">
+                    <Compass className="h-3 w-3" />
+                    <select
+                      value={task.initiative_id || ""}
+                      disabled={updatingId === task.id}
+                      onChange={(event) => void patchTask(task, { initiative_id: event.target.value || null })}
+                      className="bg-transparent text-[11px] outline-none"
+                      aria-label={`Initiative for ${task.title}`}
+                    >
+                      <option value="">No initiative</option>
+                      {initiatives.map((initiative) => <option key={initiative.id} value={initiative.id}>{initiative.title}</option>)}
+                    </select>
+                  </label>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
                   {task.blockers.map((blocker) => (

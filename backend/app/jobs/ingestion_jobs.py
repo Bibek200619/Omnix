@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 
 from ..services.supabase_service import (
     select_one_trusted,
-    update_one_trusted,
 )
 from ..routers.upload import _extract_text_from_bytes
 from ..rag.startup import get_vector_store
