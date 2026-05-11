@@ -1175,7 +1175,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[var(--omnix-sidebar-w)] flex-col overflow-hidden border-r border-[var(--omnix-border)] bg-[linear-gradient(180deg,rgba(5,12,23,0.98),rgba(4,10,20,0.985))] shadow-[24px_0_120px_rgba(0,0,0,0.6),4px_0_40px_rgba(0,255,255,0.05)] backdrop-blur-[28px] transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]",
+          "fixed inset-y-0 left-0 z-50 flex w-[min(21rem,calc(100vw_-_2.75rem))] flex-col overflow-hidden border-r border-[var(--omnix-border)] bg-[linear-gradient(180deg,rgba(5,12,23,0.98),rgba(4,10,20,0.985))] shadow-[24px_0_120px_rgba(0,0,0,0.6),4px_0_40px_rgba(0,255,255,0.05)] backdrop-blur-[28px] transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] lg:w-[var(--omnix-sidebar-w)]",
           isOpen ? "translate-x-0" : "-translate-x-full",
           collapsed ? "lg:-translate-x-full" : "lg:translate-x-0",
         )}
@@ -1218,7 +1218,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-[26px] w-[26px] rounded-[7px] border border-[var(--omnix-border)] bg-transparent text-[var(--omnix-text-3)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white lg:hidden"
+                  className="h-10 w-10 rounded-[10px] border border-[var(--omnix-border)] bg-transparent text-[var(--omnix-text-3)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white lg:hidden"
                   aria-label="Close navigation"
                   title="Close navigation"
                   onClick={onClose}
@@ -1262,7 +1262,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                 href={item.href}
                 onClick={onClose}
                 className={cn(
-                  "omnix-sidebar-link group/nav relative mb-px flex items-center gap-2.5 rounded-[var(--omnix-radius-sm)] border px-2.5 py-[9px] text-[13px] transition duration-150",
+                  "omnix-sidebar-link group/nav relative mb-px flex min-h-11 items-center gap-2.5 rounded-[var(--omnix-radius-sm)] border px-2.5 py-[9px] text-[13px] transition duration-150 lg:min-h-0",
                   isActive
                     ? "border-cyan-300/20 bg-[radial-gradient(ellipse_at_0%_50%,rgba(0,255,255,0.1),transparent_60%),rgba(0,255,255,0.06)] font-semibold text-white shadow-[var(--omnix-glow-xs),inset_0_1px_0_rgba(255,255,255,0.04)]"
                     : "border-transparent font-normal text-[var(--omnix-text-2)] hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface)] hover:text-white hover:shadow-[var(--omnix-glow-xs)]",
@@ -1500,7 +1500,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
           )}
         </section>
 
-        <div className="relative border-t border-[rgba(0,255,255,0.07)] p-2.5 pb-[calc(env(safe-area-inset-bottom)+0.625rem)]">
+        <div className="relative border-t border-[rgba(0,255,255,0.07)] p-2.5 pb-[calc(env(safe-area-inset-bottom)_+_0.625rem)]">
           {/* Top beam on profile section */}
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(0,255,255,0.2),transparent)]" />
           <Link

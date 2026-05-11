@@ -135,7 +135,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
       exit={{ opacity: 0, y: -6, scale: 0.99 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
       className={cn(
-        "group flex w-full items-start gap-3",
+        "group flex w-full items-start gap-2 sm:gap-3",
         isOwn ? "flex-row-reverse" : "flex-row",
       )}
     >
@@ -145,11 +145,11 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
           email={message.senderEmail}
           handle={message.senderHandle}
           avatarUrl={message.senderAvatarUrl}
-          className={cn("mt-1 h-9 w-9 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]", workspaceRoleAvatarClass(senderRole))}
+          className={cn("mt-1 h-8 w-8 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:h-9 sm:w-9", workspaceRoleAvatarClass(senderRole))}
         />
       ) : (
         <div
-          className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-cyan-300/20 bg-[linear-gradient(135deg,rgba(0,255,255,0.1),rgba(0,100,255,0.15))] text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+          className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-cyan-300/20 bg-[linear-gradient(135deg,rgba(0,255,255,0.1),rgba(0,100,255,0.15))] text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:h-9 sm:w-9 sm:rounded-[12px]"
           title={senderName}
         >
           <Sparkles className="h-4 w-4 drop-shadow-sm opacity-80" />
@@ -159,13 +159,13 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         className={cn(
           "group/content relative min-w-0 transition",
           isOwn
-            ? "max-w-[86%] sm:max-w-[680px]"
-            : "max-w-[92%] sm:max-w-[78%]",
+            ? "max-w-[calc(100%_-_2.5rem)] sm:max-w-[680px]"
+            : "max-w-[calc(100%_-_2.5rem)] sm:max-w-[78%]",
           failed
             ? "overflow-hidden rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-rose-50"
           : isUser
-            ? "omnix-human-card px-4 py-3 text-[var(--omnix-text-2)] shadow-sm"
-            : "omnix-ai-card px-5 py-[18px] text-slate-100",
+            ? "omnix-human-card px-3 py-3 text-[var(--omnix-text-2)] shadow-sm sm:px-4"
+            : "omnix-ai-card px-3.5 py-3.5 text-slate-100 sm:px-5 sm:py-[18px]",
           sending && "opacity-80",
         )}
         style={isUser ? ({ "--role-color": roleColor } as CSSProperties) : undefined}
