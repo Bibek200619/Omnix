@@ -120,7 +120,7 @@ export default function TeamPage() {
   return (
     <section className="omnix-page-frame omnix-scrollbar">
       <div className="omnix-content-max flex flex-col gap-5">
-        <div className="relative overflow-hidden rounded-[26px] border border-[rgba(0,255,255,0.12)] bg-[linear-gradient(145deg,rgba(0,255,255,0.06),rgba(155,92,255,0.035)_45%,rgba(0,0,0,0.18))] p-6 shadow-[0_28px_100px_rgba(0,0,0,0.34)]">
+        <div className="relative overflow-hidden rounded-[18px] border border-[rgba(0,255,255,0.12)] bg-[linear-gradient(145deg,rgba(0,255,255,0.06),rgba(155,92,255,0.035)_45%,rgba(0,0,0,0.18))] p-4 shadow-[0_28px_100px_rgba(0,0,0,0.34)] sm:rounded-[26px] sm:p-6">
           <div className="pointer-events-none absolute -right-16 -top-20 h-72 w-72 rounded-full bg-cyan-300/10 blur-[85px]" />
           <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div>
@@ -135,6 +135,7 @@ export default function TeamPage() {
             </div>
             <Button
               type="button"
+              className="w-full md:w-auto"
               leftIcon={<Plus className="h-4 w-4" />}
               disabled={!canInvite}
               onClick={() => {
@@ -161,7 +162,7 @@ export default function TeamPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="relative min-w-[220px] flex-1">
+          <div className="relative w-full min-w-0 flex-1 sm:min-w-[220px]">
             <Search className="absolute left-[11px] top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-white/25" />
             <input
               value={search}

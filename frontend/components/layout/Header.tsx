@@ -82,13 +82,13 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
     <header className="relative z-30 shrink-0 select-none border-b border-[rgba(0,255,255,0.08)] bg-[var(--omnix-header-glass)] pt-safe backdrop-blur-[24px]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent_0%,rgba(0,255,255,0.25)_40%,rgba(0,255,255,0.5)_55%,rgba(0,255,255,0.25)_70%,transparent_100%)]" />
       <InviteNotificationBar />
-      <div className="relative flex h-[var(--omnix-header-h)] w-full items-center gap-3 px-5 sm:px-[22px]">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="relative flex h-[var(--omnix-header-h)] w-full items-center gap-1.5 px-3 sm:gap-3 sm:px-[22px]">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-9 w-9 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)] lg:hidden"
+            className="h-10 w-10 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)] lg:hidden"
             aria-label="Open navigation"
             title="Open navigation"
             onClick={onMenuClick}
@@ -122,18 +122,18 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
                 {activeWorkspace?.name || active.title}
               </span>
               <span className={cn(
-                 "shrink-0 rounded-[4px] border border-white/5 bg-white/5 px-1.5 py-0.5 text-[9px] font-medium capitalize tracking-wide text-white/30",
+                 "hidden shrink-0 rounded-[4px] border border-white/5 bg-white/5 px-1.5 py-0.5 text-[9px] font-medium capitalize tracking-wide text-white/30 sm:inline-flex",
                )}>
                  {activeWorkspace?.current_user_role?.replace(/_/g, ' ') || "Member"}
               </span>
             </div>
-            <p className="mt-px truncate text-[10px] tracking-[0.03em] text-[rgba(255,255,255,0.22)]">
+            <p className="mt-px hidden truncate text-[10px] tracking-[0.03em] text-[rgba(255,255,255,0.22)] min-[390px]:block">
                {activeWorkspace ? (isSubspace ? "Operational Subspace" : "Super Workspace") : active.subtitle}
             </p>
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <InviteNotificationBell />
           <div className="hidden h-[22px] w-px bg-[rgba(0,255,255,0.1)] sm:block" />
           <Button
@@ -141,7 +141,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
             variant="secondary"
             size="icon"
             onClick={() => router.push("/chat")}
-            className="h-9 w-9 rounded-[10px] border-[var(--omnix-cyan)] bg-transparent text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] sm:w-auto sm:px-4"
+            className="hidden h-9 w-9 rounded-[10px] border-[var(--omnix-cyan)] bg-transparent text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] min-[360px]:inline-flex sm:w-auto sm:px-4"
             aria-label="Start new chat"
             title="Start new chat"
           >

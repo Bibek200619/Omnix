@@ -14,7 +14,7 @@ export function PageTransition({ children, className }: PageTransitionProps) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
-      className={cn("min-h-[calc(100vh-6.5rem)]", className)}
+      className={cn("min-h-0", className)}
     >
       {children}
     </motion.div>
