@@ -429,7 +429,7 @@ export default function WorkspacePage() {
               </div>
             </section>
 
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
               {workspaceMetrics.map((metric) => {
                 const Icon = metric.icon;
                 return (
