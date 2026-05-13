@@ -1007,21 +1007,28 @@ textarea {
   }
 
   .omnix-page-frame {
-    padding: 12px;
+    padding: 12px 14px;
   }
 
   .omnix-page-hero {
-    align-items: flex-start;
+    align-items: stretch;
     flex-direction: column;
-    gap: 0.85rem;
+    gap: 1.25rem;
   }
 
   .omnix-page-title {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .omnix-page-subtitle {
-    font-size: 12px;
+    font-size: 11px;
+    margin-top: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .omnix-page-frame {
+    padding: 10px 12px;
   }
 
   .omnix-content-max {

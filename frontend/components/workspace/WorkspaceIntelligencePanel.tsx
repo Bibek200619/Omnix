@@ -45,54 +45,55 @@ export function WorkspaceIntelligencePanel({
       <button 
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="group relative z-10 flex w-full flex-col justify-between gap-4 p-4 text-left outline-none sm:p-6 md:flex-row md:items-start md:gap-6"
+        className="group relative z-10 flex w-full flex-col md:flex-row md:items-start justify-between gap-5 p-5 sm:p-6 text-left outline-none"
       >
-        <div className="flex min-w-0 gap-4">
+        <div className="flex min-w-0 gap-3 sm:gap-4">
           <div className="relative shrink-0">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/5 text-cyan-300/80 shadow-[0_0_10px_rgba(34,211,238,0.1)] transition-transform duration-300 group-hover:scale-105">
-              {loading ? <Loader2 className="h-6 w-6 animate-spin opacity-50" /> : <BrainCircuit className="h-6 w-6 opacity-80" />}
+            <span className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/5 text-cyan-300/80 shadow-[0_0_10px_rgba(34,211,238,0.1)] transition-transform duration-300 group-hover:scale-105">
+              {loading ? <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin opacity-50" /> : <BrainCircuit className="h-5 w-5 sm:h-6 sm:w-6 opacity-80" />}
             </span>
-            <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-emerald-500/80 shadow-[0_0_4px_rgba(16,185,129,0.5)] border-2 border-slate-900" />
+            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-emerald-500/80 shadow-[0_0_4px_rgba(16,185,129,0.5)] border-2 border-slate-900" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-cyan-400/60">Workspace AI</p>
+              <p className="text-[9px] sm:text-[10px] font-medium uppercase tracking-[0.15em] sm:tracking-[0.2em] text-cyan-400/60">Workspace AI</p>
               {profile?.is_global && (
-                <span className="flex items-center gap-1 rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[9px] font-medium text-purple-300 uppercase tracking-tight">
-                  <Globe2 className="h-2.5 w-2.5" />
-                  Organization Wide
+                <span className="flex items-center gap-1 rounded-full border border-purple-500/30 bg-purple-500/10 px-1.5 py-0.5 text-[8px] sm:text-[9px] font-medium text-purple-300 uppercase tracking-tight">
+                  <Globe2 className="h-2 w-2 sm:h-2.5 sm:w-2.5" />
+                  <span className="hidden xs:inline">Organization Wide</span>
+                  <span className="xs:hidden">Global</span>
                 </span>
               )}
             </div>
-            <h3 className="mt-1.5 text-xl font-medium tracking-tight text-white/90 group-hover:text-white transition-colors">
+            <h3 className="mt-1 text-lg sm:text-xl font-medium tracking-tight text-white/90 group-hover:text-white transition-colors">
               {profile ? profile.workspace_name : "Waking up..."}
             </h3>
             {expertise && (
-              <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-emerald-400/90">
+              <div className="mt-1 flex items-center gap-1.5 text-[11px] sm:text-xs font-medium text-emerald-400/90">
                 <Sparkles className="h-3 w-3" />
                 Specializing in {expertise}
               </div>
             )}
-            <p className={cn("mt-3 text-sm font-medium leading-relaxed text-slate-300/80 max-w-2xl transition-all", expanded ? "line-clamp-none" : "line-clamp-1")}>
+            <p className={cn("mt-2 sm:mt-3 text-[13px] sm:text-sm font-medium leading-relaxed text-slate-300/80 max-w-2xl transition-all", expanded ? "line-clamp-none" : "line-clamp-1")}>
                {summary}
             </p>
           </div>
         </div>
         
-        <div className="shrink-0 flex flex-row md:flex-col items-center md:items-end justify-between w-full md:w-auto gap-3">
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
-               <div className="text-[10px] font-medium uppercase tracking-wider text-white/30">Focus</div>
-               <div className="text-sm font-medium text-white/80">{focusLabels[focus]}</div>
+        <div className="shrink-0 flex flex-row md:flex-col items-center md:items-end justify-between w-full md:w-auto gap-4 border-t border-white/5 pt-4 md:border-0 md:pt-0">
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden xs:block">
+               <div className="text-[9px] font-medium uppercase tracking-wider text-white/30">Focus</div>
+               <div className="text-xs sm:text-sm font-medium text-white/80">{focusLabels[focus]}</div>
             </div>
-            <div className="h-8 w-px bg-white/5 hidden sm:block" />
+            <div className="h-7 w-px bg-white/5 hidden xs:block" />
             <div className="text-right">
-               <div className="text-[10px] font-medium uppercase tracking-wider text-white/30">Search Scope</div>
-               <div className="text-sm font-medium text-cyan-400">{profile?.retrieval_scope === "global" ? "Everything" : "This workspace only"}</div>
+               <div className="text-[9px] font-medium uppercase tracking-wider text-white/30">Search Scope</div>
+               <div className="text-xs sm:text-sm font-medium text-cyan-400">{profile?.retrieval_scope === "global" ? "Everything" : "Workspace"}</div>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-white/40 group-hover:text-cyan-300/80 transition-colors">
-            {expanded ? "Hide insights" : "View insights"}
+          <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-medium uppercase tracking-wider text-white/40 group-hover:text-cyan-300/80 transition-colors">
+            {expanded ? "Hide" : "Insights"}
             {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </div>
         </div>
