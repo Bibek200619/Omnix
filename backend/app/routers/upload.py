@@ -10,9 +10,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 
 from ..core.security import get_current_user
-from ..rag.chunking import split_text_into_chunks
-from ..services.supabase_service import SupabaseServiceError, insert_many, insert_one
-from ..db.supabase_client import get_supabase
+from ..services.supabase_service import SupabaseServiceError, insert_one
+from ..services.document_context_service import store_extracted_text_chunks
 from ..services.workspace_service import active_workspace_id_from_request, require_workspace_access
 from .conversations import require_conversation_access
 
@@ -185,7 +184,30 @@ async def upload_file(
         logger.exception("Failed to insert file metadata: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to register file")
 
-    # Enqueue ingestion job to process the file asynchronously
+    # Persist lightweight chunks immediately so chat can use the upload even if
+    # Redis, the worker, or embedding generation is delayed on the EC2 host.
+    if normalized:
+        try:
+            stored_chunks = await store_extracted_text_chunks(
+                file_id=str(file_row.get("id")),
+                user_id=user_id,
+                text=normalized,
+                workspace_id=workspace_id,
+                replace_existing=True,
+            )
+            metadata = dict(file_row.get("metadata") or {})
+            metadata.update(
+                {
+                    "text_chunk_count": stored_chunks.chunk_count,
+                    "text_chunks_truncated": stored_chunks.truncated,
+                }
+            )
+            file_row["metadata"] = metadata
+        except Exception:
+            logger.exception("Failed to persist immediate text chunks for file %s.", file_row.get("id"))
+
+    # Enqueue ingestion job to add embeddings asynchronously. Chat still works
+    # through keyword/fallback retrieval if this background path is unavailable.
     try:
         from ..jobs.queue import enqueue_job
         await enqueue_job({"type": "ingest_file", "file_id": str(file_row.get("id")), "user_id": user_id, "workspace_id": workspace_id})
