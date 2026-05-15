@@ -1,68 +1,68 @@
 import os
-import asyncio
-import httpx
-import time
-from concurrent.futures import ThreadPoolExecutor
+
+import pytest
 
 os.environ["SUPABASE_URL"] = "http://localhost:8001"
 os.environ["SUPABASE_ANON_KEY"] = "anon"
 os.environ["SUPABASE_SERVICE_ROLE_KEY"] = "service"
 os.environ["DEV_MODE"] = "false"
-os.environ["MODEL_URL"] = "http://127.0.0.1:8001/v1/chat/completions"
+os.environ["MODEL_URL"] = "http://127.0.0.1:11434/v1/chat/completions"
+os.environ["AI_MODEL"] = "gemma:2b"
 
-from app.services.chat_service import call_llm, ModelServiceError
+from app.services import chat_service
+from app.services.chat_service import AIMessage, AIGeneration, OllamaChatService
 
-async def test_timeout():
-    print("Testing slow request (timeout)...")
-    start = time.time()
-    try:
-        await call_llm("slow", [], 0.2)
-    except ModelServiceError as e:
-        print(f"Caught expected error: {e}")
-    end = time.time()
-    print(f"Timeout test took {end - start:.2f}s (should be ~3s)")
 
-async def test_isolation():
-    print("\nTesting isolation (1 slow, 1 fast concurrently)...")
-    start = time.time()
-    
-    async def fast_call():
-        await asyncio.sleep(0.5) # Give slow call a head start
-        res = await call_llm("fast", [], 0.2)
-        print(f"Fast call returned: {res}")
-        return time.time()
-    
-    async def slow_call():
-        try:
-            await call_llm("slow", [], 0.2)
-        except ModelServiceError:
-            pass
-        return time.time()
-        
-    results = await asyncio.gather(slow_call(), fast_call())
-    slow_end, fast_end = results
-    
-    print(f"Fast call took: {fast_end - start - 0.5:.2f}s")
-    print(f"Slow call took: {slow_end - start:.2f}s")
+def test_build_payload_uses_gemma_and_preserves_context():
+    service = OllamaChatService()
 
-async def test_concurrency_limit():
-    print("\nTesting concurrency limit (6 slow requests)...")
-    
-    async def attempt(i):
-        try:
-            await call_llm("slow", [], 0.2)
-        except ModelServiceError as e:
-            if e.status_code == 503:
-                print(f"Request {i} rejected with 503 (expected capacity limit)")
-            else:
-                print(f"Request {i} timed out")
-    
-    await asyncio.gather(*[attempt(i) for i in range(6)])
+    payload = service._build_payload(
+        "What changed?",
+        context=[{"role": "assistant", "content": "The workspace was updated."}],
+        temperature=0.1,
+        stream=False,
+    )
 
-async def main():
-    await test_timeout()
-    await test_isolation()
-    await test_concurrency_limit()
+    assert payload["model"] == "gemma:2b"
+    assert payload["temperature"] == 0.1
+    assert payload["stream"] is False
+    assert payload["messages"][0]["role"] == "system"
+    assert payload["messages"][1] == {
+        "role": "assistant",
+        "content": "The workspace was updated.",
+    }
+    assert payload["messages"][-1] == {"role": "user", "content": "What changed?"}
 
-if __name__ == "__main__":
-    asyncio.run(main())
+
+def test_extract_content_supports_openai_compatible_response():
+    content = OllamaChatService._extract_content(
+        {"choices": [{"message": {"content": "Omnix is ready."}}]}
+    )
+
+    assert content == "Omnix is ready."
+
+
+def test_parse_stream_line_supports_sse_delta_chunks():
+    line = 'data: {"choices":[{"delta":{"content":"hello"}}]}'
+
+    assert OllamaChatService._parse_stream_line(line) == "hello"
+
+
+@pytest.mark.asyncio
+async def test_call_llm_uses_service_abstraction(monkeypatch):
+    class FakeService:
+        async def generate(self, prompt, context=None, **kwargs):
+            assert prompt == "Summarize this"
+            assert context == [AIMessage(role="user", content="Prior context")]
+            assert kwargs["model"] == "gemma:2b"
+            return AIGeneration(content="Done", model="gemma:2b")
+
+    monkeypatch.setattr(chat_service, "get_chat_service", lambda: FakeService())
+
+    result = await chat_service.generate_ai_response(
+        "Summarize this",
+        context=[AIMessage(role="user", content="Prior context")],
+        model="gemma:2b",
+    )
+
+    assert result.content == "Done"

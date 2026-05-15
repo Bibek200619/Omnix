@@ -10,8 +10,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from starlette.responses import StreamingResponse
 
 from ..core.security import get_current_user
-from ..schemas.chat import ChatRequest, ChatResponse, MessageRead
-from ..services.chat_service import ModelServiceError, call_llm, call_llm_stream
+from ..schemas.chat import AIGenerationRequest, AIGenerationResponse, ChatRequest, ChatResponse, MessageRead
+from ..services.chat_service import (
+    AIMessage,
+    ModelServiceError,
+    call_llm,
+    call_llm_stream,
+    generate_ai_response,
+)
 from ..services.supabase_service import (
     SupabaseServiceError,
     insert_many,
@@ -220,6 +226,37 @@ async def get_messages(
     )
 
 
+@router.post("/ai/generate", response_model=AIGenerationResponse)
+async def generate_ai(
+    payload: AIGenerationRequest,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> AIGenerationResponse:
+    user_id = _user_id_from_claims(current_user)
+    _check_rate_limit(user_id)
+
+    try:
+        generation = await generate_ai_response(
+            payload.prompt,
+            context=[
+                AIMessage(role=message.role, content=message.content)
+                for message in payload.context
+            ],
+            system_prompt=payload.system_prompt,
+            temperature=payload.temperature,
+            model=payload.model,
+            max_tokens=payload.max_tokens,
+        )
+    except ModelServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return AIGenerationResponse(
+        response=generation.content,
+        model=generation.model,
+        provider="ollama",
+        usage=generation.usage,
+    )
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     request: Request,
@@ -300,6 +337,8 @@ async def chat(
             prompt_message,
             context=_build_context(recent_messages),
             temperature=payload.temperature,
+            model=payload.model,
+            max_tokens=payload.max_tokens,
         )
     except ModelServiceError as exc:
         failed_at = utc_now_iso()
@@ -454,6 +493,8 @@ async def chat_stream(
                 prompt_message,
                 context=_build_context(recent_messages),
                 temperature=payload.temperature,
+                model=payload.model,
+                max_tokens=payload.max_tokens,
             ):
                 if await request.is_disconnected():
                     logger.info("Client disconnected during streaming.")

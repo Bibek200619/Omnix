@@ -291,18 +291,9 @@ export function ChatInterface() {
               },
             ]);
           } else if (t === "status") {
-            // optionally show retrieval progress
-            // we display a short status message in the assistant content
-            const st = obj.status;
-            if (assistantId && st) {
-              setMessages((current) =>
-                current.map((m) =>
-                  m.id === assistantId
-                    ? { ...m, content: `...${st}...` }
-                    : m,
-                ),
-              );
-            }
+            // Status events are transport metadata. Keep them out of the
+            // persisted assistant text so streamed tokens remain clean.
+            return;
           } else if (t === "token") {
             if (!assistantId) return;
             const txt = obj.text ?? "";
