@@ -7,7 +7,6 @@ import {
   CircleDot,
   ClipboardCheck,
   Compass,
-  Link2,
   Loader2,
   Plus,
   Sparkles,
@@ -46,11 +45,6 @@ const assistLabels: Record<WorkspaceTaskAssistanceMode, string> = {
   next_actions: "Next actions",
   workload: "Ownership view",
 };
-
-function dueLabel(value?: string | null) {
-  if (!value) return "No due date";
-  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(`${value}T00:00:00`));
-}
 
 function mergeTask(current: WorkspaceTask[], incoming: WorkspaceTask) {
   return [incoming, ...current.filter((task) => task.id !== incoming.id && !(incoming.client_nonce && task.client_nonce === incoming.client_nonce))];
@@ -157,10 +151,84 @@ export function WorkspaceTasksSurface() {
     return () => realtimeRegistry.unsubscribe({ type: "tasks", workspaceId: activeWorkspaceId });
   }, [activeWorkspaceId, loadExecution, session?.user.id]);
 
-  const displayedTasks = useMemo(
-    () => tasks.filter((task) => (filter === "open" ? task.status !== "complete" : task.status === filter)),
-    [filter, tasks],
-  );
+  const displayedTasks = useMemo(() => {
+    const filtered = tasks.filter((task) => (filter === "open" ? task.status !== "complete" : task.status === filter));
+    
+    // Prioritization Logic:
+    // 1. Active status tasks
+    // 2. Tasks with blockers
+    // 3. Tasks due soon (within 3 days)
+    // 4. Assigned to me
+    // 5. Everything else (by created_at)
+    
+    const now = new Date();
+    const threeDaysFromNow = new Date();
+    threeDaysFromNow.setDate(now.getDate() + 3);
+
+    return [...filtered].sort((a, b) => {
+      // 1. Active
+      if (a.status === "active" && b.status !== "active") return -1;
+      if (b.status === "active" && a.status !== "active") return 1;
+
+      // 2. Blocked
+      const aBlocked = a.blockers.length > 0;
+      const bBlocked = b.blockers.length > 0;
+      if (aBlocked && !bBlocked) return -1;
+      if (bBlocked && !aBlocked) return 1;
+
+      // 3. Due Soon
+      const aDue = a.due_date ? new Date(a.due_date) : null;
+      const bDue = b.due_date ? new Date(b.due_date) : null;
+      const aDueSoon = aDue && aDue <= threeDaysFromNow;
+      const bDueSoon = bDue && bDue <= threeDaysFromNow;
+      if (aDueSoon && !bDueSoon) return -1;
+      if (bDueSoon && !aDueSoon) return 1;
+
+      // 4. Assigned to me
+      const aMine = a.owner_user_id === session?.user.id;
+      const bMine = b.owner_user_id === session?.user.id;
+      if (aMine && !bMine) return -1;
+      if (bMine && !aMine) return 1;
+
+      return 0;
+    });
+  }, [filter, tasks, session?.user.id]);
+
+  const executionOverview = useMemo(() => {
+    if (!tasks.length) return null;
+    
+    const active = tasks.filter(t => t.status === "active").length;
+    const blocked = tasks.filter(t => t.blockers.length > 0 && t.status !== "complete").length;
+    
+    const now = new Date();
+    const threeDaysFromNow = new Date();
+    threeDaysFromNow.setDate(now.getDate() + 3);
+    const dueSoon = tasks.filter(t => {
+      if (!t.due_date || t.status === "complete") return false;
+      return new Date(t.due_date) <= threeDaysFromNow;
+    }).length;
+    
+    const myTasks = tasks.filter(t => t.owner_user_id === session?.user.id && t.status !== "complete").length;
+    
+    return [
+      { label: "Active Tasks", count: active, color: "text-cyan-300" },
+      { label: "Blocked Tasks", count: blocked, color: "text-amber-300" },
+      { label: "Due Soon", count: dueSoon, color: "text-rose-300" },
+      { label: "My Tasks", count: myTasks, color: "text-emerald-300" },
+    ];
+  }, [tasks, session?.user.id]);
+
+  const simplifiedMomentum = useMemo(() => {
+    if (!momentum) return null;
+    const blocked = momentum.blocked_count > 0;
+    const moving = momentum.flow_counts.active > 0 || momentum.flow_counts.review > 0;
+    const complete = momentum.flow_counts.complete > 0 && momentum.open_count === 0;
+
+    if (blocked) return { label: "Blocked", color: "text-amber-300", description: "Progress is currently impeded by identified blockers." };
+    if (moving) return { label: "Moving", color: "text-cyan-300", description: "Operational tasks are advancing through the flow." };
+    if (complete) return { label: "Complete", color: "text-emerald-300", description: "All recorded tasks in this view have reached completion." };
+    return { label: "Quiet", color: "text-[var(--omnix-text-3)]", description: "No active operational momentum detected in recorded tasks." };
+  }, [momentum]);
 
   async function createTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -261,14 +329,14 @@ export function WorkspaceTasksSurface() {
 
   return (
     <section className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
-      <header className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-3 sm:px-5 sm:py-4">
+      <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
             <ClipboardCheck className="h-3.5 w-3.5" /> Execution layer
           </p>
-          <h1 className="omnix-display text-xl font-semibold text-white">Workspace Tasks</h1>
+          <h1 className="omnix-display text-xl font-semibold text-white">Execution</h1>
           <p className="mt-1 hidden text-sm text-[var(--omnix-text-2)] md:block">
-            {activeWorkspace?.name} next steps, ownership, and recorded blockers.
+            {activeWorkspace?.name} operational focus.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-full border border-[var(--omnix-border)] bg-black/15 px-3 py-1.5 text-xs text-[var(--omnix-text-2)]">
@@ -279,14 +347,26 @@ export function WorkspaceTasksSurface() {
         </div>
       </header>
 
+      {/* Phase 2: Execution Overview */}
+      {executionOverview && (
+        <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {executionOverview.map((item) => (
+            <div key={item.label} className="rounded-xl border border-[var(--omnix-border)] bg-black/10 p-3 shadow-[var(--omnix-glow-xs)] transition hover:bg-white/[0.02]">
+              <p className={cn("text-xl font-bold sm:text-2xl", item.color)}>{item.count}</p>
+              <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--omnix-text-3)]">{item.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {error ? (
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-rose-400/20 bg-rose-400/8 px-3 py-2 text-xs text-rose-100">
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-rose-400/20 bg-rose-400/8 px-3 py-2 text-xs text-rose-100">
           <span>{error}</span>
           <button type="button" onClick={() => setError(null)} aria-label="Dismiss error"><X className="h-3.5 w-3.5" /></button>
         </div>
       ) : null}
 
-      <div className="omnix-scrollbar mb-3 flex shrink-0 gap-2 overflow-x-auto pb-1 xl:grid xl:grid-cols-5 xl:overflow-visible xl:pb-0">
+      <div className="omnix-scrollbar mb-4 flex shrink-0 gap-2 overflow-x-auto pb-1 xl:grid xl:grid-cols-5 xl:overflow-visible xl:pb-0">
         {flow.map((phase) => (
           <button
             key={phase.value}
@@ -305,15 +385,16 @@ export function WorkspaceTasksSurface() {
 
       <div className="grid shrink-0 gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <main className="omnix-panel flex min-w-0 flex-col rounded-xl p-3 sm:p-4 xl:min-h-[28rem]">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--omnix-border)] pb-3">
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setFilter("open")} className={cn("rounded-full border px-3 py-1.5 text-xs transition", filter === "open" ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100" : "border-[var(--omnix-border)] text-[var(--omnix-text-2)]")}>Open flow</button>
-              <p className="text-xs text-[var(--omnix-text-3)]">{displayedTasks.length} shown</p>
+              <button type="button" onClick={() => setFilter("open")} className={cn("rounded-full border px-3 py-1.5 text-xs font-medium transition", filter === "open" ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100" : "border-[var(--omnix-border)] text-[var(--omnix-text-2)]")}>Current Flow</button>
+              <p className="text-xs text-[var(--omnix-text-3)]">{displayedTasks.length} items</p>
             </div>
             <Button size="sm" onClick={() => setCreateOpen((open) => !open)} leftIcon={<Plus className="h-3.5 w-3.5" />}>
-              Open task
+              Record Task
             </Button>
           </div>
+          
           {createOpen ? (
             <form onSubmit={createTask} className="mb-4 grid gap-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.035] p-3 sm:grid-cols-2">
               <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Operational next step" className="h-10 text-sm sm:col-span-2" autoFocus />
@@ -337,6 +418,7 @@ export function WorkspaceTasksSurface() {
               </div>
             </form>
           ) : null}
+
           <div className="space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
             {loading ? <Loader2 className="mx-auto mt-10 h-5 w-5 animate-spin text-cyan-100/50" /> : null}
             {!loading && displayedTasks.length === 0 ? (
@@ -346,120 +428,161 @@ export function WorkspaceTasksSurface() {
                 <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">Capture only the next steps that require shared visibility.</p>
               </div>
             ) : null}
-            {displayedTasks.map((task) => (
-              <article key={task.id} className="rounded-xl border border-[var(--omnix-border)] bg-black/[0.12] p-3.5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-white">{task.title}</p>
-                    {task.description ? <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--omnix-text-2)]">{task.description}</p> : null}
+            {displayedTasks.map((task) => {
+              const isMyTask = task.owner_user_id === session?.user.id;
+              const isBlocked = task.blockers.length > 0;
+              const isActive = task.status === "active";
+              
+              const now = new Date();
+              const threeDaysFromNow = new Date();
+              threeDaysFromNow.setDate(now.getDate() + 3);
+              const isDueSoon = task.due_date && new Date(task.due_date) <= threeDaysFromNow;
+
+              return (
+                <article key={task.id} className={cn(
+                  "group relative rounded-xl border p-3.5 transition",
+                  isBlocked ? "border-amber-400/30 bg-amber-400/[0.03]" : "border-[var(--omnix-border)] bg-black/[0.12] hover:bg-white/[0.03]"
+                )}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        {isBlocked && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-300" />}
+                        {isActive && <div className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />}
+                        <p className="truncate text-sm font-medium text-white">{task.title}</p>
+                      </div>
+                      {task.description ? <p className="mt-1 line-clamp-1 text-xs text-[var(--omnix-text-2)] group-hover:line-clamp-none transition-all">{task.description}</p> : null}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={task.status}
+                        disabled={updatingId === task.id}
+                        onChange={(event) => void patchTask(task, { status: event.target.value as WorkspaceTaskStatus })}
+                        className={cn(
+                          "omnix-input h-7 rounded-lg px-2 text-[11px] font-semibold transition",
+                          task.status === "active" ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-100" : "bg-black/20"
+                        )}
+                        aria-label={`Status for ${task.title}`}
+                      >
+                        {flow.map((phase) => <option key={phase.value} value={phase.value}>{phase.label}</option>)}
+                      </select>
+                    </div>
                   </div>
-                  <select
-                    value={task.status}
-                    disabled={updatingId === task.id}
-                    onChange={(event) => void patchTask(task, { status: event.target.value as WorkspaceTaskStatus })}
-                    className="omnix-input h-10 rounded-lg px-2 text-xs md:h-8"
-                    aria-label={`Status for ${task.title}`}
-                  >
-                    {flow.map((phase) => <option key={phase.value} value={phase.value}>{phase.label}</option>)}
-                  </select>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <label className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--omnix-border)] px-3 py-2 text-[11px] text-[var(--omnix-text-2)] md:min-h-0 md:px-2 md:py-1">
-                    <UserRound className="h-3.5 w-3.5" />
-                    <select
-                      value={task.owner_user_id || ""}
-                      disabled={updatingId === task.id}
-                      onChange={(event) => void patchTask(task, { owner_user_id: event.target.value || null })}
-                      className="bg-transparent text-[11px] outline-none"
-                      aria-label={`Owner for ${task.title}`}
-                    >
-                      <option value="">Unassigned</option>
-                      {members.map((member) => <option key={member.user_id} value={member.user_id}>{member.full_name || member.email || member.handle || member.user_id}</option>)}
-                    </select>
-                  </label>
-                  <label className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--omnix-border)] px-3 py-2 text-[11px] text-[var(--omnix-text-2)] md:min-h-0 md:px-2 md:py-1">
-                    <CalendarDays className="h-3.5 w-3.5" />
+
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    {/* Simplified Metadata */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5 text-[11px] text-[var(--omnix-text-2)]">
+                        <UserRound className={cn("h-3 w-3", isMyTask ? "text-emerald-300" : "text-[var(--omnix-text-3)]")} />
+                        <select
+                          value={task.owner_user_id || ""}
+                          disabled={updatingId === task.id}
+                          onChange={(event) => void patchTask(task, { owner_user_id: event.target.value || null })}
+                          className="bg-transparent outline-none"
+                        >
+                          <option value="">Unassigned</option>
+                          {members.map((member) => <option key={member.user_id} value={member.user_id}>{member.full_name || member.email || "Teammate"}</option>)}
+                        </select>
+                      </div>
+
+                      <div className={cn("flex items-center gap-1.5 text-[11px]", isDueSoon ? "text-rose-300 font-medium" : "text-[var(--omnix-text-2)]")}>
+                        <CalendarDays className="h-3 w-3" />
+                        <input
+                          type="date"
+                          value={task.due_date || ""}
+                          disabled={updatingId === task.id}
+                          onChange={(event) => void patchTask(task, { due_date: event.target.value || null })}
+                          className="bg-transparent outline-none"
+                        />
+                        {!task.due_date && <span className="text-[var(--omnix-text-3)]">No date</span>}
+                      </div>
+                    </div>
+
+                    {/* Secondary metadata hidden until hover/focus */}
+                    <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1.5 text-[11px] text-[var(--omnix-text-3)]">
+                        <Compass className="h-3 w-3" />
+                        <select
+                          value={task.initiative_id || ""}
+                          disabled={updatingId === task.id}
+                          onChange={(event) => void patchTask(task, { initiative_id: event.target.value || null })}
+                          className="bg-transparent outline-none max-w-[120px] truncate"
+                        >
+                          <option value="">No initiative</option>
+                          {initiatives.map((initiative) => <option key={initiative.id} value={initiative.id}>{initiative.title}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Blockers Area */}
+                  {task.blockers.length > 0 && (
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                      {task.blockers.map((blocker) => (
+                        <button
+                          type="button"
+                          key={blocker}
+                          onClick={() => void patchTask(task, { blockers: task.blockers.filter((entry) => entry !== blocker) })}
+                          className="inline-flex items-center gap-1 rounded-md border border-amber-300/20 bg-amber-300/[0.08] px-2 py-1 text-[10px] font-medium text-amber-100"
+                        >
+                          {blocker} <X className="h-2.5 w-2.5 opacity-60" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Inline Blocker Adder (Simplified) */}
+                  <div className="mt-2.5 border-t border-white/[0.04] pt-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <input
-                      type="date"
-                      value={task.due_date || ""}
-                      disabled={updatingId === task.id}
-                      onChange={(event) => void patchTask(task, { due_date: event.target.value || null })}
-                      className="bg-transparent outline-none"
-                      aria-label={`Due date for ${task.title}`}
+                      value={blockerDrafts[task.id] || ""}
+                      onChange={(event) => setBlockerDrafts((current) => ({ ...current, [task.id]: event.target.value }))}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          addBlocker(task);
+                        }
+                      }}
+                      placeholder="Add blocker..."
+                      className="h-6 w-full bg-transparent px-1 text-[10px] text-[var(--omnix-text-3)] outline-none placeholder:text-white/10 focus:placeholder:text-white/20"
                     />
-                    {!task.due_date ? <span>{dueLabel(null)}</span> : null}
-                  </label>
-                  {task.linked_context.map((link) => (
-                    <span key={`${link.context_type}-${link.context_id}`} className="inline-flex items-center gap-1 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.045] px-2 py-1 text-[11px] text-cyan-100/80">
-                      <Link2 className="h-3 w-3" /> {link.label || link.context_type}
-                    </span>
-                  ))}
-                  <label className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.045] px-3 py-2 text-[11px] text-cyan-100/80 md:min-h-0 md:px-2 md:py-1">
-                    <Compass className="h-3 w-3" />
-                    <select
-                      value={task.initiative_id || ""}
-                      disabled={updatingId === task.id}
-                      onChange={(event) => void patchTask(task, { initiative_id: event.target.value || null })}
-                      className="bg-transparent text-[11px] outline-none"
-                      aria-label={`Initiative for ${task.title}`}
-                    >
-                      <option value="">No initiative</option>
-                      {initiatives.map((initiative) => <option key={initiative.id} value={initiative.id}>{initiative.title}</option>)}
-                    </select>
-                  </label>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                  {task.blockers.map((blocker) => (
-                    <button
-                      type="button"
-                      key={blocker}
-                      onClick={() => void patchTask(task, { blockers: task.blockers.filter((entry) => entry !== blocker) })}
-                      className="inline-flex items-center gap-1 rounded-md border border-amber-300/20 bg-amber-300/[0.06] px-2 py-1 text-[11px] text-amber-100"
-                      title="Remove recorded blocker"
-                    >
-                      <AlertTriangle className="h-3 w-3" /> {blocker} <X className="h-3 w-3 opacity-60" />
-                    </button>
-                  ))}
-                  <input
-                    value={blockerDrafts[task.id] || ""}
-                    onChange={(event) => setBlockerDrafts((current) => ({ ...current, [task.id]: event.target.value }))}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        addBlocker(task);
-                      }
-                    }}
-                    placeholder={task.blockers.length ? "Add blocker" : "Record blocker"}
-                    className="h-10 min-w-[9rem] rounded-md border border-dashed border-[var(--omnix-border)] bg-transparent px-2 text-[11px] text-[var(--omnix-text-2)] outline-none focus:border-cyan-300/30 md:h-7"
-                  />
-                </div>
-              </article>
-            ))}
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </main>
 
         <aside className="space-y-3">
+          {/* Phase 6: Momentum Refinement */}
           <section className="omnix-panel rounded-xl p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Momentum</p>
-            <p className="mt-2 text-sm leading-6 text-[var(--omnix-text)]">{momentum?.summary || "Reading recorded execution state."}</p>
+            {simplifiedMomentum && (
+              <div className="mt-3">
+                <div className="flex items-center gap-2">
+                  <div className={cn("h-2 w-2 rounded-full shadow-[0_0_8px_currentColor]", simplifiedMomentum.color)} />
+                  <p className={cn("text-lg font-bold", simplifiedMomentum.color)}>{simplifiedMomentum.label}</p>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-2)]">{simplifiedMomentum.description}</p>
+              </div>
+            )}
+            
             <div className="mt-4 grid grid-cols-2 gap-2 text-center">
               {[
-                ["Open", momentum?.open_count ?? 0],
+                ["Active", momentum?.flow_counts.active ?? 0],
                 ["Blocked", momentum?.blocked_count ?? 0],
                 ["Due soon", momentum?.due_soon_count ?? 0],
-                ["Unassigned", momentum?.unassigned_count ?? 0],
+                ["My tasks", tasks.filter(t => t.owner_user_id === session?.user.id && t.status !== "complete").length],
               ].map(([label, count]) => (
-                <div key={String(label)} className="rounded-lg border border-[var(--omnix-border)] bg-black/10 px-2 py-2">
-                  <p className="text-lg text-white">{count}</p>
-                  <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">{label}</p>
+                <div key={String(label)} className="rounded-lg border border-[var(--omnix-border)] bg-black/10 px-2 py-2 transition hover:bg-white/[0.02]">
+                  <p className="text-lg font-bold text-white">{count}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-[var(--omnix-text-3)]">{label}</p>
                 </div>
               ))}
             </div>
-            <p className="mt-3 text-[10px] leading-5 text-[var(--omnix-text-3)]">Calculated only from recorded status, assignment, blocker, and due-date fields.</p>
           </section>
+
           <section className="omnix-panel rounded-xl p-4">
             <p className="mb-3 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-purple-100/70">
-              <Sparkles className="h-3.5 w-3.5" /> Ambient execution assist
+              <Sparkles className="h-3.5 w-3.5" /> Execution Assist
             </p>
             <div className="grid gap-1.5">
               {Object.entries(assistLabels).map(([mode, label]) => (
@@ -478,7 +601,7 @@ export function WorkspaceTasksSurface() {
             {assistance ? (
               <div className="mt-3 rounded-lg border border-purple-300/15 bg-purple-300/[0.045] p-3">
                 <p className="whitespace-pre-wrap text-xs leading-5 text-[var(--omnix-text)]">{assistance.content}</p>
-                <p className="mt-2 text-[10px] text-[var(--omnix-text-3)]">Advisory only. Read from {assistance.source_task_count} task records; no state changed.</p>
+                <p className="mt-2 text-[10px] text-[var(--omnix-text-3)]">Advisory only. Read from {assistance.source_task_count} task records.</p>
               </div>
             ) : null}
           </section>
