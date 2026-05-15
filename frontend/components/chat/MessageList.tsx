@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, ArrowDown } from "lucide-react";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import type { Message } from "@/components/chat/types";
 import type { WorkspacePresenceMember } from "@/lib/workspace-types";
+import { cn } from "@/lib/utils";
 
 type MessageListProps = {
   messages: Message[];
@@ -44,15 +45,74 @@ export function MessageList({
   onRegenerate,
   typingMembers = [],
 }: MessageListProps) {
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [newMessagesCount, setNewMessagesCount] = useState(0);
+  const wasAtBottomRef = useRef(true);
+  const prevMessagesCountRef = useRef(messages.length);
 
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  const scrollToBottom = useCallback((smooth = true) => {
+    if (!endRef.current) return;
+    
+    // Use requestAnimationFrame to ensure the DOM has updated
+    window.requestAnimationFrame(() => {
+      endRef.current?.scrollIntoView({ 
+        behavior: smooth ? "smooth" : "instant", 
+        block: "end" 
+      });
+      
+      // Force sync bottom state
+      setIsAtBottom(true);
+      wasAtBottomRef.current = true;
+      setNewMessagesCount(0);
     });
+  }, []);
 
-    return () => window.cancelAnimationFrame(frame);
-  }, [messages, loading]);
+  const handleScroll = useCallback(() => {
+    if (!scrollContainerRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+    // Using a threshold of 100px to detect if user is near bottom
+    const atBottom = scrollHeight - scrollTop - clientHeight < 100;
+    
+    setIsAtBottom(atBottom);
+    wasAtBottomRef.current = atBottom;
+    
+    if (atBottom) {
+      setNewMessagesCount(0);
+    }
+  }, []);
+
+  const isMessagesEmpty = messages.length === 0;
+  // Initial scroll to bottom when conversation loads
+  useEffect(() => {
+    if (!loadingConversation && !isMessagesEmpty) {
+      scrollToBottom(false);
+    }
+  }, [loadingConversation, isMessagesEmpty, scrollToBottom]);
+
+  // Handle new messages and streaming auto-follow
+  useEffect(() => {
+    if (messages.length > prevMessagesCountRef.current) {
+      const lastMessage = messages[messages.length - 1];
+      const isUserMessage = lastMessage?.isOwn;
+      
+      // Auto-follow if we were already at bottom or if it's a new message from current user
+      if (wasAtBottomRef.current || isUserMessage) {
+        scrollToBottom(true);
+      } else {
+        // We are scrolled up, increment counter for new incoming messages
+        setNewMessagesCount(prev => prev + (messages.length - prevMessagesCountRef.current));
+      }
+    } else if (loading && wasAtBottomRef.current) {
+      // Keep following if streaming and we are at the bottom
+      scrollToBottom(true);
+    }
+    
+    prevMessagesCountRef.current = messages.length;
+  }, [messages, loading, scrollToBottom]);
 
   if (loadingConversation) {
     return <ConversationSkeleton />;
@@ -83,49 +143,94 @@ export function MessageList({
   }
 
   return (
-    <div className="omnix-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-4 pb-5 sm:gap-7 sm:px-7 sm:py-6 sm:pb-7 lg:px-9">
-      <AnimatePresence initial={false}>
-        {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} onRetry={onRetry} onRegenerate={onRegenerate} />
-        ))}
-        {typingMembers.length ? (
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div 
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="omnix-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-4 pb-5 sm:gap-7 sm:px-7 sm:py-6 sm:pb-7 lg:px-9"
+      >
+        <AnimatePresence initial={false}>
+          {messages.map((message) => (
+            <MessageBubble key={message.id} message={message} onRetry={onRetry} onRegenerate={onRegenerate} />
+          ))}
+          {typingMembers.length ? (
+            <motion.div
+              key="collaborator-typing"
+              layout
+              className="flex w-full items-start gap-3"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+            >
+              <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/10 text-xs font-bold text-emerald-100 shadow-[0_0_18px_rgba(0,232,122,0.16)]">
+                {typingMembers[0]?.avatar_label || "U"}
+              </div>
+              <TypingIndicator
+                label={
+                  typingMembers.length === 1
+                    ? `${typingMembers[0]?.full_name || typingMembers[0]?.email || "A teammate"} is typing`
+                    : `${typingMembers.length} teammates are typing`
+                }
+              />
+            </motion.div>
+          ) : null}
+          {loading ? (
+            <motion.div
+              key="typing"
+              layout
+              className="flex w-full items-start gap-3"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+            >
+              <div className="mt-1 h-9 w-9 shrink-0 rounded-lg border border-cyan-300/30 bg-cyan-300/10 shadow-[var(--omnix-glow-xs)]" />
+              <TypingIndicator />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+        <div ref={endRef} className="h-px w-full shrink-0" />
+      </div>
+
+      <AnimatePresence>
+        {!isAtBottom && messages.length > 3 && (
           <motion.div
-            key="collaborator-typing"
-            layout
-            className="flex w-full items-start gap-3"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
+            initial={{ opacity: 0, y: 12, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="absolute bottom-6 left-1/2 z-20 -translate-x-1/2"
           >
-            <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/10 text-xs font-bold text-emerald-100 shadow-[0_0_18px_rgba(0,232,122,0.16)]">
-              {typingMembers[0]?.avatar_label || "U"}
-            </div>
-            <TypingIndicator
-              label={
-                typingMembers.length === 1
-                  ? `${typingMembers[0]?.full_name || typingMembers[0]?.email || "A teammate"} is typing`
-                  : `${typingMembers.length} teammates are typing`
-              }
-            />
+            <button
+              onClick={() => scrollToBottom(true)}
+              className={cn(
+                "group flex flex-col items-center gap-1.5 rounded-2xl border px-4 py-2.5",
+                "bg-[var(--omnix-surface)]/80 backdrop-blur-md shadow-[var(--omnix-glow-md)]",
+                "transition-all hover:bg-[var(--omnix-surface)] hover:border-cyan-300/40",
+                newMessagesCount > 0 
+                  ? "border-cyan-300/50 ring-1 ring-cyan-300/20" 
+                  : "border-[var(--omnix-border)]"
+              )}
+            >
+              {newMessagesCount > 0 && (
+                <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[var(--omnix-cyan)]">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-500" />
+                  </span>
+                  {newMessagesCount} {newMessagesCount === 1 ? 'new message' : 'new messages'}
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-xs font-semibold text-white">
+                <ArrowDown className="h-3.5 w-3.5 transition-transform group-hover:translate-y-0.5" />
+                Jump to Latest
+              </div>
+            </button>
           </motion.div>
-        ) : null}
-        {loading ? (
-          <motion.div
-            key="typing"
-            layout
-            className="flex w-full items-start gap-3"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
-          >
-            <div className="mt-1 h-9 w-9 shrink-0 rounded-lg border border-cyan-300/30 bg-cyan-300/10 shadow-[var(--omnix-glow-xs)]" />
-            <TypingIndicator />
-          </motion.div>
-        ) : null}
+        )}
       </AnimatePresence>
-      <div ref={endRef} />
     </div>
   );
 }
+
