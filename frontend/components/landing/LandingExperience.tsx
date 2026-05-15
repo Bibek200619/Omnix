@@ -289,7 +289,7 @@ function Navbar() {
         {[
           { label:"Features", href:"#features" },
           { label:"How it works", href:"#how-it-works" },
-          { label:"Pricing", href:"#pricing" },
+          { label:"Access", href:"#pricing" },
           { label:"Docs", href:"#inside-app" },
           { label:"About", href:"#security" },
         ].map(item=>(
@@ -329,9 +329,9 @@ function FloatTag({ text, icon, style }:{ text:string; icon:string; style:CSSPro
 
 function HeroChat() {
   const msgs = [
-    { role:"user",  text:"Which onboarding steps are blocking enterprise rollout?" },
-    { role:"ai",    text:"Three blockers found: SSO config, data residency compliance, and custom role setup.", sources:["runbooks.pdf","enterprise-sla.pdf"] },
-    { role:"user",  text:"Summarise the compliance requirements." },
+    { role:"user",  text:"Which onboarding steps are blocking launch readiness?" },
+    { role:"ai",    text:"Three blockers found: invite setup, source coverage, and unresolved checklist owners.", sources:["launch-checklist.md","workspace-notes.md"] },
+    { role:"user",  text:"Summarise the remaining owner handoffs." },
     { role:"ai",    text:null, loading:true },
   ];
   return (
@@ -339,9 +339,9 @@ function HeroChat() {
       transition={{duration:0.9,delay:0.5,ease:easeOutExpo}}
       className="relative mx-auto mt-10 w-full sm:mt-14" style={{maxWidth:900}}>
 
-      <FloatTag text="Runbooks retrieved" icon="↗" style={{top:"12%",left:"-10%"}}/>
-      <FloatTag text="SOC 2 verified" icon="✓" style={{top:"38%",right:"-10%"}}/>
-      <FloatTag text="1.4s response" icon="→" style={{bottom:"28%",left:"-9%"}}/>
+      <FloatTag text="Sources retrieved" icon="↗" style={{top:"12%",left:"-10%"}}/>
+      <FloatTag text="Workspace scoped" icon="✓" style={{top:"38%",right:"-10%"}}/>
+      <FloatTag text="Streaming reply" icon="→" style={{bottom:"28%",left:"-9%"}}/>
       <FloatTag text="Grounded answer" icon="◆" style={{bottom:"12%",right:"-9%"}}/>
 
       <div className="absolute inset-0 rounded-2xl" style={{boxShadow:`0 0 80px rgba(0,255,255,0.1),0 50px 130px rgba(0,0,0,0.8)`,borderRadius:20}}/>
@@ -352,9 +352,9 @@ function HeroChat() {
           <div className="flex gap-1.5">
             {["#ff5f57","#febc2e","#28c840"].map(c=><div key={c} className="w-3 h-3 rounded-full" style={{background:c}}/>)}
           </div>
-          <div className="flex-1 text-center text-xs" style={{color:"rgba(255,255,255,0.25)"}}>OMNIX — Enterprise Workspace</div>
+          <div className="flex-1 text-center text-xs" style={{color:"rgba(255,255,255,0.25)"}}>OMNIX - Demo Workspace</div>
           <div className="hidden items-center gap-1.5 rounded-md px-2.5 py-1 text-xs sm:flex" style={{background:"rgba(34,197,94,0.12)",color:"#4ade80"}}>
-            <span className="w-1.5 h-1.5 rounded-full" style={{background:"#22c55e"}}/>Synced
+            <span className="w-1.5 h-1.5 rounded-full" style={{background:"#22c55e"}}/>Demo
           </div>
         </div>
         <div className="flex" style={{height:400}}>
@@ -366,7 +366,7 @@ function HeroChat() {
                   style={{background:C.cyan,color:C.navyDark}}>D</div>
                 <div>
                   <div className="text-xs font-bold" style={{color:C.white}}>demo</div>
-                  <div className="text-xs" style={{color:C.faint}}>Founder · 2 members</div>
+                  <div className="text-xs" style={{color:C.faint}}>Example workspace</div>
                 </div>
               </div>
               {[
@@ -382,7 +382,7 @@ function HeroChat() {
                 </div>
               ))}
               <div className="text-xs font-black mt-5 mb-2 px-1" style={{color:C.faint,letterSpacing:"0.1em"}}>RECENT CHATS</div>
-              {["Enterprise rollout","SLA compliance","API rate limits"].map((c,i)=>(
+              {["Launch checklist","Support handoff","API notes"].map((c,i)=>(
                 <div key={c} className="px-3 py-1.5 rounded-lg mb-0.5 text-xs"
                   style={{color:i===0?C.white:C.faint,background:i===0?"rgba(255,255,255,0.04)":"transparent"}}>{c}</div>
               ))}
@@ -390,9 +390,9 @@ function HeroChat() {
           </div>
           <div className="flex-1 flex flex-col">
             <div className="flex items-center justify-between gap-2 px-3 py-3 sm:px-5" style={{borderBottom:`1px solid rgba(255,255,255,0.04)`}}>
-              <div className="truncate text-sm font-bold" style={{color:C.white}}>Enterprise rollout blockers</div>
+              <div className="truncate text-sm font-bold" style={{color:C.white}}>Launch readiness blockers</div>
               <div className="hidden gap-1.5 sm:flex">
-                {["Auto","Workspace","Web","Hybrid"].map((m,i)=>(
+                {["Auto","Workspace","Web","Synthesis"].map((m,i)=>(
                   <span key={m} className="px-2.5 py-1 rounded-lg text-xs font-semibold"
                     style={{background:i===0?"rgba(0,255,255,0.14)":C.card,color:i===0?C.cyan:C.faint,border:i===0?`1px solid rgba(0,255,255,0.25)`:`1px solid ${C.border}`}}>
                     {m}
@@ -414,7 +414,7 @@ function HeroChat() {
                         <div className="flex items-center gap-2" style={{color:C.cyan}}>
                           <motion.div animate={{rotate:360}} transition={{duration:1,repeat:Infinity,ease:"linear"}}
                             className="w-3 h-3 rounded-full border border-current border-t-transparent"/>
-                          <span className="text-xs">Retrieving from 4 documents…</span>
+                          <span className="text-xs">Retrieving workspace sources…</span>
                         </div>
                       ):(
                         <div>
@@ -495,16 +495,16 @@ function Hero() {
           className="mt-6 text-base leading-relaxed sm:mt-7 sm:text-lg" style={{color:C.muted,maxWidth:540}}>
           OMNIX gives operators, support teams, and builders a secure place to ask questions
           against private knowledge — with searchable history, workspaces built for real operations,
-          and enterprise-grade security.
+          and session-gated access.
         </motion.p>
         <motion.div initial={{opacity:0,y:22}} animate={{opacity:1,y:0}} transition={{duration:0.5,delay:0.5}}
           className="mt-8 flex w-full max-w-sm flex-col items-center gap-3 sm:mt-10 sm:w-auto sm:max-w-none sm:flex-row sm:gap-4">
           <CyanBtn large href="/register">Start working free <Icon d={ICONS.arrow} size={18} stroke={C.navyDark} sw={2.5}/></CyanBtn>
-          <GhostBtn large><Icon d={ICONS.play} size={18} stroke={C.muted} sw={1.8}/>Watch demo</GhostBtn>
+          <GhostBtn large href="#inside-app"><Icon d={ICONS.play} size={18} stroke={C.muted} sw={1.8}/>View product tour</GhostBtn>
         </motion.div>
         <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.75}}
           className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-          {["No credit card","Free for small teams","GDPR & SOC 2"].map(t=>(
+          {["No credit card","Workspace-scoped","Session-gated"].map(t=>(
             <span key={t} className="text-xs flex items-center gap-1.5" style={{color:"rgba(255,255,255,0.28)"}}>
               <Icon d={ICONS.check} size={11} stroke="rgba(0,255,255,0.5)" sw={2.5}/>{t}
             </span>
@@ -518,7 +518,7 @@ function Hero() {
 
 // ─── MARQUEE ──────────────────────────────────────────────────────────────────
 function Marquee() {
-  const items = ["Meridian Labs","Vertex Systems","Foundry Digital","Apex Ops","Clearline AI","Orbit Health","DataCore","Nimbus Tech","Stratum HQ","Prism Works","Relay Cloud","Cascade IO"];
+  const items = ["Workspace hierarchy","Document uploads","Searchable history","Source-grounded answers","Role-aware access","Streaming responses","Stream recovery","Workspace switching","Activity feed","Invite flow","Operational telemetry","Retrieval modes"];
   const doubled = [...items,...items];
   return (
     <div className="py-10 overflow-hidden relative"
@@ -527,7 +527,7 @@ function Marquee() {
         <DriftingOrb x="50%" y="50%" size={500} color="rgba(0,255,255,0.04)" dur={18}/>
       </SectionBg>
       <p className="text-center text-xs font-black tracking-widest mb-6 relative z-10"
-        style={{color:C.faint,letterSpacing:"0.12em"}}>TRUSTED BY TEAMS AT</p>
+        style={{color:C.faint,letterSpacing:"0.12em"}}>CURRENT PRODUCT SURFACES</p>
       <div className="relative z-10">
         <div className="absolute left-0 top-0 bottom-0 w-32 z-10 pointer-events-none"
           style={{background:`linear-gradient(90deg,#061020,transparent)`}}/>
@@ -553,12 +553,12 @@ function Marquee() {
 // ─── STATS ────────────────────────────────────────────────────────────────────
 function Stats() {
   const stats=[
-    {value:"10,000+",label:"Active teams",        icon:ICONS.team   },
-    {value:"98.7%",  label:"Answer accuracy",     icon:ICONS.shield  },
-    {value:"< 1.8s", label:"Avg response time",   icon:ICONS.bolt    },
-    {value:"99.99%", label:"Platform uptime",     icon:ICONS.lock    },
-    {value:"50M+",   label:"Queries answered",    icon:ICONS.chat    },
-    {value:"SOC 2",  label:"Type II certified",   icon:ICONS.check   },
+    {value:"4",        label:"Retrieval modes",        icon:ICONS.search  },
+    {value:"Workspace",label:"Scoped knowledge",        icon:ICONS.workspace},
+    {value:"Files",    label:"Uploaded source context", icon:ICONS.files   },
+    {value:"History",  label:"Searchable conversations",icon:ICONS.clock   },
+    {value:"Roles",    label:"Workspace access",        icon:ICONS.team    },
+    {value:"Live data",label:"Analytics source",         icon:ICONS.chart   },
   ];
   return (
     <Sec className="px-4 py-14 sm:px-6 sm:py-20">
@@ -586,15 +586,15 @@ function Stats() {
 
 // ─── FEATURES ─────────────────────────────────────────────────────────────────
 const FEATS=[
-  {icon:ICONS.chat,      title:"Precision AI Chat",         accent:C.cyan,    desc:"Ask complex questions across all your team's documents. OMNIX retrieves the right context and gives grounded, citation-backed answers every time."},
-  {icon:ICONS.files,     title:"Shared Knowledge Files",    accent:"#818cf8", desc:"Upload PDFs, DOCX, Markdown, and text files. Every workspace member has instant access to the same documents, indexed in seconds."},
-  {icon:ICONS.workspace, title:"Collaborative Workspaces",  accent:"#34d399", desc:"Invite teammates with role-based access. Founders, editors, and members each get the right level of control and visibility."},
-  {icon:ICONS.clock,     title:"Searchable Chat History",   accent:"#fb923c", desc:"Every conversation is stored, indexed, and searchable. Find any past answer in seconds across your entire team's history."},
-  {icon:ICONS.lock,      title:"Enterprise Security",       accent:"#f472b6", desc:"Identity-first architecture. Every screen is gated behind an active session. Encrypted at rest and in transit."},
-  {icon:ICONS.bolt,      title:"Real-Time Sync",            accent:C.cyan,    desc:"Conversations sync instantly across every device. Start on desktop, pick up on mobile — your workspace travels with you."},
-  {icon:ICONS.globe,     title:"Multi-Mode Retrieval",      accent:"#818cf8", desc:"Switch between Auto, Workspace, Web, and Hybrid retrieval modes on the fly to get exactly the context you need."},
-  {icon:ICONS.chart,     title:"Workspace Analytics",       accent:"#34d399", desc:"Track team query patterns, response quality, and knowledge gaps. Make smarter decisions about what to document next."},
-  {icon:ICONS.link,      title:"API & Integrations",        accent:"#fb923c", desc:"Connect OMNIX to your existing tools. REST API, webhooks, and native integrations with Slack, Notion, and more."},
+  {icon:ICONS.chat,      title:"Precision AI Chat",         accent:C.cyan,    desc:"Ask complex questions across uploaded workspace knowledge. OMNIX retrieves relevant context and shows source grounding when sources are available."},
+  {icon:ICONS.files,     title:"Shared Knowledge Files",    accent:"#818cf8", desc:"Upload PDFs, DOCX, Markdown, and text files. Workspace sources are indexed for retrieval after ingestion completes."},
+  {icon:ICONS.workspace, title:"Collaborative Workspaces",  accent:"#34d399", desc:"Invite teammates into role-aware workspaces while preserving hierarchy, workspace switching, and onboarding gates."},
+  {icon:ICONS.clock,     title:"Searchable Chat History",   accent:"#fb923c", desc:"Conversations persist to workspace history so teams can return to previous threads and recover context."},
+  {icon:ICONS.lock,      title:"Session-Gated Access",      accent:"#f472b6", desc:"The app keeps private workspace surfaces behind authenticated sessions and backend workspace checks."},
+  {icon:ICONS.bolt,      title:"Streaming Recovery",        accent:C.cyan,    desc:"Long AI replies use streaming paths with recovery handling so interrupted responses can still resolve cleanly."},
+  {icon:ICONS.globe,     title:"Aligned Retrieval Modes",   accent:"#818cf8", desc:"Use the same modes exposed in chat: Auto, Workspace, Web, and Synthesis."},
+  {icon:ICONS.chart,     title:"Workspace Reporting",       accent:"#34d399", desc:"Analytics show counts and status loaded from real app data, including workspaces, members, files, conversations, and invites."},
+  {icon:ICONS.link,      title:"Source Operations",         accent:"#fb923c", desc:"Manage uploaded sources and workspace context through the product surfaces already present in this build."},
 ];
 
 function Features() {
@@ -671,18 +671,18 @@ function AppScreenshots() {
       <div className="flex-1 flex flex-col p-5 gap-3">
         <div className="rounded-2xl px-4 py-3 text-sm self-end max-w-xs"
           style={{background:"rgba(0,255,255,0.1)",border:`1px solid rgba(0,255,255,0.2)`,color:C.white}}>
-          What are our enterprise SLA commitments?
+          What changed in the onboarding notes?
         </div>
         <div className="rounded-2xl px-4 py-3.5 text-sm max-w-sm"
           style={{background:C.card,border:`1px solid ${C.border}`,color:"rgba(255,255,255,0.82)"}}>
           <div className="text-xs mb-2 flex items-center gap-1.5" style={{color:C.cyan}}>
             <OmnixMark size={12}/><b>OMNIX AI</b>
           </div>
-          Based on enterprise-sla.pdf: 99.9% uptime, P1 response within 4 hours, automatic SLA credits for outages.
+          Based on onboarding-notes.md: invite copy changed, source setup moved earlier, and the owner checklist still needs review.
           <div className="flex gap-1.5 mt-2">
             <span className="text-xs px-2 py-0.5 rounded flex items-center gap-1"
               style={{background:"rgba(0,255,255,0.07)",color:C.cyan,border:`1px solid rgba(0,255,255,0.14)`}}>
-              <Icon d={ICONS.doc} size={9} stroke={C.cyan} sw={2}/>enterprise-sla.pdf
+              <Icon d={ICONS.doc} size={9} stroke={C.cyan} sw={2}/>onboarding-notes.md
             </span>
           </div>
         </div>
@@ -743,7 +743,7 @@ function AppScreenshots() {
         <Icon d={ICONS.search} size={16} stroke={C.faint} sw={1.8}/>
         <span className="text-sm" style={{color:"rgba(255,255,255,0.2)"}}>Search chat history…</span>
       </div>
-      {["Enterprise rollout blockers","SLA compliance requirements","API rate limit policies","Onboarding step checklist","Data residency rules"].map((chat,i)=>(
+      {["Launch checklist blockers","Support handoff notes","API usage notes","Onboarding step checklist","Source visibility rules"].map((chat,i)=>(
         <div key={chat} className="p-4 rounded-2xl cursor-pointer transition-all"
           style={{background:C.card,border:`1px solid ${C.border}`}}
           onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor=C.borderC;}}
@@ -862,9 +862,9 @@ function AppScreenshots() {
 // ─── HOW IT WORKS ─────────────────────────────────────────────────────────────
 function HowItWorks() {
   const steps=[
-    {num:"01",title:"Create your workspace",    desc:"Sign up free, name your workspace, and invite your team. No credit card required. Up in 60 seconds.",  icon:ICONS.workspace},
-    {num:"02",title:"Upload your knowledge",    desc:"Drop in PDFs, Markdown, DOCX, and text files. OMNIX indexes every document and makes it instantly searchable.", icon:ICONS.upload},
-    {num:"03",title:"Ask precise questions",    desc:"Type any question in natural language. OMNIX retrieves context from your documents and returns grounded, cited answers.", icon:ICONS.chat},
+    {num:"01",title:"Create your workspace",    desc:"Sign up free, name your workspace, and invite your team when your workspace is ready. No credit card required.",  icon:ICONS.workspace},
+    {num:"02",title:"Upload your knowledge",    desc:"Drop in PDFs, Markdown, DOCX, and text files. OMNIX stores them as workspace sources and indexes them for retrieval.", icon:ICONS.upload},
+    {num:"03",title:"Ask precise questions",    desc:"Type any question in natural language. OMNIX retrieves matching context and returns source-grounded answers when evidence is available.", icon:ICONS.chat},
     {num:"04",title:"Share across your team",   desc:"Teammates can ask their own questions, see shared history, and build on what others have already asked and learned.", icon:ICONS.team},
   ];
   return (
@@ -877,7 +877,7 @@ function HowItWorks() {
       <Sec className="max-w-5xl mx-auto relative z-10">
         <motion.div variants={fadeUp} className="mb-10 text-center sm:mb-16">
           <Label>HOW IT WORKS</Label>
-          <H2>Set up in minutes, <GradText>value in seconds</GradText></H2>
+          <H2>Set up the workspace, <GradText>then build context</GradText></H2>
         </motion.div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {steps.map((s,i)=>(
@@ -912,10 +912,10 @@ function HowItWorks() {
 function RetrievalModes() {
   const [active,setActive]=useState(0);
   const modes=[
-    {name:"Auto",      color:C.cyan,    desc:"OMNIX intelligently selects the best retrieval strategy for each question — workspace docs, live web, or a blend of both. Zero configuration needed.",                           icon:ICONS.bolt   },
-    {name:"Workspace", color:"#818cf8", desc:"Retrieval is strictly limited to documents your team has uploaded. Answers are always grounded in your own knowledge base, with no external data ever included.",               icon:ICONS.files  },
-    {name:"Web",       color:"#34d399", desc:"OMNIX queries the live web in real time and synthesises up-to-date answers. Ideal for current events, public documentation, and rapidly changing external information.",       icon:ICONS.globe  },
-    {name:"Hybrid",    color:"#fb923c", desc:"Combines workspace documents with live web context. You get the precision of private knowledge and the freshness of real-time data — simultaneously, in a single answer.",     icon:ICONS.link   },
+    {name:"Auto",      color:C.cyan,    desc:"OMNIX routes the question through the best available retrieval path for the current request.",                           icon:ICONS.bolt   },
+    {name:"Workspace", color:"#818cf8", desc:"Retrieval is limited to workspace documents and conversation context available to the current user.",               icon:ICONS.files  },
+    {name:"Web",       color:"#34d399", desc:"OMNIX uses the configured web-search path for current public information when web mode is selected.",       icon:ICONS.globe  },
+    {name:"Synthesis", color:"#fb923c", desc:"Synthesis maps to the app's hybrid mode: workspace context and web context can be combined in one response.",     icon:ICONS.link   },
   ];
   const m=modes[active];
   return (
@@ -979,12 +979,12 @@ function RetrievalModes() {
 // ─── SECURITY ─────────────────────────────────────────────────────────────────
 function Security() {
   const badges=[
-    {label:"SOC 2 Type II",    color:C.cyan   },
-    {label:"GDPR Compliant",   color:"#818cf8"},
-    {label:"AES-256",          color:"#34d399"},
-    {label:"TLS 1.3",          color:"#fb923c"},
-    {label:"Zero Trust",       color:"#f472b6"},
-    {label:"Audit Logs",       color:C.cyan   },
+    {label:"Auth sessions",        color:C.cyan   },
+    {label:"Workspace roles",      color:"#818cf8"},
+    {label:"Scoped sources",       color:"#34d399"},
+    {label:"Backend checks",       color:"#fb923c"},
+    {label:"Activity events",      color:"#f472b6"},
+    {label:"Recovery paths",       color:C.cyan   },
   ];
   return (
     <section id="security" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
@@ -1008,13 +1008,13 @@ function Security() {
               style={{background:"rgba(255,255,255,0.02)",border:`1px solid rgba(255,255,255,0.06)`}}>
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-2 h-2 rounded-full" style={{background:"#22c55e"}}/>
-                <span className="text-xs font-black" style={{color:"rgba(255,255,255,0.35)",letterSpacing:"0.1em"}}>SECURITY STATUS</span>
+                <span className="text-xs font-black" style={{color:"rgba(255,255,255,0.35)",letterSpacing:"0.1em"}}>IMPLEMENTED SAFEGUARDS</span>
               </div>
-              {["Identity verified","Documents encrypted","Workspace isolated","Session active"].map(item=>(
+              {["Authenticated routes","Workspace-scoped access","Source visibility checks","Session persistence"].map(item=>(
                 <div key={item} className="flex items-center justify-between py-1.5">
                   <span className="text-sm" style={{color:C.muted}}>{item}</span>
                   <div className="flex items-center gap-1.5 text-xs" style={{color:"#4ade80"}}>
-                    <Icon d={ICONS.check} size={11} stroke="#4ade80" sw={2.5}/>OK
+                    <Icon d={ICONS.check} size={11} stroke="#4ade80" sw={2.5}/>Live
                   </div>
                 </div>
               ))}
@@ -1024,14 +1024,14 @@ function Security() {
             <Label>ENTERPRISE SECURITY</Label>
             <H2>Your knowledge stays <GradText>yours — always</GradText></H2>
             <motion.p variants={fadeUp} className="text-base leading-relaxed mb-6" style={{color:C.muted}}>
-              OMNIX was built security-first. Every screen requires an active session. Every file is encrypted at rest with AES-256. Every action is logged for compliance.
+              OMNIX keeps workspace surfaces behind authenticated sessions and scopes knowledge access through workspace membership. Certification and compliance claims are not shown until they are independently verified.
             </motion.p>
             {[
               "Identity-first: every page gated behind active session",
-              "End-to-end encryption for all data in transit",
+              "Workspace membership checks before sensitive data access",
               "Granular role-based access per workspace",
-              "Complete audit trail for compliance teams",
-              "Data residency controls — choose your region",
+              "Activity events for supported workspace actions",
+              "Stream and session recovery paths preserved",
             ].map(item=>(
               <motion.div key={item} variants={fadeUp} className="flex items-start gap-3 mb-3">
                 <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
@@ -1050,17 +1050,16 @@ function Security() {
 
 // ─── PRICING ──────────────────────────────────────────────────────────────────
 function Pricing() {
-  const [annual,setAnnual]=useState(true);
   const plans=[
-    {name:"Starter",   price:"Free",              sub:"For small teams getting started",        accent:C.faint, popular:false,
-     features:["3 workspace members","5 document uploads","Chat history (30 days)","Auto retrieval mode","Community support"],
-     cta:"Get started free"},
-    {name:"Pro",       price:annual?"$18":"$24",  sub:"Per member / month, billed annually",   accent:C.cyan,  popular:true,
-     features:["Unlimited members","Unlimited document uploads","Unlimited chat history","All retrieval modes","Priority support","Workspace analytics","API access"],
-     cta:"Start Pro trial"},
-    {name:"Enterprise",price:"Custom",             sub:"For large orgs with advanced needs",    accent:"#818cf8",popular:false,
-     features:["Everything in Pro","SSO / SAML","Custom data residency","SLA guarantee (99.99%)","Dedicated support","Custom integrations","Compliance exports","On-prem option"],
-     cta:"Contact sales"},
+    {name:"Current build",      price:"Open",     sub:"Use the workspace flow available in this repo",        accent:C.cyan,    popular:true,  href:"/register",
+     features:["Auth-gated workspace access","Document uploads and retrieval","Searchable chat history","Auto, Workspace, Web, and Synthesis modes","Operational analytics from loaded app data"],
+     cta:"Start working free"},
+    {name:"Shared workspace",   price:"Included", sub:"For teams using workspace membership",                 accent:"#34d399", popular:false, href:"/register",
+     features:["Workspace invitations","Role-aware access controls","Shared files and conversations","Presence and activity surfaces backed by workspace state","Onboarding gate preserved"],
+     cta:"Create workspace"},
+    {name:"Enterprise controls",price:"Planned",  sub:"Not claimed as live in this build",                    accent:"#818cf8",popular:false, href:"#security",
+     features:["Certification-backed compliance is not claimed","Paid billing and trials are not shown","Public API and webhooks are not claimed","Enterprise SLA claims stay out until verified"],
+     cta:"Review security posture"},
   ];
   return (
     <section id="pricing" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
@@ -1072,23 +1071,9 @@ function Pricing() {
       </SectionBg>
       <Sec className="max-w-6xl mx-auto relative z-10">
         <motion.div variants={fadeUp} className="text-center mb-14">
-          <Label>PRICING</Label>
-          <H2>Simple, transparent pricing</H2>
-          <motion.p variants={fadeUp} className="text-lg mb-8" style={{color:C.muted}}>Start free. Scale as your team grows.</motion.p>
-          <motion.div variants={fadeUp} className="inline-flex items-center gap-1 p-1.5 rounded-2xl"
-            style={{background:C.card,border:`1px solid ${C.border}`}}>
-            <button onClick={()=>setAnnual(false)}
-              className="px-5 py-2 rounded-xl text-sm font-bold transition-all"
-              style={{background:!annual?"rgba(0,255,255,0.14)":"transparent",color:!annual?C.cyan:C.faint,border:!annual?`1px solid rgba(0,255,255,0.25)`:"none"}}>
-              Monthly
-            </button>
-            <button onClick={()=>setAnnual(true)}
-              className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition-all"
-              style={{background:annual?"rgba(0,255,255,0.14)":"transparent",color:annual?C.cyan:C.faint,border:annual?`1px solid rgba(0,255,255,0.25)`:"none"}}>
-              Annual
-              <span className="text-xs px-2 py-0.5 rounded-full font-black" style={{background:"rgba(34,197,94,0.15)",color:"#4ade80"}}>-25%</span>
-            </button>
-          </motion.div>
+          <Label>ACCESS</Label>
+          <H2>Access without inflated claims</H2>
+          <motion.p variants={fadeUp} className="text-lg" style={{color:C.muted}}>This build does not present paid billing, trials, SLAs, or certification-backed enterprise tiers.</motion.p>
         </motion.div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {plans.map(p=>(
@@ -1097,7 +1082,7 @@ function Pricing() {
               style={{background:p.popular?`linear-gradient(145deg,rgba(0,255,255,0.07),rgba(0,51,255,0.07))`:C.card,border:p.popular?`1px solid rgba(0,255,255,0.28)`:`1px solid ${C.border}`,boxShadow:p.popular?`0 0 60px rgba(0,255,255,0.1),0 40px 80px rgba(0,0,0,0.3)`:"none"}}>
               {p.popular&&(
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-5 py-1 rounded-full text-xs font-black"
-                  style={{background:C.cyan,color:C.navyDark}}>MOST POPULAR</div>
+                  style={{background:C.cyan,color:C.navyDark}}>CURRENT</div>
               )}
               <div className="mb-6">
                 <div className="font-black text-lg mb-1" style={{color:p.popular?C.cyan:C.white}}>{p.name}</div>
@@ -1118,7 +1103,7 @@ function Pricing() {
                   </li>
                 ))}
               </ul>
-              <Link href="/register"
+              <Link href={p.href}
                 className="block w-full py-3.5 rounded-xl text-center font-black text-sm transition-all duration-200"
                   style={{background:p.popular?C.cyan:"transparent",border:p.popular?"none":`1px solid ${p.accent}50`,color:p.popular?C.navyDark:p.accent}}
                   onMouseEnter={e=>{if(p.popular){(e.currentTarget as HTMLElement).style.boxShadow=`0 0 40px rgba(0,255,255,0.5)`;}else{(e.currentTarget as HTMLElement).style.background=`${p.accent}14`;}}}
@@ -1133,18 +1118,18 @@ function Pricing() {
   );
 }
 
-// ─── TESTIMONIALS ─────────────────────────────────────────────────────────────
-function Testimonials() {
-  const tees=[
-    {text:"OMNIX transformed how our support team handles complex product questions. We went from 15-minute research cycles to instant, accurate answers backed by our actual documentation.",author:"Sarah Chen",    role:"Head of Customer Success · Meridian Labs",color:C.cyan,   av:"SC"},
-    {text:"The workspace model is exactly right for enterprise. Private knowledge stays private, history is searchable, and the team collaboration features make it genuinely useful at scale.",  author:"Marcus Williams",role:"VP Engineering · Vertex Systems",          color:"#818cf8",av:"MW"},
-    {text:"We replaced three different tools with OMNIX. The precision of answers grounded in our own documents is unlike anything we'd used before. Our ops team loves it.",                   author:"Priya Nair",    role:"Operations Lead · Foundry Digital",          color:"#34d399",av:"PN"},
-    {text:"The retrieval modes are a game-changer. Being able to switch between workspace-only and hybrid web search on the fly means we always get exactly the context we need.",              author:"James Liu",     role:"CTO · Clearline AI",                        color:"#fb923c",av:"JL"},
-    {text:"Setup took under 10 minutes. We uploaded our runbooks, invited the team, and immediately started getting value. The onboarding experience is incredibly smooth.",                    author:"Elena Moser",   role:"DevOps Lead · Stratum HQ",                  color:"#f472b6",av:"EM"},
-    {text:"Security was our biggest concern. OMNIX's SOC 2 certification and identity-first approach gave us the confidence to roll it out to 200+ team members enterprise-wide.",              author:"David Park",    role:"CISO · Orbit Health",                       color:C.cyan,   av:"DP"},
+// ─── TRUST LEDGER ─────────────────────────────────────────────────────────────
+function TrustLedger() {
+  const items=[
+    {title:"Customer proof", status:"Removed", desc:"No named customer logos, quotes, star reviews, or adoption metrics are shown without source evidence.", color:C.cyan, icon:ICONS.shield},
+    {title:"AI modes", status:"Aligned", desc:"Landing labels match the chat composer: Auto, Workspace, Web, and Synthesis.", color:"#818cf8", icon:ICONS.search},
+    {title:"Analytics", status:"Scoped", desc:"Reporting is described as real app data from workspaces, members, files, conversations, and invites.", color:"#34d399", icon:ICONS.chart},
+    {title:"Security claims", status:"Conservative", desc:"Certification, compliance, SLA, and exact encryption claims are removed until independently verified.", color:"#fb923c", icon:ICONS.lock},
+    {title:"Demo behavior", status:"Fixed", desc:"The hero demo action now opens the product tour instead of advertising a missing video.", color:"#f472b6", icon:ICONS.play},
+    {title:"Roadmap items", status:"Labeled", desc:"Enterprise controls are presented as planned, not as shipped capabilities.", color:C.cyan, icon:ICONS.tag},
   ];
   return (
-    <section className="relative overflow-hidden px-4 py-16 sm:px-6 sm:py-28">
+    <section id="trust-ledger" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
       <SectionBg>
         <DriftingOrb x="28%" y="50%" size={600} color="rgba(0,51,255,0.06)" dur={28} delay={-8}/>
         <DriftingOrb x="76%" y="50%" size={500} color="rgba(0,255,255,0.05)" dur={22} delay={-3}/>
@@ -1152,33 +1137,29 @@ function Testimonials() {
       </SectionBg>
       <Sec className="max-w-6xl mx-auto relative z-10">
         <motion.div variants={fadeUp} className="text-center mb-16">
-          <Label>TESTIMONIALS</Label>
-          <H2>Trusted by teams that need <GradText>precision</GradText></H2>
+          <Label>TRUST LEDGER</Label>
+          <H2>Claims kept <GradText>grounded</GradText></H2>
         </motion.div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {tees.map(t=>(
-            <motion.div key={t.author} variants={fadeUp}
+          {items.map(item=>(
+            <motion.div key={item.title} variants={fadeUp}
               className="p-6 rounded-2xl flex flex-col gap-5 transition-all duration-300"
               style={{background:C.card,border:`1px solid ${C.border}`}}
-              onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor=`${t.color}28`;(e.currentTarget as HTMLElement).style.transform="translateY(-3px)";}}
+              onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor=`${item.color}28`;(e.currentTarget as HTMLElement).style.transform="translateY(-3px)";}}
               onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor=C.border;(e.currentTarget as HTMLElement).style.transform="translateY(0)";}}>
-              <div className="flex gap-0.5">
-                {[...Array(5)].map((_,i)=>(
-                  <svg key={i} width="14" height="14" viewBox="0 0 24 24" fill={t.color}>
-                    <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
-                  </svg>
-                ))}
+              <div className="flex items-center justify-between gap-4">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{background:`${item.color}14`,border:`1px solid ${item.color}28`}}>
+                  <Icon d={item.icon} size={18} stroke={item.color} sw={1.8}/>
+                </div>
+                <div className="rounded-full px-3 py-1 text-xs font-black"
+                  style={{background:`${item.color}12`,border:`1px solid ${item.color}28`,color:item.color}}>
+                  {item.status}
+                </div>
               </div>
-              <p className="text-sm leading-relaxed flex-1" style={{color:"rgba(255,255,255,0.56)"}}>&quot;{t.text}&quot;</p>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0"
-                  style={{background:`${t.color}16`,border:`1px solid ${t.color}28`,color:t.color}}>
-                  {t.av}
-                </div>
-                <div>
-                  <div className="text-sm font-black" style={{color:C.white}}>{t.author}</div>
-                  <div className="text-xs" style={{color:C.faint}}>{t.role}</div>
-                </div>
+              <div>
+                <h3 className="font-black text-base mb-2" style={{color:C.white}}>{item.title}</h3>
+                <p className="text-sm leading-relaxed" style={{color:"rgba(255,255,255,0.56)"}}>{item.desc}</p>
               </div>
             </motion.div>
           ))}
@@ -1190,12 +1171,12 @@ function Testimonials() {
 
 // ─── FAQ ──────────────────────────────────────────────────────────────────────
 const FAQS=[
-  {q:"How does OMNIX retrieve context from my documents?",     a:"OMNIX indexes your uploaded files using semantic search. When you ask a question, it retrieves the most relevant chunks of text from your documents and passes them to the AI as context — ensuring grounded, citation-backed answers."},
-  {q:"Is my data private and secure?",                         a:"Absolutely. OMNIX uses AES-256 encryption for data at rest and TLS for data in transit. Your documents are only accessible to members of your workspace. We are SOC 2 Type II certified and fully GDPR compliant."},
-  {q:"What file types can I upload?",                          a:"OMNIX supports PDF, DOCX, TXT, and Markdown files today, with CSV and XLSX support coming soon. Files are automatically indexed and made available to the AI within seconds of upload."},
-  {q:"How many team members can I have?",                      a:"The Starter plan supports up to 3 members. Pro unlocks unlimited members. Enterprise plans can accommodate any org size with custom SLAs and dedicated infrastructure."},
-  {q:"What retrieval modes does OMNIX support?",               a:"OMNIX offers four modes: Auto (smart selection), Workspace (private docs only), Web (real-time web search), and Hybrid (workspace + web combined). You can switch modes mid-conversation."},
-  {q:"Can I use OMNIX via API?",                               a:"Yes. Pro and Enterprise plans include API access. You can query OMNIX programmatically, integrate it into your existing tools, and build on top of the retrieval layer with webhooks and custom integrations."},
+  {q:"How does OMNIX retrieve context from my documents?",     a:"OMNIX indexes uploaded files for semantic retrieval. When you ask a question, it retrieves relevant chunks from accessible workspace sources and uses them as context for source-grounded answers."},
+  {q:"Is my data private and secure?",                         a:"The current product keeps workspace surfaces behind authenticated sessions and scopes document access to workspace membership. This page does not claim SOC 2, GDPR certification, SLA coverage, or exact encryption guarantees."},
+  {q:"What file types can I upload?",                          a:"OMNIX supports PDF, DOCX, TXT, and Markdown uploads in the current product flow. Files become useful to AI retrieval after ingestion and indexing complete."},
+  {q:"How many team members can I have?",                      a:"Membership is workspace and invite based in this build. Billing limits, paid tiers, and enterprise seat commitments are not presented as shipped capabilities."},
+  {q:"What retrieval modes does OMNIX support?",               a:"The chat composer exposes Auto, Workspace, Web, and Synthesis. Synthesis maps to the backend hybrid path that can combine workspace and web context."},
+  {q:"Can I use OMNIX via API?",                               a:"The app uses backend APIs internally. Public API access, webhooks, and third-party marketplace integrations are not advertised as shipped capabilities on this landing page."},
 ];
 
 function FAQ() {
@@ -1278,7 +1259,7 @@ function CTA() {
                 <GhostBtn large href="/login">Sign in to workspace</GhostBtn>
               </motion.div>
               <motion.div variants={fadeUp} className="flex items-center justify-center gap-8 mt-10 flex-wrap">
-                {["Free for small teams","No credit card","SOC 2 certified","GDPR compliant"].map(t=>(
+                {["No credit card","Workspace-scoped","Session-gated","No certification claims"].map(t=>(
                   <span key={t} className="text-xs flex items-center gap-1.5" style={{color:"rgba(255,255,255,0.3)"}}>
                     <Icon d={ICONS.check} size={11} stroke="rgba(0,255,255,0.45)" sw={2.5}/>{t}
                   </span>
@@ -1295,16 +1276,21 @@ function CTA() {
 // ─── FOOTER ───────────────────────────────────────────────────────────────────
 function Footer() {
   const cols=[
-    {title:"Product",   links:["Features","How it works","Pricing","Changelog","Roadmap","Status"]},
-    {title:"Company",   links:["About","Blog","Careers","Press","Brand","Contact"]},
-    {title:"Resources", links:["Docs","API Reference","Community","Guides","Security","Partners"]},
-    {title:"Legal",     links:["Privacy","Terms","Cookie Policy","GDPR","Compliance","DPA"]},
-  ];
-  const social=[
-    {icon:ICONS.link, label:"X"},
-    {icon:ICONS.globe, label:"LinkedIn"},
-    {icon:ICONS.files, label:"GitHub"},
-    {icon:ICONS.play,  label:"YouTube"},
+    {title:"Product", links:[
+      {label:"Features", href:"#features"},
+      {label:"Product tour", href:"#inside-app"},
+      {label:"How it works", href:"#how-it-works"},
+      {label:"Retrieval modes", href:"#retrieval"},
+    ]},
+    {title:"Trust", links:[
+      {label:"Security posture", href:"#security"},
+      {label:"Access scope", href:"#pricing"},
+      {label:"Trust ledger", href:"#trust-ledger"},
+    ]},
+    {title:"Start", links:[
+      {label:"Create account", href:"/register"},
+      {label:"Sign in", href:"/login"},
+    ]},
   ];
   return (
     <footer className="relative px-4 pb-8 pt-14 sm:px-8 sm:pb-10 sm:pt-20" style={{borderTop:`1px solid rgba(255,255,255,0.05)`}}>
@@ -1315,20 +1301,21 @@ function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-14 mb-14"
           style={{borderBottom:`1px solid rgba(255,255,255,0.06)`}}>
           <div>
-            <h3 className="font-black text-xl mb-1" style={{color:C.white}}>Stay in the loop</h3>
-            <p className="text-sm" style={{color:C.faint}}>Product updates, security advisories, and team tips — monthly.</p>
+            <h3 className="font-black text-xl mb-1" style={{color:C.white}}>Explore the current build</h3>
+            <p className="text-sm" style={{color:C.faint}}>Review shipped surfaces and trust notes before creating a workspace.</p>
           </div>
           <div className="flex w-full flex-col gap-3 min-[380px]:flex-row md:w-auto">
-            <input type="email" placeholder="you@company.com"
-              className="min-w-0 flex-1 rounded-xl px-4 py-3 text-sm outline-none md:w-64"
-              style={{background:C.card,border:`1px solid ${C.border}`,color:C.white}}/>
-            <button className="px-5 py-3 rounded-xl text-sm font-black flex items-center gap-2"
+            <a href="#inside-app" className="rounded-xl px-5 py-3 text-center text-sm font-black"
               style={{background:C.cyan,color:C.navyDark}}>
-              Subscribe<Icon d={ICONS.arrow} size={13} stroke={C.navyDark} sw={2.5}/>
-            </button>
+              Product tour
+            </a>
+            <a href="#trust-ledger" className="rounded-xl px-5 py-3 text-center text-sm font-black"
+              style={{background:C.card,border:`1px solid ${C.border}`,color:C.muted}}>
+              Trust notes
+            </a>
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-10 mb-14">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-14">
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-3 mb-4">
               <OmnixMark size={30}/>
@@ -1337,17 +1324,6 @@ function Footer() {
             <p className="text-sm leading-relaxed mb-6" style={{color:C.faint}}>
               AI workspace for knowledge teams. Precise answers, secure by design.
             </p>
-            <div className="flex gap-3">
-              {social.map(s=>(
-                <a key={s.label} href="#"
-                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
-                  style={{background:C.card,border:`1px solid ${C.border}`}}
-                  onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor=C.borderC;}}
-                  onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor=C.border;}}>
-                  <Icon d={s.icon} size={14} stroke={C.faint} sw={1.8}/>
-                </a>
-              ))}
-            </div>
           </div>
           {cols.map(col=>(
             <div key={col.title}>
@@ -1355,11 +1331,11 @@ function Footer() {
                 style={{color:C.faint,letterSpacing:"0.1em"}}>{col.title.toUpperCase()}</div>
               <ul className="space-y-2.5">
                 {col.links.map(link=>(
-                  <li key={link}>
-                    <a href="#" className="text-sm transition-colors duration-200" style={{color:"rgba(255,255,255,0.38)"}}
+                  <li key={link.label}>
+                    <a href={link.href} className="text-sm transition-colors duration-200" style={{color:"rgba(255,255,255,0.38)"}}
                       onMouseEnter={e=>(e.currentTarget.style.color=C.white)}
                       onMouseLeave={e=>(e.currentTarget.style.color="rgba(255,255,255,0.38)")}>
-                      {link}
+                      {link.label}
                     </a>
                   </li>
                 ))}
@@ -1372,7 +1348,7 @@ function Footer() {
           <div className="flex items-center gap-6">
             <p className="text-xs" style={{color:"rgba(255,255,255,0.2)"}}>© 2026 OMNIX. All rights reserved.</p>
             <div className="flex items-center gap-1.5 text-xs" style={{color:"rgba(255,255,255,0.2)"}}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{background:"#22c55e"}}/>All systems operational
+              <span className="w-1.5 h-1.5 rounded-full" style={{background:"#22c55e"}}/>Claims scoped to current build
             </div>
           </div>
           <p className="text-xs" style={{color:"rgba(255,255,255,0.14)"}}>Built for teams that need answers they can trust.</p>
@@ -1397,7 +1373,7 @@ export function LandingExperience() {
       <RetrievalModes/>
       <Security/>
       <Pricing/>
-      <Testimonials/>
+      <TrustLedger/>
       <FAQ/>
       <CTA/>
       <Footer/>
