@@ -196,36 +196,30 @@ export function MessageList({
       <AnimatePresence>
         {!isAtBottom && messages.length > 3 && (
           <motion.div
-            initial={{ opacity: 0, y: 12, scale: 0.95 }}
+            initial={{ opacity: 0, y: 12, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.95 }}
+            exit={{ opacity: 0, y: 12, scale: 0.9 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="absolute bottom-6 left-1/2 z-20 -translate-x-1/2"
           >
             <button
               onClick={() => scrollToBottom(true)}
               className={cn(
-                "group flex flex-col items-center gap-1.5 rounded-2xl border px-4 py-2.5",
-                "bg-[var(--omnix-surface)]/80 backdrop-blur-md shadow-[var(--omnix-glow-md)]",
-                "transition-all hover:bg-[var(--omnix-surface)] hover:border-cyan-300/40",
+                "group relative flex h-10 w-10 items-center justify-center rounded-full border transition-all",
+                "bg-[var(--omnix-surface)]/90 backdrop-blur-md shadow-[var(--omnix-glow-md)]",
+                "hover:bg-[var(--omnix-surface)] hover:border-cyan-300/50 hover:scale-110 active:scale-95",
                 newMessagesCount > 0 
-                  ? "border-cyan-300/50 ring-1 ring-cyan-300/20" 
+                  ? "border-cyan-300/60 ring-2 ring-cyan-300/20" 
                   : "border-[var(--omnix-border)]"
               )}
+              title="Jump to Latest"
             >
               {newMessagesCount > 0 && (
-                <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[var(--omnix-cyan)]">
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-500" />
-                  </span>
-                  {newMessagesCount} {newMessagesCount === 1 ? 'new message' : 'new messages'}
-                </div>
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-cyan-500 px-1 text-[9px] font-bold text-[#050c17] shadow-[0_0_10px_rgba(6,182,212,0.6)] animate-in zoom-in duration-300">
+                  {newMessagesCount}
+                </span>
               )}
-              <div className="flex items-center gap-2 text-xs font-semibold text-white">
-                <ArrowDown className="h-3.5 w-3.5 transition-transform group-hover:translate-y-0.5" />
-                Jump to Latest
-              </div>
+              <ArrowDown className="h-5 w-5 text-white transition-transform group-hover:translate-y-0.5" />
             </button>
           </motion.div>
         )}
