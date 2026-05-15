@@ -42,10 +42,3 @@ dist/
 
 # Uploads and User Data
 uploads/
-# Environment files
-.env
-.env.local
-backend/.env
-frontend/.env
-frontend/.env.local
-
