@@ -114,13 +114,12 @@ class ContextBuilder:
         context_text = "\n\n".join(context_blocks) if context_blocks else "No relevant context found."
         clean_query = (query or "").strip()
         prompt = (
-            "You are an AI assistant for Omnix. Answer using only the cited context below. "
-            "When a source supports a claim, cite it with its source label such as [S1].\n\n"
-            "Context:\n"
+            "You are Omnix AI.\n\n"
+            "Use the following retrieved document context to answer the user's question.\n\n"
+            "DOCUMENT CONTEXT:\n"
             f"{context_text}\n\n"
-            "Question:\n"
-            f"{clean_query}\n\n"
-            "Answer:\n"
+            "USER QUESTION:\n"
+            f"{clean_query}\n"
         )
 
         return BuiltContext(
