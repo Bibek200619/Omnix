@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 import logging
+import reprlib
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -43,8 +45,62 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
 
-def _user_id_from_claims(current_user: dict[str, Any]) -> str:
-    return str(current_user["sub"])
+def _safe_current_user_repr(current_user: Any) -> str:
+    def redact(value: Mapping[str, Any]) -> dict[str, Any]:
+        redacted: dict[str, Any] = {}
+        for key, item in value.items():
+            key_text = str(key).lower()
+            if any(marker in key_text for marker in ("authorization", "password", "secret", "token")):
+                redacted[str(key)] = "***REDACTED***"
+            else:
+                redacted[str(key)] = item
+        return redacted
+
+    try:
+        if isinstance(current_user, Mapping):
+            debug_value: Any = redact(current_user)
+        elif hasattr(current_user, "model_dump"):
+            dumped = current_user.model_dump()
+            debug_value = redact(dumped) if isinstance(dumped, Mapping) else dumped
+        elif hasattr(current_user, "__dict__"):
+            debug_value = redact(vars(current_user))
+        else:
+            debug_value = current_user
+        return reprlib.repr(debug_value)
+    except Exception:
+        return f"<unrepresentable current_user type={type(current_user).__name__}>"
+
+
+def _resolve_authenticated_user_id(current_user: Any) -> str | None:
+    for key in ("id", "user_id", "sub"):
+        value = (
+            current_user.get(key)
+            if isinstance(current_user, Mapping)
+            else getattr(current_user, key, None)
+        )
+        if value is None:
+            continue
+
+        user_id = str(value).strip()
+        if user_id and user_id.lower() != "none":
+            return user_id
+
+    return None
+
+
+def _user_id_from_claims(current_user: Any) -> str:
+    user_id = _resolve_authenticated_user_id(current_user)
+    if user_id is None:
+        logger.error(
+            "Unable to resolve authenticated user id | current_user_type=%r | current_user=%s",
+            type(current_user),
+            _safe_current_user_repr(current_user),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unable to resolve authenticated user",
+        )
+    return user_id
 
 
 def _database_error() -> HTTPException:
@@ -328,7 +384,7 @@ async def get_workspace_members(
 async def invite_workspace_member(
     workspace_id: str,
     invite_payload: WorkspaceInviteCreate,
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: Any = Depends(get_current_user),
 ) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
     current_user_email = user_email_from_claims(current_user)
@@ -360,6 +416,12 @@ async def invite_workspace_member(
             {"workspace_id": workspace_id, "email": normalized_email, "status": "pending"},
         )
     except SupabaseServiceError as exc:
+        logger.exception(
+            "Failed to check existing workspace invite | workspace_id=%s | email=%s | root_error=%r",
+            workspace_id,
+            normalized_email,
+            exc.__cause__ or exc,
+        )
         raise _database_error() from exc
 
     if existing_invite is not None:
@@ -371,23 +433,12 @@ async def invite_workspace_member(
     timestamp = utc_now_iso()
 
     try:
-        user_id = None
-
-        if isinstance(current_user, dict):
-            user_id = current_user.get("id") or current_user.get("user_id") or current_user.get("sub")
-        else:
-            user_id = (
-                getattr(current_user, "id", None)
-                or getattr(current_user, "user_id", None)
-                or getattr(current_user, "sub", None)
-            )
-
-        if not user_id:
-            logger.error("Could not resolve authenticated user id from current_user=%r", current_user)
-            raise HTTPException(status_code=401, detail="Unable to resolve authenticated user")
-
-        logger.info("Invite debug | current_user_type=%s | user_id=%s | current_user=%r",
-                    type(current_user).__name__, user_id, current_user)
+        logger.info(
+            "Workspace invite insert auth context | current_user_type=%r | resolved_user_id=%s | current_user=%s",
+            type(current_user),
+            user_id,
+            _safe_current_user_repr(current_user),
+        )
         created = await insert_one_trusted(
             "workspace_invites",
             {
@@ -401,8 +452,17 @@ async def invite_workspace_member(
             },
         )
     except SupabaseServiceError as exc:
-        logger.exception("Failed to create workspace invite")
+        logger.exception(
+            "Failed to create workspace invite | workspace_id=%s | email=%s | invited_by=%s | root_error=%r",
+            workspace_id,
+            normalized_email,
+            user_id,
+            exc.__cause__ or exc,
+        )
         raise _database_error() from exc
+
+    if created.get("invited_by_user_id") is None and created.get("invited_by") is not None:
+        created = {**created, "invited_by_user_id": str(created["invited_by"])}
 
     hydrated = await hydrate_invites([created])
     return hydrated[0]

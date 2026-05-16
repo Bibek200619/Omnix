@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
@@ -52,8 +53,12 @@ def normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
-def user_email_from_claims(current_user: dict[str, Any]) -> str | None:
-    email = current_user.get("email")
+def user_email_from_claims(current_user: Any) -> str | None:
+    email = (
+        current_user.get("email")
+        if isinstance(current_user, Mapping)
+        else getattr(current_user, "email", None)
+    )
     if isinstance(email, str) and email.strip():
         return normalize_email(email)
     return None
@@ -394,17 +399,29 @@ async def hydrate_invites(invites: list[dict[str, Any]]) -> list[dict[str, Any]]
     if not invites:
         return []
 
+    normalized_invites = [
+        (
+            {
+                **invite,
+                "invited_by_user_id": str(invite["invited_by"]),
+            }
+            if invite.get("invited_by_user_id") is None and invite.get("invited_by") is not None
+            else invite
+        )
+        for invite in invites
+    ]
+
     workspace_ids = sorted(
         {
             str(invite["workspace_id"])
-            for invite in invites
+            for invite in normalized_invites
             if invite.get("workspace_id")
         }
     )
     inviter_ids = sorted(
         {
             str(invite["invited_by_user_id"])
-            for invite in invites
+            for invite in normalized_invites
             if invite.get("invited_by_user_id")
         }
     )
@@ -426,7 +443,7 @@ async def hydrate_invites(invites: list[dict[str, Any]]) -> list[dict[str, Any]]
     profiles = await get_user_profiles(inviter_ids)
 
     hydrated: list[dict[str, Any]] = []
-    for invite in invites:
+    for invite in normalized_invites:
         inviter_id = str(invite.get("invited_by_user_id") or "")
         workspace = workspace_by_id.get(str(invite.get("workspace_id") or ""))
         profile = profiles.get(inviter_id, {})
