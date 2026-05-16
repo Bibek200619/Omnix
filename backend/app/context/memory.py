@@ -53,7 +53,7 @@ class MemoryManager:
                     Citation(
                         source_id=str(msg.get("id")),
                         source_type=ContextSourceType.MEMORY,
-                        content=f"{msg.get("role", "unknown").upper()}: {msg.get("content")}",
+                        content=f"{str(msg.get('role', 'unknown')).upper()}: {msg.get('content')}",
                         metadata={"role": msg.get("role"), "created_at": msg.get("created_at")},
                     )
                 )
