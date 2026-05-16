@@ -43,6 +43,7 @@ from ..services.workspace_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
+invite_router = APIRouter(prefix="/workspace-invites", tags=["workspace-invites"])
 
 
 def _safe_current_user_repr(current_user: Any) -> str:
@@ -110,6 +111,17 @@ def _database_error() -> HTTPException:
     )
 
 
+def _is_missing_supabase_column(exc: SupabaseServiceError, column: str) -> bool:
+    root_error = exc.__cause__ or exc
+    message = str(root_error).lower()
+    normalized_column = column.lower()
+    return normalized_column in message and (
+        "could not find" in message
+        or "does not exist" in message
+        or "schema cache" in message
+    )
+
+
 async def _enriched_workspace_for_user(
     workspace_id: str,
     user_id: str,
@@ -123,6 +135,185 @@ async def _enriched_workspace_for_user(
         "is_shared": len(members) > 1,
         "members_preview": members[:3],
     }
+
+
+async def _pending_workspace_invites_for_user(current_user: Any) -> list[dict[str, Any]]:
+    user_email = user_email_from_claims(current_user)
+    if user_email is None:
+        return []
+
+    try:
+        return await list_pending_invites_for_email(user_email)
+    except Exception:
+        logger.exception("Failed to fetch pending workspace invites; returning empty list instead of 500.")
+        return []
+
+
+async def _accept_workspace_invite(invite_id: str, current_user: Any) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    user_email = user_email_from_claims(current_user)
+    if user_email is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Your account is missing an email address.",
+        )
+
+    try:
+        invite = await select_one_trusted(
+            "workspace_invites",
+            WORKSPACE_INVITE_COLUMNS,
+            {"id": invite_id},
+        )
+    except SupabaseServiceError as exc:
+        logger.exception("Failed to load workspace invite for accept | invite_id=%s", invite_id)
+        raise _database_error() from exc
+
+    if invite is None or normalize_email(str(invite.get("email") or "")) != user_email:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invite not found.",
+        )
+
+    if invite.get("status") != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This invite is no longer pending.",
+        )
+
+    workspace_id = str(invite["workspace_id"])
+    timestamp = utc_now_iso()
+
+    try:
+        workspace = await select_one_trusted("workspaces", WORKSPACE_COLUMNS, {"id": workspace_id})
+    except SupabaseServiceError as exc:
+        logger.exception("Failed to load workspace for invite accept | workspace_id=%s", workspace_id)
+        raise _database_error() from exc
+
+    if workspace is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found.",
+        )
+
+    access = await resolve_workspace_access(workspace_id, user_id)
+    if access is None:
+        try:
+            await insert_one(
+                "workspace_members",
+                {
+                    "workspace_id": workspace_id,
+                    "user_id": user_id,
+                    "role": "member",
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                },
+            )
+        except SupabaseServiceError as exc:
+            logger.exception(
+                "Failed to create workspace membership from invite | workspace_id=%s | user_id=%s",
+                workspace_id,
+                user_id,
+            )
+            raise _database_error() from exc
+
+    accept_payload = {
+        "status": "accepted",
+        "accepted_by_user_id": user_id,
+        "accepted_at": timestamp,
+        "updated_at": timestamp,
+    }
+    try:
+        await update_one_trusted("workspace_invites", {"id": invite_id}, accept_payload)
+    except SupabaseServiceError as exc:
+        if _is_missing_supabase_column(exc, "accepted_at"):
+            logger.warning(
+                "workspace_invites.accepted_at is unavailable; marking invite accepted without accepted_at | invite_id=%s",
+                invite_id,
+            )
+            fallback_payload = {key: value for key, value in accept_payload.items() if key != "accepted_at"}
+            try:
+                await update_one_trusted("workspace_invites", {"id": invite_id}, fallback_payload)
+            except SupabaseServiceError as fallback_exc:
+                logger.exception("Failed to mark workspace invite accepted | invite_id=%s", invite_id)
+                raise _database_error() from fallback_exc
+        else:
+            logger.exception("Failed to mark workspace invite accepted | invite_id=%s", invite_id)
+            raise _database_error() from exc
+
+    return await _enriched_workspace_for_user(workspace_id, user_id)
+
+
+async def _decline_workspace_invite(invite_id: str, current_user: Any) -> dict[str, Any]:
+    user_email = user_email_from_claims(current_user)
+    if user_email is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Your account is missing an email address.",
+        )
+
+    try:
+        invite = await select_one_trusted(
+            "workspace_invites",
+            WORKSPACE_INVITE_COLUMNS,
+            {"id": invite_id},
+        )
+    except SupabaseServiceError as exc:
+        logger.exception("Failed to load workspace invite for decline | invite_id=%s", invite_id)
+        raise _database_error() from exc
+
+    if invite is None or normalize_email(str(invite.get("email") or "")) != user_email:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invite not found.",
+        )
+
+    if invite.get("status") != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This invite is no longer pending.",
+        )
+
+    try:
+        declined = await update_one_trusted(
+            "workspace_invites",
+            {"id": invite_id},
+            {"status": "declined", "updated_at": utc_now_iso()},
+        )
+    except SupabaseServiceError as exc:
+        logger.exception("Failed to mark workspace invite declined | invite_id=%s", invite_id)
+        raise _database_error() from exc
+
+    if declined is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invite not found.",
+        )
+
+    hydrated = await hydrate_invites([declined])
+    return hydrated[0]
+
+
+@invite_router.get("", response_model=list[WorkspaceInviteRead])
+async def list_authenticated_workspace_invites(
+    current_user: Any = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    return await _pending_workspace_invites_for_user(current_user)
+
+
+@invite_router.post("/{invite_id}/accept", response_model=WorkspaceRead)
+async def accept_authenticated_workspace_invite(
+    invite_id: str,
+    current_user: Any = Depends(get_current_user),
+) -> dict[str, Any]:
+    return await _accept_workspace_invite(invite_id, current_user)
+
+
+@invite_router.post("/{invite_id}/decline", response_model=WorkspaceInviteRead)
+async def decline_authenticated_workspace_invite(
+    invite_id: str,
+    current_user: Any = Depends(get_current_user),
+) -> dict[str, Any]:
+    return await _decline_workspace_invite(invite_id, current_user)
 
 
 @router.post("", response_model=WorkspaceRead, status_code=status.HTTP_201_CREATED)
@@ -159,149 +350,25 @@ async def create_workspace(
 
 @router.get("/invites/pending", response_model=list[WorkspaceInviteRead])
 async def get_pending_workspace_invites(
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: Any = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
-    user_email = user_email_from_claims(current_user)
-    if user_email is None:
-        return []
-    try:
-        return await list_pending_invites_for_email(user_email)
-    except Exception as exc:
-        logger.exception("Failed to fetch pending invites; returning empty list instead of 500.")
-        return []
+    return await _pending_workspace_invites_for_user(current_user)
 
 
 @router.post("/invites/{invite_id}/accept", response_model=WorkspaceRead)
 async def accept_workspace_invite(
     invite_id: str,
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: Any = Depends(get_current_user),
 ) -> dict[str, Any]:
-    user_id = _user_id_from_claims(current_user)
-    user_email = user_email_from_claims(current_user)
-    if user_email is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Your account is missing an email address.",
-        )
-
-    try:
-        invite = await select_one_trusted(
-            "workspace_invites",
-            WORKSPACE_INVITE_COLUMNS,
-            {"id": invite_id},
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-
-    if invite is None or normalize_email(str(invite.get("email") or "")) != user_email:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invite not found.",
-        )
-
-    if invite.get("status") != "pending":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This invite is no longer pending.",
-        )
-
-    workspace_id = str(invite["workspace_id"])
-    timestamp = utc_now_iso()
-
-    try:
-        workspace = await select_one_trusted("workspaces", WORKSPACE_COLUMNS, {"id": workspace_id})
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-
-    if workspace is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workspace not found.",
-        )
-
-    access = await resolve_workspace_access(workspace_id, user_id)
-    if access is None:
-        try:
-            await insert_one(
-                "workspace_members",
-                {
-                    "workspace_id": workspace_id,
-                    "user_id": user_id,
-                    "role": "member",
-                    "created_at": timestamp,
-                    "updated_at": timestamp,
-                },
-            )
-        except SupabaseServiceError as exc:
-            raise _database_error() from exc
-
-    try:
-        await update_one_trusted(
-            "workspace_invites",
-            {"id": invite_id},
-            {
-                "status": "accepted",
-                "accepted_by_user_id": user_id,
-                "accepted_at": timestamp,
-                "updated_at": timestamp,
-            },
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-
-    return await _enriched_workspace_for_user(workspace_id, user_id)
+    return await _accept_workspace_invite(invite_id, current_user)
 
 
 @router.post("/invites/{invite_id}/decline", response_model=WorkspaceInviteRead)
 async def decline_workspace_invite(
     invite_id: str,
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: Any = Depends(get_current_user),
 ) -> dict[str, Any]:
-    user_email = user_email_from_claims(current_user)
-    if user_email is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Your account is missing an email address.",
-        )
-
-    try:
-        invite = await select_one_trusted(
-            "workspace_invites",
-            WORKSPACE_INVITE_COLUMNS,
-            {"id": invite_id},
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-
-    if invite is None or normalize_email(str(invite.get("email") or "")) != user_email:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invite not found.",
-        )
-
-    if invite.get("status") != "pending":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This invite is no longer pending.",
-        )
-
-    try:
-        declined = await update_one_trusted(
-            "workspace_invites",
-            {"id": invite_id},
-            {"status": "declined", "updated_at": utc_now_iso()},
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-
-    if declined is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invite not found.",
-        )
-
-    hydrated = await hydrate_invites([declined])
-    return hydrated[0]
+    return await _decline_workspace_invite(invite_id, current_user)
 
 
 @router.get("", response_model=list[WorkspaceRead])

@@ -110,7 +110,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     try {
       setPendingInvitesLoading(true);
-      const data = await apiClient.get<WorkspaceInvite[]>("/workspaces/invites/pending");
+      const data = await apiClient.get<WorkspaceInvite[]>("/workspace-invites");
       setPendingInvites(data || []);
     } catch (err) {
       console.error("Failed to load pending invites", err);
@@ -283,10 +283,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const acceptInvite = useCallback(
     async (inviteId: string) => {
-      const workspace = await apiClient.post<Workspace>(`/workspaces/invites/${inviteId}/accept`);
+      const workspace = await apiClient.post<Workspace>(`/workspace-invites/${inviteId}/accept`);
       setPendingInvites((current) => current.filter((invite) => invite.id !== inviteId));
-      await refreshWorkspaces();
+      setWorkspaces((current) => [workspace, ...current.filter((item) => item.id !== workspace.id)]);
       setActiveWorkspace(workspace.id);
+      await refreshWorkspaces();
       return workspace;
     },
     [refreshWorkspaces, setActiveWorkspace],
@@ -294,7 +295,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const declineInvite = useCallback(
     async (inviteId: string) => {
-      await apiClient.post(`/workspaces/invites/${inviteId}/decline`);
+      await apiClient.post(`/workspace-invites/${inviteId}/decline`);
       setPendingInvites((current) => current.filter((invite) => invite.id !== inviteId));
     },
     [],

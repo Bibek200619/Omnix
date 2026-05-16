@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Clock3, Mail, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { Clock3, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
 import { useWorkspace } from "@/lib/workspace-context";
 import type { WorkspaceMember } from "@/lib/workspace-types";
+import { PendingWorkspaceInvites } from "./PendingWorkspaceInvites";
 import { WorkspaceInviteModal } from "./WorkspaceInviteModal";
 import { WorkspaceMemberStack, workspaceMemberName } from "./WorkspaceMemberStack";
 
@@ -19,15 +20,11 @@ export function WorkspaceAccessPanel() {
     activeWorkspace,
     activeMembers,
     activeInvites,
-    pendingInvites,
     membersLoading,
     invitesLoading,
-    pendingInvitesLoading,
     inviteToActiveWorkspace,
     removeWorkspaceMember,
     revokeInvite,
-    acceptInvite,
-    declineInvite,
   } = useWorkspace();
 
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -82,83 +79,11 @@ export function WorkspaceAccessPanel() {
     }
   }
 
-  async function handleAcceptInvite(inviteId: string) {
-    try {
-      setBusyKey(`pending:${inviteId}`);
-      setActionError(null);
-      await acceptInvite(inviteId);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Unable to accept invite.");
-    } finally {
-      setBusyKey(null);
-    }
-  }
-
-  async function handleDeclineInvite(inviteId: string) {
-    try {
-      setBusyKey(`decline:${inviteId}`);
-      setActionError(null);
-      await declineInvite(inviteId);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Unable to decline invite.");
-    } finally {
-      setBusyKey(null);
-    }
-  }
-
   return (
     <section className="space-y-4">
-      {pendingInvites.length > 0 || pendingInvitesLoading ? (
-        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
-          <div className="flex items-center gap-3">
-            <Mail className="h-5 w-5 text-cyan-200" />
-            <div>
-              <h2 className="font-semibold text-white">Incoming invites</h2>
-              <p className="mt-1 text-sm text-slate-400">
-                Join a shared workspace to pick up team memory, files, and conversations.
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 space-y-3">
-            {pendingInvitesLoading ? (
-              <p className="text-sm text-slate-400">Loading invites...</p>
-            ) : (
-              pendingInvites.map((invite) => (
-                <div
-                  key={invite.id}
-                  className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-4 lg:flex-row lg:items-center lg:justify-between"
-                >
-                  <div>
-                    <div className="text-sm font-medium text-white">{invite.workspace_name || "Workspace invite"}</div>
-                    <div className="mt-1 text-sm text-slate-400">
-                      Invited by {invite.inviter_name || invite.inviter_email || "a teammate"}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => handleDeclineInvite(invite.id)}
-                      isLoading={busyKey === `decline:${invite.id}`}
-                    >
-                      Decline
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={() => handleAcceptInvite(invite.id)}
-                      isLoading={busyKey === `pending:${invite.id}`}
-                    >
-                      Accept
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      ) : null}
+      <PendingWorkspaceInvites showEmpty />
 
-      <div className="rounded-lg border border-white/10 bg-white/[0.04] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
+      <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="flex items-center gap-3">
