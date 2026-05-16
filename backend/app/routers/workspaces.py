@@ -378,7 +378,7 @@ async def invite_workspace_member(
                 "email": normalized_email,
                 "role": "member",
                 "status": "pending",
-                "invited_by_user_id": user_id,
+                "invited_by": user_id,
                 "created_at": timestamp,
                 "updated_at": timestamp,
             },
