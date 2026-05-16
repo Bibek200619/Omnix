@@ -119,7 +119,11 @@ class ContextBuilder:
             "DOCUMENT CONTEXT:\n"
             f"{context_text}\n\n"
             "USER QUESTION:\n"
-            f"{clean_query}\n"
+            f"{clean_query}\n\n"
+            "IMPORTANT:\n"
+            "- If document context is provided, answer from that content first.\n"
+            "- Do not say you cannot access uploaded files; the document context above is the accessible uploaded content.\n"
+            "- If the answer is not present in the document context, say that it is not in the uploaded document.\n"
         )
 
         return BuiltContext(

@@ -145,12 +145,26 @@ async def build_uploaded_document_context(
     file_ids = [str(file_row["id"]) for file_row in files if file_row.get("id")]
     documents = await _load_document_chunks(file_ids, user_id=user_id, workspace_id=workspace_id)
     if not documents:
+        logger.info(
+            "Uploaded document retrieval found files but no chunks: conversation_id=%s workspace_id=%s files=%d.",
+            conversation_id,
+            workspace_id,
+            len(files),
+        )
         return None
 
     file_by_id = {str(file_row["id"]): file_row for file_row in files if file_row.get("id")}
     file_order = {file_id: index for index, file_id in enumerate(file_ids)}
     generic_query = _is_generic_document_query(query)
     results: list[RetrievalResult] = []
+    logger.info(
+        "Uploaded document retrieval scan: conversation_id=%s workspace_id=%s files=%d chunks=%d generic_query=%s.",
+        conversation_id,
+        workspace_id,
+        len(files),
+        len(documents),
+        generic_query,
+    )
 
     for row in documents:
         content = (row.get("content") or "").strip()
@@ -160,6 +174,8 @@ async def build_uploaded_document_context(
         file_row = file_by_id.get(file_id or "", {})
         lexical_score = _score_chunk(query, content, file_row)
         recency_score = max(0.0, 1.0 - (file_order.get(file_id or "", 999) * 0.05))
+        if not generic_query and lexical_score <= 0:
+            continue
         score = recency_score if generic_query else lexical_score + (recency_score * 0.15)
 
         results.append(
@@ -196,6 +212,16 @@ async def build_uploaded_document_context(
     if not built.sources:
         return None
     built.diagnostics["fallback"] = "uploaded_document_context"
+    first_preview = (
+        built.chunks[0].get("content", "") if built.chunks else built.sources[0].get("chunk_preview", "")
+    )
+    logger.info(
+        "Uploaded document retrieval built context: sources=%d chunks=%d prompt_length=%d first_chunk_preview=%r.",
+        len(built.sources),
+        len(built.chunks),
+        len(built.prompt),
+        str(first_preview).replace("\n", " ")[:240],
+    )
     return built
 
 

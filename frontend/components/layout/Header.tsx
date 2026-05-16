@@ -94,7 +94,7 @@ export function Header({ onMenuClick }: HeaderProps) {
               Invites {pendingInvites.length}
             </Button>
           ) : null}
-          <ActionsMenu className="hidden sm:inline-flex" />
+          <ActionsMenu className="inline-flex" />
           <Button
             type="button"
             variant="secondary"
