@@ -33,6 +33,7 @@ import { Input } from "@/components/ui/Input";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
+import { workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import { PendingWorkspaceInvites } from "@/components/workspace/PendingWorkspaceInvites";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModal";
@@ -165,7 +166,7 @@ function WorkspaceSelector() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="group flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left transition hover:border-white/20 hover:bg-white/[0.06]"
+        className="group flex w-full items-center justify-between gap-2 rounded-lg border border-cyan-300/20 bg-[#0d1720] px-2.5 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.045),0_10px_28px_rgba(0,0,0,0.22)] transition hover:border-cyan-300/35 hover:bg-[#10202b]"
         aria-expanded={open}
       >
         <div className="flex min-w-0 items-center gap-2.5">
@@ -175,7 +176,7 @@ function WorkspaceSelector() {
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold text-white">{active ? active.name : "No workspace selected"}</div>
             <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
-              <span>{active?.current_user_role === "owner" ? "Owner" : "Member"}</span>
+              <span>{workspaceRoleLabel(active?.current_user_role)}</span>
               {active ? (
                 <>
                   <span className="h-1 w-1 rounded-full bg-white/20" />
@@ -243,7 +244,9 @@ function WorkspaceSelector() {
                         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
                           <span>{ws.member_count} {ws.member_count === 1 ? "member" : "members"}</span>
                           <span className="h-1 w-1 rounded-full bg-white/15" />
-                          <span>{ws.current_user_role === "owner" ? "Owner" : "Member"}</span>
+                          <span className={cn("rounded-full border px-1.5 py-0.5", workspaceRoleBadgeClass(ws.current_user_role))}>
+                            {workspaceRoleLabel(ws.current_user_role)}
+                          </span>
                         </div>
                         {ws.description && <div className="mt-0.5 truncate text-[11px] text-slate-500">{ws.description}</div>}
                       </div>
