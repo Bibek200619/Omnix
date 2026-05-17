@@ -27,7 +27,7 @@ class KeywordSearch:
         *,
         user_id: str,
         workspace_id: str | None = None,
-        top_k: int = 8,
+        top_k: int = 3,
     ) -> list[RetrievalResult]:
         started_at = time.perf_counter()
         if not query or not query.strip():

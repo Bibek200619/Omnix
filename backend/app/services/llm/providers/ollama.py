@@ -32,7 +32,7 @@ class OllamaProvider(BaseLLMProvider):
             "stream": False,
             "options": {
                 "temperature": request.config.temperature if request.config else 0.7,
-                "num_predict": request.config.max_tokens if request.config else 1000,
+                "num_predict": request.config.max_tokens if request.config else 256,
             }
         }
         
