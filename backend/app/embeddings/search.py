@@ -4,6 +4,7 @@ import logging
 from typing import Any, List
 
 from ..db.supabase_client import get_supabase
+from ..services.supabase_service import execute_query_sync
 from .dimensions import get_expected_embedding_dimension, validate_embedding_dimension
 from .provider import get_default_provider
 
@@ -43,7 +44,10 @@ async def semantic_search(query: str, user_id: str, workspace_id: str | None = N
             "p_workspace": workspace_id,
         }
         logger.info("Starting semantic_search RPC (top_k=%d, dimension=%d).", top_k, len(embedding))
-        resp = supabase.rpc("search_documents_vector", params).execute()
+        resp = execute_query_sync(
+            supabase.rpc("search_documents_vector", params),
+            operation="semantic search rpc",
+        )
         rows = getattr(resp, "data", None) or []
         logger.info("semantic_search RPC returned %d row(s).", len(rows))
         return rows

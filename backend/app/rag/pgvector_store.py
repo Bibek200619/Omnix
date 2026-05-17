@@ -4,6 +4,7 @@ import logging
 
 from ..embeddings.dimensions import get_expected_embedding_dimension, validate_embedding_dimension, validate_embeddings_dimension
 from ..db.supabase_client import get_supabase
+from ..services.supabase_service import execute_query_sync
 from .vector_store_base import VectorStore
 
 logger = logging.getLogger(__name__)
@@ -37,15 +38,18 @@ class PgVectorStore(VectorStore):
                 workspace_id,
                 EMBEDDING_DIMENSION,
             )
-            response = supabase.rpc(
-                "search_documents_vector",
-                {
-                    "q": query_embedding,
-                    "p_top_k": top_k,
-                    "p_user": user_id,
-                    "p_workspace": workspace_id,
-                },
-            ).execute()
+            response = execute_query_sync(
+                supabase.rpc(
+                    "search_documents_vector",
+                    {
+                        "q": query_embedding,
+                        "p_top_k": top_k,
+                        "p_user": user_id,
+                        "p_workspace": workspace_id,
+                    },
+                ),
+                operation="pgvector semantic search",
+            )
 
             data = getattr(response, "data", None) or []
             results = []

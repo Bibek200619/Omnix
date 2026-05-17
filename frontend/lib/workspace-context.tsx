@@ -5,6 +5,11 @@ import { apiClient } from "./api";
 import { useAuth } from "./auth-context";
 import { getWorkspaceInviteId, type Workspace, type WorkspaceInvite, type WorkspaceMember } from "./workspace-types";
 
+type RefreshOptions = {
+  force?: boolean;
+  silent?: boolean;
+};
+
 type WorkspaceContextType = {
   workspaces: Workspace[];
   loading: boolean;
@@ -18,9 +23,9 @@ type WorkspaceContextType = {
   invitesLoading: boolean;
   pendingInvitesLoading: boolean;
   setActiveWorkspace: (id: string | null) => void;
-  refreshWorkspaces: () => Promise<void>;
-  refreshActiveWorkspaceData: () => Promise<void>;
-  refreshPendingInvites: () => Promise<void>;
+  refreshWorkspaces: (options?: RefreshOptions) => Promise<void>;
+  refreshActiveWorkspaceData: (options?: RefreshOptions) => Promise<void>;
+  refreshPendingInvites: (options?: RefreshOptions) => Promise<void>;
   createWorkspace: (payload: { name: string; description?: string }) => Promise<Workspace>;
   renameWorkspace: (workspaceId: string, payload: { name: string; description?: string | null }) => Promise<Workspace>;
   deleteWorkspace: (workspaceId: string) => Promise<void>;
@@ -36,6 +41,11 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefin
 function workspaceStorageKey() {
   return "omnix.activeWorkspaceId";
 }
+
+const WORKSPACE_SILENT_REFRESH_MIN_MS = 15_000;
+const PENDING_INVITES_POLL_INTERVAL_MS = 60_000;
+const PENDING_INVITES_SILENT_REFRESH_MIN_MS = 30_000;
+const ACTIVE_WORKSPACE_DATA_MIN_MS = 45_000;
 
 const inviteStatusRank: Record<WorkspaceInvite["status"], number> = {
   pending: 0,
@@ -88,6 +98,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [pendingInvitesLoading, setPendingInvitesLoading] = useState(false);
   const workspaceFetchIdRef = useRef(0);
   const createWorkspaceInFlightRef = useRef<Map<string, Promise<Workspace>>>(new Map());
+  const workspaceRefreshInFlightRef = useRef<Promise<void> | null>(null);
+  const pendingInvitesInFlightRef = useRef<Promise<void> | null>(null);
+  const activeWorkspaceDataInFlightRef = useRef<Promise<void> | null>(null);
+  const lastWorkspaceRefreshAtRef = useRef(0);
+  const lastPendingInvitesRefreshAtRef = useRef(0);
+  const lastActiveWorkspaceDataRefreshAtRef = useRef(0);
 
   const activeWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) || null,
@@ -110,53 +126,97 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const refreshWorkspaces = useCallback(async () => {
+  const refreshWorkspaces = useCallback(async (options?: RefreshOptions) => {
+    const now = Date.now();
+    if (
+      options?.silent &&
+      !options.force &&
+      now - lastWorkspaceRefreshAtRef.current < WORKSPACE_SILENT_REFRESH_MIN_MS
+    ) {
+      return;
+    }
+
+    if (workspaceRefreshInFlightRef.current) {
+      return workspaceRefreshInFlightRef.current;
+    }
+
     const requestId = workspaceFetchIdRef.current + 1;
     workspaceFetchIdRef.current = requestId;
-    console.debug("[workspace] refresh start", { requestId });
 
-    try {
-      setLoading(true);
-      const data = await apiClient.get<Workspace[]>("/workspaces");
-      if (workspaceFetchIdRef.current !== requestId) {
-        console.debug("[workspace] ignored stale refresh", { requestId });
-        return;
+    const request = (async () => {
+      try {
+        if (!options?.silent) {
+          setLoading(true);
+        }
+        const data = await apiClient.get<Workspace[]>("/workspaces");
+        if (workspaceFetchIdRef.current !== requestId) {
+          return;
+        }
+        setWorkspaces(data || []);
+        setError(null);
+        lastWorkspaceRefreshAtRef.current = Date.now();
+      } catch (err) {
+        if (workspaceFetchIdRef.current !== requestId) {
+          return;
+        }
+        setError(err instanceof Error ? err.message : "Failed to load workspaces");
+        if (!options?.silent) {
+          setWorkspaces([]);
+        }
+      } finally {
+        if (workspaceFetchIdRef.current === requestId && !options?.silent) {
+          setLoading(false);
+        }
+        workspaceRefreshInFlightRef.current = null;
       }
-      console.debug("[workspace] refresh success", { requestId, count: data?.length ?? 0 });
-      setWorkspaces(data || []);
-      setError(null);
-    } catch (err) {
-      if (workspaceFetchIdRef.current !== requestId) {
-        return;
-      }
-      console.debug("[workspace] refresh failed", { requestId, err });
-      setError(err instanceof Error ? err.message : "Failed to load workspaces");
-      setWorkspaces([]);
-    } finally {
-      if (workspaceFetchIdRef.current === requestId) {
-        setLoading(false);
-      }
-    }
+    })();
+
+    workspaceRefreshInFlightRef.current = request;
+    return request;
   }, []);
 
-  const refreshPendingInvites = useCallback(async () => {
+  const refreshPendingInvites = useCallback(async (options?: RefreshOptions) => {
     if (!user) {
       setPendingInvites([]);
       return;
     }
 
-    try {
-      setPendingInvitesLoading(true);
-      const data = await apiClient.get<WorkspaceInvite[]>("/workspace-invites");
-      setPendingInvites(sortWorkspaceInvites(data || []));
-    } catch (err) {
-      console.error("Failed to load pending invites", err);
-    } finally {
-      setPendingInvitesLoading(false);
+    const now = Date.now();
+    if (
+      options?.silent &&
+      !options.force &&
+      now - lastPendingInvitesRefreshAtRef.current < PENDING_INVITES_SILENT_REFRESH_MIN_MS
+    ) {
+      return;
     }
+
+    if (pendingInvitesInFlightRef.current) {
+      return pendingInvitesInFlightRef.current;
+    }
+
+    const request = (async () => {
+      try {
+        if (!options?.silent) {
+          setPendingInvitesLoading(true);
+        }
+        const data = await apiClient.get<WorkspaceInvite[]>("/workspace-invites");
+        setPendingInvites(sortWorkspaceInvites(data || []));
+        lastPendingInvitesRefreshAtRef.current = Date.now();
+      } catch (err) {
+        console.error("Failed to load pending invites", err);
+      } finally {
+        if (!options?.silent) {
+          setPendingInvitesLoading(false);
+        }
+        pendingInvitesInFlightRef.current = null;
+      }
+    })();
+
+    pendingInvitesInFlightRef.current = request;
+    return request;
   }, [user]);
 
-  const refreshActiveWorkspaceData = useCallback(async () => {
+  const refreshActiveWorkspaceData = useCallback(async (options?: RefreshOptions) => {
     if (!activeWorkspaceId) {
       setActiveMembers([]);
       setActiveInvites([]);
@@ -168,31 +228,63 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    try {
-      setMembersLoading(true);
-      const members = await apiClient.get<WorkspaceMember[]>(`/workspaces/${activeWorkspaceId}/members`);
-      setActiveMembers(members || []);
-    } catch (err) {
-      console.error("Failed to load workspace members", err);
-      setActiveMembers([]);
-    } finally {
-      setMembersLoading(false);
-    }
-
-    if (activeWorkspace.current_user_role !== "owner") {
-      setActiveInvites([]);
+    const now = Date.now();
+    if (
+      options?.silent &&
+      !options.force &&
+      now - lastActiveWorkspaceDataRefreshAtRef.current < ACTIVE_WORKSPACE_DATA_MIN_MS
+    ) {
       return;
     }
 
-    try {
-      setInvitesLoading(true);
-      const invites = await apiClient.get<WorkspaceInvite[]>(`/workspaces/${activeWorkspaceId}/invites`);
-      setActiveInvites((current) => reconcileWorkspaceInvites(current, invites || []));
-    } catch (err) {
-      console.error("Failed to load workspace invites", err);
-    } finally {
-      setInvitesLoading(false);
+    if (activeWorkspaceDataInFlightRef.current) {
+      return activeWorkspaceDataInFlightRef.current;
     }
+
+    const request = (async () => {
+      try {
+        if (!options?.silent) {
+          setMembersLoading(true);
+        }
+        const members = await apiClient.get<WorkspaceMember[]>(`/workspaces/${activeWorkspaceId}/members`);
+        setActiveMembers(members || []);
+      } catch (err) {
+        console.error("Failed to load workspace members", err);
+        if (!options?.silent) {
+          setActiveMembers([]);
+        }
+      } finally {
+        if (!options?.silent) {
+          setMembersLoading(false);
+        }
+      }
+
+      if (activeWorkspace.current_user_role !== "owner") {
+        setActiveInvites([]);
+        lastActiveWorkspaceDataRefreshAtRef.current = Date.now();
+        activeWorkspaceDataInFlightRef.current = null;
+        return;
+      }
+
+      try {
+        if (!options?.silent) {
+          setInvitesLoading(true);
+        }
+        const invites = await apiClient.get<WorkspaceInvite[]>(`/workspaces/${activeWorkspaceId}/invites`);
+        setActiveInvites((current) => reconcileWorkspaceInvites(current, invites || []));
+        lastActiveWorkspaceDataRefreshAtRef.current = Date.now();
+      } catch (err) {
+        console.error("Failed to load workspace invites", err);
+      } finally {
+        if (!options?.silent) {
+          setInvitesLoading(false);
+        }
+        activeWorkspaceDataInFlightRef.current = null;
+      }
+    })();
+
+    activeWorkspaceDataInFlightRef.current = request;
+    return request;
   }, [activeWorkspace, activeWorkspaceId]);
 
   const createWorkspace = useCallback(async (payload: { name: string; description?: string }) => {
@@ -271,7 +363,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.delete(`/workspaces/${workspaceId}`);
       console.debug("[workspace] delete success", { workspaceId });
-      await refreshWorkspaces();
+      await refreshWorkspaces({ force: true });
     } catch (err) {
       console.debug("[workspace] delete failed; rolling back", { workspaceId, err });
       setWorkspaces(previousWorkspaces);
@@ -310,7 +402,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
       await apiClient.delete(`/workspaces/${activeWorkspaceId}/members/${userId}`);
       setActiveMembers((current) => current.filter((member) => member.user_id !== userId));
-      await refreshWorkspaces();
+      await refreshWorkspaces({ force: true });
     },
     [activeWorkspaceId, refreshWorkspaces],
   );
@@ -333,7 +425,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setPendingInvites((current) => current.filter((invite) => getWorkspaceInviteId(invite) !== inviteId));
       setWorkspaces((current) => [workspace, ...current.filter((item) => item.id !== workspace.id)]);
       setActiveWorkspace(workspace.id);
-      await refreshWorkspaces();
+      await refreshWorkspaces({ force: true });
       return workspace;
     },
     [refreshWorkspaces, setActiveWorkspace],
@@ -360,8 +452,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    refreshWorkspaces();
-    refreshPendingInvites();
+    refreshWorkspaces({ force: true });
+    refreshPendingInvites({ force: true });
 
     try {
       const saved = typeof window !== "undefined" ? window.localStorage.getItem(workspaceStorageKey()) : null;
@@ -380,12 +472,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
 
     const intervalId = window.setInterval(() => {
-      void refreshPendingInvites();
-    }, 60_000);
+      if (document.visibilityState !== "hidden") {
+        void refreshPendingInvites({ silent: true });
+      }
+    }, PENDING_INVITES_POLL_INTERVAL_MS);
 
     function handleVisibilityChange() {
       if (document.visibilityState === "visible") {
-        void refreshPendingInvites();
+        void refreshPendingInvites({ silent: true });
       }
     }
 
@@ -420,7 +514,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [activeWorkspaceId, loading, setActiveWorkspace, user, workspaces]);
 
   useEffect(() => {
-    void refreshActiveWorkspaceData();
+    lastActiveWorkspaceDataRefreshAtRef.current = 0;
+    activeWorkspaceDataInFlightRef.current = null;
+    void refreshActiveWorkspaceData({ force: true });
   }, [refreshActiveWorkspaceData]);
 
   const value = useMemo(
