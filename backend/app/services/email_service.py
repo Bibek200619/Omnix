@@ -27,6 +27,12 @@ def build_invite_accept_url(invite_id: str) -> str:
     return f"{_app_url()}/invite?{urlencode({'invite': invite_id})}"
 
 
+def _email_log_domain(email: str | None) -> str:
+    if not email or "@" not in email:
+        return "unknown"
+    return email.rsplit("@", 1)[-1] or "unknown"
+
+
 def _invite_email_html(
     *,
     workspace_name: str,
@@ -103,9 +109,9 @@ async def send_workspace_invite_email(
 
     if not api_key:
         logger.info(
-            "Skipping workspace invite email because RESEND_API_KEY is not configured | invite_id=%s | to=%s",
+            "Skipping workspace invite email because RESEND_API_KEY is not configured | invite_id=%s | to_domain=%s",
             invite_id,
-            to_email,
+            _email_log_domain(to_email),
         )
         return EmailDeliveryResult(status="skipped", detail="RESEND_API_KEY is not configured")
 

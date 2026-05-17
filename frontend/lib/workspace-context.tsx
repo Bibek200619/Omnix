@@ -3,7 +3,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "./api";
 import { useAuth } from "./auth-context";
-import type { Workspace, WorkspaceInvite, WorkspaceMember } from "./workspace-types";
+import { getWorkspaceInviteId, type Workspace, type WorkspaceInvite, type WorkspaceMember } from "./workspace-types";
 
 type WorkspaceContextType = {
   workspaces: Workspace[];
@@ -251,7 +251,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const invite = await apiClient.post<WorkspaceInvite>(`/workspaces/${activeWorkspaceId}/invites`, {
         email,
       });
-      setActiveInvites((current) => [invite, ...current.filter((item) => item.id !== invite.id)]);
+      const nextInviteId = getWorkspaceInviteId(invite);
+      setActiveInvites((current) => [
+        invite,
+        ...current.filter((item) => getWorkspaceInviteId(item) !== nextInviteId),
+      ]);
     },
     [activeWorkspaceId],
   );
@@ -276,7 +280,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
 
       await apiClient.delete(`/workspaces/${activeWorkspaceId}/invites/${inviteId}`);
-      setActiveInvites((current) => current.filter((invite) => invite.id !== inviteId));
+      setActiveInvites((current) => current.filter((invite) => getWorkspaceInviteId(invite) !== inviteId));
     },
     [activeWorkspaceId],
   );
@@ -284,7 +288,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const acceptInvite = useCallback(
     async (inviteId: string) => {
       const workspace = await apiClient.post<Workspace>(`/workspace-invites/${inviteId}/accept`);
-      setPendingInvites((current) => current.filter((invite) => invite.id !== inviteId));
+      setPendingInvites((current) => current.filter((invite) => getWorkspaceInviteId(invite) !== inviteId));
       setWorkspaces((current) => [workspace, ...current.filter((item) => item.id !== workspace.id)]);
       setActiveWorkspace(workspace.id);
       await refreshWorkspaces();
@@ -296,7 +300,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const declineInvite = useCallback(
     async (inviteId: string) => {
       await apiClient.post(`/workspace-invites/${inviteId}/decline`);
-      setPendingInvites((current) => current.filter((invite) => invite.id !== inviteId));
+      setPendingInvites((current) => current.filter((invite) => getWorkspaceInviteId(invite) !== inviteId));
     },
     [],
   );

@@ -25,7 +25,7 @@ BEGIN
       email text NOT NULL,
       role text NOT NULL DEFAULT 'member',
       status text NOT NULL DEFAULT 'pending',
-      invited_by_user_id uuid NOT NULL,
+      invited_by uuid NOT NULL,
       accepted_by_user_id uuid,
       created_at timestamptz DEFAULT now(),
       updated_at timestamptz DEFAULT now(),
@@ -79,14 +79,14 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'workspace_invites_invited_by_user_id_fkey'
+    SELECT 1 FROM pg_constraint WHERE conname = 'workspace_invites_invited_by_fkey'
   ) THEN
     BEGIN
       ALTER TABLE workspace_invites
-      ADD CONSTRAINT workspace_invites_invited_by_user_id_fkey
-      FOREIGN KEY (invited_by_user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+      ADD CONSTRAINT workspace_invites_invited_by_fkey
+      FOREIGN KEY (invited_by) REFERENCES auth.users(id) ON DELETE CASCADE;
     EXCEPTION WHEN undefined_table OR undefined_object THEN
-      RAISE NOTICE 'Skipping workspace_invites.invited_by_user_id FK creation - auth.users not available.';
+      RAISE NOTICE 'Skipping workspace_invites.invited_by FK creation - auth.users not available.';
     END;
   END IF;
 

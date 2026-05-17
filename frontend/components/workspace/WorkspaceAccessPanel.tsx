@@ -6,7 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
 import { useWorkspace } from "@/lib/workspace-context";
-import type { WorkspaceMember } from "@/lib/workspace-types";
+import { getWorkspaceInviteId, type WorkspaceMember } from "@/lib/workspace-types";
 import { PendingWorkspaceInvites } from "./PendingWorkspaceInvites";
 import { WorkspaceInviteModal } from "./WorkspaceInviteModal";
 import { WorkspaceMemberStack, workspaceMemberName } from "./WorkspaceMemberStack";
@@ -197,25 +197,29 @@ export function WorkspaceAccessPanel() {
                     No pending invites.
                   </div>
                 ) : (
-                  outgoingPendingInvites.map((invite) => (
-                    <div key={invite.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-                      <div className="text-sm font-medium text-white">{invite.email}</div>
-                      <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-400">
-                        <span>{invite.status}</span>
-                        <ClientTime value={invite.created_at} fallback="Recently" format="date" />
+                  outgoingPendingInvites.map((invite) => {
+                    const inviteId = getWorkspaceInviteId(invite);
+
+                    return (
+                      <div key={inviteId} className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                        <div className="text-sm font-medium text-white">{invite.email}</div>
+                        <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-400">
+                          <span>{invite.status}</span>
+                          <ClientTime value={invite.created_at} fallback="Recently" format="date" />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="mt-3"
+                          onClick={() => handleRevokeInvite(inviteId)}
+                          isLoading={busyKey === `invite:${inviteId}`}
+                        >
+                          Revoke
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="mt-3"
-                        onClick={() => handleRevokeInvite(invite.id)}
-                        isLoading={busyKey === `invite:${invite.id}`}
-                      >
-                        Revoke
-                      </Button>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
