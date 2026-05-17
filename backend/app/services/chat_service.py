@@ -211,7 +211,7 @@ class OllamaChatService:
                 await asyncio.sleep(0.25 * (2**attempt))
 
         raise ModelServiceError(
-            "Model service unavailable. Ensure Ollama is running and gemma:2b is installed.",
+            "Model service unavailable. Ensure Ollama is running and phi3:latest is installed.",
             status.HTTP_503_SERVICE_UNAVAILABLE,
         ) from last_error
 
@@ -253,7 +253,7 @@ class OllamaChatService:
         except httpx.HTTPError as exc:
             logger.warning("Ollama stream failed: %s", exc)
             raise ModelServiceError(
-                "Model service unavailable. Ensure Ollama is running and gemma:2b is installed.",
+                "Model service unavailable. Ensure Ollama is running and phi3:latest is installed.",
                 status.HTTP_503_SERVICE_UNAVAILABLE,
             ) from exc
 

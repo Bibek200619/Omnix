@@ -7,13 +7,13 @@ os.environ["SUPABASE_ANON_KEY"] = "anon"
 os.environ["SUPABASE_SERVICE_ROLE_KEY"] = "service"
 os.environ["DEV_MODE"] = "false"
 os.environ["MODEL_URL"] = "http://127.0.0.1:11434/v1/chat/completions"
-os.environ["AI_MODEL"] = "gemma:2b"
+os.environ["AI_MODEL"] = "phi3:latest"
 
 from app.services import chat_service
 from app.services.chat_service import AIMessage, AIGeneration, OllamaChatService
 
 
-def test_build_payload_uses_gemma_and_preserves_context():
+def test_build_payload_uses_phi3_and_preserves_context():
     service = OllamaChatService()
 
     payload = service._build_payload(
@@ -23,7 +23,7 @@ def test_build_payload_uses_gemma_and_preserves_context():
         stream=False,
     )
 
-    assert payload["model"] == "gemma:2b"
+    assert payload["model"] == "phi3:latest"
     assert payload["temperature"] == 0.1
     assert payload["stream"] is False
     assert payload["messages"][0]["role"] == "system"
@@ -54,15 +54,15 @@ async def test_call_llm_uses_service_abstraction(monkeypatch):
         async def generate(self, prompt, context=None, **kwargs):
             assert prompt == "Summarize this"
             assert context == [AIMessage(role="user", content="Prior context")]
-            assert kwargs["model"] == "gemma:2b"
-            return AIGeneration(content="Done", model="gemma:2b")
+            assert kwargs["model"] == "phi3:latest"
+            return AIGeneration(content="Done", model="phi3:latest")
 
     monkeypatch.setattr(chat_service, "get_chat_service", lambda: FakeService())
 
     result = await chat_service.generate_ai_response(
         "Summarize this",
         context=[AIMessage(role="user", content="Prior context")],
-        model="gemma:2b",
+        model="phi3:latest",
     )
 
     assert result.content == "Done"

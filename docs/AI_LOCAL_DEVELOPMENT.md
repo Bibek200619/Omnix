@@ -10,7 +10,7 @@ Next.js frontend
   -> chat service
   -> retrieval/context layer
   -> Ollama OpenAI-compatible API
-  -> gemma:2b
+  -> phi3:latest
 ```
 
 The service layer is designed so RAG, workspace memory, tools, and future agent orchestration can inject context before generation without changing frontend contracts.
@@ -31,13 +31,13 @@ SUPABASE_JWKS_URL=https://your-project.supabase.co/auth/v1/.well-known/jwks.json
 REDIS_URL=redis://localhost:6379/0
 
 MODEL_URL=http://localhost:11434/v1/chat/completions
-AI_MODEL=gemma:2b
+AI_MODEL=phi3:latest
 AI_REQUEST_TIMEOUT_SECONDS=60
 AI_STREAM_TIMEOUT_SECONDS=120
 AI_MAX_RETRIES=2
 AI_MAX_OUTPUT_TOKENS=900
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_DEFAULT_MODEL=gemma:2b
+OLLAMA_DEFAULT_MODEL=phi3:latest
 ```
 
 Frontend `.env.local`:
@@ -45,15 +45,15 @@ Frontend `.env.local`:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_public_anon_key
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_API_BASE_URL=http://18.204.231.209
 ```
 
 ## Local Startup
 
 ```bash
 ollama serve
-ollama pull gemma:2b
-ollama run gemma:2b "Say hello from Omnix."
+ollama pull phi3:latest
+ollama run phi3:latest "Say hello from Omnix."
 ```
 
 ```bash
@@ -90,7 +90,7 @@ Direct Ollama:
 curl http://localhost:11434/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gemma:2b",
+    "model": "phi3:latest",
     "messages": [{"role": "user", "content": "Explain Omnix in one sentence."}],
     "stream": false
   }'
@@ -152,7 +152,7 @@ Recommended commands:
 ```bash
 git checkout main
 git pull origin main
-git checkout -b codex/ollama-gemma-chat
+git checkout -b codex/ollama-phi3-chat
 
 cd backend && source venv/bin/activate && pytest
 cd ../frontend && npm run lint && npm run build
@@ -175,13 +175,13 @@ Keep production variables separate from local variables. The frontend must never
 Current EC2 public IPv4 address:
 
 ```text
-54.172.104.28
+18.204.231.209
 ```
 
 Temporary Vercel production API variable until DNS and SSL are ready:
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=http://54.172.104.28
+NEXT_PUBLIC_API_BASE_URL=http://18.204.231.209
 ```
 
 After `api.omni-x.co.in` is configured with HTTPS, switch Vercel to:
