@@ -6,6 +6,8 @@ export type WorkspaceMember = {
   role: WorkspaceRole;
   email?: string | null;
   full_name?: string | null;
+  handle?: string | null;
+  avatar_url?: string | null;
   avatar_label: string;
   created_at?: string | null;
   updated_at?: string | null;
@@ -18,7 +20,7 @@ export type WorkspaceInvite = {
   invite_id: string;
   workspace_id: string;
   email: string;
-  role: "member";
+  role: "co_owner" | "member";
   status: WorkspaceInviteStatus;
   invited_by?: string | null;
   accepted_by_user_id?: string | null;

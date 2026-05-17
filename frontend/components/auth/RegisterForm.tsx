@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, UserRound, UserPlus } from "lucide-react";
+import { AtSign, Lock, Mail, UserRound, UserPlus } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
 import { Input } from "@/components/ui/Input";
 import { LoadingButton } from "@/components/ui/LoadingButton";
+import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 
@@ -43,8 +44,15 @@ export function RegisterForm() {
 
     const formData = new FormData(event.currentTarget);
     const name = String(formData.get("name") ?? "").trim();
+    const handle = String(formData.get("handle") ?? "").trim().replace(/^@/, "").toLowerCase();
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
+
+    if (!/^[a-z0-9][a-z0-9_-]{2,29}$/.test(handle)) {
+      setError("Choose a handle with 3-30 lowercase letters, numbers, hyphens, or underscores.");
+      setLoading(false);
+      return;
+    }
 
     try {
       const { data, error: signUpError } = await supabase.auth.signUp({
@@ -53,6 +61,7 @@ export function RegisterForm() {
         options: {
           data: {
             full_name: name || undefined,
+            handle,
           },
         },
       });
@@ -64,6 +73,11 @@ export function RegisterForm() {
       }
 
       if (data.session) {
+        await refreshSession();
+        await apiClient.patch("/profile", {
+          display_name: name || undefined,
+          handle,
+        });
         await refreshSession();
         router.replace(safeRedirectPath());
         router.refresh();
@@ -100,6 +114,20 @@ export function RegisterForm() {
         autoComplete="name"
         placeholder="Alex Morgan"
         icon={<UserRound className="h-4 w-4" />}
+        disabled={loading || !isConfigured}
+      />
+      <Input
+        id="handle"
+        name="handle"
+        label="Omnix handle"
+        type="text"
+        autoComplete="username"
+        placeholder="alex-morgan"
+        required
+        minLength={3}
+        maxLength={30}
+        icon={<AtSign className="h-4 w-4" />}
+        hint="Unique ID for workspace invites. Lowercase letters, numbers, hyphens, and underscores."
         disabled={loading || !isConfigured}
       />
       <Input

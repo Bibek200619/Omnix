@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { LogOut, Settings, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { useProfile } from "@/lib/profile-context";
 import { cn } from "@/lib/utils";
-import { initialsFromText } from "@/lib/workspace-roles";
 
 type ProfileMenuProps = {
   user: User | null;
@@ -21,11 +22,12 @@ function userDisplayName(user: User | null) {
 
 export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenuProps) {
   const router = useRouter();
+  const { profile } = useProfile();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const displayName = userDisplayName(user);
-  const email = user?.email ?? "";
-  const initials = initialsFromText(displayName || email);
+  const displayName = profile?.display_name || userDisplayName(user);
+  const email = profile?.email || user?.email || "";
+  const handle = profile?.handle ? `@${profile.handle}` : null;
 
   useEffect(() => {
     if (!open) return;
@@ -50,9 +52,9 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
     };
   }, [open]);
 
-  function goToSettings(hash?: string) {
+  function goTo(path: string) {
     setOpen(false);
-    router.push(hash ? `/settings${hash}` : "/settings");
+    router.push(path);
   }
 
   return (
@@ -71,7 +73,13 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
             : "border-white/12 bg-white/[0.075] text-slate-100 hover:border-cyan-300/35 hover:bg-white/[0.11]",
         )}
       >
-        {initials}
+        <ProfileAvatar
+          name={displayName}
+          email={email}
+          handle={profile?.handle}
+          avatarUrl={profile?.avatar_url}
+          className="h-full w-full border-0 bg-transparent"
+        />
       </button>
 
       {open ? (
@@ -81,12 +89,17 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
         >
           <div className="border-b border-white/8 px-4 py-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-cyan-300/30 bg-cyan-300/12 text-sm font-semibold text-cyan-50">
-                {initials}
-              </div>
+              <ProfileAvatar
+                name={displayName}
+                email={email}
+                handle={profile?.handle}
+                avatarUrl={profile?.avatar_url}
+                className="h-10 w-10 border-cyan-300/30 bg-cyan-300/12 text-cyan-50"
+              />
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-white">{displayName}</div>
                 {email ? <div className="mt-0.5 truncate text-xs text-slate-500">{email}</div> : null}
+                {handle ? <div className="mt-0.5 truncate text-xs font-medium text-cyan-200">{handle}</div> : null}
               </div>
             </div>
           </div>
@@ -95,7 +108,7 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
             <button
               type="button"
               role="menuitem"
-              onClick={() => goToSettings("#profile")}
+              onClick={() => goTo("/settings/profile")}
               className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm text-slate-300 transition hover:bg-white/[0.07] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
             >
               <UserRound className="h-4 w-4 text-cyan-200" />
@@ -104,11 +117,11 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
             <button
               type="button"
               role="menuitem"
-              onClick={() => goToSettings()}
+              onClick={() => goTo("/settings/workspace")}
               className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm text-slate-300 transition hover:bg-white/[0.07] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
             >
               <Settings className="h-4 w-4 text-slate-400" />
-              Settings
+              Workspace Settings
             </button>
           </div>
 
