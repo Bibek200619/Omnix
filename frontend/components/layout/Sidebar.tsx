@@ -732,7 +732,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 size="sm"
                 variant="secondary"
                 className="mt-3 w-full"
-                onClick={refreshConversations}
+                onClick={() => void refreshConversations()}
               >
                 Retry
               </Button>

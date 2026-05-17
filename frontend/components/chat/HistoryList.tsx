@@ -128,7 +128,7 @@ export function HistoryList() {
               type="button"
               size="sm"
               variant="secondary"
-              onClick={refreshConversations}
+              onClick={() => void refreshConversations()}
             >
               Retry
             </Button>

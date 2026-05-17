@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ConversationSummary } from "@/components/chat/types";
@@ -19,7 +20,7 @@ type ConversationHistoryContextType = {
   loading: boolean;
   error: string | null;
   activeConversationId: string | null;
-  refreshConversations: () => Promise<void>;
+  refreshConversations: (options?: { silent?: boolean }) => Promise<void>;
   setActiveConversation: (conversationId: string | null) => void;
   upsertConversation: (conversation: ConversationSummary) => void;
   renameConversation: (conversationId: string, title: string) => Promise<void>;
@@ -56,6 +57,7 @@ export function ConversationHistoryProvider({
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
     null,
   );
+  const refreshInFlightRef = useRef(false);
 
   const setActiveConversation = useCallback((conversationId: string | null) => {
     setActiveConversationId(conversationId);
@@ -73,17 +75,29 @@ export function ConversationHistoryProvider({
     window.localStorage.removeItem(key);
   }, [activeWorkspaceId]);
 
-  const refreshConversations = useCallback(async () => {
+  const refreshConversations = useCallback(async (options?: { silent?: boolean }) => {
+    if (refreshInFlightRef.current) {
+      return;
+    }
+
+    refreshInFlightRef.current = true;
     try {
-      setLoading(true);
+      if (!options?.silent) {
+        setLoading(true);
+      }
       const data = await apiClient.get<ConversationSummary[]>("/conversations");
       setConversations(sortConversations(data));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load conversations");
-      setConversations([]);
+      if (!options?.silent) {
+        setConversations([]);
+      }
     } finally {
-      setLoading(false);
+      if (!options?.silent) {
+        setLoading(false);
+      }
+      refreshInFlightRef.current = false;
     }
   }, []);
 
@@ -158,6 +172,29 @@ export function ConversationHistoryProvider({
 
     refreshConversations();
   }, [activeWorkspaceId, refreshConversations, setActiveConversation, user]);
+
+  useEffect(() => {
+    if (!user || typeof window === "undefined") {
+      return;
+    }
+
+    const refreshSilently = () => {
+      if (document.visibilityState === "hidden") {
+        return;
+      }
+      void refreshConversations({ silent: true });
+    };
+
+    const intervalId = window.setInterval(refreshSilently, 10_000);
+    window.addEventListener("focus", refreshSilently);
+    document.addEventListener("visibilitychange", refreshSilently);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshSilently);
+      document.removeEventListener("visibilitychange", refreshSilently);
+    };
+  }, [refreshConversations, user]);
 
   useEffect(() => {
     if (!activeConversationId) {
