@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, LogOut, Mail, Menu, MessageSquarePlus, Users } from "lucide-react";
+import { AlertCircle, LogOut, Menu, MessageSquarePlus, Users } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
+import { InviteNotificationBar, InviteNotificationBell } from "@/components/workspace/InviteNotifications";
 import { ActionsMenu } from "@/components/actions/ActionsMenu";
 
 const routeTitles = [
@@ -25,7 +26,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { signOut } = useAuth();
-  const { activeWorkspace, activeMembers, pendingInvites } = useWorkspace();
+  const { activeWorkspace, activeMembers } = useWorkspace();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const active =
@@ -52,6 +53,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-canvas/85 backdrop-blur-xl">
+      <InviteNotificationBar />
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <Button
@@ -84,21 +86,7 @@ export function Header({ onMenuClick }: HeaderProps) {
               <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} />
             </div>
           ) : null}
-          {pendingInvites.length > 0 ? (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className="hidden md:inline-flex"
-              leftIcon={<Mail className="h-3.5 w-3.5" />}
-              onClick={() => router.push("/settings")}
-            >
-              Invites
-              <span className="ml-1 rounded-full bg-cyan-300/15 px-1.5 text-[11px] text-cyan-100">
-                {pendingInvites.length}
-              </span>
-            </Button>
-          ) : null}
+          <InviteNotificationBell />
           <ActionsMenu className="inline-flex" />
           <Button
             type="button"

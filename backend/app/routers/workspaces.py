@@ -24,6 +24,7 @@ from ..services.supabase_service import (
     select_one_trusted,
     update_one_trusted,
 )
+from ..services.email_service import send_workspace_invite_email
 from ..services.workspace_service import (
     WORKSPACE_COLUMNS,
     WORKSPACE_INVITE_COLUMNS,
@@ -111,6 +112,21 @@ def _database_error() -> HTTPException:
     )
 
 
+def _inviter_label(current_user: Any) -> str:
+    metadata = (
+        current_user.get("user_metadata", {})
+        if isinstance(current_user, Mapping)
+        else getattr(current_user, "user_metadata", {})
+    )
+    name = None
+    if isinstance(metadata, Mapping):
+        name = metadata.get("full_name") or metadata.get("name")
+    email = user_email_from_claims(current_user)
+    if isinstance(name, str) and name.strip():
+        return f"{name.strip()} ({email})" if email else name.strip()
+    return email or "A teammate"
+
+
 def _is_missing_supabase_column(exc: SupabaseServiceError, column: str) -> bool:
     root_error = exc.__cause__ or exc
     message = str(root_error).lower()
@@ -135,6 +151,37 @@ async def _enriched_workspace_for_user(
         "is_shared": len(members) > 1,
         "members_preview": members[:3],
     }
+
+
+async def _insert_workspace_invite(
+    *,
+    workspace_id: str,
+    email: str,
+    inviter_user_id: str,
+    timestamp: str,
+) -> dict[str, Any]:
+    base_payload = {
+        "workspace_id": workspace_id,
+        "email": email,
+        "role": "member",
+        "status": "pending",
+        "created_at": timestamp,
+        "updated_at": timestamp,
+    }
+    preferred_payload = {**base_payload, "invited_by_user_id": inviter_user_id}
+
+    try:
+        return await insert_one_trusted("workspace_invites", preferred_payload)
+    except SupabaseServiceError as exc:
+        if not _is_missing_supabase_column(exc, "invited_by_user_id"):
+            raise
+        logger.warning(
+            "workspace_invites.invited_by_user_id unavailable; retrying invite insert with invited_by | workspace_id=%s",
+            workspace_id,
+        )
+
+    fallback_payload = {**base_payload, "invited_by": inviter_user_id}
+    return await insert_one_trusted("workspace_invites", fallback_payload)
 
 
 async def _pending_workspace_invites_for_user(current_user: Any) -> list[dict[str, Any]]:
@@ -506,17 +553,11 @@ async def invite_workspace_member(
             user_id,
             _safe_current_user_repr(current_user),
         )
-        created = await insert_one_trusted(
-            "workspace_invites",
-            {
-                "workspace_id": workspace_id,
-                "email": normalized_email,
-                "role": "member",
-                "status": "pending",
-                "invited_by": user_id,
-                "created_at": timestamp,
-                "updated_at": timestamp,
-            },
+        created = await _insert_workspace_invite(
+            workspace_id=workspace_id,
+            email=normalized_email,
+            inviter_user_id=user_id,
+            timestamp=timestamp,
         )
     except SupabaseServiceError as exc:
         logger.exception(
@@ -532,6 +573,21 @@ async def invite_workspace_member(
         created = {**created, "invited_by_user_id": str(created["invited_by"])}
 
     hydrated = await hydrate_invites([created])
+    invite_id = str(created.get("id") or "")
+    if invite_id:
+        email_result = await send_workspace_invite_email(
+            to_email=normalized_email,
+            workspace_name=str(access.workspace.get("name") or "Omnix workspace"),
+            inviter_label=_inviter_label(current_user),
+            invite_id=invite_id,
+        )
+        logger.info(
+            "Workspace invite email delivery result | invite_id=%s | status=%s | provider_id=%s",
+            invite_id,
+            email_result.status,
+            email_result.provider_id,
+        )
+
     return hydrated[0]
 
 
