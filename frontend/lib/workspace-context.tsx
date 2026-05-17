@@ -37,6 +37,43 @@ function workspaceStorageKey() {
   return "omnix.activeWorkspaceId";
 }
 
+const inviteStatusRank: Record<WorkspaceInvite["status"], number> = {
+  pending: 0,
+  accepted: 1,
+  declined: 2,
+  revoked: 3,
+};
+
+function inviteTimestamp(invite: WorkspaceInvite) {
+  return Date.parse(invite.updated_at || invite.created_at || "") || 0;
+}
+
+function sortWorkspaceInvites(invites: WorkspaceInvite[]) {
+  return [...invites].sort((a, b) => {
+    const statusDelta = inviteStatusRank[a.status] - inviteStatusRank[b.status];
+    if (statusDelta !== 0) return statusDelta;
+    return inviteTimestamp(b) - inviteTimestamp(a);
+  });
+}
+
+function reconcileWorkspaceInvites(current: WorkspaceInvite[], incoming: WorkspaceInvite[]) {
+  const incomingIds = new Set(incoming.map((invite) => getWorkspaceInviteId(invite)));
+  const byId = new Map<string, WorkspaceInvite>();
+
+  incoming.forEach((invite) => {
+    byId.set(getWorkspaceInviteId(invite), invite);
+  });
+
+  current.forEach((invite) => {
+    const inviteId = getWorkspaceInviteId(invite);
+    if (invite.status === "pending" && !incomingIds.has(inviteId)) {
+      byId.set(inviteId, invite);
+    }
+  });
+
+  return sortWorkspaceInvites(Array.from(byId.values()));
+}
+
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -111,19 +148,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     try {
       setPendingInvitesLoading(true);
       const data = await apiClient.get<WorkspaceInvite[]>("/workspace-invites");
-      setPendingInvites(data || []);
+      setPendingInvites(sortWorkspaceInvites(data || []));
     } catch (err) {
       console.error("Failed to load pending invites", err);
-      setPendingInvites([]);
     } finally {
       setPendingInvitesLoading(false);
     }
   }, [user]);
 
   const refreshActiveWorkspaceData = useCallback(async () => {
-    if (!activeWorkspaceId || !activeWorkspace) {
+    if (!activeWorkspaceId) {
       setActiveMembers([]);
       setActiveInvites([]);
+      return;
+    }
+
+    if (!activeWorkspace) {
+      setActiveMembers([]);
       return;
     }
 
@@ -146,10 +187,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     try {
       setInvitesLoading(true);
       const invites = await apiClient.get<WorkspaceInvite[]>(`/workspaces/${activeWorkspaceId}/invites`);
-      setActiveInvites(invites || []);
+      setActiveInvites((current) => reconcileWorkspaceInvites(current, invites || []));
     } catch (err) {
       console.error("Failed to load workspace invites", err);
-      setActiveInvites([]);
     } finally {
       setInvitesLoading(false);
     }
@@ -252,10 +292,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         email,
       });
       const nextInviteId = getWorkspaceInviteId(invite);
-      setActiveInvites((current) => [
-        invite,
-        ...current.filter((item) => getWorkspaceInviteId(item) !== nextInviteId),
-      ]);
+      setActiveInvites((current) =>
+        sortWorkspaceInvites([
+          invite,
+          ...current.filter((item) => getWorkspaceInviteId(item) !== nextInviteId),
+        ]),
+      );
     },
     [activeWorkspaceId],
   );

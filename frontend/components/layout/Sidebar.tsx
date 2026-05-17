@@ -17,6 +17,7 @@ import {
   Loader2,
   MessageSquare,
   MessageSquarePlus,
+  PanelLeftClose,
   Plus,
   Search,
   Settings,
@@ -49,7 +50,6 @@ function WorkspaceSelector() {
     loading,
     activeWorkspaceId,
     activeWorkspace,
-    activeMembers,
     pendingInvites,
     setActiveWorkspace,
     createWorkspace,
@@ -75,7 +75,6 @@ function WorkspaceSelector() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const active = activeWorkspace || workspaces.find((w) => w.id === activeWorkspaceId) || null;
-  const memberPreview = activeMembers.length > 0 ? activeMembers : active?.members_preview ?? [];
 
   async function handleCreate() {
     if (!newWorkspaceName.trim() || creatingWorkspace) return;
@@ -162,11 +161,11 @@ function WorkspaceSelector() {
   }
 
   return (
-    <div className="relative mt-3">
+    <div className="relative mt-2">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="group flex w-full items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2.5 text-left transition hover:border-white/20 hover:bg-white/[0.065]"
+        className="group flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left transition hover:border-white/20 hover:bg-white/[0.06]"
         aria-expanded={open}
       >
         <div className="flex min-w-0 items-center gap-2.5">
@@ -181,25 +180,14 @@ function WorkspaceSelector() {
                 <>
                   <span className="h-1 w-1 rounded-full bg-white/20" />
                   <span>{active.member_count} {active.member_count === 1 ? "member" : "members"}</span>
+                  <span className="h-1 w-1 rounded-full bg-white/20" />
+                  <span className="inline-flex items-center gap-1">
+                    {active.is_shared ? <Users className="h-3 w-3" /> : <Globe2 className="h-3 w-3" />}
+                    {active.is_shared ? "Shared" : "Solo"}
+                  </span>
                 </>
               ) : null}
             </div>
-            {active ? (
-              <div className="mt-1.5 flex items-center gap-2">
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
-                    active.is_shared
-                      ? "border-cyan-300/20 bg-cyan-300/10 text-cyan-100"
-                      : "border-white/10 bg-white/[0.04] text-slate-300",
-                  )}
-                >
-                  {active.is_shared ? <Users className="h-3 w-3" /> : <Globe2 className="h-3 w-3" />}
-                  {active.is_shared ? "Shared" : "Solo"}
-                </span>
-                <WorkspaceMemberStack members={memberPreview} totalCount={active.member_count} />
-              </div>
-            ) : null}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -219,7 +207,7 @@ function WorkspaceSelector() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-white/10 bg-[#071017]/95 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-sm"
+            className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-white/10 bg-[#05070b]/98 shadow-[0_18px_60px_rgba(0,0,0,0.55)] ring-1 ring-black/30 backdrop-blur-xl"
           >
             <div className="max-h-64 overflow-y-auto py-1">
               {loading ? (
@@ -240,13 +228,16 @@ function WorkspaceSelector() {
                         setOpen(false);
                       }}
                       className={cn(
-                        "flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition",
+                        "relative flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition",
                         ws.id === activeWorkspaceId
                           ? "bg-cyan-300/10"
                           : "hover:bg-white/[0.06]",
                       )}
                     >
-                      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.045] text-xs font-semibold text-white">{ws.name.charAt(0).toUpperCase()}</div>
+                      {ws.id === activeWorkspaceId ? (
+                        <span className="absolute left-0 h-5 w-0.5 rounded-full bg-cyan-300" />
+                      ) : null}
+                      <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.045] text-[11px] font-semibold text-white">{ws.name.charAt(0).toUpperCase()}</div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-white">{ws.name}</div>
                         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
@@ -254,7 +245,7 @@ function WorkspaceSelector() {
                           <span className="h-1 w-1 rounded-full bg-white/15" />
                           <span>{ws.current_user_role === "owner" ? "Owner" : "Member"}</span>
                         </div>
-                        {ws.description && <div className="mt-1 truncate text-xs text-slate-500">{ws.description}</div>}
+                        {ws.description && <div className="mt-0.5 truncate text-[11px] text-slate-500">{ws.description}</div>}
                       </div>
                       <WorkspaceMemberStack members={ws.members_preview} totalCount={ws.member_count} className="hidden sm:flex" />
                       {ws.id === activeWorkspaceId && (
@@ -534,10 +525,12 @@ function WorkspaceSelector() {
 
 type SidebarProps = {
   isOpen: boolean;
+  collapsed: boolean;
   onClose: () => void;
+  onToggleCollapse: () => void;
 };
 
-export function Sidebar({ isOpen, onClose }: SidebarProps) {
+export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -625,44 +618,58 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-white/10 bg-[#080a0f]/98 shadow-[24px_0_80px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-transform duration-200 lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex w-[17rem] flex-col border-r border-white/10 bg-[#080a0f]/98 shadow-[24px_0_80px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-transform duration-200 ease-out",
           isOpen ? "translate-x-0" : "-translate-x-full",
+          collapsed ? "lg:-translate-x-full" : "lg:translate-x-0",
         )}
       >
-        <div className="flex h-auto items-start justify-between border-b border-white/10 px-5 py-4 lg:py-5">
-          <div className="flex w-full flex-col gap-4">
+        <div className="flex h-auto items-start justify-between border-b border-white/10 px-4 py-3">
+          <div className="flex w-full flex-col gap-3">
             <div className="flex items-center justify-between">
               <Link
                 href="/chat"
                 onClick={onClose}
                 className="flex items-center gap-2"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200">
-                  <Sparkles className="h-5 w-5" />
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200">
+                  <Sparkles className="h-4 w-4" />
                 </span>
                 <div>
                   <span className="block text-sm font-semibold text-white leading-tight">Omnix</span>
                   <span className="text-xs text-slate-500 leading-tight">AI workspace</span>
                 </div>
               </Link>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="lg:hidden"
-                aria-label="Close navigation"
-                title="Close navigation"
-                onClick={onClose}
-              >
-                <X className="h-5 w-5" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="hidden h-8 w-8 lg:inline-flex"
+                  aria-label="Collapse workspace sidebar"
+                  title="Collapse workspace sidebar"
+                  onClick={onToggleCollapse}
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 lg:hidden"
+                  aria-label="Close navigation"
+                  title="Close navigation"
+                  onClick={onClose}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <WorkspaceSelector />
             <PendingWorkspaceInvites compact maxVisible={2} />
           </div>
         </div>
 
-        <nav className="space-y-1 border-b border-white/10 px-3 py-4">
+        <nav className="space-y-1 border-b border-white/10 px-2.5 py-3">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -674,7 +681,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 href={item.href}
                 onClick={onClose}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium transition",
+                  "flex items-center gap-2.5 rounded-md border px-2.5 py-2 text-sm font-medium transition",
                   isActive
                     ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100"
                     : "border-transparent text-slate-400 hover:bg-white/[0.05] hover:text-white",
@@ -687,8 +694,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           })}
         </nav>
 
-        <section className="flex min-h-0 flex-1 flex-col px-3 py-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
+        <section className="flex min-h-0 flex-1 flex-col px-2.5 py-3">
+          <div className="mb-2.5 flex items-center justify-between gap-3">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
               Recent chats
             </p>
@@ -711,7 +718,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             placeholder="Search"
             aria-label="Search recent chats"
             icon={<Search className="h-4 w-4" />}
-            className="mb-3 h-10"
+            className="mb-3 h-9 rounded-md"
             disabled={loading || Boolean(error)}
           />
 
@@ -742,7 +749,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               {[0, 1, 2].map((item) => (
                 <div
                   key={item}
-                  className="shimmer rounded-lg border border-white/10 bg-white/[0.04] p-3"
+                  className="shimmer rounded-md border border-white/10 bg-white/[0.04] p-3"
                 >
                   <div className="h-3 w-4/5 rounded-full bg-white/10" />
                   <div className="mt-3 h-2.5 w-3/5 rounded-full bg-white/10" />
@@ -773,7 +780,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       exit={{ opacity: 0, y: -6 }}
                       transition={{ duration: 0.16, ease: "easeOut" }}
                       className={cn(
-                        "group rounded-lg border px-3 py-2.5 transition",
+                        "group rounded-md border px-2.5 py-2 transition",
                         isActive
                           ? "border-cyan-300/35 bg-cyan-300/10"
                           : "border-transparent hover:border-white/10 hover:bg-white/[0.05]",
@@ -887,7 +894,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               </AnimatePresence>
             </div>
           ) : (
-            <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.03] p-4 text-center">
+            <div className="rounded-md border border-dashed border-white/10 bg-white/[0.03] p-4 text-center">
               <MessageSquare className="mx-auto h-5 w-5 text-cyan-200" />
               <p className="mt-3 text-sm font-medium text-white">
                 {query ? "No matches" : "No conversations yet"}
@@ -901,14 +908,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           )}
         </section>
 
-        <div className="border-t border-white/10 px-4 py-5">
-          <div className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3">
+        <div className="border-t border-white/10 px-3 py-3">
+          <div className="rounded-md border border-white/8 bg-white/[0.03] px-3 py-2.5">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
               <p className="text-xs font-semibold text-white">Synced</p>
             </div>
-            <p className="mt-2 text-xs leading-5 text-slate-400">
-              Your conversations are always available across devices.
+            <p className="mt-1.5 text-xs leading-5 text-slate-400">
+              Conversations stay synced across devices.
             </p>
           </div>
         </div>
