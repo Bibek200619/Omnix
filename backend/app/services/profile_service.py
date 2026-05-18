@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 USER_PROFILE_COLUMNS = "user_id,handle,display_name,avatar_url,created_at,updated_at"
 HANDLE_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{2,29}$")
 AVATAR_DATA_URL_RE = re.compile(r"^data:image/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=\s]+$")
+PROFILE_TIMESTAMP_COLUMNS = {"created_at", "updated_at"}
 
 
 @dataclass(slots=True)
@@ -73,6 +74,26 @@ def validate_avatar_url(value: str | None) -> str | None:
         status_code=status.HTTP_400_BAD_REQUEST,
         detail="Avatar must be an image data URL or http(s) URL.",
     )
+
+
+def _is_missing_supabase_column(exc: SupabaseServiceError, column: str) -> bool:
+    root_error = exc.__cause__ or exc
+    message = str(root_error).lower()
+    normalized_column = column.lower()
+    return normalized_column in message and (
+        "could not find" in message
+        or "does not exist" in message
+        or "schema cache" in message
+    )
+
+
+def _has_missing_profile_timestamp(exc: SupabaseServiceError) -> bool:
+    return any(_is_missing_supabase_column(exc, column) for column in PROFILE_TIMESTAMP_COLUMNS)
+
+
+def _is_unique_profile_violation(exc: SupabaseServiceError) -> bool:
+    message = str(exc.__cause__ or exc).lower()
+    return "duplicate" in message or "unique" in message
 
 
 def user_id_from_claims(current_user: Any) -> str:
@@ -170,6 +191,25 @@ def _merge_profile(row: dict[str, Any] | None, auth_profile: AuthUserProfile, us
     }
 
 
+async def _insert_user_profile(payload: Mapping[str, Any]) -> dict[str, Any]:
+    try:
+        return await insert_one_trusted("user_profiles", payload)
+    except SupabaseServiceError as exc:
+        if not _has_missing_profile_timestamp(exc):
+            raise
+
+        logger.warning(
+            "user_profiles timestamp columns are unavailable; creating profile without timestamps | user_id=%s",
+            payload.get("user_id"),
+        )
+        fallback_payload = {
+            key: value
+            for key, value in payload.items()
+            if key not in PROFILE_TIMESTAMP_COLUMNS
+        }
+        return await insert_one_trusted("user_profiles", fallback_payload)
+
+
 async def ensure_user_profile(current_user: Any) -> dict[str, Any]:
     user_id = user_id_from_claims(current_user)
     auth_profile = _metadata_profile(current_user)
@@ -199,10 +239,14 @@ async def ensure_user_profile(current_user: Any) -> dict[str, Any]:
         "updated_at": timestamp,
     }
     try:
-        created = await insert_one_trusted("user_profiles", payload)
+        created = await _insert_user_profile(payload)
     except SupabaseServiceError:
         fallback_payload = {**payload, "handle": None}
-        created = await insert_one_trusted("user_profiles", fallback_payload)
+        try:
+            created = await _insert_user_profile(fallback_payload)
+        except SupabaseServiceError as exc:
+            logger.exception("Failed to create user profile | user_id=%s", user_id)
+            raise HTTPException(status_code=500, detail="Internal server error") from exc
 
     return _merge_profile(created, auth_profile, user_id)
 
@@ -245,10 +289,32 @@ async def update_user_profile(current_user: Any, payload: Mapping[str, Any]) -> 
     try:
         updated = await update_one_trusted("user_profiles", {"user_id": user_id}, updates)
     except SupabaseServiceError as exc:
-        message = str(exc.__cause__ or exc).lower()
-        if "duplicate" in message or "unique" in message:
+        if _is_unique_profile_violation(exc):
             raise HTTPException(status_code=409, detail="That handle is already taken.") from exc
-        raise HTTPException(status_code=500, detail="Internal server error") from exc
+
+        if _is_missing_supabase_column(exc, "updated_at"):
+            fallback_updates = {key: value for key, value in updates.items() if key != "updated_at"}
+            if not fallback_updates:
+                logger.warning(
+                    "user_profiles.updated_at is unavailable and no profile fields changed | user_id=%s",
+                    user_id,
+                )
+                return current
+
+            logger.warning(
+                "user_profiles.updated_at is unavailable; updating profile without timestamp | user_id=%s",
+                user_id,
+            )
+            try:
+                updated = await update_one_trusted("user_profiles", {"user_id": user_id}, fallback_updates)
+            except SupabaseServiceError as fallback_exc:
+                if _is_unique_profile_violation(fallback_exc):
+                    raise HTTPException(status_code=409, detail="That handle is already taken.") from fallback_exc
+                logger.exception("Failed to update user profile | user_id=%s", user_id)
+                raise HTTPException(status_code=500, detail="Internal server error") from fallback_exc
+        else:
+            logger.exception("Failed to update user profile | user_id=%s", user_id)
+            raise HTTPException(status_code=500, detail="Internal server error") from exc
 
     return _merge_profile(updated, _metadata_profile(current_user), user_id)
 
