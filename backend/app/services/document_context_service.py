@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..rag.chunking import split_text_into_chunks
-from ..retrieval.context_builder import BuiltContext, ContextBuilder
+from ..retrieval.context_builder import BuiltContext, ContextBuilder, ContextSupplement
 from ..retrieval.scoring import RetrievalResult
 from ..services.supabase_service import (
     SupabaseServiceError,
@@ -132,6 +132,7 @@ async def build_uploaded_document_context(
     conversation_id: str | None,
     workspace_id: str | None,
     top_k: int = 3,
+    supplemental_contexts: list[ContextSupplement | dict[str, Any]] | None = None,
 ) -> BuiltContext | None:
     """Build prompt context from uploaded document chunks when vector retrieval has no hit."""
     files = await _load_candidate_files(
@@ -207,8 +208,17 @@ async def build_uploaded_document_context(
     )
     _assign_chunk_indexes(results)
 
-    builder = ContextBuilder(max_chunks=top_k, token_budget=3200, max_chunk_tokens=700)
-    built = builder.build(query, results[: max(top_k * 3, top_k)], workspace_id=workspace_id)
+    builder = ContextBuilder(
+        max_chunks=max(top_k, top_k + len(supplemental_contexts or [])),
+        token_budget=3200,
+        max_chunk_tokens=700,
+    )
+    built = builder.build(
+        query,
+        results[: max(top_k * 3, top_k)],
+        workspace_id=workspace_id,
+        supplemental_contexts=supplemental_contexts,
+    )
     if not built.sources:
         return None
     built.diagnostics["fallback"] = "uploaded_document_context"

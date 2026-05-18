@@ -20,6 +20,7 @@ from ..services.chat_service import (
     generate_ai_response,
 )
 from ..services.document_context_service import build_uploaded_document_context
+from ..services.query_classifier import SearchDecision, SearchMode, classify_search_need
 from ..services.supabase_service import (
     SupabaseServiceError,
     delete_many_trusted,
@@ -31,6 +32,7 @@ from ..services.supabase_service import (
     update_one,
     update_one_trusted,
 )
+from ..services.web_search import WebSearchResponse, get_web_search_service
 from ..services.workspace_service import require_active_workspace_access, utc_now_iso
 from .conversations import (
     build_conversation_title,
@@ -45,7 +47,7 @@ RECENT_CONTEXT_LIMIT = 4
 MAX_CONTEXT_CHARS = 8000
 DEFAULT_MESSAGE_LIMIT = 50
 MAX_MESSAGE_LIMIT = 100
-MESSAGE_COLUMNS = "id,conversation_id,user_id,role,content,status,created_at"
+MESSAGE_COLUMNS = "id,conversation_id,user_id,role,content,status,created_at,metadata"
 MESSAGE_CONTEXT_COLUMNS = "role,content,status,created_at"
 FILE_COLUMNS = "id,user_id,workspace_id,conversation_id,file_name,file_type,metadata,created_at"
 
@@ -215,6 +217,85 @@ def _empty_retrieval_debug(strategy: str = "none") -> dict[str, Any]:
     }
 
 
+def _safe_sources_for_metadata(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    safe_sources: list[dict[str, Any]] = []
+    for source in sources[:12]:
+        if not isinstance(source, dict):
+            continue
+        safe_sources.append(
+            {
+                key: value
+                for key, value in source.items()
+                if key
+                in {
+                    "id",
+                    "label",
+                    "type",
+                    "title",
+                    "url",
+                    "domain",
+                    "favicon_url",
+                    "published_date",
+                    "excerpt",
+                    "score",
+                    "chunk_index",
+                    "file_id",
+                    "retrieval_sources",
+                    "semantic_score",
+                    "keyword_score",
+                    "metadata",
+                }
+            }
+        )
+    return safe_sources
+
+
+def _message_sources(message: dict[str, Any]) -> list[dict[str, Any]]:
+    metadata = message.get("metadata")
+    if not isinstance(metadata, dict):
+        return []
+    sources = metadata.get("sources")
+    if not isinstance(sources, list):
+        return []
+    return [source for source in sources if isinstance(source, dict)]
+
+
+def _with_sources_payload(message: dict[str, Any]) -> dict[str, Any]:
+    sources = _message_sources(message)
+    if not sources:
+        return message
+    return {**message, "sources": sources}
+
+
+async def _update_assistant_message(
+    *,
+    assistant_message_id: str,
+    user_id: str,
+    content: str,
+    status_value: str,
+    sources: list[dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    payload: dict[str, Any] = {"content": content, "status": status_value}
+    if sources is not None:
+        payload["metadata"] = {"sources": _safe_sources_for_metadata(sources)}
+
+    try:
+        return await update_one(
+            "messages",
+            {"id": assistant_message_id, "user_id": user_id},
+            payload,
+        )
+    except SupabaseServiceError:
+        if "metadata" not in payload:
+            raise
+        logger.warning("Message metadata column unavailable; finalizing assistant message without persisted sources.")
+        return await update_one(
+            "messages",
+            {"id": assistant_message_id, "user_id": user_id},
+            {"content": content, "status": status_value},
+        )
+
+
 def _should_skip_retrieval_for_prompt(message_text: str) -> bool:
     normalized = " ".join((message_text or "").strip().split())
     if not normalized:
@@ -300,23 +381,123 @@ async def _attach_files_to_conversation(
             raise _database_error() from exc
 
 
+async def _build_web_supplements(
+    message_text: str,
+    *,
+    workspace_id: str | None,
+    search_mode: SearchMode,
+) -> tuple[list[Any], list[dict[str, Any]], SearchDecision, dict[str, Any]]:
+    decision = classify_search_need(message_text, search_mode)
+    diagnostics: dict[str, Any] = {"decision": decision.to_dict(), "search": None}
+    if not decision.needs_web:
+        return [], [], decision, diagnostics
+
+    service = get_web_search_service()
+    try:
+        search_response: WebSearchResponse = await service.search(message_text)
+    except Exception as exc:
+        logger.exception("Web search failed before generation: %s", exc)
+        diagnostics["search"] = {"ok": False, "error": "unexpected_search_error"}
+        return [], [], decision, diagnostics
+
+    diagnostics["search"] = search_response.to_diagnostics()
+    if not search_response.results:
+        return [], [], decision, diagnostics
+
+    supplements = [
+        result.to_supplement(workspace_id=workspace_id)
+        for result in search_response.results
+    ]
+    sources = [
+        result.to_source(label=f"W{index}")
+        for index, result in enumerate(search_response.results, start=1)
+    ]
+    return supplements, sources, decision, diagnostics
+
+
+def _merge_sources(*source_groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for group in source_groups:
+        for source in group:
+            if not isinstance(source, dict):
+                continue
+            key = str(source.get("url") or source.get("id") or source.get("label") or "")
+            if key and key in seen:
+                continue
+            if key:
+                seen.add(key)
+            merged.append(source)
+    return merged
+
+
+def _web_only_context(
+    message_text: str,
+    *,
+    workspace_id: str | None,
+    web_supplements: list[Any],
+) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
+    from ..retrieval.context_builder import ContextBuilder
+
+    builder = ContextBuilder(
+        max_chunks=max(1, len(web_supplements)),
+        token_budget=2200,
+        max_chunk_tokens=360,
+    )
+    built_context = builder.build(
+        message_text,
+        [],
+        workspace_id=workspace_id,
+        supplemental_contexts=web_supplements,
+    )
+    return (
+        built_context.prompt,
+        built_context.sources,
+        _retrieval_debug_from_context("web", built_context),
+    )
+
+
 async def _retrieve_prompt_context(
     message_text: str,
     user_id: str,
     conversation_id: str,
     workspace_id: str | None,
     attachment_ids: list[str] | None = None,
+    search_mode: SearchMode = "auto",
 ) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
     prompt_message = message_text
     has_new_attachments = any(str(item).strip() for item in attachment_ids or [])
+    web_supplements, web_sources, search_decision, web_diagnostics = await _build_web_supplements(
+        message_text,
+        workspace_id=workspace_id,
+        search_mode=search_mode,
+    )
+    if search_mode == "web":
+        if web_supplements:
+            prompt, sources, debug = _web_only_context(
+                message_text,
+                workspace_id=workspace_id,
+                web_supplements=web_supplements,
+            )
+            debug["diagnostics"]["web_search"] = web_diagnostics
+            return prompt, _merge_sources(sources, web_sources), debug
+        debug = _empty_retrieval_debug("web_unavailable")
+        debug["diagnostics"]["web_search"] = web_diagnostics
+        return prompt_message, [], debug
 
-    if not has_new_attachments and _should_skip_retrieval_for_prompt(message_text):
+    if (
+        not has_new_attachments
+        and not search_decision.needs_web
+        and _should_skip_retrieval_for_prompt(message_text)
+    ):
         logger.info(
             "Skipping retrieval for lightweight prompt: conversation_id=%s workspace_id=%s.",
             conversation_id,
             workspace_id,
         )
-        return prompt_message, [], _empty_retrieval_debug("lightweight_prompt")
+        debug = _empty_retrieval_debug("lightweight_prompt")
+        debug["diagnostics"]["web_search"] = web_diagnostics
+        return prompt_message, [], debug
 
     try:
         uploaded_context = await build_uploaded_document_context(
@@ -324,11 +505,13 @@ async def _retrieve_prompt_context(
             user_id=user_id,
             conversation_id=conversation_id,
             workspace_id=workspace_id,
+            supplemental_contexts=web_supplements,
         )
         if uploaded_context and uploaded_context.sources:
+            uploaded_context.diagnostics["web_search"] = web_diagnostics
             return (
                 uploaded_context.prompt,
-                uploaded_context.sources,
+                _merge_sources(uploaded_context.sources, web_sources),
                 _retrieval_debug_from_context("uploaded_document", uploaded_context),
             )
     except Exception as exc:
@@ -340,29 +523,58 @@ async def _retrieve_prompt_context(
             conversation_id,
             workspace_id,
         )
-        return prompt_message, [], _empty_retrieval_debug("no_documents")
+        if web_supplements:
+            prompt, sources, debug = _web_only_context(
+                message_text,
+                workspace_id=workspace_id,
+                web_supplements=web_supplements,
+            )
+            debug["diagnostics"]["web_search"] = web_diagnostics
+            return prompt, _merge_sources(sources, web_sources), debug
+        debug = _empty_retrieval_debug("no_documents")
+        debug["diagnostics"]["web_search"] = web_diagnostics
+        return prompt_message, [], debug
 
     try:
         from ..rag.startup import get_vector_store
         from ..retrieval.hybrid_search import HybridSearchEngine
 
         engine = HybridSearchEngine(get_vector_store())
-        _, built_context = await engine.build_context(
+        response = await engine.search(
             message_text,
             user_id=user_id,
             workspace_id=workspace_id,
         )
+        built_context = engine.context_builder.build(
+            message_text,
+            response.results,
+            workspace_id=workspace_id,
+            supplemental_contexts=web_supplements,
+        )
+        response.diagnostics["context"] = built_context.diagnostics
+        built_context.diagnostics["web_search"] = web_diagnostics
 
         if built_context.sources:
             return (
                 built_context.prompt,
-                built_context.sources,
+                _merge_sources(built_context.sources, web_sources),
                 _retrieval_debug_from_context("hybrid", built_context),
             )
     except Exception as exc:
         logger.exception("Hybrid retrieval failed for conversation %s: %s", conversation_id, exc)
 
-    return prompt_message, [], _empty_retrieval_debug()
+    if web_supplements:
+        prompt, sources, debug = _web_only_context(
+            message_text,
+            workspace_id=workspace_id,
+            web_supplements=web_supplements,
+        )
+        debug["diagnostics"]["web_search"] = web_diagnostics
+        return prompt, _merge_sources(sources, web_sources), debug
+
+    debug = _empty_retrieval_debug()
+    debug["diagnostics"]["web_search"] = web_diagnostics
+    return prompt_message, [], debug
 
 
 async def _has_retrievable_documents(*, user_id: str, workspace_id: str | None) -> bool:
@@ -401,13 +613,14 @@ async def get_messages(
     user_id = _user_id_from_claims(current_user)
     conversation, workspace_access = await require_conversation_access(conversation_id, user_id)
 
-    return await _load_message_list(
+    messages = await _load_message_list(
         conversation_id,
         user_id,
         str(conversation.get("workspace_id") or "") if workspace_access is not None else None,
         limit,
         offset,
     )
+    return [_with_sources_payload(message) for message in messages]
 
 
 @router.delete(
@@ -548,6 +761,7 @@ async def chat(
         conversation_id,
         workspace_id,
         payload.attachment_ids,
+        payload.search_mode,
     )
     _log_ollama_prompt_debug(
         conversation_id=conversation_id,
@@ -590,10 +804,12 @@ async def chat(
 
     try:
         completed_assistant_message, _ = await asyncio.gather(
-            update_one(
-                "messages",
-                {"id": assistant_message["id"], "user_id": user_id},
-                {"content": assistant_response, "status": "completed"},
+            _update_assistant_message(
+                assistant_message_id=str(assistant_message["id"]),
+                user_id=user_id,
+                content=assistant_response,
+                status_value="completed",
+                sources=sources,
             ),
             _touch_conversation(
                 conversation_id,
@@ -621,7 +837,7 @@ async def chat(
         sources=sources,
         conversation=hydrated_conversation,
         user_message=user_message,
-        assistant_message=completed_assistant_message,
+        assistant_message=_with_sources_payload(completed_assistant_message),
     )
 
 
@@ -696,30 +912,43 @@ async def chat_stream(
         workspace_id=workspace_id,
     )
 
-    prompt_message, sources, retrieval_debug = await _retrieve_prompt_context(
-        message_text,
-        user_id,
-        conversation_id,
-        workspace_id,
-        payload.attachment_ids,
-    )
-
     async def event_generator() -> AsyncIterator[str]:
         assistant_parts: list[str] = []
+        prompt_message = message_text
+        sources: list[dict[str, Any]] = []
+        retrieval_debug = _empty_retrieval_debug("pending")
 
         init_payload = {
             "type": "init",
             "conversation_id": conversation_id,
             "user_message_id": str(user_message.get("id")),
             "assistant_message_id": str(assistant_message.get("id")),
-            "sources": sources,
+            "sources": [],
         }
         yield f"data: {json.dumps(init_payload)}\n\n"
 
-        status_payload = {"type": "status", "status": "retrieved", "count": len(sources)}
+        status_payload = {"type": "status", "status": "researching", "count": 0}
         yield f"data: {json.dumps(status_payload)}\n\n"
 
         try:
+            prompt_message, sources, retrieval_debug = await _retrieve_prompt_context(
+                message_text,
+                user_id,
+                conversation_id,
+                workspace_id,
+                payload.attachment_ids,
+                payload.search_mode,
+            )
+            sources_payload = {
+                "type": "sources",
+                "sources": sources,
+                "retrieval": retrieval_debug,
+            }
+            yield f"data: {json.dumps(sources_payload)}\n\n"
+
+            status_payload = {"type": "status", "status": "retrieved", "count": len(sources)}
+            yield f"data: {json.dumps(status_payload)}\n\n"
+
             _log_ollama_prompt_debug(
                 conversation_id=conversation_id,
                 prompt=prompt_message,
@@ -770,10 +999,12 @@ async def chat_stream(
 
         try:
             await asyncio.gather(
-                update_one(
-                    "messages",
-                    {"id": assistant_message["id"], "user_id": user_id},
-                    {"content": final_content, "status": "completed"},
+                _update_assistant_message(
+                    assistant_message_id=str(assistant_message["id"]),
+                    user_id=user_id,
+                    content=final_content,
+                    status_value="completed",
+                    sources=sources,
                 ),
                 _touch_conversation(
                     conversation_id,
