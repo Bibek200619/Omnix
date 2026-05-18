@@ -12,8 +12,10 @@ class ProviderSettings(BaseAppSettings):
     MODEL_URL: str = f"{DEFAULT_OLLAMA_BASE_URL}/api/chat"
     AI_MODEL: str = "phi3:mini"
     AI_SYSTEM_PROMPT: str = (
-        "You are Omnix, a precise AI workspace assistant. Answer clearly, use the "
-        "provided context when it is relevant, and say when you do not know."
+        "You are Omnix, a precise AI workspace assistant. Answer clearly using the "
+        "provided uploaded document, workspace, and live web context when available. "
+        "If WEB SEARCH RESULTS are present, treat them as current evidence and do not "
+        "claim you lack live access. Say when the provided sources do not contain the answer."
     )
     AI_REQUEST_TIMEOUT_SECONDS: float = 60.0
     AI_STREAM_TIMEOUT_SECONDS: float = 120.0
