@@ -5,10 +5,12 @@ from typing import Optional
 from pydantic import Field, AliasChoices
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Resolve backend config from `backend/`, not the repository root. The root
-# `.env.local` belongs to the Next.js app and only contains public browser keys.
+# Resolve backend config from root `.env` as a broad deployment/local fallback,
+# then backend-specific files. The root `.env.local` still belongs to the
+# Next.js app and is intentionally not loaded by FastAPI.
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-ENV_FILES = [BACKEND_DIR / ".env", BACKEND_DIR / ".env.local"]
+REPO_ROOT = BACKEND_DIR.parent
+ENV_FILES = [REPO_ROOT / ".env", BACKEND_DIR / ".env", BACKEND_DIR / ".env.local"]
 
 class BaseAppSettings(BaseSettings):
     ENV: str = "dev"
