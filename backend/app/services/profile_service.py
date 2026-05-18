@@ -157,10 +157,12 @@ async def get_auth_profile_for_user(user_id: str) -> AuthUserProfile:
 
 def _merge_profile(row: dict[str, Any] | None, auth_profile: AuthUserProfile, user_id: str) -> dict[str, Any]:
     row = dict(row or {})
+    handle = row.get("handle") or auth_profile.handle
     return {
         "user_id": user_id,
         "email": auth_profile.email,
-        "handle": row.get("handle") or auth_profile.handle,
+        "handle": handle,
+        "username": handle,
         "display_name": row.get("display_name") or auth_profile.display_name,
         "avatar_url": row.get("avatar_url") or auth_profile.avatar_url,
         "created_at": row.get("created_at"),
@@ -207,8 +209,16 @@ async def ensure_user_profile(current_user: Any) -> dict[str, Any]:
 
 async def update_user_profile(current_user: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
     user_id = user_id_from_claims(current_user)
-    current = await ensure_user_profile(current_user)
     updates: dict[str, Any] = {"updated_at": utc_now_iso()}
+    handle_value = payload.get("username") if "username" in payload else payload.get("handle")
+
+    if "username" in payload and "handle" in payload:
+        username = normalize_handle(str(payload["username"])) if payload["username"] is not None else None
+        handle = normalize_handle(str(payload["handle"])) if payload["handle"] is not None else None
+        if username != handle:
+            raise HTTPException(status_code=400, detail="Username and handle must match when both are provided.")
+
+    current = await ensure_user_profile(current_user)
 
     if "display_name" in payload and payload["display_name"] is not None:
         display_name = str(payload["display_name"]).strip()
@@ -221,8 +231,8 @@ async def update_user_profile(current_user: Any, payload: Mapping[str, Any]) -> 
     elif "avatar_url" in payload:
         updates["avatar_url"] = validate_avatar_url(payload.get("avatar_url"))
 
-    if "handle" in payload and payload["handle"] is not None:
-        next_handle = validate_handle(str(payload["handle"]))
+    if handle_value is not None:
+        next_handle = validate_handle(str(handle_value))
         current_handle = normalize_handle(current.get("handle"))
         if current_handle and next_handle != current_handle:
             raise HTTPException(status_code=400, detail="Handle is already set and cannot be changed.")

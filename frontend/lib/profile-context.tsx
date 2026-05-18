@@ -8,6 +8,7 @@ export type UserProfile = {
   user_id: string;
   email?: string | null;
   handle?: string | null;
+  username?: string | null;
   display_name?: string | null;
   avatar_url?: string | null;
   created_at?: string | null;
@@ -17,6 +18,7 @@ export type UserProfile = {
 export type UserProfileUpdate = {
   display_name?: string;
   handle?: string;
+  username?: string;
   avatar_url?: string | null;
   remove_avatar?: boolean;
 };

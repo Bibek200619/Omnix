@@ -76,7 +76,7 @@ export function RegisterForm() {
         await refreshSession();
         await apiClient.patch("/profile", {
           display_name: name || undefined,
-          handle,
+          username: handle,
         });
         await refreshSession();
         router.replace(safeRedirectPath());

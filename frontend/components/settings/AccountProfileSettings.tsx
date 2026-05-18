@@ -104,7 +104,7 @@ export function AccountProfileSettings() {
     try {
       setSavingHandle(true);
       setError(null);
-      await updateProfile({ handle: nextHandle });
+      await updateProfile({ username: nextHandle });
       setMessage("Handle reserved.");
       window.setTimeout(() => setMessage(null), 2200);
     } catch (err) {
