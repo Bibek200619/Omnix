@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { FileText, Plus, Send, X } from "lucide-react";
+import { Database, FileText, Globe2, Layers3, Plus, Send, Sparkles, X, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { UploadDropzone } from "@/components/upload/UploadDropzone";
-import type { MessageAttachment } from "@/components/chat/types";
+import type { MessageAttachment, SearchMode } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
 
 type ChatInputProps = {
@@ -13,9 +13,22 @@ type ChatInputProps = {
   loading: boolean;
   conversationId?: string;
   attachments?: MessageAttachment[];
+  searchMode: SearchMode;
+  onSearchModeChange: (mode: SearchMode) => void;
   onUploadSuccess?: (file: MessageAttachment) => void;
   onRemoveAttachment?: (fileId: string) => void;
 };
+
+const searchModes: Array<{
+  value: SearchMode;
+  label: string;
+  icon: LucideIcon;
+}> = [
+  { value: "auto", label: "Auto", icon: Sparkles },
+  { value: "workspace", label: "Workspace", icon: Database },
+  { value: "web", label: "Web", icon: Globe2 },
+  { value: "hybrid", label: "Hybrid", icon: Layers3 },
+];
 
 function attachmentName(file: MessageAttachment) {
   return file.file_name || file.filename || "Uploaded document";
@@ -32,6 +45,8 @@ export function ChatInput({
   loading,
   conversationId,
   attachments = [],
+  searchMode,
+  onSearchModeChange,
   onUploadSuccess,
   onRemoveAttachment,
 }: ChatInputProps) {
@@ -113,6 +128,31 @@ export function ChatInput({
           />
         </div>
       ) : null}
+
+      <div className="mb-2 flex flex-wrap items-center gap-1 rounded-lg border border-white/8 bg-white/[0.025] p-1">
+        {searchModes.map((mode) => {
+          const Icon = mode.icon;
+          const active = searchMode === mode.value;
+          return (
+            <button
+              key={mode.value}
+              type="button"
+              onClick={() => onSearchModeChange(mode.value)}
+              className={cn(
+                "inline-flex h-8 min-w-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70",
+                active
+                  ? "border-cyan-300/35 bg-cyan-300/12 text-cyan-50"
+                  : "border-transparent text-slate-400 hover:bg-white/[0.055] hover:text-slate-100",
+              )}
+              aria-pressed={active}
+              title={`${mode.label} search mode`}
+            >
+              <Icon className="h-3.5 w-3.5 shrink-0" />
+              <span>{mode.label}</span>
+            </button>
+          );
+        })}
+      </div>
 
       <div className="flex items-end gap-2 rounded-lg border border-white/8 bg-white/[0.035] p-1.5 transition focus-within:border-cyan-300/30 focus-within:bg-white/[0.05]">
         <Button
