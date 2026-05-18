@@ -337,6 +337,61 @@ def _assistant_message_payload(
     }
 
 
+def _has_persistable_payload(payload: dict[str, Any]) -> bool:
+    sources = payload.get("sources")
+    return bool(payload.get("web_search_used") or (isinstance(sources, list) and sources))
+
+
+async def _persist_assistant_payload(
+    *,
+    assistant_message_id: str,
+    user_id: str,
+    sources: list[dict[str, Any]],
+    search_mode: SearchMode,
+    retrieval_debug: dict[str, Any] | None,
+    stage: str,
+) -> dict[str, Any] | None:
+    message_payload = _assistant_message_payload(
+        sources=sources,
+        search_mode=search_mode,
+        retrieval_debug=retrieval_debug,
+    )
+    if not _has_persistable_payload(message_payload):
+        return None
+
+    logger.info(
+        "Persisting assistant payload: stage=%s assistant_message_id=%s mode=%s web_search_used=%s source_count=%d",
+        stage,
+        assistant_message_id,
+        message_payload.get("mode"),
+        message_payload.get("web_search_used"),
+        len(message_payload.get("sources") or []),
+    )
+
+    try:
+        updated = await update_one_trusted(
+            "messages",
+            {"id": assistant_message_id, "user_id": user_id},
+            {"payload": message_payload},
+        )
+    except SupabaseServiceError:
+        logger.exception(
+            "Failed to persist assistant payload: stage=%s assistant_message_id=%s",
+            stage,
+            assistant_message_id,
+        )
+        raise
+
+    persisted_payload = updated.get("payload") if isinstance(updated, dict) else None
+    if not _has_persistable_payload(persisted_payload if isinstance(persisted_payload, dict) else {}):
+        logger.warning(
+            "Assistant payload update returned without persisted metadata: stage=%s assistant_message_id=%s",
+            stage,
+            assistant_message_id,
+        )
+    return updated
+
+
 async def _update_assistant_message(
     *,
     assistant_message_id: str,
@@ -349,11 +404,13 @@ async def _update_assistant_message(
 ) -> dict[str, Any] | None:
     payload: dict[str, Any] = {"content": content, "status": status_value}
     if sources is not None:
-        payload["payload"] = _assistant_message_payload(
+        message_payload = _assistant_message_payload(
             sources=sources,
             search_mode=search_mode,
             retrieval_debug=retrieval_debug,
         )
+        if _has_persistable_payload(message_payload):
+            payload["payload"] = message_payload
 
     try:
         return await update_one(
@@ -905,6 +962,20 @@ async def chat(
         payload.attachment_ids,
         payload.search_mode,
     )
+    try:
+        await _persist_assistant_payload(
+            assistant_message_id=str(assistant_message["id"]),
+            user_id=user_id,
+            sources=sources,
+            search_mode=payload.search_mode,
+            retrieval_debug=retrieval_debug,
+            stage="chat_retrieved",
+        )
+    except SupabaseServiceError:
+        logger.warning(
+            "Continuing chat generation after assistant payload pre-persist failed: assistant_message_id=%s",
+            assistant_message["id"],
+        )
     _log_ollama_prompt_debug(
         conversation_id=conversation_id,
         prompt=prompt_message,
@@ -1092,6 +1163,21 @@ async def chat_stream(
 
             status_payload = {"type": "status", "status": "retrieved", "count": len(sources)}
             yield f"data: {json.dumps(status_payload)}\n\n"
+
+            try:
+                await _persist_assistant_payload(
+                    assistant_message_id=str(assistant_message["id"]),
+                    user_id=user_id,
+                    sources=sources,
+                    search_mode=payload.search_mode,
+                    retrieval_debug=retrieval_debug,
+                    stage="stream_retrieved",
+                )
+            except SupabaseServiceError:
+                logger.warning(
+                    "Continuing streaming after assistant payload pre-persist failed: assistant_message_id=%s",
+                    assistant_message["id"],
+                )
 
             _log_ollama_prompt_debug(
                 conversation_id=conversation_id,

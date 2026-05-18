@@ -109,3 +109,54 @@ async def test_update_assistant_message_persists_payload(monkeypatch: pytest.Mon
         ],
         "citations": ["W1"],
     }
+
+
+@pytest.mark.asyncio
+async def test_persist_assistant_payload_updates_payload_immediately(monkeypatch: pytest.MonkeyPatch) -> None:
+    updates: list[dict[str, object]] = []
+
+    async def fake_update_one_trusted(table: str, filters: dict[str, object], payload: dict[str, object]):
+        assert table == "messages"
+        assert filters == {"id": "assistant-1", "user_id": "user-1"}
+        updates.append(payload)
+        return {"id": "assistant-1", **payload}
+
+    monkeypatch.setattr(messages, "update_one_trusted", fake_update_one_trusted)
+
+    updated = await messages._persist_assistant_payload(
+        assistant_message_id="assistant-1",
+        user_id="user-1",
+        sources=[
+            {
+                "label": "W1",
+                "type": "web",
+                "title": "Live result",
+                "url": "https://example.com",
+                "snippet": "Current information.",
+            }
+        ],
+        search_mode="web",
+        retrieval_debug=None,
+        stage="stream_retrieved",
+    )
+
+    assert updated is not None
+    assert updates == [
+        {
+            "payload": {
+                "mode": "web",
+                "web_search_used": True,
+                "sources": [
+                    {
+                        "label": "W1",
+                        "type": "web",
+                        "title": "Live result",
+                        "url": "https://example.com",
+                        "snippet": "Current information.",
+                        "excerpt": "Current information.",
+                    }
+                ],
+                "citations": ["W1"],
+            }
+        }
+    ]
