@@ -21,8 +21,10 @@ from .supabase_service import (
 
 logger = logging.getLogger(__name__)
 
-USER_PROFILE_COLUMNS = "user_id,handle,display_name,avatar_url,created_at,updated_at"
-HANDLE_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{2,29}$")
+PROFILE_TABLE = "profiles"
+PROFILE_ID_COLUMN = "id"
+USER_PROFILE_COLUMNS = "id,name,username,avatar_url,created_at,updated_at"
+USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{2,29}$")
 AVATAR_DATA_URL_RE = re.compile(r"^data:image/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=\s]+$")
 PROFILE_TIMESTAMP_COLUMNS = {"created_at", "updated_at"}
 
@@ -30,34 +32,34 @@ PROFILE_TIMESTAMP_COLUMNS = {"created_at", "updated_at"}
 @dataclass(slots=True)
 class AuthUserProfile:
     email: str | None
-    display_name: str | None
+    name: str | None
     avatar_url: str | None
-    handle: str | None
+    username: str | None
 
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def normalize_handle(value: str | None) -> str | None:
+def normalize_username(value: str | None) -> str | None:
     if value is None:
         return None
-    handle = value.strip().lower()
-    if handle.startswith("@"):
-        handle = handle[1:]
-    return handle or None
+    username = value.strip().lower()
+    if username.startswith("@"):
+        username = username[1:]
+    return username or None
 
 
-def validate_handle(value: str | None) -> str | None:
-    handle = normalize_handle(value)
-    if handle is None:
+def validate_username(value: str | None) -> str | None:
+    username = normalize_username(value)
+    if username is None:
         return None
-    if not HANDLE_RE.fullmatch(handle):
+    if not USERNAME_RE.fullmatch(username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Handle must be 3-30 characters and use lowercase letters, numbers, hyphens, or underscores.",
+            detail="Username must be 3-30 characters and use lowercase letters, numbers, hyphens, or underscores.",
         )
-    return handle
+    return username
 
 
 def validate_avatar_url(value: str | None) -> str | None:
@@ -136,14 +138,14 @@ def _metadata_from_claims(current_user: Any) -> Mapping[str, Any]:
 
 def _metadata_profile(current_user: Any) -> AuthUserProfile:
     metadata = _metadata_from_claims(current_user)
-    display_name = metadata.get("full_name") or metadata.get("name")
+    name = metadata.get("full_name") or metadata.get("name")
     avatar_url = metadata.get("avatar_url") or metadata.get("picture")
-    handle = metadata.get("handle") or metadata.get("username")
+    username = metadata.get("username")
     return AuthUserProfile(
         email=user_email_from_claims(current_user),
-        display_name=display_name.strip() if isinstance(display_name, str) and display_name.strip() else None,
+        name=name.strip() if isinstance(name, str) and name.strip() else None,
         avatar_url=avatar_url.strip() if isinstance(avatar_url, str) and avatar_url.strip() else None,
-        handle=normalize_handle(handle) if isinstance(handle, str) else None,
+        username=normalize_username(username) if isinstance(username, str) else None,
     )
 
 
@@ -153,22 +155,22 @@ def _auth_profile_for_user_sync(user_id: str) -> AuthUserProfile:
         user = getattr(user_response, "user", None)
     except Exception:
         logger.exception("Failed to resolve auth profile for %s.", user_id)
-        return AuthUserProfile(email=None, display_name=None, avatar_url=None, handle=None)
+        return AuthUserProfile(email=None, name=None, avatar_url=None, username=None)
 
     metadata = getattr(user, "user_metadata", None) or {}
-    display_name = None
+    name = None
     avatar_url = None
-    handle = None
+    username = None
     if isinstance(metadata, Mapping):
-        display_name = metadata.get("full_name") or metadata.get("name")
+        name = metadata.get("full_name") or metadata.get("name")
         avatar_url = metadata.get("avatar_url") or metadata.get("picture")
-        handle = metadata.get("handle") or metadata.get("username")
+        username = metadata.get("username")
 
     return AuthUserProfile(
         email=getattr(user, "email", None),
-        display_name=display_name.strip() if isinstance(display_name, str) and display_name.strip() else None,
+        name=name.strip() if isinstance(name, str) and name.strip() else None,
         avatar_url=avatar_url.strip() if isinstance(avatar_url, str) and avatar_url.strip() else None,
-        handle=normalize_handle(handle) if isinstance(handle, str) else None,
+        username=normalize_username(username) if isinstance(username, str) else None,
     )
 
 
@@ -178,13 +180,13 @@ async def get_auth_profile_for_user(user_id: str) -> AuthUserProfile:
 
 def _merge_profile(row: dict[str, Any] | None, auth_profile: AuthUserProfile, user_id: str) -> dict[str, Any]:
     row = dict(row or {})
-    handle = row.get("handle") or auth_profile.handle
+    profile_id = row.get(PROFILE_ID_COLUMN) or user_id
+    username = row.get("username") or auth_profile.username
     return {
-        "user_id": user_id,
+        "user_id": str(profile_id),
         "email": auth_profile.email,
-        "handle": handle,
-        "username": handle,
-        "display_name": row.get("display_name") or auth_profile.display_name,
+        "username": username,
+        "display_name": row.get("name") or auth_profile.name,
         "avatar_url": row.get("avatar_url") or auth_profile.avatar_url,
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
@@ -193,21 +195,21 @@ def _merge_profile(row: dict[str, Any] | None, auth_profile: AuthUserProfile, us
 
 async def _insert_user_profile(payload: Mapping[str, Any]) -> dict[str, Any]:
     try:
-        return await insert_one_trusted("profiles", payload)
+        return await insert_one_trusted(PROFILE_TABLE, payload)
     except SupabaseServiceError as exc:
         if not _has_missing_profile_timestamp(exc):
             raise
 
         logger.warning(
-            "profiles timestamp columns are unavailable; creating profile without timestamps | user_id=%s",
-            payload.get("user_id"),
+            "profiles timestamp columns are unavailable; creating profile without timestamps | id=%s",
+            payload.get(PROFILE_ID_COLUMN),
         )
         fallback_payload = {
             key: value
             for key, value in payload.items()
             if key not in PROFILE_TIMESTAMP_COLUMNS
         }
-        return await insert_one_trusted("profiles", fallback_payload)
+        return await insert_one_trusted(PROFILE_TABLE, fallback_payload)
 
 
 async def ensure_user_profile(current_user: Any) -> dict[str, Any]:
@@ -215,7 +217,7 @@ async def ensure_user_profile(current_user: Any) -> dict[str, Any]:
     auth_profile = _metadata_profile(current_user)
 
     try:
-        existing = await select_one_trusted("profiles", USER_PROFILE_COLUMNS, {"user_id": user_id})
+        existing = await select_one_trusted(PROFILE_TABLE, USER_PROFILE_COLUMNS, {PROFILE_ID_COLUMN: user_id})
     except SupabaseServiceError as exc:
         logger.exception("Failed to load user profile | user_id=%s", user_id)
         raise HTTPException(status_code=500, detail="Internal server error") from exc
@@ -224,16 +226,16 @@ async def ensure_user_profile(current_user: Any) -> dict[str, Any]:
         return _merge_profile(existing, auth_profile, user_id)
 
     timestamp = utc_now_iso()
-    handle = None
+    username = None
     try:
-        handle = validate_handle(auth_profile.handle)
+        username = validate_username(auth_profile.username)
     except HTTPException:
-        handle = None
+        username = None
 
     payload = {
-        "user_id": user_id,
-        "handle": handle,
-        "display_name": auth_profile.display_name,
+        PROFILE_ID_COLUMN: user_id,
+        "username": username,
+        "name": auth_profile.name,
         "avatar_url": validate_avatar_url(auth_profile.avatar_url),
         "created_at": timestamp,
         "updated_at": timestamp,
@@ -241,7 +243,7 @@ async def ensure_user_profile(current_user: Any) -> dict[str, Any]:
     try:
         created = await _insert_user_profile(payload)
     except SupabaseServiceError:
-        fallback_payload = {**payload, "handle": None}
+        fallback_payload = {**payload, "username": None}
         try:
             created = await _insert_user_profile(fallback_payload)
         except SupabaseServiceError as exc:
@@ -254,43 +256,37 @@ async def ensure_user_profile(current_user: Any) -> dict[str, Any]:
 async def update_user_profile(current_user: Any, payload: Mapping[str, Any]) -> dict[str, Any]:
     user_id = user_id_from_claims(current_user)
     updates: dict[str, Any] = {"updated_at": utc_now_iso()}
-    handle_value = payload.get("username") if "username" in payload else payload.get("handle")
-
-    if "username" in payload and "handle" in payload:
-        username = normalize_handle(str(payload["username"])) if payload["username"] is not None else None
-        handle = normalize_handle(str(payload["handle"])) if payload["handle"] is not None else None
-        if username != handle:
-            raise HTTPException(status_code=400, detail="Username and handle must match when both are provided.")
+    username_value = payload.get("username")
 
     current = await ensure_user_profile(current_user)
 
     if "display_name" in payload and payload["display_name"] is not None:
-        display_name = str(payload["display_name"]).strip()
-        if not display_name:
+        name = str(payload["display_name"]).strip()
+        if not name:
             raise HTTPException(status_code=400, detail="Display name cannot be empty.")
-        updates["display_name"] = display_name
+        updates["name"] = name
 
     if payload.get("remove_avatar"):
         updates["avatar_url"] = None
     elif "avatar_url" in payload:
         updates["avatar_url"] = validate_avatar_url(payload.get("avatar_url"))
 
-    if handle_value is not None:
-        next_handle = validate_handle(str(handle_value))
-        current_handle = normalize_handle(current.get("handle"))
-        if current_handle and next_handle != current_handle:
-            raise HTTPException(status_code=400, detail="Handle is already set and cannot be changed.")
-        if not current_handle:
-            existing = await select_one_trusted("profiles", USER_PROFILE_COLUMNS, {"handle": next_handle})
-            if existing is not None and str(existing.get("user_id")) != user_id:
-                raise HTTPException(status_code=409, detail="That handle is already taken.")
-            updates["handle"] = next_handle
+    if username_value is not None:
+        next_username = validate_username(str(username_value))
+        current_username = normalize_username(current.get("username"))
+        if current_username and next_username != current_username:
+            raise HTTPException(status_code=400, detail="Username is already set and cannot be changed.")
+        if not current_username:
+            existing = await select_one_trusted(PROFILE_TABLE, USER_PROFILE_COLUMNS, {"username": next_username})
+            if existing is not None and str(existing.get(PROFILE_ID_COLUMN)) != user_id:
+                raise HTTPException(status_code=409, detail="That username is already taken.")
+            updates["username"] = next_username
 
     try:
-        updated = await update_one_trusted("profiles", {"user_id": user_id}, updates)
+        updated = await update_one_trusted(PROFILE_TABLE, {PROFILE_ID_COLUMN: user_id}, updates)
     except SupabaseServiceError as exc:
         if _is_unique_profile_violation(exc):
-            raise HTTPException(status_code=409, detail="That handle is already taken.") from exc
+            raise HTTPException(status_code=409, detail="That username is already taken.") from exc
 
         if _is_missing_supabase_column(exc, "updated_at"):
             fallback_updates = {key: value for key, value in updates.items() if key != "updated_at"}
@@ -306,10 +302,10 @@ async def update_user_profile(current_user: Any, payload: Mapping[str, Any]) -> 
                 user_id,
             )
             try:
-                updated = await update_one_trusted("profiles", {"user_id": user_id}, fallback_updates)
+                updated = await update_one_trusted(PROFILE_TABLE, {PROFILE_ID_COLUMN: user_id}, fallback_updates)
             except SupabaseServiceError as fallback_exc:
                 if _is_unique_profile_violation(fallback_exc):
-                    raise HTTPException(status_code=409, detail="That handle is already taken.") from fallback_exc
+                    raise HTTPException(status_code=409, detail="That username is already taken.") from fallback_exc
                 logger.exception("Failed to update user profile | user_id=%s", user_id)
                 raise HTTPException(status_code=500, detail="Internal server error") from fallback_exc
         else:
@@ -326,20 +322,29 @@ async def get_user_profile_map(user_ids: list[str]) -> dict[str, dict[str, Any]]
 
     try:
         rows = await select_all_trusted(
-            "profiles",
+            PROFILE_TABLE,
             USER_PROFILE_COLUMNS,
-            filters={"user_id": ids},
+            filters={PROFILE_ID_COLUMN: ids},
         )
     except SupabaseServiceError:
         logger.exception("Failed to load app profiles for workspace members.")
         return {}
 
-    return {str(row["user_id"]): row for row in rows if row.get("user_id")}
+    profile_map: dict[str, dict[str, Any]] = {}
+    empty_auth_profile = AuthUserProfile(email=None, name=None, avatar_url=None, username=None)
+    for row in rows:
+        profile_id = row.get(PROFILE_ID_COLUMN)
+        if profile_id:
+            profile_map[str(profile_id)] = {
+                **_merge_profile(row, empty_auth_profile, str(profile_id)),
+                "name": row.get("name"),
+            }
+    return profile_map
 
 
-async def resolve_profile_by_handle(handle: str) -> dict[str, Any] | None:
-    normalized = validate_handle(handle)
+async def resolve_profile_by_username(username: str) -> dict[str, Any] | None:
+    normalized = validate_username(username)
     try:
-        return await select_one_trusted("profiles", USER_PROFILE_COLUMNS, {"handle": normalized})
+        return await select_one_trusted(PROFILE_TABLE, USER_PROFILE_COLUMNS, {"username": normalized})
     except SupabaseServiceError as exc:
         raise HTTPException(status_code=500, detail="Internal server error") from exc

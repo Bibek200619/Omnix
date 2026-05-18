@@ -23,7 +23,6 @@ def _profile_row(**overrides: Any) -> dict[str, Any]:
     row = {
         "user_id": "user-1",
         "email": "alex@example.com",
-        "handle": "alex-dev",
         "username": "alex-dev",
         "display_name": "Alex Dev",
         "avatar_url": "https://example.com/avatar.png",
@@ -66,11 +65,11 @@ def test_get_profile_returns_authenticated_user_profile(monkeypatch: pytest.Monk
     assert response.status_code == 200
     body = response.json()
     assert body["user_id"] == "user-1"
-    assert body["handle"] == "alex-dev"
     assert body["username"] == "alex-dev"
+    assert body["display_name"] == "Alex Dev"
 
 
-def test_patch_profile_updates_username_display_name_and_avatar(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_patch_profile_updates_display_name_username_and_avatar(monkeypatch: pytest.MonkeyPatch) -> None:
     captured_payload: dict[str, Any] = {}
 
     async def fake_update_user_profile(
@@ -80,7 +79,6 @@ def test_patch_profile_updates_username_display_name_and_avatar(monkeypatch: pyt
         assert current_user["sub"] == "user-1"
         captured_payload.update(payload)
         return _profile_row(
-            handle=payload["username"],
             username=payload["username"],
             display_name=payload["display_name"],
             avatar_url=payload["avatar_url"],
@@ -106,7 +104,6 @@ def test_patch_profile_updates_username_display_name_and_avatar(monkeypatch: pyt
     }
     body = response.json()
     assert body["display_name"] == "Alex Morgan"
-    assert body["handle"] == "alex-morgan"
     assert body["username"] == "alex-morgan"
     assert body["avatar_url"] == "https://example.com/new-avatar.png"
 
@@ -120,7 +117,7 @@ def test_patch_profile_rejects_unknown_profile_fields() -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_user_profile_maps_username_to_handle_column(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_update_user_profile_maps_api_fields_to_profile_columns(monkeypatch: pytest.MonkeyPatch) -> None:
     selected_filters: list[dict[str, Any]] = []
     update_payloads: list[dict[str, Any]] = []
 
@@ -130,12 +127,13 @@ async def test_update_user_profile_maps_username_to_handle_column(monkeypatch: p
         filters: dict[str, Any],
     ) -> dict[str, Any] | None:
         assert table == "profiles"
+        assert columns == "id,name,username,avatar_url,created_at,updated_at"
         selected_filters.append(filters)
-        if "user_id" in filters:
+        if "id" in filters:
             return {
-                "user_id": "user-1",
-                "handle": None,
-                "display_name": None,
+                "id": "user-1",
+                "username": None,
+                "name": None,
                 "avatar_url": None,
                 "created_at": None,
                 "updated_at": None,
@@ -148,12 +146,12 @@ async def test_update_user_profile_maps_username_to_handle_column(monkeypatch: p
         payload: dict[str, Any],
     ) -> dict[str, Any]:
         assert table == "profiles"
-        assert filters == {"user_id": "user-1"}
+        assert filters == {"id": "user-1"}
         update_payloads.append(payload)
         return {
-            "user_id": "user-1",
-            "handle": payload["handle"],
-            "display_name": payload["display_name"],
+            "id": "user-1",
+            "username": payload["username"],
+            "name": payload["name"],
             "avatar_url": payload["avatar_url"],
             "created_at": None,
             "updated_at": payload["updated_at"],
@@ -172,16 +170,17 @@ async def test_update_user_profile_maps_username_to_handle_column(monkeypatch: p
         },
     )
 
-    assert selected_filters[-1] == {"handle": "alex-morgan"}
+    assert selected_filters[-1] == {"username": "alex-morgan"}
     assert update_payloads == [
         {
             "updated_at": "2026-05-18T00:00:00+00:00",
-            "display_name": "Alex Morgan",
+            "name": "Alex Morgan",
             "avatar_url": "https://example.com/avatar.png",
-            "handle": "alex-morgan",
+            "username": "alex-morgan",
         }
     ]
-    assert response["handle"] == "alex-morgan"
+    assert response["user_id"] == "user-1"
+    assert response["display_name"] == "Alex Morgan"
     assert response["username"] == "alex-morgan"
 
 
@@ -198,9 +197,9 @@ async def test_update_user_profile_retries_without_updated_at_when_schema_is_beh
     ) -> dict[str, Any] | None:
         assert table == "profiles"
         return {
-            "user_id": "user-1",
-            "handle": "alex-dev",
-            "display_name": "Alex Dev",
+            "id": "user-1",
+            "username": "alex-dev",
+            "name": "Alex Dev",
             "avatar_url": None,
             "created_at": None,
             "updated_at": None,
@@ -212,14 +211,14 @@ async def test_update_user_profile_retries_without_updated_at_when_schema_is_beh
         payload: dict[str, Any],
     ) -> dict[str, Any]:
         assert table == "profiles"
-        assert filters == {"user_id": "user-1"}
+        assert filters == {"id": "user-1"}
         update_payloads.append(payload)
         if "updated_at" in payload:
             raise _missing_column_error("updated_at")
         return {
-            "user_id": "user-1",
-            "handle": "alex-dev",
-            "display_name": payload["display_name"],
+            "id": "user-1",
+            "username": "alex-dev",
+            "name": payload["name"],
             "avatar_url": None,
             "created_at": None,
         }
@@ -236,12 +235,11 @@ async def test_update_user_profile_retries_without_updated_at_when_schema_is_beh
     assert update_payloads == [
         {
             "updated_at": "2026-05-18T00:00:00+00:00",
-            "display_name": "Alex Morgan",
+            "name": "Alex Morgan",
         },
-        {"display_name": "Alex Morgan"},
+        {"name": "Alex Morgan"},
     ]
     assert response["display_name"] == "Alex Morgan"
-    assert response["handle"] == "alex-dev"
     assert response["username"] == "alex-dev"
 
 
@@ -257,7 +255,7 @@ async def test_ensure_user_profile_retries_insert_without_timestamps_when_schema
         filters: dict[str, Any],
     ) -> dict[str, Any] | None:
         assert table == "profiles"
-        assert filters == {"user_id": "user-1"}
+        assert filters == {"id": "user-1"}
         return None
 
     async def fake_insert_one_trusted(table: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -266,9 +264,9 @@ async def test_ensure_user_profile_retries_insert_without_timestamps_when_schema
         if "updated_at" in payload:
             raise _missing_column_error("updated_at")
         return {
-            "user_id": payload["user_id"],
-            "handle": payload["handle"],
-            "display_name": payload["display_name"],
+            "id": payload["id"],
+            "username": payload["username"],
+            "name": payload["name"],
             "avatar_url": payload["avatar_url"],
         }
 
@@ -286,31 +284,50 @@ async def test_ensure_user_profile_retries_insert_without_timestamps_when_schema
 
     assert inserted_payloads == [
         {
-            "user_id": "user-1",
-            "handle": "alex-dev",
-            "display_name": "Alex Dev",
+            "id": "user-1",
+            "username": "alex-dev",
+            "name": "Alex Dev",
             "avatar_url": None,
             "created_at": "2026-05-18T00:00:00+00:00",
             "updated_at": "2026-05-18T00:00:00+00:00",
         },
         {
-            "user_id": "user-1",
-            "handle": "alex-dev",
-            "display_name": "Alex Dev",
+            "id": "user-1",
+            "username": "alex-dev",
+            "name": "Alex Dev",
             "avatar_url": None,
         },
     ]
-    assert response["handle"] == "alex-dev"
+    assert response["user_id"] == "user-1"
+    assert response["display_name"] == "Alex Dev"
     assert response["username"] == "alex-dev"
 
 
 @pytest.mark.asyncio
-async def test_update_user_profile_rejects_conflicting_username_and_handle() -> None:
+async def test_update_user_profile_rejects_existing_username_change(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_select_one_trusted(
+        table: str,
+        columns: str,
+        filters: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        assert table == "profiles"
+        assert filters == {"id": "user-1"}
+        return {
+            "id": "user-1",
+            "username": "alex-dev",
+            "name": "Alex Dev",
+            "avatar_url": None,
+            "created_at": None,
+            "updated_at": None,
+        }
+
+    monkeypatch.setattr(profile_service, "select_one_trusted", fake_select_one_trusted)
+
     with pytest.raises(HTTPException) as exc_info:
         await profile_service.update_user_profile(
             {"sub": "user-1", "email": "alex@example.com"},
-            {"username": "alex-dev", "handle": "other-dev"},
+            {"username": "other-dev"},
         )
 
     assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "Username and handle must match when both are provided."
+    assert exc_info.value.detail == "Username is already set and cannot be changed."

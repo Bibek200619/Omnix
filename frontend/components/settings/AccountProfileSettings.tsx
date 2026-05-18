@@ -63,7 +63,7 @@ export function AccountProfileSettings() {
   const displayName = profile?.display_name || metadataName(user?.user_metadata) || user?.email || "Omnix user";
   const email = profile?.email || user?.email || "";
   const avatarUrl = removeAvatar ? null : avatarPreview || profile?.avatar_url || null;
-  const handle = profile?.handle || "";
+  const handle = profile?.username || profile?.handle || "";
 
   useEffect(() => {
     setNameDraft(displayName);
@@ -155,8 +155,8 @@ export function AccountProfileSettings() {
   }
 
   async function copyHandle() {
-    if (!profile?.handle || !navigator.clipboard) return;
-    await navigator.clipboard.writeText(`@${profile.handle}`);
+    if (!handle || !navigator.clipboard) return;
+    await navigator.clipboard.writeText(`@${handle}`);
     setMessage("Handle copied.");
     window.setTimeout(() => setMessage(null), 1600);
   }
@@ -170,7 +170,7 @@ export function AccountProfileSettings() {
           <ProfileAvatar
             name={displayName}
             email={email}
-            handle={profile?.handle}
+            handle={handle}
             avatarUrl={avatarUrl}
             className="h-20 w-20 border-cyan-300/25 bg-cyan-300/10 text-xl text-cyan-50"
           />
@@ -230,14 +230,14 @@ export function AccountProfileSettings() {
               <div className="rounded-lg border border-white/10 bg-black/15 p-4">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Omnix handle</p>
-                  {profile?.handle ? (
+                  {handle ? (
                     <button type="button" onClick={copyHandle} className="text-slate-500 transition hover:text-cyan-200" aria-label="Copy handle">
                       <Copy className="h-3.5 w-3.5" />
                     </button>
                   ) : null}
                 </div>
-                {profile?.handle ? (
-                  <p className="mt-2 font-mono text-sm text-cyan-100">@{profile.handle}</p>
+                {handle ? (
+                  <p className="mt-2 font-mono text-sm text-cyan-100">@{handle}</p>
                 ) : (
                   <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                     <Input
@@ -286,7 +286,7 @@ export function AccountProfileSettings() {
           <ProfileAvatar
             name={displayName}
             email={email}
-            handle={profile?.handle}
+            handle={handle}
             avatarUrl={avatarUrl}
             className="h-16 w-16 border-cyan-300/25 bg-cyan-300/10 text-lg text-cyan-50"
           />

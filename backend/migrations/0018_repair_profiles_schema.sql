@@ -4,12 +4,12 @@
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS profiles (
-  user_id uuid PRIMARY KEY
+  id uuid PRIMARY KEY
 );
 
 ALTER TABLE profiles
-  ADD COLUMN IF NOT EXISTS handle text,
-  ADD COLUMN IF NOT EXISTS display_name text,
+  ADD COLUMN IF NOT EXISTS username text,
+  ADD COLUMN IF NOT EXISTS name text,
   ADD COLUMN IF NOT EXISTS avatar_url text,
   ADD COLUMN IF NOT EXISTS created_at timestamptz,
   ADD COLUMN IF NOT EXISTS updated_at timestamptz;
@@ -27,11 +27,11 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1
     FROM pg_constraint
-    WHERE conname = 'profiles_handle_format_check'
+    WHERE conname = 'profiles_username_format_check'
   ) THEN
     ALTER TABLE profiles
-    ADD CONSTRAINT profiles_handle_format_check
-    CHECK (handle IS NULL OR handle ~ '^[a-z0-9][a-z0-9_-]{2,29}$');
+    ADD CONSTRAINT profiles_username_format_check
+    CHECK (username IS NULL OR username ~ '^[a-z0-9][a-z0-9_-]{2,29}$');
   END IF;
 END$$;
 
@@ -40,35 +40,35 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1
     FROM pg_constraint
-    WHERE conname = 'profiles_user_id_fkey'
+    WHERE conname = 'profiles_id_fkey'
   ) THEN
     BEGIN
       ALTER TABLE profiles
-      ADD CONSTRAINT profiles_user_id_fkey
-      FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+      ADD CONSTRAINT profiles_id_fkey
+      FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
     EXCEPTION WHEN undefined_table OR undefined_object THEN
-      RAISE NOTICE 'Skipping profiles.user_id FK creation - auth.users not available.';
+      RAISE NOTICE 'Skipping profiles.id FK creation - auth.users not available.';
     END;
   END IF;
 END$$;
 
-CREATE UNIQUE INDEX IF NOT EXISTS ux_profiles_handle_lower
-ON profiles(lower(handle))
-WHERE handle IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_profiles_username_lower
+ON profiles(lower(username))
+WHERE username IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_profiles_user_id
-ON profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_id
+ON profiles(id);
 
-INSERT INTO profiles (user_id, created_at, updated_at)
+INSERT INTO profiles (id, created_at, updated_at)
 SELECT DISTINCT wm.user_id, now(), now()
 FROM workspace_members wm
 WHERE wm.user_id IS NOT NULL
-ON CONFLICT (user_id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO profiles (user_id, created_at, updated_at)
+INSERT INTO profiles (id, created_at, updated_at)
 SELECT DISTINCT w.user_id, now(), now()
 FROM workspaces w
 WHERE w.user_id IS NOT NULL
-ON CONFLICT (user_id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
 COMMIT;
