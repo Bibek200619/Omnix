@@ -33,7 +33,7 @@ import { Input } from "@/components/ui/Input";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
-import { workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
+import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import { PendingWorkspaceInvites } from "@/components/workspace/PendingWorkspaceInvites";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModal";
@@ -275,7 +275,7 @@ function WorkspaceSelector() {
 
             <div className="border-t border-white/8 p-2.5">
               <div className="space-y-2">
-                {active?.current_user_role === "owner" ? (
+                {isWorkspaceFounderRole(active?.current_user_role) ? (
                   <>
                     <div className="grid grid-cols-2 gap-2">
                       <Button
@@ -388,7 +388,7 @@ function WorkspaceSelector() {
             workspaceName={active.name}
             loading={inviting}
             error={inviteError}
-            allowRoleSelection={active.current_user_role === "owner"}
+            allowRoleSelection={isWorkspaceFounderRole(active.current_user_role)}
             onClose={() => setInviteOpen(false)}
             onSubmit={handleInvite}
           />
