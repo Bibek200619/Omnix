@@ -30,7 +30,7 @@ export default function NotificationSettingsPage() {
       description="Keep invite and workspace alerts visible without burying them in account details."
     >
       <div className="grid gap-4">
-        <section className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+        <section className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5">
           <div className="flex items-center gap-3">
             <Bell className="h-5 w-5 text-cyan-200" />
             <h3 className="font-semibold text-white">Workspace alerts</h3>
@@ -50,8 +50,8 @@ export default function NotificationSettingsPage() {
             />
           </div>
         </section>
-        <section className="rounded-lg border border-white/10 bg-white/[0.025] p-5">
-          <div className="flex items-center gap-3 text-sm text-slate-400">
+        <section className="rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-5">
+          <div className="flex items-center gap-3 text-sm text-[var(--omnix-text-2)]">
             <Mail className="h-4 w-4 text-amber-200" />
             Email invitations are sent from the backend when a workspace invite is created.
           </div>

@@ -175,13 +175,13 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         animate={{
-          borderColor: isDragActive ? "rgba(34, 211, 238, 0.5)" : "rgba(255, 255, 255, 0.08)",
-          backgroundColor: isDragActive ? "rgba(34, 211, 238, 0.04)" : "rgba(255, 255, 255, 0.02)",
+          borderColor: isDragActive ? "rgba(0, 255, 255, 0.5)" : "rgba(0, 255, 255, 0.12)",
+          backgroundColor: isDragActive ? "rgba(0, 255, 255, 0.06)" : "rgba(0, 255, 255, 0.035)",
           scale: isDragActive ? 1.01 : 1,
         }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
         className={cn(
-          "relative overflow-hidden rounded-xl border border-dashed text-center transition-shadow hover:border-white/20",
+          "relative overflow-hidden rounded-xl border border-dashed text-center transition-shadow hover:border-[var(--omnix-border-active)] hover:shadow-[var(--omnix-glow-xs)]",
           compact ? "p-4" : "p-8",
         )}
       >
@@ -244,12 +244,12 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
               exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
               transition={{ type: "spring", stiffness: 400, damping: 25 }}
               className={cn(
-                "group flex flex-col gap-4 rounded-xl border border-white/6 bg-white/[0.02] transition-colors hover:bg-white/[0.04] sm:flex-row sm:items-center",
+                "group flex flex-col gap-4 rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] transition-colors hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)] sm:flex-row sm:items-center",
                 compact ? "p-3" : "p-4",
               )}
             >
               <div className="flex items-center gap-4 min-w-0 flex-1">
-                <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors", it.status === "done" ? "bg-emerald-500/10 text-emerald-400" : it.status === "error" ? "bg-rose-500/10 text-rose-400" : "bg-white/5 text-slate-300")}>
+                <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--omnix-border)] transition-colors", it.status === "done" ? "bg-emerald-500/10 text-emerald-400" : it.status === "error" ? "bg-rose-500/10 text-rose-400" : "bg-cyan-300/10 text-cyan-100")}>
                   <FileText className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -257,7 +257,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
                   <div className="mt-1.5 flex items-center gap-3">
                     <p className="text-xs text-slate-500">{Math.round(it.file.size / 1024)} KB</p>
                     {it.status === "uploading" && (
-                      <div className="flex-1 h-1.5 max-w-[120px] overflow-hidden rounded-full bg-white/[0.05]">
+                      <div className="flex-1 h-1.5 max-w-[120px] overflow-hidden rounded-full bg-[var(--omnix-surface-hover)]">
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: it.progress + "%" }}
@@ -281,7 +281,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
                   <Button type="button" size="sm" variant="ghost" onClick={() => upload(it)}>Upload</Button>
                 )}
                 
-                <button type="button" onClick={() => setItems((s) => s.filter((_i) => _i.id !== it.id))} className="rounded-md p-1.5 text-slate-500 hover:bg-white/10 hover:text-slate-300 transition-colors">
+                <button type="button" onClick={() => setItems((s) => s.filter((_i) => _i.id !== it.id))} className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-cyan-300/10 hover:text-slate-100">
                   <X className="h-4 w-4" />
                 </button>
               </div>
