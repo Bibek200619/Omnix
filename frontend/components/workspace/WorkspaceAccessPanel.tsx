@@ -61,7 +61,7 @@ function inviteStatusMeta(status: string) {
       return {
         label: "Declined",
         icon: XCircle,
-        className: "border-slate-400/20 bg-white/[0.04] text-slate-300",
+        className: "border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-[var(--omnix-text-2)]",
       };
     case "revoked":
       return {
@@ -176,17 +176,18 @@ export function WorkspaceAccessPanel() {
   }
 
   return (
-    <section className="space-y-4">
-      <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:p-5">
+    <section className="space-y-6">
+      <div className="relative overflow-hidden rounded-2xl border border-[var(--omnix-border)] bg-[rgba(10,14,26,0.5)] p-5 backdrop-blur-md sm:p-6">
+        <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-[var(--omnix-cyan)] opacity-10 blur-[80px]" />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-100">
+          <div className="relative z-10 min-w-0">
+            <div className="flex items-center gap-5">
+              <span className="flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--omnix-grad-primary)] text-white shadow-[var(--omnix-glow-md)]">
                 <Users className="h-5 w-5" />
               </span>
               <div className="min-w-0">
-                <h2 className="text-base font-semibold text-white">Team Members</h2>
-                <p className="mt-1 text-sm text-slate-400">
+                <h2 className="omnix-display text-2xl font-semibold text-white">Team Members</h2>
+                <p className="mt-1 text-sm text-[var(--omnix-text-2)]">
                   Manage workspace access, ownership level, and collaborator visibility.
                 </p>
               </div>
@@ -194,7 +195,7 @@ export function WorkspaceAccessPanel() {
             {activeWorkspace ? (
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} size="md" />
-                <span className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-xs font-medium text-slate-300">
+                <span className="rounded-full border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 py-1 text-xs font-medium text-[var(--omnix-text-2)]">
                   {activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "member" : "members"}
                 </span>
                 <span className={cn("rounded-full border px-3 py-1 text-xs font-semibold", workspaceRoleBadgeClass(activeWorkspace.current_user_role))}>
@@ -212,6 +213,7 @@ export function WorkspaceAccessPanel() {
                 setInviteError(null);
                 setInviteOpen(true);
               }}
+              className="relative z-10 rounded-full border-[var(--omnix-border)] bg-[var(--omnix-surface)] hover:bg-[var(--omnix-surface-hover)]"
             >
               Invite teammate
             </Button>
@@ -225,15 +227,15 @@ export function WorkspaceAccessPanel() {
         ) : null}
 
         {!activeWorkspace ? (
-          <div className="mt-5 rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-slate-400">
+          <div className="mt-5 rounded-lg border border-dashed border-[var(--omnix-border)] px-4 py-5 text-sm text-[var(--omnix-text-2)]">
             Select a workspace to manage its team.
           </div>
         ) : (
-          <div className="mt-5 space-y-2.5">
+          <div className="relative z-10 mt-6 overflow-hidden rounded-2xl border border-[var(--omnix-border)] bg-[rgba(6,8,16,0.6)] backdrop-blur-xl">
             {membersLoading ? (
-              <div className="grid gap-2.5">
+              <div className="grid gap-2.5 p-4">
                 {[0, 1, 2].map((item) => (
-                  <div key={item} className="shimmer h-16 rounded-lg border border-white/10 bg-white/[0.04]" />
+                  <div key={item} className="shimmer h-16 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)]" />
                 ))}
               </div>
             ) : (
@@ -247,7 +249,7 @@ export function WorkspaceAccessPanel() {
                 return (
                   <div
                     key={member.user_id}
-                    className="relative flex flex-col gap-3 rounded-lg border border-white/10 bg-[#080d13]/80 px-3.5 py-3 transition hover:border-white/16 hover:bg-white/[0.045] sm:flex-row sm:items-center sm:justify-between"
+                    className="group relative flex flex-col gap-3 border-b border-[var(--omnix-border)] px-4 py-4 transition hover:bg-[var(--omnix-surface)] sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <ProfileAvatar
@@ -288,7 +290,7 @@ export function WorkspaceAccessPanel() {
                                 current === member.user_id ? null : member.user_id,
                               )
                             }
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/[0.045] text-slate-300 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-slate-300 transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
                           >
                             <MoreHorizontal className="h-4 w-4" />
                           </button>
@@ -296,7 +298,7 @@ export function WorkspaceAccessPanel() {
                           {openMemberMenu === member.user_id ? (
                             <div
                               role="menu"
-                              className="absolute right-0 top-full z-40 mt-2 w-44 overflow-hidden rounded-lg border border-white/12 bg-[#05070b] p-1.5 shadow-[0_18px_54px_rgba(0,0,0,0.58)] ring-1 ring-black/40"
+                              className="absolute right-0 top-full z-40 mt-2 w-44 overflow-hidden rounded-lg border border-[var(--omnix-border-2)] bg-[#07131f] p-1.5 shadow-[0_18px_54px_rgba(0,0,0,0.58),var(--omnix-glow-xs)] ring-1 ring-black/40"
                             >
                               {canManageRoles && member.role !== "co_owner" ? (
                                 <button
@@ -342,7 +344,7 @@ export function WorkspaceAccessPanel() {
         )}
       </div>
 
-      <div className="rounded-lg border border-white/10 bg-white/[0.025] p-4 sm:p-5">
+      <div className="rounded-2xl border border-[var(--omnix-border)] bg-[rgba(6,8,16,0.6)] p-5 backdrop-blur-xl">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
@@ -362,11 +364,11 @@ export function WorkspaceAccessPanel() {
 
         <div className="mt-4 space-y-2.5">
           {!activeWorkspace ? (
-            <div className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-slate-500">
+              <div className="rounded-lg border border-dashed border-[var(--omnix-border)] px-4 py-5 text-sm text-[var(--omnix-text-3)]">
               Select a workspace to view invites.
             </div>
           ) : !isWorkspaceFounderRole(activeWorkspace.current_user_role) ? (
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-slate-400">
+              <div className="rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-4 py-4 text-sm text-[var(--omnix-text-2)]">
               Only the workspace founder can manage outgoing invites.
             </div>
           ) : invitesLoading ? (
@@ -375,7 +377,7 @@ export function WorkspaceAccessPanel() {
               Loading invitations
             </div>
           ) : outgoingInvites.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-slate-500">
+              <div className="rounded-lg border border-dashed border-[var(--omnix-border)] px-4 py-5 text-sm text-[var(--omnix-text-3)]">
               No outgoing invitations yet.
             </div>
           ) : (
@@ -385,7 +387,7 @@ export function WorkspaceAccessPanel() {
               const StatusIcon = status.icon;
 
               return (
-                <div key={inviteId} className="flex flex-col gap-3 rounded-lg border border-white/10 bg-[#080d13]/70 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div key={inviteId} className="flex flex-col gap-3 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3.5 py-3 transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)] sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-white">{invite.email}</div>
                     <div className="mt-1 text-xs text-slate-500">
@@ -431,7 +433,7 @@ export function WorkspaceAccessPanel() {
 
       {confirmAction ? (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-lg border border-white/10 bg-[#071017] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
+          <div className="w-full max-w-md rounded-xl border border-[var(--omnix-border-2)] bg-[#07131f] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.55),var(--omnix-glow-xs)]">
             <div className="flex items-start gap-3">
               <ProfileAvatar
                 name={workspaceMemberName(confirmAction.member)}

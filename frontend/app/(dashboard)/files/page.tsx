@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
+import { Database, FileText } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -74,13 +75,16 @@ export default function FilesPage() {
   }
 
   return (
-    <section className="flex min-h-[calc(100vh-8rem)] flex-col gap-4">
-      <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/[0.04] p-4 sm:flex-row sm:items-center sm:justify-between">
+    <section className="omnix-scrollbar h-full w-full overflow-y-auto px-5 py-6 md:px-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-5 pb-12">
+      <div className="relative overflow-hidden rounded-2xl border border-[var(--omnix-border)] bg-[rgba(10,14,26,0.5)] p-5 backdrop-blur-md sm:flex sm:items-center sm:justify-between">
+        <div className="pointer-events-none absolute right-0 top-0 h-56 w-56 rounded-full bg-[var(--omnix-cyan)] opacity-10 blur-[70px]" />
         <div>
-          <h1 className="text-lg font-semibold text-white">
+          <h1 className="omnix-display flex items-center gap-2 text-xl font-semibold text-white">
+            <Database className="h-5 w-5 text-[var(--omnix-cyan)]" />
             {activeWorkspace?.name ?? "Workspace"} files
           </h1>
-          <p className="text-sm text-slate-400">
+          <p className="mt-1 text-sm text-[var(--omnix-text-2)]">
             {activeWorkspace?.is_shared
               ? "Shared documents are available to every workspace member."
               : "Upload documents to your workspace. Supported: PDF, DOCX, TXT, Markdown."}
@@ -97,24 +101,25 @@ export default function FilesPage() {
         ) : null}
       </div>
 
-      <div className="mt-4">
+      <div className="rounded-2xl border border-[var(--omnix-border)] bg-[rgba(6,8,16,0.6)] p-4 backdrop-blur-xl">
         <UploadDropzone />
       </div>
 
-      <div className="mt-6">
-        <h2 className="text-sm font-medium text-white">
+      <div className="rounded-2xl border border-[var(--omnix-border)] bg-[rgba(6,8,16,0.6)] p-5 backdrop-blur-xl">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+          <FileText className="h-4 w-4 text-cyan-200" />
           {activeWorkspace?.is_shared ? "Shared files" : "Workspace files"}
         </h2>
         {loading ? (
-          <p className="text-slate-400">Loading...</p>
+          <p className="mt-4 text-[var(--omnix-text-2)]">Loading...</p>
         ) : error ? (
-          <p className="text-rose-300">{error}</p>
+          <p className="mt-4 text-rose-300">{error}</p>
         ) : files.length === 0 ? (
-          <p className="text-slate-400">No files uploaded yet.</p>
+          <p className="mt-4 rounded-lg border border-dashed border-[var(--omnix-border)] p-5 text-sm text-[var(--omnix-text-2)]">No files uploaded yet.</p>
         ) : (
           <div className="mt-3 space-y-2">
             {files.map((f) => (
-              <div key={f.id} className="flex items-center justify-between rounded-md border border-white/6 bg-white/[0.02] p-3">
+              <div key={f.id} className="omnix-card-hover flex items-center justify-between rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-white">{f.file_name ?? f.filename}</p>
                   <p className="mt-1 text-xs text-slate-400">{f.file_type ?? f.content_type} • {f.size_bytes} bytes</p>
@@ -127,6 +132,7 @@ export default function FilesPage() {
             ))}
           </div>
         )}
+      </div>
       </div>
     </section>
   );
