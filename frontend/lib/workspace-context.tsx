@@ -4,7 +4,16 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import { apiClient } from "./api";
 import { useAuth } from "./auth-context";
 import { isWorkspaceFounderRole } from "./workspace-roles";
-import { getWorkspaceInviteId, type Workspace, type WorkspaceInvite, type WorkspaceMember } from "./workspace-types";
+import {
+  getWorkspaceInviteId,
+  type Workspace,
+  type WorkspaceCreatePayload,
+  type WorkspaceInvite,
+  type WorkspaceMember,
+  type WorkspaceRole,
+  type WorkspaceSubspaceCreatePayload,
+  type WorkspaceType,
+} from "./workspace-types";
 
 type RefreshOptions = {
   force?: boolean;
@@ -17,17 +26,23 @@ type WorkspaceContextType = {
   error: string | null;
   activeWorkspaceId: string | null;
   activeWorkspace: Workspace | null;
+  activeRootWorkspace: Workspace | null;
   activeMembers: WorkspaceMember[];
   activeInvites: WorkspaceInvite[];
   pendingInvites: WorkspaceInvite[];
   membersLoading: boolean;
   invitesLoading: boolean;
   pendingInvitesLoading: boolean;
+  subspaceLoadingByParentId: Record<string, boolean>;
+  subspaceErrorByParentId: Record<string, string | null>;
   setActiveWorkspace: (id: string | null) => void;
   refreshWorkspaces: (options?: RefreshOptions) => Promise<void>;
+  refreshWorkspaceTree: (workspaceId: string, options?: RefreshOptions) => Promise<Workspace | null>;
+  refreshWorkspaceSubspaces: (workspaceId: string, options?: RefreshOptions) => Promise<Workspace[]>;
   refreshActiveWorkspaceData: (options?: RefreshOptions) => Promise<void>;
   refreshPendingInvites: (options?: RefreshOptions) => Promise<void>;
-  createWorkspace: (payload: { name: string; description?: string }) => Promise<Workspace>;
+  createWorkspace: (payload: WorkspaceCreatePayload) => Promise<Workspace>;
+  createSubspace: (parentId: string, payload: WorkspaceSubspaceCreatePayload) => Promise<Workspace>;
   renameWorkspace: (workspaceId: string, payload: { name: string; description?: string | null }) => Promise<Workspace>;
   deleteWorkspace: (workspaceId: string) => Promise<void>;
   inviteToActiveWorkspace: (target: string, role?: "co_owner" | "member") => Promise<void>;
@@ -86,6 +101,224 @@ function reconcileWorkspaceInvites(current: WorkspaceInvite[], incoming: Workspa
   return sortWorkspaceInvites(Array.from(byId.values()));
 }
 
+type WorkspaceApiRecord = Partial<Workspace> & {
+  id: string;
+  name?: string | null;
+};
+
+function normalizeWorkspaceRole(role: unknown): WorkspaceRole {
+  if (role === "founder" || role === "owner" || role === "co_owner" || role === "member") {
+    return role;
+  }
+  return "member";
+}
+
+function normalizeWorkspaceType(value: unknown, parentWorkspaceId?: string | null): WorkspaceType {
+  if (value === "workspace" || value === "super" || value === "sub") {
+    return value;
+  }
+  return parentWorkspaceId ? "sub" : "workspace";
+}
+
+function normalizeWorkspaceRecord(record: WorkspaceApiRecord, parentFromTree?: string | null): Workspace {
+  const parentWorkspaceId =
+    record.parent_workspace_id === undefined
+      ? parentFromTree ?? null
+      : record.parent_workspace_id || null;
+  const membersPreview = Array.isArray(record.members_preview) ? record.members_preview : [];
+  const memberCount =
+    typeof record.member_count === "number"
+      ? record.member_count
+      : Math.max(membersPreview.length, 1);
+
+  return {
+    id: String(record.id),
+    user_id: String(record.user_id ?? ""),
+    name: String(record.name || "Untitled workspace"),
+    description: record.description ?? null,
+    parent_workspace_id: parentWorkspaceId,
+    workspace_type: normalizeWorkspaceType(record.workspace_type, parentWorkspaceId),
+    is_global: Boolean(record.is_global),
+    current_user_role: normalizeWorkspaceRole(record.current_user_role),
+    member_count: memberCount,
+    is_shared: Boolean(record.is_shared ?? memberCount > 1),
+    members_preview: membersPreview,
+    created_at: record.created_at ?? null,
+    updated_at: record.updated_at ?? null,
+    subspaces: [],
+  };
+}
+
+function workspaceTimestamp(workspace: Workspace) {
+  return Date.parse(workspace.created_at || workspace.updated_at || "") || 0;
+}
+
+function sortSubspaces(subspaces: Workspace[]) {
+  return [...subspaces].sort((a, b) => {
+    if (a.is_global !== b.is_global) {
+      return a.is_global ? -1 : 1;
+    }
+
+    const timeDelta = workspaceTimestamp(a) - workspaceTimestamp(b);
+    if (timeDelta !== 0) {
+      return timeDelta;
+    }
+
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function normalizeWorkspaceForest(records: WorkspaceApiRecord[] | null | undefined) {
+  if (!Array.isArray(records)) {
+    return [];
+  }
+
+  const byId = new Map<string, Workspace>();
+
+  function visit(record: WorkspaceApiRecord, parentFromTree?: string | null) {
+    if (!record?.id) {
+      return;
+    }
+
+    const workspace = normalizeWorkspaceRecord(record, parentFromTree);
+    byId.set(workspace.id, workspace);
+
+    if (Array.isArray(record.subspaces)) {
+      record.subspaces.forEach((subspace) => visit(subspace as WorkspaceApiRecord, workspace.id));
+    }
+  }
+
+  records.forEach((record) => visit(record));
+
+  const childrenByParentId = new Map<string, Workspace[]>();
+  const roots: Workspace[] = [];
+
+  for (const workspace of byId.values()) {
+    const parentId = workspace.parent_workspace_id;
+    if (parentId && byId.has(parentId)) {
+      childrenByParentId.set(parentId, [...(childrenByParentId.get(parentId) ?? []), workspace]);
+      continue;
+    }
+
+    roots.push(workspace);
+  }
+
+  function attachChildren(workspace: Workspace, seen = new Set<string>()): Workspace {
+    if (seen.has(workspace.id)) {
+      return { ...workspace, subspaces: [] };
+    }
+
+    const nextSeen = new Set(seen);
+    nextSeen.add(workspace.id);
+
+    return {
+      ...workspace,
+      subspaces: sortSubspaces(childrenByParentId.get(workspace.id) ?? []).map((child) =>
+        attachChildren(child, nextSeen),
+      ),
+    };
+  }
+
+  return roots.map((workspace) => attachChildren(workspace));
+}
+
+function flattenWorkspaces(workspaces: Workspace[]) {
+  const flattened: Workspace[] = [];
+
+  function visit(workspace: Workspace) {
+    flattened.push(workspace);
+    workspace.subspaces?.forEach(visit);
+  }
+
+  workspaces.forEach(visit);
+  return flattened;
+}
+
+function findWorkspaceById(workspaces: Workspace[], workspaceId: string | null) {
+  if (!workspaceId) {
+    return null;
+  }
+
+  return flattenWorkspaces(workspaces).find((workspace) => workspace.id === workspaceId) ?? null;
+}
+
+function findRootWorkspaceById(workspaces: Workspace[], workspaceId: string | null) {
+  if (!workspaceId) {
+    return null;
+  }
+
+  for (const workspace of workspaces) {
+    if (workspace.id === workspaceId) {
+      return workspace;
+    }
+
+    if (workspace.subspaces?.some((subspace) => findWorkspaceById([subspace], workspaceId))) {
+      return workspace;
+    }
+  }
+
+  return null;
+}
+
+function upsertWorkspaceTree(workspaces: Workspace[], tree: Workspace) {
+  const withoutTree = workspaces.filter((workspace) => workspace.id !== tree.id);
+  const existingIndex = workspaces.findIndex((workspace) => workspace.id === tree.id);
+  if (existingIndex === -1) {
+    return [tree, ...withoutTree];
+  }
+
+  return workspaces.map((workspace) => (workspace.id === tree.id ? tree : workspace));
+}
+
+function updateWorkspaceSubspaces(workspaces: Workspace[], parentId: string, subspaces: Workspace[]): Workspace[] {
+  return workspaces.map((workspace) => {
+    if (workspace.id === parentId) {
+      return { ...workspace, subspaces: sortSubspaces(subspaces) };
+    }
+
+    if (workspace.subspaces?.length) {
+      return {
+        ...workspace,
+        subspaces: updateWorkspaceSubspaces(workspace.subspaces, parentId, subspaces),
+      };
+    }
+
+    return workspace;
+  });
+}
+
+function patchWorkspaceInTree(
+  workspaces: Workspace[],
+  workspaceId: string,
+  patcher: (workspace: Workspace) => Workspace,
+): Workspace[] {
+  return workspaces.map((workspace) => {
+    if (workspace.id === workspaceId) {
+      return patcher(workspace);
+    }
+
+    if (workspace.subspaces?.length) {
+      return {
+        ...workspace,
+        subspaces: patchWorkspaceInTree(workspace.subspaces, workspaceId, patcher),
+      };
+    }
+
+    return workspace;
+  });
+}
+
+function removeWorkspaceFromTree(workspaces: Workspace[], workspaceId: string): Workspace[] {
+  return workspaces
+    .filter((workspace) => workspace.id !== workspaceId)
+    .map((workspace) => ({
+      ...workspace,
+      subspaces: workspace.subspaces?.length
+        ? removeWorkspaceFromTree(workspace.subspaces, workspaceId)
+        : [],
+    }));
+}
+
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -98,9 +331,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [membersLoading, setMembersLoading] = useState(false);
   const [invitesLoading, setInvitesLoading] = useState(false);
   const [pendingInvitesLoading, setPendingInvitesLoading] = useState(false);
+  const [subspaceLoadingByParentId, setSubspaceLoadingByParentId] = useState<Record<string, boolean>>({});
+  const [subspaceErrorByParentId, setSubspaceErrorByParentId] = useState<Record<string, string | null>>({});
   const workspaceFetchIdRef = useRef(0);
   const createWorkspaceInFlightRef = useRef<Map<string, Promise<Workspace>>>(new Map());
   const workspaceRefreshInFlightRef = useRef<Promise<void> | null>(null);
+  const workspaceTreeRefreshInFlightRef = useRef<Map<string, Promise<Workspace | null>>>(new Map());
+  const subspaceRefreshInFlightRef = useRef<Map<string, Promise<Workspace[]>>>(new Map());
   const pendingInvitesInFlightRef = useRef<Promise<void> | null>(null);
   const activeWorkspaceDataInFlightRef = useRef<Promise<void> | null>(null);
   const lastWorkspaceRefreshAtRef = useRef(0);
@@ -108,7 +345,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const lastActiveWorkspaceDataRefreshAtRef = useRef(0);
 
   const activeWorkspace = useMemo(
-    () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) || null,
+    () => findWorkspaceById(workspaces, activeWorkspaceId),
+    [activeWorkspaceId, workspaces],
+  );
+
+  const activeRootWorkspace = useMemo(
+    () => findRootWorkspaceById(workspaces, activeWorkspaceId),
     [activeWorkspaceId, workspaces],
   );
 
@@ -150,11 +392,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         if (!options?.silent) {
           setLoading(true);
         }
-        const data = await apiClient.get<Workspace[]>("/workspaces");
+        let data: WorkspaceApiRecord[] = [];
+        try {
+          data = await apiClient.get<WorkspaceApiRecord[]>("/workspaces/hierarchy");
+        } catch (hierarchyError) {
+          console.warn("[workspace] hierarchy fetch failed; falling back to flat workspaces", hierarchyError);
+          data = await apiClient.get<WorkspaceApiRecord[]>("/workspaces");
+        }
         if (workspaceFetchIdRef.current !== requestId) {
           return;
         }
-        setWorkspaces(data || []);
+        setWorkspaces(normalizeWorkspaceForest(data));
         setError(null);
         lastWorkspaceRefreshAtRef.current = Date.now();
       } catch (err) {
@@ -174,6 +422,81 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     })();
 
     workspaceRefreshInFlightRef.current = request;
+    return request;
+  }, []);
+
+  const refreshWorkspaceTree = useCallback(async (workspaceId: string, options?: RefreshOptions) => {
+    const normalizedWorkspaceId = workspaceId.trim();
+    if (!normalizedWorkspaceId) {
+      return null;
+    }
+
+    const inFlight = workspaceTreeRefreshInFlightRef.current.get(normalizedWorkspaceId);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const request = (async () => {
+      try {
+        const data = await apiClient.get<WorkspaceApiRecord>(`/workspaces/${normalizedWorkspaceId}/hierarchy`);
+        const [tree] = normalizeWorkspaceForest([data]);
+        if (tree) {
+          setWorkspaces((current) => upsertWorkspaceTree(current, tree));
+        }
+        return tree ?? null;
+      } catch (err) {
+        if (!options?.silent) {
+          setError(err instanceof Error ? err.message : "Failed to load workspace hierarchy");
+        }
+        return null;
+      } finally {
+        workspaceTreeRefreshInFlightRef.current.delete(normalizedWorkspaceId);
+      }
+    })();
+
+    workspaceTreeRefreshInFlightRef.current.set(normalizedWorkspaceId, request);
+    return request;
+  }, []);
+
+  const refreshWorkspaceSubspaces = useCallback(async (workspaceId: string, options?: RefreshOptions) => {
+    const normalizedWorkspaceId = workspaceId.trim();
+    if (!normalizedWorkspaceId) {
+      return [];
+    }
+
+    const inFlight = subspaceRefreshInFlightRef.current.get(normalizedWorkspaceId);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const request = (async () => {
+      try {
+        if (!options?.silent) {
+          setSubspaceLoadingByParentId((current) => ({ ...current, [normalizedWorkspaceId]: true }));
+        }
+        setSubspaceErrorByParentId((current) => ({ ...current, [normalizedWorkspaceId]: null }));
+        const data = await apiClient.get<WorkspaceApiRecord[]>(`/workspaces/${normalizedWorkspaceId}/subspaces`);
+        const subspaces = sortSubspaces(
+          (data || []).map((record) => normalizeWorkspaceRecord(record, normalizedWorkspaceId)),
+        );
+        setWorkspaces((current) => updateWorkspaceSubspaces(current, normalizedWorkspaceId, subspaces));
+        return subspaces;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load subspaces";
+        setSubspaceErrorByParentId((current) => ({ ...current, [normalizedWorkspaceId]: message }));
+        if (!options?.silent) {
+          console.error("Failed to load workspace subspaces", err);
+        }
+        return [];
+      } finally {
+        if (!options?.silent) {
+          setSubspaceLoadingByParentId((current) => ({ ...current, [normalizedWorkspaceId]: false }));
+        }
+        subspaceRefreshInFlightRef.current.delete(normalizedWorkspaceId);
+      }
+    })();
+
+    subspaceRefreshInFlightRef.current.set(normalizedWorkspaceId, request);
     return request;
   }, []);
 
@@ -289,12 +612,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     return request;
   }, [activeWorkspace, activeWorkspaceId]);
 
-  const createWorkspace = useCallback(async (payload: { name: string; description?: string }) => {
+  const createWorkspace = useCallback(async (payload: WorkspaceCreatePayload) => {
     const normalizedPayload = {
       ...payload,
       name: payload.name.trim(),
     };
-    const inFlightKey = `${normalizedPayload.name.toLowerCase()}::${normalizedPayload.description ?? ""}`;
+    const inFlightKey = `${normalizedPayload.name.toLowerCase()}::${normalizedPayload.description ?? ""}::${normalizedPayload.workspace_type ?? "workspace"}::${normalizedPayload.parent_workspace_id ?? ""}`;
     const inFlight = createWorkspaceInFlightRef.current.get(inFlightKey);
     if (inFlight) {
       console.debug("[workspace] create deduped while request is in flight", { name: normalizedPayload.name });
@@ -303,11 +626,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     console.debug("[workspace] explicit create requested", { name: normalizedPayload.name });
     const request = apiClient
-      .post<Workspace>("/workspaces", normalizedPayload)
+      .post<WorkspaceApiRecord>("/workspaces", normalizedPayload)
       .then((created) => {
-        console.debug("[workspace] create success", { id: created.id, name: created.name });
-        setWorkspaces((current) => [created, ...current.filter((workspace) => workspace.id !== created.id)]);
-        return created;
+        const [workspace] = normalizeWorkspaceForest([created]);
+        if (!workspace) {
+          throw new Error("Workspace could not be created.");
+        }
+        console.debug("[workspace] create success", { id: workspace.id, name: workspace.name });
+        setWorkspaces((current) => [workspace, ...current.filter((item) => item.id !== workspace.id)]);
+        if (workspace.workspace_type === "super") {
+          void refreshWorkspaceTree(workspace.id, { silent: true });
+        }
+        return workspace;
       })
       .finally(() => {
         createWorkspaceInFlightRef.current.delete(inFlightKey);
@@ -315,7 +645,31 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     createWorkspaceInFlightRef.current.set(inFlightKey, request);
     return request;
-  }, []);
+  }, [refreshWorkspaceTree]);
+
+  const createSubspace = useCallback(async (parentId: string, payload: WorkspaceSubspaceCreatePayload) => {
+    const normalizedPayload = { ...payload, name: payload.name.trim() };
+    if (!normalizedPayload.name) {
+      throw new Error("Subspace name cannot be empty.");
+    }
+    const endpoint = `/workspaces/${parentId}/subspaces`;
+    const created = await apiClient.post<WorkspaceApiRecord>(endpoint, normalizedPayload);
+    const workspace = normalizeWorkspaceRecord(created, parentId);
+    setWorkspaces((current) =>
+      updateWorkspaceSubspaces(
+        current,
+        parentId,
+        sortSubspaces([workspace, ...(findWorkspaceById(current, parentId)?.subspaces ?? [])].filter((item, index, items) =>
+          items.findIndex((candidate) => candidate.id === item.id) === index,
+        )),
+      ),
+    );
+    const refreshed = await refreshWorkspaceTree(parentId, { force: true, silent: true });
+    if (!refreshed) {
+      await refreshWorkspaces({ force: true, silent: true });
+    }
+    return workspace;
+  }, [refreshWorkspaceTree, refreshWorkspaces]);
 
   const renameWorkspace = useCallback(async (workspaceId: string, payload: { name: string; description?: string | null }) => {
     const nextName = payload.name.trim();
@@ -325,12 +679,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     console.debug("[workspace] rename requested", { workspaceId, nextName });
     const previousWorkspaces = workspaces;
+
     setWorkspaces((current) =>
-      current.map((workspace) =>
-        workspace.id === workspaceId
-          ? { ...workspace, name: nextName, description: payload.description ?? workspace.description }
-          : workspace,
-      ),
+      patchWorkspaceInTree(current, workspaceId, (workspace) => ({
+        ...workspace,
+        name: nextName,
+        description: payload.description ?? workspace.description,
+      })),
     );
 
     try {
@@ -339,25 +694,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         name: nextName,
       });
       console.debug("[workspace] rename success", { workspaceId, name: updated.name });
-      setWorkspaces((current) =>
-        current.map((workspace) => (workspace.id === workspaceId ? updated : workspace)),
-      );
+      void refreshWorkspaces({ force: true, silent: true });
       return updated;
     } catch (err) {
       console.debug("[workspace] rename failed; rolling back", { workspaceId, err });
       setWorkspaces(previousWorkspaces);
       throw err;
     }
-  }, [workspaces]);
+  }, [workspaces, refreshWorkspaces]);
 
   const deleteWorkspace = useCallback(async (workspaceId: string) => {
     console.debug("[workspace] delete requested", { workspaceId });
     const previousWorkspaces = workspaces;
-    const remainingWorkspaces = workspaces.filter((workspace) => workspace.id !== workspaceId);
-
+    const remainingWorkspaces = removeWorkspaceFromTree(workspaces, workspaceId);
     setWorkspaces(remainingWorkspaces);
-    if (activeWorkspaceId === workspaceId) {
-      setActiveWorkspace(remainingWorkspaces[0]?.id ?? null);
+
+    if (!findWorkspaceById(remainingWorkspaces, activeWorkspaceId)) {
+      setActiveWorkspace(flattenWorkspaces(remainingWorkspaces)[0]?.id ?? null);
       setActiveMembers([]);
       setActiveInvites([]);
     }
@@ -457,7 +810,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const acceptInvite = useCallback(
     async (inviteId: string) => {
-      const workspace = await apiClient.post<Workspace>(`/workspace-invites/${inviteId}/accept`);
+      const created = await apiClient.post<WorkspaceApiRecord>(`/workspace-invites/${inviteId}/accept`);
+      const [workspace] = normalizeWorkspaceForest([created]);
+      if (!workspace) {
+        throw new Error("Invite was accepted, but the workspace could not be loaded.");
+      }
       setPendingInvites((current) => current.filter((invite) => getWorkspaceInviteId(invite) !== inviteId));
       setWorkspaces((current) => [workspace, ...current.filter((item) => item.id !== workspace.id)]);
       setActiveWorkspace(workspace.id);
@@ -479,11 +836,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!user) {
       workspaceFetchIdRef.current += 1;
       createWorkspaceInFlightRef.current.clear();
+      workspaceTreeRefreshInFlightRef.current.clear();
+      subspaceRefreshInFlightRef.current.clear();
       setWorkspaces([]);
       setActiveWorkspace(null);
       setActiveMembers([]);
       setActiveInvites([]);
       setPendingInvites([]);
+      setSubspaceLoadingByParentId({});
+      setSubspaceErrorByParentId({});
       setLoading(false);
       return;
     }
@@ -539,13 +900,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const activeExists = activeWorkspaceId && workspaces.some((workspace) => workspace.id === activeWorkspaceId);
+    const activeExists = Boolean(findWorkspaceById(workspaces, activeWorkspaceId));
     if (!activeExists) {
+      const nextWorkspaceId = flattenWorkspaces(workspaces)[0]?.id ?? null;
       console.debug("[workspace] saved active workspace missing; selecting first available workspace", {
         activeWorkspaceId,
-        nextWorkspaceId: workspaces[0].id,
+        nextWorkspaceId,
       });
-      setActiveWorkspace(workspaces[0].id);
+      setActiveWorkspace(nextWorkspaceId);
     }
   }, [activeWorkspaceId, loading, setActiveWorkspace, user, workspaces]);
 
@@ -562,17 +924,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       error,
       activeWorkspaceId,
       activeWorkspace,
+      activeRootWorkspace,
       activeMembers,
       activeInvites,
       pendingInvites,
       membersLoading,
       invitesLoading,
       pendingInvitesLoading,
+      subspaceLoadingByParentId,
+      subspaceErrorByParentId,
       setActiveWorkspace,
       refreshWorkspaces,
+      refreshWorkspaceTree,
+      refreshWorkspaceSubspaces,
       refreshActiveWorkspaceData,
       refreshPendingInvites,
       createWorkspace,
+      createSubspace,
       renameWorkspace,
       deleteWorkspace,
       inviteToActiveWorkspace,
@@ -588,17 +956,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       error,
       activeWorkspaceId,
       activeWorkspace,
+      activeRootWorkspace,
       activeMembers,
       activeInvites,
       pendingInvites,
       membersLoading,
       invitesLoading,
       pendingInvitesLoading,
+      subspaceLoadingByParentId,
+      subspaceErrorByParentId,
       setActiveWorkspace,
       refreshWorkspaces,
+      refreshWorkspaceTree,
+      refreshWorkspaceSubspaces,
       refreshActiveWorkspaceData,
       refreshPendingInvites,
       createWorkspace,
+      createSubspace,
       renameWorkspace,
       deleteWorkspace,
       inviteToActiveWorkspace,
