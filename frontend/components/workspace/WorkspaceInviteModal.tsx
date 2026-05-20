@@ -57,9 +57,9 @@ export function WorkspaceInviteModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-xl border border-[var(--omnix-border-2)] bg-[#07131f] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.48),var(--omnix-glow-xs)]">
-        <div className="flex items-start justify-between gap-4">
+    <div className="omnix-modal-backdrop fixed inset-0 z-[80] flex items-center justify-center px-4">
+      <div className="omnix-modal-card w-full max-w-md p-5">
+        <div className="relative z-10 flex items-start justify-between gap-4">
           <div>
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
               <UserPlus className="h-4 w-4" />
@@ -82,7 +82,7 @@ export function WorkspaceInviteModal({
           </Button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        <form onSubmit={handleSubmit} className="relative z-10 mt-5 space-y-4">
           <Input
             id="invite-email"
             label="Email or handle"

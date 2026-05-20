@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
@@ -82,12 +83,12 @@ export default function DashboardPage() {
   }));
 
   return (
-    <section className="omnix-scrollbar h-full w-full overflow-y-auto overflow-x-hidden px-5 py-6 md:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-8 pb-12">
+    <section className="omnix-page-frame omnix-scrollbar">
+      <div className="omnix-content-max flex flex-col gap-8">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <h1 className="omnix-display flex items-center gap-2 text-2xl font-bold tracking-tight text-white">
-            <Sparkles className="h-5 w-5 text-[var(--omnix-cyan)] drop-shadow-[0_0_10px_rgba(0,255,255,0.7)]" />
+          <h1 className="omnix-display flex items-center gap-2 text-2xl font-bold text-white">
+            <Sparkles className="h-5 w-5 text-[var(--omnix-cyan)] drop-shadow-[0_0_14px_rgba(0,255,255,0.85)]" />
             Workspace Overview
           </h1>
           <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">
@@ -111,15 +112,17 @@ export default function DashboardPage() {
           return (
             <article
               key={metric.label}
-              className="omnix-replit-panel p-5"
-              style={{ animation: `omnix-slide-in 0.4s ease-out ${index * 100}ms both` }}
+              className="omnix-metric-card p-5"
+              style={{
+                "--metric-color": metric.color,
+                animation: `omnix-slide-in 0.4s ease-out ${index * 100}ms both`,
+              } as CSSProperties}
             >
-              <div className="absolute -right-10 -top-10 h-24 w-24 rounded-full opacity-20 blur-2xl transition-opacity group-hover:opacity-40" style={{ background: metric.color }} />
               <div className="relative z-10 flex items-start justify-between">
                 <div className="rounded-lg p-2" style={{ background: `${metric.color}22` }}>
                   <Icon className="h-5 w-5" style={{ color: metric.color }} />
                 </div>
-                <span className="rounded-full bg-white/[0.05] px-2 py-1 text-xs font-medium text-[var(--omnix-text-2)]">
+                <span className="rounded-full bg-white/[0.05] px-2 py-1 text-xs font-medium text-[var(--omnix-text-2)] ring-1 ring-white/[0.04]">
                   {metric.trend}
                 </span>
               </div>
@@ -149,7 +152,8 @@ export default function DashboardPage() {
                     key={action.label}
                     type="button"
                     onClick={() => router.push(action.href)}
-                    className="group relative z-10 flex items-center gap-4 rounded-lg border border-transparent bg-white/[0.02] p-4 text-left transition-all duration-150 hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface-hover)]"
+                    className="omnix-command-button group relative z-10 flex items-center gap-4 p-4 text-left"
+                    style={{ "--command-color": action.color } as CSSProperties}
                   >
                     <span className="rounded-md p-2" style={{ background: `${action.color}22` }}>
                       <Icon className="h-5 w-5" style={{ color: action.color }} />
@@ -180,7 +184,7 @@ export default function DashboardPage() {
                   key={chat.id}
                   type="button"
                   onClick={() => router.push(`/chat?conversation=${chat.id}`)}
-                  className="group relative z-10 flex w-full items-center justify-between gap-3 rounded-lg border border-transparent p-3 text-left transition-colors hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface-hover)]"
+                  className="group relative z-10 flex w-full items-center justify-between gap-3 rounded-lg border border-transparent p-3 text-left transition-all hover:-translate-y-0.5 hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)]"
                 >
                   <span className="flex min-w-0 items-center gap-3">
                     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-300/[0.08] text-cyan-100">
@@ -193,7 +197,7 @@ export default function DashboardPage() {
                   </span>
                 </button>
               )) : (
-                <div className="rounded-lg border border-dashed border-[var(--omnix-border)] p-5 text-sm text-[var(--omnix-text-2)]">
+                <div className="relative z-10 rounded-lg border border-dashed border-[var(--omnix-border)] bg-black/10 p-5 text-sm text-[var(--omnix-text-2)]">
                   No conversations yet. Start a chat to populate the workspace timeline.
                 </div>
               )}

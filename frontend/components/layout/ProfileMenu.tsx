@@ -68,10 +68,10 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
         title="Profile menu"
         onClick={() => setOpen((current) => !current)}
         className={cn(
-          "flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold shadow-[0_10px_30px_rgba(0,0,0,0.24)] transition",
+          "flex h-[34px] w-[34px] items-center justify-center rounded-full border text-sm font-semibold shadow-[0_10px_30px_rgba(0,0,0,0.24)] transition",
           open
-            ? "border-cyan-300/45 bg-cyan-300/15 text-cyan-50 shadow-[var(--omnix-glow-xs)] ring-2 ring-cyan-300/20"
-            : "border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-slate-100 hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)]",
+            ? "border-cyan-300/45 bg-[linear-gradient(135deg,#00FFFF,#0088ff)] text-[#050c17] shadow-[var(--omnix-glow-sm)] ring-2 ring-cyan-300/20"
+            : "border-cyan-300/40 bg-[linear-gradient(135deg,#00FFFF,#0088ff)] text-[#050c17] hover:shadow-[var(--omnix-glow-sm)]",
         )}
       >
         <ProfileAvatar
@@ -79,14 +79,14 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
           email={email}
           handle={username}
           avatarUrl={profile?.avatar_url}
-          className="h-full w-full border-0 bg-transparent"
+          className="h-full w-full border-0 bg-transparent text-[#050c17]"
         />
       </button>
 
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-full z-[110] mt-2 w-64 overflow-hidden rounded-xl border border-[var(--omnix-border-2)] bg-[#07131f] shadow-[0_24px_70px_rgba(0,0,0,0.68),var(--omnix-glow-xs)] ring-1 ring-black/40"
+          className="omnix-floating-card absolute right-0 top-full z-[110] mt-2 w-64 overflow-hidden ring-1 ring-black/40"
         >
           <div className="border-b border-[var(--omnix-border)] px-4 py-3">
             <div className="flex items-center gap-3">
