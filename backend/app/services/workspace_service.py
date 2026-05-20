@@ -703,10 +703,7 @@ async def _cleanup_workspace_creation(workspace_ids: list[str]) -> None:
             await delete_many_trusted("workspace_members", {"workspace_id": workspace_id})
             await delete_many_trusted("workspaces", {"id": workspace_id})
         except Exception:
-            logger.exception(
-                "Failed to clean up partially created workspace | workspace_id=%s",
-                workspace_id,
-            )
+            logger.exception("Failed to clean up partially created workspace")
 
 
 async def _global_spaces_for_super_workspace(super_workspace_id: str) -> list[dict[str, Any]]:
