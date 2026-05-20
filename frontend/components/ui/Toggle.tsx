@@ -18,7 +18,7 @@ export function Toggle({
   return (
     <label
       className={cn(
-        "flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-[var(--omnix-border)] bg-black/20 p-4 transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)]",
+        "flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-[var(--omnix-border)] bg-black/20 p-4 transition hover:-translate-y-0.5 hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:shadow-[var(--omnix-glow-xs)]",
         className,
       )}
     >
@@ -34,7 +34,7 @@ export function Toggle({
         className={cn(
           "relative h-6 w-11 shrink-0 rounded-full border transition duration-200",
           checked
-            ? "border-cyan-300/50 bg-cyan-300"
+            ? "border-cyan-300/50 bg-[var(--omnix-grad-cyan)] shadow-[var(--omnix-glow-xs)]"
             : "border-[var(--omnix-border)] bg-[var(--omnix-surface)]",
         )}
       >

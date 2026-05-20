@@ -36,12 +36,13 @@ export function SettingsShell({ title, description, children }: SettingsShellPro
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full w-full overflow-hidden text-[var(--omnix-text)]">
-      <aside className="hidden w-[220px] shrink-0 border-r border-[var(--omnix-border)] bg-[rgba(5,12,23,0.6)] px-2.5 py-4 backdrop-blur-xl md:block">
+    <div className="relative flex h-full w-full overflow-hidden text-[var(--omnix-text)]">
+      <aside className="relative hidden w-[220px] shrink-0 overflow-hidden border-r border-[var(--omnix-border)] bg-[rgba(5,12,23,0.68)] px-2.5 py-4 shadow-[18px_0_70px_rgba(0,0,0,0.22)] backdrop-blur-xl md:block">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-52 bg-[radial-gradient(ellipse_at_50%_-10%,rgba(0,255,255,0.09)_0%,transparent_70%)]" />
         <div className="px-2 pb-2.5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--omnix-text-3)]">Settings Menu</p>
+          <p className="relative z-10 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--omnix-text-3)]">Settings Menu</p>
         </div>
-        <nav className="flex flex-col gap-0.5">
+        <nav className="relative z-10 flex flex-col gap-0.5">
           {settingsNav.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -53,8 +54,8 @@ export function SettingsShell({ title, description, children }: SettingsShellPro
                 className={cn(
                   "relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition",
                   active
-                    ? "bg-[var(--omnix-surface-hover)] font-medium text-white shadow-[var(--omnix-glow-xs)]"
-                    : "text-[var(--omnix-text-2)] hover:bg-[var(--omnix-surface)] hover:text-white",
+                    ? "border border-cyan-300/20 bg-cyan-300/[0.08] font-medium text-white shadow-[var(--omnix-glow-xs)]"
+                    : "border border-transparent text-[var(--omnix-text-2)] hover:bg-[var(--omnix-surface)] hover:text-white",
                 )}
               >
                 {active ? <span className="omnix-active-rail" /> : null}
@@ -69,8 +70,8 @@ export function SettingsShell({ title, description, children }: SettingsShellPro
         </nav>
       </aside>
 
-      <section className="omnix-scrollbar min-w-0 flex-1 overflow-y-auto px-5 py-8 sm:px-8 lg:px-10">
-        <div className="mx-auto max-w-[680px] pb-20">
+      <section className="omnix-page-frame omnix-scrollbar min-w-0 flex-1">
+        <div className="relative z-10 mx-auto max-w-[680px] pb-20">
         <div className="mb-6">
           <h2 className="omnix-display text-[22px] font-bold text-white">{title}</h2>
           <p className="mt-1 text-[13px] leading-6 text-[var(--omnix-text-3)]">{description}</p>

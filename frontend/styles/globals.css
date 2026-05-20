@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -124,7 +126,10 @@ textarea {
 
 .omnix-app-bg {
   background-color: var(--omnix-bg);
-  background-image: var(--omnix-grad-bg);
+  background-image:
+    radial-gradient(ellipse 100% 60% at 50% -10%, rgba(0, 255, 255, 0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 80% 20%, rgba(0, 0, 255, 0.06) 0%, transparent 60%),
+    linear-gradient(180deg, #050c17 0%, #061020 48%, #050b16 100%);
   color: var(--omnix-text);
   font-family: var(--omnix-font);
 }
@@ -137,7 +142,8 @@ textarea {
   background-image: radial-gradient(circle, rgba(0, 255, 255, 0.08) 1px, transparent 1px);
   background-size: 32px 32px;
   content: "";
-  opacity: 0.44;
+  opacity: 0.5;
+  animation: omnix-grid-drift 34s linear infinite;
 }
 
 .omnix-app-bg::after {
@@ -150,6 +156,54 @@ textarea {
   pointer-events: none;
   background: radial-gradient(circle at top right, rgba(0, 0, 255, 0.07) 0%, transparent 65%);
   content: "";
+}
+
+.omnix-ambient-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.omnix-ambient-layer::before,
+.omnix-ambient-layer::after {
+  position: absolute;
+  border-radius: 999px;
+  content: "";
+  filter: blur(70px);
+  opacity: 0.75;
+  transform: translate3d(0, 0, 0);
+}
+
+.omnix-ambient-layer::before {
+  top: 9%;
+  left: 23%;
+  width: min(34vw, 430px);
+  height: min(34vw, 430px);
+  background: radial-gradient(circle, rgba(0, 255, 255, 0.115), transparent 68%);
+  animation: auth-drift 24s ease-in-out infinite;
+}
+
+.omnix-ambient-layer::after {
+  right: 7%;
+  bottom: 8%;
+  width: min(38vw, 520px);
+  height: min(38vw, 520px);
+  background: radial-gradient(circle, rgba(0, 51, 255, 0.12), transparent 68%);
+  animation: auth-drift 29s ease-in-out infinite reverse;
+}
+
+.omnix-shell-scanline {
+  position: fixed;
+  inset-inline: 0;
+  top: -12rem;
+  z-index: 0;
+  height: 12rem;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(0, 255, 255, 0.055), transparent);
+  opacity: 0.7;
+  animation: omnix-scan 9s ease-in-out infinite;
 }
 
 .omnix-panel {
@@ -172,6 +226,8 @@ textarea {
   border: 1px solid var(--omnix-border);
   border-radius: var(--omnix-radius);
   background: var(--omnix-surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(18px);
   transition:
     transform 180ms ease,
     border-color 180ms ease,
@@ -207,7 +263,14 @@ textarea {
   border: 1px solid var(--omnix-border);
   border-radius: var(--omnix-radius);
   background: var(--omnix-surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(18px);
   animation: omnix-slide-in 0.42s ease-out both;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
 }
 
 .omnix-section-card::after {
@@ -224,12 +287,219 @@ textarea {
   opacity: 0.45;
 }
 
+.omnix-section-card:hover {
+  border-color: var(--omnix-border-2);
+  background: rgba(0, 255, 255, 0.052);
+  box-shadow: var(--omnix-glow-xs), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
 .omnix-floating-card {
   border: 1px solid var(--omnix-border-2);
   border-radius: var(--omnix-radius-lg);
   background: rgba(7, 19, 31, 0.96);
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.7), var(--omnix-glow-xs);
   backdrop-filter: blur(20px);
+}
+
+.omnix-page-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1.5rem 1.25rem;
+}
+
+.omnix-page-frame::before {
+  position: fixed;
+  inset: var(--omnix-header-h) 0 auto var(--omnix-sidebar-w);
+  z-index: 0;
+  height: 16rem;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 24% 10%, rgba(0, 255, 255, 0.11), transparent 62%),
+    radial-gradient(ellipse at 82% 0%, rgba(155, 92, 255, 0.08), transparent 58%);
+  content: "";
+  filter: blur(8px);
+}
+
+.omnix-content-max {
+  position: relative;
+  z-index: 1;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding-bottom: 3rem;
+}
+
+.omnix-cinematic-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--omnix-border);
+  border-radius: var(--omnix-radius-lg);
+  background: rgba(6, 8, 16, 0.6);
+  box-shadow: 0 22px 80px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(22px);
+}
+
+.omnix-cinematic-card::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(0, 255, 255, 0.12), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.028), transparent 46%);
+  content: "";
+  opacity: 0.7;
+}
+
+.omnix-cinematic-card::after {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.72), transparent);
+  content: "";
+  opacity: 0.42;
+}
+
+.omnix-metric-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--omnix-border);
+  border-radius: var(--omnix-radius);
+  background: var(--omnix-surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(18px);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.omnix-metric-card:hover {
+  border-color: var(--metric-color, var(--omnix-cyan));
+  box-shadow: 0 0 20px color-mix(in srgb, var(--metric-color, #00ffff) 20%, transparent), var(--omnix-glow-xs);
+  transform: translateY(-2px);
+}
+
+.omnix-metric-card::before {
+  position: absolute;
+  top: -2.5rem;
+  right: -2.5rem;
+  width: 6rem;
+  height: 6rem;
+  border-radius: 999px;
+  background: var(--metric-color, var(--omnix-cyan));
+  content: "";
+  filter: blur(24px);
+  opacity: 0.2;
+  transition: opacity 180ms ease;
+}
+
+.omnix-metric-card:hover::before {
+  opacity: 0.4;
+}
+
+.omnix-command-button {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 0.625rem;
+  background: rgba(255, 255, 255, 0.02);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.omnix-command-button:hover {
+  border-color: var(--command-color, var(--omnix-border-2));
+  background: color-mix(in srgb, var(--command-color, #00ffff) 7%, rgba(255, 255, 255, 0.02));
+  box-shadow: 0 0 20px color-mix(in srgb, var(--command-color, #00ffff) 16%, transparent);
+  transform: translateY(-1px);
+}
+
+.omnix-ai-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--omnix-border);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(0, 255, 255, 0.08), transparent 32%),
+    var(--omnix-surface);
+  box-shadow: var(--omnix-glow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px);
+}
+
+.omnix-ai-card::before {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--omnix-cyan), transparent);
+  content: "";
+  opacity: 0.44;
+}
+
+.omnix-ai-card::after {
+  position: absolute;
+  right: -3rem;
+  top: -3rem;
+  width: 10rem;
+  height: 10rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(0, 255, 255, 0.12), transparent 72%);
+  content: "";
+  filter: blur(28px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.omnix-source-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--omnix-border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.22);
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.omnix-source-card:hover {
+  border-color: var(--omnix-border-2);
+  background: var(--omnix-surface);
+  box-shadow: var(--omnix-glow-xs);
+  transform: translateY(-1px);
+}
+
+.omnix-modal-backdrop {
+  background:
+    radial-gradient(circle at 50% 24%, rgba(0, 255, 255, 0.12), transparent 34%),
+    rgba(0, 0, 0, 0.76);
+  backdrop-filter: blur(10px);
+}
+
+.omnix-modal-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--omnix-border-2);
+  border-radius: var(--omnix-radius-lg);
+  background: rgba(7, 19, 31, 0.96);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55), var(--omnix-glow-xs);
+}
+
+.omnix-modal-card::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 100% 0%, rgba(0, 255, 255, 0.11), transparent 38%);
+  content: "";
 }
 
 .omnix-active-rail {
@@ -281,7 +551,7 @@ textarea {
 }
 
 .omnix-primary-action {
-  border: 0;
+  border: 1px solid rgba(0, 255, 255, 0.18);
   background: linear-gradient(135deg, #00ffff, #0055ff);
   color: #050c17;
   box-shadow: var(--omnix-glow-sm);
@@ -306,6 +576,11 @@ textarea {
     border-color 160ms ease,
     background 160ms ease,
     box-shadow 160ms ease;
+}
+
+.omnix-soft-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--omnix-border-2), transparent);
 }
 
 .omnix-ghost-action:hover {
@@ -469,6 +744,15 @@ textarea {
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes omnix-grid-drift {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 32px 32px;
   }
 }
 

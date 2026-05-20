@@ -222,7 +222,7 @@ export function InviteNotificationBell() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ duration: 0.16, ease: "easeOut" }}
-            className="absolute right-0 top-full z-[100] mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-[var(--omnix-border-2)] bg-[#07131f] shadow-[0_24px_70px_rgba(0,0,0,0.65),var(--omnix-glow-xs)] ring-1 ring-black/40"
+            className="omnix-floating-card absolute right-0 top-full z-[100] mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden ring-1 ring-black/40"
           >
             <div className="flex items-center justify-between gap-3 border-b border-[var(--omnix-border)] px-4 py-3">
               <div>
