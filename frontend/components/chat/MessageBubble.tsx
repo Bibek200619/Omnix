@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { memo, useState } from "react";
 import { Check, Copy, RotateCcw, FileText, ChevronDown, ChevronUp, ExternalLink, Globe2, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -36,6 +37,13 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
   const senderName = message.senderName || (isUser ? (isOwn ? "You" : "Teammate") : "Omnix AI");
   const senderRole = message.senderRole || (isUser ? "member" : "assistant");
   const sources = message.sources ?? [];
+  const senderRoleKey = String(senderRole);
+  const roleColor =
+    senderRoleKey === "owner" || senderRoleKey === "founder"
+      ? "var(--role-founder)"
+      : senderRoleKey === "co_owner"
+      ? "var(--role-coowner)"
+      : "var(--role-member)";
 
   async function copyMessage() {
     if (!navigator.clipboard || !message.content) return;
@@ -138,10 +146,10 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         />
       ) : (
         <div
-          className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-cyan-300/35 bg-[linear-gradient(135deg,#00ffff,#0055ff)] text-xs font-semibold text-white shadow-[var(--omnix-glow-md)]"
+          className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-cyan-300/40 bg-[linear-gradient(135deg,rgba(0,255,255,0.2),rgba(0,100,255,0.3))] text-cyan-100 shadow-[0_0_20px_rgba(0,255,255,0.35),0_0_40px_rgba(0,100,255,0.15),inset_0_1px_0_rgba(255,255,255,0.12)]"
           title={senderName}
         >
-          <Sparkles className="h-4 w-4" />
+          <Sparkles className="h-4 w-4 drop-shadow-[0_0_6px_rgba(0,255,255,0.9)]" />
         </div>
       )}
       <div
@@ -150,10 +158,11 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
           failed
             ? "overflow-hidden rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-rose-50"
           : isUser
-            ? "max-w-[680px] overflow-visible border-0 bg-transparent px-0 py-0 text-[var(--omnix-text-2)]"
+            ? "omnix-human-card max-w-[680px] px-4 py-3 text-[var(--omnix-text-2)] shadow-[0_16px_46px_rgba(0,0,0,0.16)]"
             : "omnix-ai-card max-w-[740px] px-5 py-[18px] text-slate-100",
           sending && "opacity-80",
         )}
+        style={isUser ? ({ "--role-color": roleColor } as CSSProperties) : undefined}
       >
         <div className="relative z-10 mb-2 flex flex-wrap items-center gap-2">
           <span
@@ -170,6 +179,9 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
           {isUser && message.senderHandle ? (
             <span className="truncate text-[10px] font-medium text-slate-400">@{message.senderHandle}</span>
           ) : null}
+          {isUser ? (
+            <span className="h-[5px] w-[5px] rounded-full shadow-[0_0_10px_currentColor]" style={{ background: roleColor, color: roleColor }} />
+          ) : null}
           <span
             className={cn(
               "inline-flex shrink-0 items-center rounded px-1.5 py-px text-[9px] font-bold uppercase tracking-[0.08em]",
@@ -183,7 +195,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         </div>
 
         {isUser ? (
-          <p className="relative z-10 whitespace-pre-wrap text-sm font-light leading-[1.65] text-[var(--omnix-text-2)]">{message.content}</p>
+          <p className="relative z-10 whitespace-pre-wrap text-sm font-light leading-[1.65] text-[var(--omnix-text)]">{message.content}</p>
         ) : activelyStreaming ? (
           <div className="relative z-10"><StreamingTextRenderer content={message.content} compact /></div>
         ) : (
