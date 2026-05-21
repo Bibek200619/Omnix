@@ -4,7 +4,7 @@ import re
 from functools import lru_cache
 from typing import Any
 
-TOKEN_PATTERN = re.compile(r"\S+")
+TOKEN_PATTERN = re.compile(r"[A-Za-z]+|\d+|[^\sA-Za-z\d]")
 MAX_FALLBACK_TOKEN_CHARS = 64
 FALLBACK_LONG_TOKEN_CHARS = 4
 
