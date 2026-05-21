@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
+import { WorkspaceIntelligencePanel } from "@/components/workspace/WorkspaceIntelligencePanel";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import {
@@ -61,6 +62,7 @@ export default function WorkspacePage() {
     activeWorkspaceId,
     activeMembers,
     activeInvites,
+    activeWorkspaceIntelligence,
     createWorkspace,
     createSubspace,
     loading,
@@ -327,6 +329,8 @@ export default function WorkspacePage() {
           </aside>
 
           <div className="space-y-5">
+            <WorkspaceIntelligencePanel profile={activeWorkspaceIntelligence} />
+
             <section className="omnix-glass-band p-5 sm:p-6">
               <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex min-w-0 gap-4">
