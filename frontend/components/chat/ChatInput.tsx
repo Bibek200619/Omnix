@@ -108,8 +108,10 @@ export function ChatInput({
           : "0 12px 38px rgba(0, 0, 0, 0.26)",
       }}
       transition={{ duration: 0.18, ease: "easeOut" }}
-      className="z-20 w-full overflow-hidden rounded-[15px] border bg-[rgba(8,16,30,0.88)] shadow-[0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-[20px]"
+      className="relative z-20 w-full overflow-hidden rounded-[15px] border bg-[rgba(8,16,30,0.9)] shadow-[0_18px_70px_rgba(0,0,0,0.34)] backdrop-blur-[22px]"
     >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(0,255,255,0.68),transparent)]" />
+      <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(0,255,255,0.16),transparent_70%)] blur-2xl" />
       {attachments.length > 0 ? (
         <div className="m-3 mb-0 flex flex-wrap gap-2 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-2">
           {attachments.map((file) => (
