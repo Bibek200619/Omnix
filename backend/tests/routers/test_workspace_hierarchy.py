@@ -18,7 +18,7 @@ async def test_super_workspace_creation_auto_creates_global_space(monkeypatch: p
 
     async def fake_insert_one(table: str, payload: dict[str, object]):
         if table == "workspaces":
-            next_id = "super-1" if payload["workspace_type"] == "super" else "global-1"
+            next_id = "super-1" if payload["workspace_type"] == "super_workspace" else "global-1"
             row = {"id": next_id, "created_at": "2026-05-20T00:00:00+00:00", **payload}
             inserted_workspaces.append(row)
             return row
@@ -34,14 +34,14 @@ async def test_super_workspace_creation_auto_creates_global_space(monkeypatch: p
     workspace = await workspace_service.create_workspace_for_user(
         user_id="owner-1",
         name="Omnix HQ",
-        workspace_type="super",
+        workspace_type="super_workspace",
     )
 
     assert workspace["id"] == "super-1"
-    assert inserted_workspaces[0]["workspace_type"] == "super"
+    assert inserted_workspaces[0]["workspace_type"] == "super_workspace"
     assert inserted_workspaces[0]["parent_workspace_id"] is None
     assert inserted_workspaces[1]["name"] == "Global"
-    assert inserted_workspaces[1]["workspace_type"] == "sub"
+    assert inserted_workspaces[1]["workspace_type"] == "global_workspace"
     assert inserted_workspaces[1]["parent_workspace_id"] == "super-1"
     assert inserted_workspaces[1]["is_global"] is True
     assert inserted_memberships == [
@@ -91,7 +91,7 @@ async def test_subspace_access_inherits_parent_membership(monkeypatch: pytest.Mo
                 "id": "sub-1",
                 "user_id": "owner-1",
                 "name": "Design Team",
-                "workspace_type": "sub",
+                "workspace_type": "subworkspace",
                 "parent_workspace_id": "super-1",
                 "is_global": False,
             }
@@ -100,7 +100,7 @@ async def test_subspace_access_inherits_parent_membership(monkeypatch: pytest.Mo
                 "id": "super-1",
                 "user_id": "owner-1",
                 "name": "Omnix HQ",
-                "workspace_type": "super",
+                "workspace_type": "super_workspace",
                 "parent_workspace_id": None,
                 "is_global": False,
             }
@@ -128,7 +128,7 @@ async def test_nested_subspace_creation_is_rejected(monkeypatch: pytest.MonkeyPa
                 "id": workspace_id,
                 "user_id": user_id,
                 "name": "Design Team",
-                "workspace_type": "sub",
+                "workspace_type": "subworkspace",
                 "parent_workspace_id": "super-1",
                 "is_global": False,
             },
