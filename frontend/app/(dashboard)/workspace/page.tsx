@@ -4,11 +4,13 @@ import type { CSSProperties, FormEvent } from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Activity,
   Check,
   ChevronDown,
   ChevronRight,
   Crown,
   Database,
+  History,
   Layers3,
   Loader2,
   MessageSquare,
@@ -28,7 +30,9 @@ import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStac
 import { WorkspaceIntelligencePanel } from "@/components/workspace/WorkspaceIntelligencePanel";
 import { WorkspacePresenceCluster } from "@/components/workspace/WorkspacePresenceCluster";
 import { WorkspaceActivityFeed } from "@/components/workspace/WorkspaceActivityFeed";
+import { WorkspaceOperationalTimeline } from "@/components/workspace/WorkspaceOperationalTimeline";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
+import { useWorkspaceContinuity } from "@/lib/workspace-continuity-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import {
@@ -72,6 +76,7 @@ export default function WorkspacePage() {
     setActiveWorkspace,
     workspaces,
   } = useWorkspace();
+  const { initiatives, timeline, loading: loadingContinuity } = useWorkspaceContinuity();
   const { activity, loadingActivity, presence, statusForWorkspace } = useWorkspaceCollaboration();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [selectedId, setSelectedId] = useState<string | null>(
@@ -436,6 +441,26 @@ export default function WorkspacePage() {
             </div>
 
             <WorkspaceActivityFeed activity={activity} loading={loadingActivity} compact />
+
+            <section className="omnix-glass-band p-5 sm:p-6">
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h3 className="omnix-display flex items-center gap-2 text-lg font-semibold text-white">
+                    <History className="h-4 w-4 text-[var(--omnix-cyan)]" />
+                    Operational Continuity
+                  </h3>
+                  <p className="mt-1 text-xs text-[var(--omnix-text-3)]">Organizational progression and active initiatives.</p>
+                </div>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5">
+                  <Activity className="h-4 w-4 text-cyan-400" />
+                </div>
+              </div>
+              <WorkspaceOperationalTimeline 
+                events={timeline} 
+                initiatives={initiatives} 
+                loading={loadingContinuity} 
+              />
+            </section>
 
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
               <section className="omnix-section-card p-5">
