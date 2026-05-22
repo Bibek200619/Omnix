@@ -71,21 +71,29 @@ def get_supabase() -> Client:
         options=_client_options(is_async=False),
     )
 
-@lru_cache
-def get_async_supabase() -> AsyncClient:
-    """Returns a singleton async Supabase client for non-blocking database operations."""
-    settings = get_settings()
-    key = settings.SUPABASE_SERVICE_ROLE_KEY
-    if not key:
-        raise ValueError(
-            "SUPABASE_SERVICE_ROLE_KEY must be set for trusted backend database operations."
-        )
+_async_client: AsyncClient | None = None
 
-    return create_async_client(
-        settings.supabase_base_url,
-        key,
-        options=_client_options(is_async=True),
-    )
+async def init_async_supabase():
+    """Initializes the async Supabase client globally."""
+    global _async_client
+    if _async_client is None:
+        settings = get_settings()
+        key = settings.SUPABASE_SERVICE_ROLE_KEY
+        if not key:
+            raise ValueError("SUPABASE_SERVICE_ROLE_KEY must be set.")
+        
+        _async_client = await create_async_client(
+            settings.supabase_base_url,
+            key,
+            options=_client_options(is_async=True),
+        )
+        logger.info("Async Supabase client initialized.")
+
+async def get_async_supabase() -> AsyncClient:
+    """Returns the initialized async Supabase client."""
+    if _async_client is None:
+        await init_async_supabase()
+    return _async_client # type: ignore
 
 @lru_cache
 def get_supabase_auth_client() -> Client:

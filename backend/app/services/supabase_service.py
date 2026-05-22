@@ -586,7 +586,7 @@ async def insert_one(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
 
     try:
         response = await _execute_with_retry_async(
-            get_async_supabase().table(table).insert(dict(payload)),
+            (await get_async_supabase()).table(table).insert(dict(payload)),
             operation=f"insert {table}",
         )
         data = getattr(response, "data", None) or []
@@ -603,7 +603,7 @@ async def insert_one(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
 async def insert_one_trusted(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
     try:
         response = await _execute_with_retry_async(
-            get_async_supabase().table(table).insert(dict(payload)),
+            (await get_async_supabase()).table(table).insert(dict(payload)),
             operation=f"trusted insert {table}",
         )
         data = getattr(response, "data", None) or []
@@ -627,7 +627,7 @@ async def insert_many(table: str, payloads: list[Mapping[str, Any]]) -> list[dic
 
     try:
         response = await _execute_with_retry_async(
-            get_async_supabase().table(table).insert([dict(p) for p in payloads]),
+            (await get_async_supabase()).table(table).insert([dict(p) for p in payloads]),
             operation=f"batch insert {table}",
         )
         data = getattr(response, "data", None) or []
@@ -644,7 +644,7 @@ async def insert_many(table: str, payloads: list[Mapping[str, Any]]) -> list[dic
 async def insert_many_trusted(table: str, payloads: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
     try:
         response = await _execute_with_retry_async(
-            get_async_supabase().table(table).insert([dict(p) for p in payloads]),
+            (await get_async_supabase()).table(table).insert([dict(p) for p in payloads]),
             operation=f"trusted batch insert {table}",
         )
         data = getattr(response, "data", None) or []
@@ -674,7 +674,7 @@ async def select_all(
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
     try:
-        query = get_async_supabase().table(table).select(columns)
+        query = (await get_async_supabase()).table(table).select(columns)
         query = _apply_filters(query, filters)
 
         if order_by:
@@ -700,7 +700,7 @@ async def select_all(
                     if cols:
                         new_columns = ",".join(cols)
                         logger.warning("Retrying async select on %s without missing column '%s'", table, missing_col)
-                        query = get_async_supabase().table(table).select(new_columns)
+                        query = (await get_async_supabase()).table(table).select(new_columns)
                         query = _apply_filters(query, filters)
                         if order_by: query = query.order(order_by, desc=desc)
                         if limit is not None: query = query.limit(limit)
@@ -724,7 +724,7 @@ async def select_all_trusted(
     offset: int | None = None,
 ) -> list[dict[str, Any]]:
     try:
-        query = get_async_supabase().table(table).select(columns)
+        query = (await get_async_supabase()).table(table).select(columns)
         query = _apply_filters(query, filters)
 
         if order_by:
@@ -759,7 +759,7 @@ async def select_one(
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
     try:
-        query = get_async_supabase().table(table).select(columns)
+        query = (await get_async_supabase()).table(table).select(columns)
         query = _apply_filters(query, filters)
         
         try:
@@ -781,7 +781,7 @@ async def select_one(
                     if cols:
                         new_columns = ",".join(cols)
                         logger.warning("Retrying async select one on %s without missing column '%s'", table, missing_col)
-                        query = get_async_supabase().table(table).select(new_columns)
+                        query = (await get_async_supabase()).table(table).select(new_columns)
                         query = _apply_filters(query, filters)
                         response = await _execute_with_retry_async(
                             query.limit(1).maybe_single(),
@@ -801,7 +801,7 @@ async def select_one_trusted(
     filters: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     try:
-        query = get_async_supabase().table(table).select(columns)
+        query = (await get_async_supabase()).table(table).select(columns)
         query = _apply_filters(query, filters)
         try:
             response = await _execute_with_retry_async(
@@ -835,7 +835,7 @@ async def update_one(
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
     try:
-        query = get_async_supabase().table(table).update(dict(payload))
+        query = (await get_async_supabase()).table(table).update(dict(payload))
         query = _apply_filters(query, filters)
         response = await _execute_with_retry_async(query, operation=f"update {table}")
         data = getattr(response, "data", None) or []
@@ -856,7 +856,7 @@ async def update_one_trusted(
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
     try:
-        query = get_async_supabase().table(table).update(dict(payload))
+        query = (await get_async_supabase()).table(table).update(dict(payload))
         query = _apply_filters(query, filters)
         response = await _execute_with_retry_async(query, operation=f"trusted update {table}")
         data = getattr(response, "data", None) or []
@@ -876,7 +876,7 @@ async def upsert_one(table: str, payload: Mapping[str, Any], on_conflict: str) -
 
     try:
         response = await _execute_with_retry_async(
-            get_async_supabase().table(table).upsert(dict(payload), on_conflict=on_conflict),
+            (await get_async_supabase()).table(table).upsert(dict(payload), on_conflict=on_conflict),
             operation=f"upsert {table}",
         )
         data = getattr(response, "data", None) or []
@@ -895,7 +895,7 @@ async def delete_many_trusted(
     filters: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
     try:
-        query = get_async_supabase().table(table).delete()
+        query = (await get_async_supabase()).table(table).delete()
         query = _apply_filters(query, filters)
         response = await _execute_with_retry_async(query, operation=f"trusted delete {table}")
         return list(getattr(response, "data", None) or [])

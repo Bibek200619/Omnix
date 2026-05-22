@@ -206,7 +206,7 @@ async def build_workspace_intelligence_profile(
     members = await list_workspace_members(workspace)
     
     # Operational Continuity (Phases 2, 3, 6)
-    client = get_async_supabase()
+    client = await get_async_supabase()
     
     try:
         init_res = await (client.table("workspace_initiatives")

@@ -7,6 +7,7 @@ from ..runtime.manager import RuntimeManager
 from ..health.router import router as health_router
 from ..routers import conversations, files, cache, messages, upload, workspaces, actions, artifacts, insights, automations, google_drive, admin, profile, continuity
 from ..core.security import auth_context_middleware
+from ..db.supabase_client import init_async_supabase
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,7 @@ def create_app() -> FastAPI:
         RuntimeManager.get().set_status("booting")
         
         try:
+            await init_async_supabase()
             await redis.initialize_redis()
             await observability.initialize()
             await vector_store.initialize()
