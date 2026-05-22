@@ -17,7 +17,7 @@ async def run_automation_job(automation: dict[str, Any]) -> dict[str, Any]:
 
     # Graceful degradation: Defer heavy insight jobs if infrastructure is under pressure
     if job_type in ("daily_summary", "workspace_insight") and check_infrastructure_pressure():
-        logger.warning("Deferring heavy automation job due to infrastructure pressure | job_type=%s", job_type)
+        logger.warning("Deferring heavy automation job due to infrastructure pressure")
         return {"status": "deferred", "reason": "infrastructure_pressure"}
 
     engine = ContextEngine()
@@ -48,7 +48,7 @@ async def run_automation_job(automation: dict[str, Any]) -> dict[str, Any]:
         results["cleaned_count"] = count
 
     else:
-        logger.warning("Unknown automation job_type: %s", job_type)
+        logger.warning("Unknown automation job_type received")
         results["error"] = "unknown job_type"
 
     return results
