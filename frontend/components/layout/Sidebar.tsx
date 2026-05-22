@@ -5,30 +5,31 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  AlertCircle,
-  AlertTriangle,
-  BarChart2,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  Edit3,
-  FileText,
-  Globe2,
-  LayoutDashboard,
-  Layers3,
-  Loader2,
-  MessageSquare,
-  MessageSquarePlus,
-  Network,
-  PanelLeftClose,
-  Plus,
-  Search,
-  Settings,
-  Trash2,
-  UserPlus,
-  Users,
-  X,
+    AlertCircle,
+    AlertTriangle,
+    BarChart2,
+    Check,
+    ChevronDown,
+    ChevronRight,
+    Clock,
+    Edit3,
+    FileText,
+    Globe2,
+    LayoutDashboard,
+    Layers3,
+    Loader2,
+    MessageSquare,
+    MessageSquarePlus,
+    Network,
+    PanelLeftClose,
+    Plus,
+    Search,
+    Settings,
+    Sparkles,
+    Trash2,
+    UserPlus,
+    Users,
+    X,
 } from "lucide-react";
 import { OmnixMark } from "@/components/brand/OmnixMark";
 import { Button } from "@/components/ui/Button";
@@ -108,7 +109,7 @@ function WorkspaceSelector() {
     deleteWorkspace,
     inviteToActiveWorkspace,
   } = useWorkspace();
-  const { presence, statusForWorkspace } = useWorkspaceCollaboration();
+  const { presence, statusForWorkspace, realtimeStatus } = useWorkspaceCollaboration();
   const [open, setOpen] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showCreateSubspaceModal, setShowCreateSubspaceModal] = useState(false);
@@ -296,6 +297,7 @@ function WorkspaceSelector() {
     const Icon = workspaceIcon(subspace);
     const isActive = subspace.id === activeWorkspaceId;
     const liveStatus = statusForWorkspace(subspace.id);
+    const health = liveStatus?.health || "quiet";
 
     return (
       <motion.button
@@ -307,9 +309,9 @@ function WorkspaceSelector() {
         type="button"
         onClick={() => selectWorkspace(subspace.id)}
         className={cn(
-          "relative my-0.5 flex min-h-9 w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-left transition",
+          "relative my-0.5 flex min-h-9 w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-left transition-all duration-300",
           isActive
-            ? "bg-cyan-300/[0.08] text-white"
+            ? "bg-cyan-300/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
             : "text-[var(--omnix-text-2)] hover:bg-[var(--omnix-surface)] hover:text-white",
         )}
       >
@@ -318,8 +320,10 @@ function WorkspaceSelector() {
         ) : null}
         <span
           className={cn(
-            "flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] border",
-            subspace.is_global
+            "flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] border transition-all duration-500",
+            isActive 
+              ? "border-cyan-300/30 bg-cyan-300/15 text-cyan-200"
+              : subspace.is_global
               ? "border-amber-300/25 bg-amber-400/10 text-amber-200"
               : "border-emerald-300/20 bg-emerald-400/10 text-emerald-200",
           )}
@@ -328,18 +332,27 @@ function WorkspaceSelector() {
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className={cn("truncate text-xs", isActive && "font-medium text-cyan-200")}>
+            <span className={cn("truncate text-[11px] font-bold tracking-tight", isActive ? "text-cyan-200" : "text-white/80")}>
               {subspace.name}
             </span>
-            <WorkspaceTypeBadge workspace={subspace} />
+            <div className="ml-auto flex items-center gap-1.5">
+              {health !== "quiet" && (
+                <span className={cn(
+                  "h-1.5 w-1.5 rounded-full animate-pulse",
+                  health === "alive" ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" : "bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]"
+                )} />
+              )}
+              <WorkspaceTypeBadge workspace={subspace} />
+            </div>
           </span>
-          <span className="mt-0.5 flex items-center gap-1.5 text-[9px] text-[var(--omnix-text-3)]">
-            <span>{liveStatus?.active_count ?? 0} active</span>
-            <span className="h-1 w-1 rounded-full bg-white/15" />
+          <span className="mt-0.5 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-tight text-white/30">
+            <span className={cn(liveStatus?.active_count && "text-emerald-400/80")}>
+              {liveStatus?.active_count ?? 0} active
+            </span>
+            <span className="h-0.5 w-0.5 rounded-full bg-white/10" />
             <span>{liveStatus?.source_count ?? 0} sources</span>
           </span>
         </span>
-        {isActive ? <Check className="h-3.5 w-3.5 shrink-0 text-cyan-300" /> : null}
       </motion.button>
     );
   }
@@ -353,6 +366,8 @@ function WorkspaceSelector() {
     const subspacesLoading = Boolean(subspaceLoadingByParentId[workspace.id]);
     const subspacesError = subspaceErrorByParentId[workspace.id];
     const liveStatus = statusForWorkspace(workspace.id);
+    const health = liveStatus?.health || "quiet";
+    const aiState = liveStatus?.ai_status || "ready";
 
     return (
       <motion.div
@@ -362,53 +377,73 @@ function WorkspaceSelector() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.12, delay: index * 0.02 }}
       >
-        <div className="flex items-stretch gap-1 px-1">
+        <div className="group/workspace flex items-stretch gap-1 px-1">
           {hasHierarchy ? (
             <button
               type="button"
               onClick={() => toggleExpanded(workspace)}
-              className="flex h-10 w-7 shrink-0 items-center justify-center rounded-[7px] text-[var(--omnix-text-3)] transition hover:bg-[var(--omnix-surface)] hover:text-white"
+              className="flex h-12 w-7 shrink-0 items-center justify-center rounded-[7px] text-[var(--omnix-text-3)] transition hover:bg-white/5 hover:text-white"
               aria-label={expanded ? `Collapse ${workspace.name}` : `Expand ${workspace.name}`}
               title={expanded ? `Collapse ${workspace.name}` : `Expand ${workspace.name}`}
             >
-              <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", expanded && "rotate-90")} />
+              <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-300", expanded && "rotate-90")} />
             </button>
           ) : (
-            <span className="h-10 w-7 shrink-0" />
+            <span className="h-12 w-7 shrink-0" />
           )}
 
           <button
             type="button"
             onClick={() => selectWorkspace(workspace.id)}
             className={cn(
-              "relative flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-[7px] px-2.5 py-2 text-left transition",
+              "relative flex min-h-[48px] min-w-0 flex-1 items-center gap-2.5 rounded-[9px] px-3 py-2 text-left transition-all duration-300",
               isActive
-                ? "bg-cyan-300/[0.08]"
-                : "hover:bg-[var(--omnix-surface)]",
+                ? "bg-cyan-300/[0.1] shadow-[var(--omnix-glow-xs),inset_0_1px_0_rgba(255,255,255,0.06)]"
+                : "hover:bg-white/[0.04]",
+              isActive && aiState === "active" && "omnix-intel-glow"
             )}
           >
             {isActive ? (
-              <span className="absolute left-0 h-5 w-0.5 rounded-full bg-cyan-300 shadow-[var(--omnix-glow-sm)]" />
+              <span className="absolute left-0 h-6 w-0.5 rounded-full bg-cyan-300 shadow-[var(--omnix-glow-sm)]" />
             ) : null}
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] border border-cyan-300/30 bg-cyan-300/15 text-cyan-100">
-              <Icon className="h-3 w-3" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-white">
-                <span className="truncate">{workspace.name}</span>
-                <WorkspaceTypeBadge workspace={workspace} />
+            
+            <div className="relative shrink-0">
+              <span className={cn(
+                "flex h-6 w-6 items-center justify-center rounded-md border transition-all duration-300",
+                isActive ? "border-cyan-300/40 bg-cyan-300/20 text-cyan-200" : "border-white/10 bg-white/5 text-white/40"
+              )}>
+                <Icon className="h-3.5 w-3.5" />
               </span>
-              <span className="mt-0.5 flex items-center gap-1.5 text-[10px] text-[var(--omnix-text-3)]">
-                <span>{liveStatus?.active_count ?? 0} active</span>
-                <span className="h-1 w-1 rounded-full bg-white/15" />
-                <span>{liveStatus?.source_count ?? 0} sources</span>
-                <span className="h-1 w-1 rounded-full bg-white/15" />
-                <span className={cn("rounded-full border px-1.5 py-0.5", workspaceRoleBadgeClass(workspace.current_user_role))}>
+              {health !== "quiet" && (
+                <span className={cn(
+                  "absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-slate-900 omnix-streaming-dot",
+                  health === "alive" ? "bg-emerald-500" : "bg-cyan-500"
+                )} />
+              )}
+            </div>
+
+            <span className="min-w-0 flex-1">
+              <span className="flex min-w-0 items-center justify-between gap-1.5">
+                <span className={cn("truncate text-[13px] font-bold tracking-tight", isActive ? "text-white" : "text-white/80")}>
+                  {workspace.name}
+                </span>
+                <div className="flex items-center gap-1.5">
+                   {aiState === "active" && <Sparkles className="h-3 w-3 text-purple-400 animate-pulse" />}
+                   <WorkspaceTypeBadge workspace={workspace} />
+                </div>
+              </span>
+              <span className="mt-0.5 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.05em] text-white/30">
+                <span className={cn(liveStatus?.active_count && "text-emerald-400/80")}>
+                  {liveStatus?.active_count ?? 0} pulse
+                </span>
+                <span className="h-0.5 w-0.5 rounded-full bg-white/10" />
+                <span>{liveStatus?.source_count ?? 0} logic</span>
+                <span className="h-0.5 w-0.5 rounded-full bg-white/10" />
+                <span className={cn("px-1.5 py-0.5 rounded border border-white/5", workspaceRoleBadgeClass(workspace.current_user_role))}>
                   {workspaceRoleLabel(workspace.current_user_role)}
                 </span>
               </span>
             </span>
-            {isActive ? <Check className="h-4 w-4 shrink-0 text-cyan-300" /> : null}
           </button>
         </div>
 
@@ -456,12 +491,20 @@ function WorkspaceSelector() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="group flex w-full items-center justify-between gap-2 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-[11px] py-[9px] text-left transition duration-200 hover:border-[var(--omnix-border-2)] hover:bg-[var(--omnix-surface-hover)]"
+        className={cn(
+          "group flex w-full items-center justify-between gap-2 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-[11px] py-[9px] text-left transition duration-200 hover:border-[var(--omnix-border-2)] hover:bg-[var(--omnix-surface-hover)]",
+          realtimeStatus === "connected" && "border-cyan-300/20"
+        )}
         aria-expanded={open}
       >
         <div className="flex min-w-0 items-center gap-[9px]">
-          <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-[5px] border border-cyan-300/35 bg-cyan-300/15 text-[var(--omnix-cyan)] shadow-[0_0_8px_rgba(0,255,255,0.2)]">
-            <ActiveWorkspaceIcon className="h-3.5 w-3.5" />
+          <div className="relative">
+            <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-[5px] border border-cyan-300/35 bg-cyan-300/15 text-[var(--omnix-cyan)] shadow-[0_0_8px_rgba(0,255,255,0.2)]">
+              <ActiveWorkspaceIcon className="h-3.5 w-3.5" />
+            </div>
+            {realtimeStatus === "connected" && (
+              <span className="absolute -bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-cyan-400" />
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5 text-xs font-medium leading-tight text-[var(--omnix-text)]">
@@ -473,7 +516,9 @@ function WorkspaceSelector() {
               {active ? (
                 <>
                   <span className="h-1 w-1 rounded-full bg-cyan-200/20" />
-                  <span>{presence?.active_count ?? statusForWorkspace(active.id)?.active_count ?? 0} active</span>
+                  <span className={cn(realtimeStatus === "connected" && "text-cyan-300/80")}>
+                    {presence?.active_count ?? statusForWorkspace(active.id)?.active_count ?? 0} active
+                  </span>
                 </>
               ) : null}
             </div>

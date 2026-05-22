@@ -1,7 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
-import { BrainCircuit, Database, FileText, Globe2, Layers3, Loader2, Sparkles } from "lucide-react";
+import { BrainCircuit, Database, FileText, Globe2, Layers3, Loader2, Sparkles, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WorkspaceIntelligenceProfile } from "@/lib/workspace-types";
 
@@ -28,96 +27,135 @@ export function WorkspaceIntelligencePanel({
   const domains = profile?.active_domains ?? [];
   const sources = profile?.connected_sources ?? [];
   const insights = profile?.recent_insights ?? [];
-  const summary = profile?.context_summary ?? "Workspace intelligence is ready once a workspace is selected.";
+  const summary = profile?.context_summary ?? "Intelligence awaiting workspace context synchronization.";
   const mode = profile?.ai_specialization ?? "general";
+  const expertise = profile?.expertise_area;
 
   return (
-    <section className={cn("omnix-cinematic-card overflow-hidden p-5", className)}>
-      <div className="pointer-events-none absolute right-[-6rem] top-[-6rem] h-56 w-56 rounded-full bg-cyan-300/10 blur-[80px]" />
-      <div className="relative z-10 flex items-start justify-between gap-4">
-        <div className="flex min-w-0 gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-sm)]">
-            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <BrainCircuit className="h-5 w-5" />}
-          </span>
+    <section className={cn(
+      "relative overflow-hidden rounded-[18px] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.9),rgba(8,12,24,0.95))] p-6 shadow-2xl backdrop-blur-xl transition-all duration-500 hover:shadow-cyan-500/10",
+      className
+    )}>
+      <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-500/10 blur-[90px] animate-pulse" />
+      <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-purple-500/10 blur-[90px] animate-pulse" />
+      
+      <div className="relative z-10 flex flex-col md:flex-row md:items-start justify-between gap-6">
+        <div className="flex min-w-0 gap-4">
+          <div className="relative shrink-0">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.2)]">
+              {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : <BrainCircuit className="h-6 w-6" />}
+            </span>
+            <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] border-2 border-slate-900" />
+          </div>
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Workspace intelligence</p>
-            <h3 className="omnix-display mt-1 text-lg font-semibold text-white">
-              {profile ? `${profile.workspace_name} context` : "Context not loaded"}
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400/60">Operational Intelligence</p>
+              {profile?.is_global && (
+                <span className="flex items-center gap-1 rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[9px] font-bold text-purple-300 uppercase tracking-tight">
+                  <Globe2 className="h-2.5 w-2.5" />
+                  Global Context
+                </span>
+              )}
+            </div>
+            <h3 className="mt-1.5 text-xl font-bold tracking-tight text-white/90">
+              {profile ? profile.workspace_name : "Identity Offline"}
             </h3>
-            <p className="mt-2 text-sm leading-6 text-[var(--omnix-text-2)]">{summary}</p>
+            {expertise && (
+              <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-emerald-400/90">
+                <Sparkles className="h-3 w-3" />
+                Specializing in {expertise}
+              </div>
+            )}
+            <p className="mt-3 text-sm font-medium leading-relaxed text-slate-300/80 max-w-2xl">{summary}</p>
           </div>
         </div>
-        <span
-          className="shrink-0 rounded-full border px-3 py-1 text-xs font-semibold"
-          style={{
-            borderColor: profile?.retrieval_scope === "global" ? "rgba(155,92,255,0.35)" : "rgba(0,255,255,0.28)",
-            background: profile?.retrieval_scope === "global" ? "rgba(155,92,255,0.12)" : "rgba(0,255,255,0.09)",
-            color: profile?.retrieval_scope === "global" ? "rgb(216,196,255)" : "rgb(180,255,255)",
-          }}
-        >
-          {profile?.retrieval_scope === "global" ? "Global scope" : "Workspace scope"}
-        </span>
+        
+        <div className="shrink-0 flex items-center gap-3">
+          <div className="text-right">
+             <div className="text-[10px] font-bold uppercase tracking-wider text-white/30">AI Strategy</div>
+             <div className="text-sm font-bold text-white/80">{modeLabels[mode]}</div>
+          </div>
+          <div className="h-8 w-px bg-white/5" />
+          <div className="text-right">
+             <div className="text-[10px] font-bold uppercase tracking-wider text-white/30">Scope</div>
+             <div className="text-sm font-bold text-cyan-400">{profile?.retrieval_scope === "global" ? "Federated" : "Isolated"}</div>
+          </div>
+        </div>
       </div>
 
-      <div className={cn("relative z-10 mt-5 grid gap-3", compact ? "sm:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-4")}>
+      <div className={cn("relative z-10 mt-8 grid gap-4", compact ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2 lg:grid-cols-4")}>
         {[
-          { label: "AI mode", value: modeLabels[mode], icon: Sparkles, color: "var(--omnix-cyan)" },
-          { label: "Sources active", value: profile?.source_count ?? 0, icon: Database, color: "var(--omnix-green)" },
-          { label: "Memory threads", value: profile?.conversation_count ?? 0, icon: Layers3, color: "var(--omnix-purple)" },
-          { label: "Members", value: profile?.member_count ?? 0, icon: Globe2, color: "var(--omnix-amber)" },
-        ].slice(0, compact ? 3 : 4).map((item) => {
+          { label: "Knowledge Sources", value: profile?.source_count ?? 0, icon: Database, color: "#22d3ee" },
+          { label: "Memory Threads", value: profile?.conversation_count ?? 0, icon: Layers3, color: "#c084fc" },
+          { label: "Collaboration Depth", value: profile?.member_count ?? 0, icon: Users, color: "#fbbf24" },
+          { label: "Retrieved Domains", value: domains.length, icon: Globe2, color: "#10b981" },
+        ].slice(0, compact ? 4 : 4).map((item) => {
           const Icon = item.icon;
           return (
-            <div key={item.label} className="rounded-xl border border-[var(--omnix-border)] bg-black/15 p-3" style={{ "--metric-color": item.color } as CSSProperties}>
-              <Icon className="h-4 w-4" style={{ color: item.color }} />
-              <div className="mt-3 truncate text-sm font-semibold text-white">{item.value}</div>
-              <div className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">{item.label}</div>
+            <div key={item.label} className="group flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-4 transition-all duration-300 hover:bg-white/[0.04] hover:border-white/10">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/40 shadow-inner group-hover:scale-110 transition-transform duration-300">
+                <Icon className="h-5 w-5 opacity-70" style={{ color: item.color }} />
+              </div>
+              <div>
+                <div className="text-lg font-bold tracking-tight text-white/90">{item.value}</div>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-white/30">{item.label}</div>
+              </div>
             </div>
           );
         })}
       </div>
 
       {!compact ? (
-        <div className="relative z-10 mt-5 grid gap-4 lg:grid-cols-2">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Active domains</p>
-            <div className="mt-3 flex flex-wrap gap-2">
+        <div className="relative z-10 mt-8 grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-1">
+            <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
+              <Globe2 className="h-3 w-3 text-cyan-400" />
+              Active Domains
+            </div>
+            <div className="flex flex-wrap gap-2">
               {domains.length ? domains.map((domain) => (
-                <span key={domain} className="rounded-full border border-cyan-300/18 bg-cyan-300/8 px-2.5 py-1 text-xs text-cyan-100">
+                <span key={domain} className="rounded-lg border border-white/5 bg-white/[0.04] px-2.5 py-1.5 text-[11px] font-bold text-cyan-50/70 hover:text-white transition-colors cursor-default">
                   {domain}
                 </span>
               )) : (
-                <span className="rounded-full border border-dashed border-[var(--omnix-border)] px-2.5 py-1 text-xs text-[var(--omnix-text-3)]">
-                  No domains detected yet
-                </span>
+                <span className="text-[11px] font-medium text-white/20 italic">No domains identified in current scope.</span>
               )}
             </div>
           </div>
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Connected sources</p>
-            <div className="mt-3 space-y-2">
-              {sources.length ? sources.slice(0, 3).map((source) => (
-                <div key={source.id} className="flex items-center gap-2 rounded-lg border border-[var(--omnix-border)] bg-black/15 px-3 py-2 text-xs text-[var(--omnix-text-2)]">
-                  <FileText className="h-3.5 w-3.5 text-cyan-200" />
+          
+          <div className="lg:col-span-2">
+            <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
+              <Database className="h-3 w-3 text-emerald-400" />
+              Intelligence Sources
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {sources.length ? sources.slice(0, 4).map((source) => (
+                <div key={source.id} className="group flex items-center gap-2.5 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5 text-[11px] font-medium text-slate-300/80 transition-all hover:bg-white/[0.06] hover:text-white">
+                  <FileText className="h-3.5 w-3.5 text-emerald-400/60 group-hover:text-emerald-400" />
                   <span className="min-w-0 flex-1 truncate">{source.name}</span>
                 </div>
               )) : (
-                <div className="rounded-lg border border-dashed border-[var(--omnix-border)] bg-black/10 px-3 py-3 text-xs text-[var(--omnix-text-3)]">
-                  Connect workspace sources to activate retrieval memory.
+                <div className="col-span-2 rounded-xl border border-dashed border-white/5 bg-white/[0.01] p-4 text-center text-[11px] font-medium text-white/20">
+                  Connect workspace assets to hydrate retrieval memory.
                 </div>
               )}
             </div>
           </div>
-          <div className="lg:col-span-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Recent AI activity</p>
-            <div className="mt-3 grid gap-2 md:grid-cols-2">
+
+          <div className="lg:col-span-3 border-t border-white/5 pt-6">
+            <div className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
+              <BrainCircuit className="h-3 w-3 text-purple-400" />
+              AI Memory Synthesis
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {insights.length ? insights.slice(0, 4).map((insight) => (
-                <div key={insight} className="rounded-lg border border-white/[0.06] bg-black/15 px-3 py-2 text-xs leading-5 text-[var(--omnix-text-2)]">
+                <div key={insight} className="relative overflow-hidden rounded-xl border border-white/5 bg-white/[0.03] p-4 text-[11px] font-medium leading-relaxed text-slate-300/80 hover:bg-white/[0.05] transition-colors">
+                  <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-purple-500/20 to-transparent" />
                   {insight}
                 </div>
               )) : (
-                <div className="rounded-lg border border-dashed border-[var(--omnix-border)] bg-black/10 px-3 py-3 text-xs text-[var(--omnix-text-3)] md:col-span-2">
-                  AI activity will appear after Omnix works with this workspace context.
+                <div className="col-span-full rounded-xl border border-dashed border-white/5 bg-white/[0.01] p-6 text-center text-[11px] font-medium text-white/20">
+                  Memory synthesis will begin as AI interactions evolve.
                 </div>
               )}
             </div>
