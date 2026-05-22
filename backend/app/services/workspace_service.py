@@ -217,6 +217,9 @@ def _workspace_not_found() -> HTTPException:
     )
 
 
+from app.services.workspace_permissions import OrganizationalAccessAuthority
+from app.core.rbac import ROLE_SUPER_FOUNDER, ROLE_SUB_LEADER, ROLE_SUB_MEMBER
+
 async def resolve_workspace_access(
     workspace_id: str,
     user_id: str,
@@ -235,76 +238,97 @@ async def resolve_workspace_access(
     workspace = normalize_workspace_record(workspace)
 
     parent_workspace_id = str(workspace.get("parent_workspace_id") or "").strip()
-    if parent_workspace_id:
-        try:
-            parent_workspace = await select_one_trusted(
-                "workspaces",
-                WORKSPACE_COLUMNS,
-                {"id": parent_workspace_id},
-            )
-        except SupabaseServiceError as exc:
-            raise _database_error() from exc
-
-        if parent_workspace is None:
-            return None
-
-        parent_workspace = normalize_workspace_record(parent_workspace)
-        if not is_super_workspace(parent_workspace):
-            return None
-
-        parent_owner_user_id = str(parent_workspace.get("user_id") or "")
-        if parent_owner_user_id == user_id:
-            return WorkspaceAccess(
-                workspace=workspace,
-                role="founder",
-                membership_workspace=parent_workspace,
-            )
-
-        try:
-            parent_membership = await select_one_trusted(
-                "workspace_members",
-                WORKSPACE_MEMBER_COLUMNS,
-                {"workspace_id": parent_workspace_id, "user_id": user_id},
-            )
-        except SupabaseServiceError as exc:
-            raise _database_error() from exc
-
-        if parent_membership is None:
-            return None
-
-        role = normalize_workspace_role(
-            parent_membership.get("role"),
-            member_user_id=user_id,
-            owner_user_id=parent_owner_user_id,
-        )
-        return WorkspaceAccess(
-            workspace=workspace,
-            role=role,
-            membership_workspace=parent_workspace,
-        )
-
-    owner_user_id = str(workspace.get("user_id") or "")
-    if owner_user_id == user_id:
-        return WorkspaceAccess(workspace=workspace, role="founder", membership_workspace=workspace)
-
+    
+    # 1. First, check for explicit direct membership on the workspace itself
     try:
-        membership = await select_one_trusted(
+        direct_membership = await select_one_trusted(
             "workspace_members",
             WORKSPACE_MEMBER_COLUMNS,
             {"workspace_id": workspace_id, "user_id": user_id},
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
+        
+    direct_role = None
+    if direct_membership:
+        owner_user_id = str(workspace.get("user_id") or "")
+        direct_role = normalize_workspace_role(
+            direct_membership.get("role"),
+            member_user_id=user_id,
+            owner_user_id=owner_user_id,
+        )
 
-    if membership is None:
+    # If it's a top-level super workspace and we have direct membership, we're done
+    if not parent_workspace_id:
+        if direct_role:
+            return WorkspaceAccess(workspace=workspace, role=direct_role, membership_workspace=workspace)
         return None
 
-    role = normalize_workspace_role(
-        membership.get("role"),
-        member_user_id=user_id,
-        owner_user_id=owner_user_id,
-    )
-    return WorkspaceAccess(workspace=workspace, role=role, membership_workspace=workspace)
+    # 2. It is a subworkspace. Let's get the parent workspace to check super founder or global visibility
+    try:
+        parent_workspace = await select_one_trusted(
+            "workspaces",
+            WORKSPACE_COLUMNS,
+            {"id": parent_workspace_id},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    if parent_workspace is None:
+        return None
+
+    parent_workspace = normalize_workspace_record(parent_workspace)
+    if not is_super_workspace(parent_workspace):
+        return None
+
+    # 3. Check membership on the parent workspace
+    try:
+        parent_membership = await select_one_trusted(
+            "workspace_members",
+            WORKSPACE_MEMBER_COLUMNS,
+            {"workspace_id": parent_workspace_id, "user_id": user_id},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    parent_role = None
+    if parent_membership:
+        parent_owner_user_id = str(parent_workspace.get("user_id") or "")
+        parent_role = normalize_workspace_role(
+            parent_membership.get("role"),
+            member_user_id=user_id,
+            owner_user_id=parent_owner_user_id,
+        )
+
+    # 4. Resolve access rules
+    is_global = workspace.get("is_global")
+    
+    # Rule A: Super Founder has access to all subworkspaces
+    if parent_role == "founder":
+        return WorkspaceAccess(
+            workspace=workspace,
+            role="founder",
+            membership_workspace=parent_workspace,
+        )
+
+    # Rule B: Global workspace is visible to all members of the super workspace
+    if is_global and parent_role:
+        return WorkspaceAccess(
+            workspace=workspace,
+            role=parent_role, # Inherit role level from parent for global
+            membership_workspace=parent_workspace,
+        )
+        
+    # Rule C: Explicit direct membership required for non-global subspaces
+    if direct_role:
+        return WorkspaceAccess(
+            workspace=workspace,
+            role=direct_role,
+            membership_workspace=workspace,
+        )
+        
+    # Access Denied
+    return None
 
 
 async def require_workspace_access(
@@ -317,15 +341,16 @@ async def require_workspace_access(
     return access
 
 
-async def require_workspace_owner(
+async def require_workspace_management_access(
     workspace_id: str,
     user_id: str,
 ) -> WorkspaceAccess:
     access = await require_workspace_access(workspace_id, user_id)
-    if not access.is_founder:
+    workspace_type = access.workspace.get("workspace_type") or "workspace"
+    if not OrganizationalAccessAuthority.can_manage_workspace(access.role, workspace_type):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the workspace founder can perform this action.",
+            detail="You do not have permission to manage this workspace.",
         )
     return access
 
@@ -600,7 +625,7 @@ async def list_user_workspaces(user_id: str) -> list[dict[str, Any]]:
         if is_super_workspace(workspace)
     ]
     try:
-        inherited_subspaces = (
+        all_inherited_subspaces = (
             [
                 normalize_workspace_record(workspace)
                 for workspace in await select_all_trusted(
@@ -616,6 +641,22 @@ async def list_user_workspaces(user_id: str) -> list[dict[str, Any]]:
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
+        
+    # Build list of all user memberships (including owned ones conceptually) for filtering
+    virtual_memberships = list(membership_rows)
+    for wid in owned_workspace_ids:
+        virtual_memberships.append({"workspace_id": wid, "user_id": user_id, "role": "founder"})
+        
+    super_founder_workspace_ids = {
+        wid for wid, role in role_by_workspace_id.items() 
+        if role == "founder" and is_super_workspace(workspace_by_id[wid])
+    }
+
+    inherited_subspaces = OrganizationalAccessAuthority.filter_visible_workspaces(
+        all_inherited_subspaces,
+        virtual_memberships,
+        super_founder_workspace_ids=super_founder_workspace_ids
+    )
 
     for workspace in inherited_subspaces:
         workspace_id = str(workspace["id"])
@@ -823,7 +864,7 @@ async def require_subspace_create_permission(
     parent_workspace_id: str,
     user_id: str,
 ) -> WorkspaceAccess:
-    parent_access = await require_workspace_owner(parent_workspace_id, user_id)
+    parent_access = await require_workspace_management_access(parent_workspace_id, user_id)
     if not is_super_workspace(parent_access.workspace):
         raise _workspace_validation_error("Subspaces can only be created under a super workspace.")
     return parent_access
@@ -959,9 +1000,29 @@ async def list_subspaces_for_super_workspace(
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
-    subspaces = [normalize_workspace_record(row) for row in rows]
-    subspaces.sort(key=lambda item: (not bool(item.get("is_global")), item.get("created_at") or ""))
-    return subspaces
+    all_subspaces = [normalize_workspace_record(row) for row in rows]
+    
+    # Super founders see everything
+    if access.role == "founder":
+        visible_subspaces = all_subspaces
+    else:
+        # Otherwise, fetch user's direct memberships to filter
+        try:
+            user_memberships = await select_all_trusted(
+                "workspace_members",
+                WORKSPACE_MEMBER_COLUMNS,
+                filters={"user_id": user_id},
+            )
+        except SupabaseServiceError as exc:
+            raise _database_error() from exc
+            
+        visible_subspaces = OrganizationalAccessAuthority.filter_visible_workspaces(
+            all_subspaces, 
+            user_memberships
+        )
+
+    visible_subspaces.sort(key=lambda item: (not bool(item.get("is_global")), item.get("created_at") or ""))
+    return visible_subspaces
 
 
 async def validate_workspace_relationship(

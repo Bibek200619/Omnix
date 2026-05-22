@@ -55,7 +55,7 @@ from ..services.workspace_service import (
     normalize_email,
     normalize_workspace_role,
     require_workspace_access,
-    require_workspace_owner,
+    require_workspace_management_access,
     resolve_workspace_access,
     user_email_from_claims,
     utc_now_iso,
@@ -754,7 +754,7 @@ async def update_workspace_intelligence(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
-    access = await require_workspace_owner(workspace_id, user_id)
+    access = await require_workspace_management_access(workspace_id, user_id)
     normalized_workspace = normalize_workspace_record(access.workspace)
     payload = intelligence_payload.model_dump()
     payload["expertise_area"] = str(payload.get("expertise_area") or "").strip() or None
@@ -801,7 +801,7 @@ async def update_workspace(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
-    await require_workspace_owner(workspace_id, user_id)
+    await require_workspace_management_access(workspace_id, user_id)
 
     payload = workspace_payload.model_dump(exclude_none=True)
     if "name" in payload:
@@ -849,6 +849,8 @@ async def get_workspace_members(
     return await list_workspace_members(access.workspace)
 
 
+from app.services.workspace_permissions import OrganizationalAccessAuthority
+
 @router.patch("/{workspace_id}/members/{member_user_id}", response_model=WorkspaceMemberRead)
 @router.patch("/{workspace_id}/members/{member_user_id}/", response_model=WorkspaceMemberRead, include_in_schema=False)
 async def update_workspace_member_role(
@@ -859,11 +861,12 @@ async def update_workspace_member_role(
 ) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
     access = await require_workspace_access(workspace_id, user_id)
+    workspace_type = access.workspace.get("workspace_type") or "workspace"
 
-    if access.role == "member":
+    if not OrganizationalAccessAuthority.can_assign_leaders(access.role, workspace_type):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only workspace founders and co-owners can manage roles.",
+            detail="You do not have permission to manage roles in this workspace.",
         )
 
     membership_workspace = _membership_workspace(access)
@@ -903,10 +906,11 @@ async def update_workspace_member_role(
             detail="Only the original founder can have the founder role.",
         )
 
-    if access.role == "co_owner" and (current_member_role != "member" or next_role != "member"):
+    # In the scoped model, subleaders and co-owners cannot escalate their own privileges or demote founders
+    if access.role in {"co_owner", "sub_leader"} and (current_member_role not in {"member", "sub_member"} or next_role not in {"member", "sub_member"}):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Co-owners can manage members only.",
+            detail="You can only manage standard members.",
         )
 
     try:
@@ -944,7 +948,7 @@ async def invite_workspace_member(
 ) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
     current_user_email = user_email_from_claims(current_user)
-    access = await require_workspace_owner(workspace_id, user_id)
+    access = await require_workspace_management_access(workspace_id, user_id)
     membership_workspace = _membership_workspace(access)
     membership_workspace_id = _membership_workspace_id(access)
 
@@ -1068,7 +1072,7 @@ async def get_workspace_invites(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     user_id = _user_id_from_claims(current_user)
-    access = await require_workspace_owner(workspace_id, user_id)
+    access = await require_workspace_management_access(workspace_id, user_id)
     return await list_workspace_invites(_membership_workspace_id(access))
 
 
@@ -1081,11 +1085,12 @@ async def remove_workspace_member(
 ) -> None:
     user_id = _user_id_from_claims(current_user)
     access = await require_workspace_access(workspace_id, user_id)
+    workspace_type = access.workspace.get("workspace_type") or "workspace"
 
-    if access.role == "member":
+    if not OrganizationalAccessAuthority.can_remove_members(access.role, workspace_type):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only workspace founders and co-owners can remove members.",
+            detail="You do not have permission to remove members from this workspace.",
         )
 
     membership_workspace = _membership_workspace(access)
@@ -1148,7 +1153,7 @@ async def revoke_workspace_invite(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> None:
     user_id = _user_id_from_claims(current_user)
-    access = await require_workspace_owner(workspace_id, user_id)
+    access = await require_workspace_management_access(workspace_id, user_id)
     membership_workspace_id = _membership_workspace_id(access)
 
     try:
@@ -1197,7 +1202,7 @@ async def delete_workspace(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> None:
     user_id = _user_id_from_claims(current_user)
-    await require_workspace_owner(workspace_id, user_id)
+    await require_workspace_management_access(workspace_id, user_id)
 
     try:
         await delete_many_trusted("workspaces", {"id": workspace_id})
