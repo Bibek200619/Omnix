@@ -64,6 +64,7 @@ from ..services.workspace_service import (
 from ..services.workspace_intelligence_service import build_workspace_intelligence_profile
 from ..services.workspace_collaboration_service import (
     heartbeat_workspace_presence,
+    leave_workspace_presence,
     list_workspace_activity,
     list_workspace_live_statuses,
     list_workspace_presence,
@@ -627,6 +628,19 @@ async def heartbeat_presence(
         current_label=presence_payload.current_label,
         metadata=presence_payload.metadata,
     )
+
+
+@router.delete("/{workspace_id}/presence", status_code=status.HTTP_204_NO_CONTENT)
+async def leave_presence(
+    workspace_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> None:
+    user_id = _user_id_from_claims(current_user)
+    await leave_workspace_presence(
+        workspace_id=workspace_id,
+        user_id=user_id,
+    )
+    return None
 
 
 @router.post("/{workspace_id}/presence/typing", response_model=WorkspacePresenceRead)
