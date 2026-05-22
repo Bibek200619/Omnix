@@ -213,6 +213,76 @@ class WorkspaceIntelligenceRead(BaseModel):
     context_summary: str
 
 
+class WorkspacePresenceHeartbeat(BaseModel):
+    current_view: str | None = Field(default=None, max_length=80)
+    current_label: str | None = Field(default=None, max_length=255)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkspaceTypingUpdate(BaseModel):
+    conversation_id: str | None = None
+    is_typing: bool = True
+
+
+class WorkspacePresenceMemberRead(BaseModel):
+    workspace_id: str
+    user_id: str
+    status: Literal["online", "recent", "offline"] = "offline"
+    current_view: str | None = None
+    current_label: str | None = None
+    is_online: bool = False
+    is_typing: bool = False
+    typing_conversation_id: str | None = None
+    last_seen_at: datetime | None = None
+    updated_at: datetime | None = None
+    email: str | None = None
+    full_name: str | None = None
+    handle: str | None = None
+    avatar_url: str | None = None
+    avatar_label: str = "U"
+
+
+class WorkspacePresenceRead(BaseModel):
+    workspace_id: str
+    online_count: int = 0
+    active_count: int = 0
+    recently_active_count: int = 0
+    typing_count: int = 0
+    online_members: list[WorkspacePresenceMemberRead] = Field(default_factory=list)
+    active_members: list[WorkspacePresenceMemberRead] = Field(default_factory=list)
+    recently_active_members: list[WorkspacePresenceMemberRead] = Field(default_factory=list)
+    typing_members: list[WorkspacePresenceMemberRead] = Field(default_factory=list)
+    updated_at: datetime | None = None
+
+
+class WorkspaceActivityRead(BaseModel):
+    id: str
+    workspace_id: str
+    actor_user_id: str | None = None
+    event_type: str
+    summary: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime | None = None
+    actor_name: str | None = None
+    actor_email: str | None = None
+    actor_avatar_url: str | None = None
+    actor_avatar_label: str = "O"
+
+
+class WorkspaceLiveStatusRead(BaseModel):
+    workspace_id: str
+    online_count: int = 0
+    active_count: int = 0
+    recently_active_count: int = 0
+    typing_count: int = 0
+    source_count: int = 0
+    ai_specialization: WorkspaceAIMode = "general"
+    ai_status: Literal["ready", "learning", "active"] = "ready"
+    health: Literal["quiet", "warming", "alive"] = "quiet"
+    recent_activity_at: datetime | None = None
+    recent_activity_summary: str | None = None
+
+
 class WorkspaceMemberRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

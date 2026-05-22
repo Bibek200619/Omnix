@@ -26,6 +26,9 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 import { WorkspaceIntelligencePanel } from "@/components/workspace/WorkspaceIntelligencePanel";
+import { WorkspacePresenceCluster } from "@/components/workspace/WorkspacePresenceCluster";
+import { WorkspaceActivityFeed } from "@/components/workspace/WorkspaceActivityFeed";
+import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import {
@@ -69,6 +72,7 @@ export default function WorkspacePage() {
     setActiveWorkspace,
     workspaces,
   } = useWorkspace();
+  const { activity, loadingActivity, presence, statusForWorkspace } = useWorkspaceCollaboration();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [selectedId, setSelectedId] = useState<string | null>(
     activeWorkspaceId ? selectionId(activeWorkspaceId) : null,
@@ -90,16 +94,16 @@ export default function WorkspacePage() {
   const selectedIndex = selected ? Math.max(0, workspaces.findIndex((workspace) => workspace.id === selected.id)) : 0;
   const selectedColor = workspaceColor(selectedIndex);
   const members = activeMembers.length > 0 ? activeMembers : selected?.members_preview ?? [];
-  const selectedMemberCount = selected?.member_count ?? members.length;
+  const selectedLiveStatus = statusForWorkspace(selected?.id);
 
   const workspaceMetrics = useMemo(
     () => [
-      { label: "Members", value: selectedMemberCount, icon: Users, color: selectedColor },
+      { label: "Active now", value: selectedLiveStatus?.active_count ?? presence?.active_count ?? 0, icon: Users, color: selectedColor },
       { label: "Subspaces", value: selected?.subspaces?.length ?? 0, icon: Layers3, color: "var(--omnix-purple)" },
-      { label: "Workspace Type", value: selected?.workspace_type ?? "None", icon: Database, color: "var(--omnix-green)" },
+      { label: "Sources", value: selectedLiveStatus?.source_count ?? 0, icon: Database, color: "var(--omnix-green)" },
       { label: "Invites", value: activeInvites.length || "Clear", icon: UserPlus, color: "var(--omnix-amber)" },
     ],
-    [activeInvites.length, selected, selectedColor, selectedMemberCount],
+    [activeInvites.length, presence?.active_count, selected, selectedColor, selectedLiveStatus?.active_count, selectedLiveStatus?.source_count],
   );
 
   function toggle(workspaceId: string) {
@@ -235,6 +239,7 @@ export default function WorkspacePage() {
                   const color = workspaceColor(index);
                   const open = expanded[workspace.id] ?? true;
                   const rootActive = selected?.id === workspace.id;
+                  const liveStatus = statusForWorkspace(workspace.id);
 
                   return (
                     <div key={workspace.id}>
@@ -269,7 +274,7 @@ export default function WorkspacePage() {
                           <span className="min-w-0">
                             <span className="block truncate text-sm font-semibold text-white">{workspace.name}</span>
                             <span className="mt-0.5 block truncate text-[10px] text-[var(--omnix-text-3)]">
-                              {workspace.member_count} members - {workspace.is_shared ? "shared" : "private"}
+                              {liveStatus?.active_count ?? 0} active - {liveStatus?.source_count ?? 0} sources
                             </span>
                           </span>
                         </button>
@@ -280,6 +285,7 @@ export default function WorkspacePage() {
                           {(workspace.subspaces ?? []).length ? (workspace.subspaces ?? []).map((subspace, childIndex) => {
                             const active = selected?.id === subspace.id;
                             const color = workspaceColor(index + childIndex + 1);
+                            const childStatus = statusForWorkspace(subspace.id);
                             return (
                               <button
                                 key={subspace.id}
@@ -302,7 +308,9 @@ export default function WorkspacePage() {
                                 </span>
                                 <span className="min-w-0 flex-1">
                                   <span className="block truncate text-xs font-medium text-[var(--omnix-text)]">{subspace.name}</span>
-                                  <span className="block truncate text-[10px] text-[var(--omnix-text-3)]">{subspace.description || "Subspace"}</span>
+                                  <span className="block truncate text-[10px] text-[var(--omnix-text-3)]">
+                                    {childStatus?.active_count ?? 0} active - {childStatus?.source_count ?? 0} sources
+                                  </span>
                                 </span>
                               </button>
                             );
@@ -330,6 +338,10 @@ export default function WorkspacePage() {
 
           <div className="space-y-5">
             <WorkspaceIntelligencePanel profile={activeWorkspaceIntelligence} />
+            <WorkspacePresenceCluster
+              presence={presence}
+              workspaceName={selected?.name}
+            />
 
             <section className="omnix-glass-band p-5 sm:p-6">
               <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -362,7 +374,13 @@ export default function WorkspacePage() {
                     </p>
                     {selected ? (
                       <div className="mt-4 flex flex-wrap items-center gap-3">
-                        <WorkspaceMemberStack members={members} totalCount={selected.member_count} size="md" />
+                        <WorkspaceMemberStack
+                          members={members}
+                          totalCount={selected.member_count}
+                          size="md"
+                          presenceMembers={presence?.recently_active_members ?? []}
+                          showPresence
+                        />
                         <span className="rounded-full border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 py-1 text-xs text-[var(--omnix-text-2)]">
                           {selected.member_count} {selected.member_count === 1 ? "member" : "members"}
                         </span>
@@ -416,6 +434,8 @@ export default function WorkspacePage() {
                 );
               })}
             </div>
+
+            <WorkspaceActivityFeed activity={activity} loading={loadingActivity} compact />
 
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
               <section className="omnix-section-card p-5">

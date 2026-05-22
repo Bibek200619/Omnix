@@ -38,6 +38,7 @@ from ..services.workspace_intelligence_service import (
     workspace_intelligence_system_prompt,
 )
 from ..services.workspace_service import require_active_workspace_access, utc_now_iso
+from ..services.workspace_collaboration_service import log_workspace_activity
 from .conversations import (
     build_conversation_title,
     hydrate_conversation_history,
@@ -1110,6 +1111,21 @@ async def chat(
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
+    if workspace_id:
+        await log_workspace_activity(
+            workspace_id=workspace_id,
+            actor_user_id=user_id,
+            event_type="workspace.ai_response_generated",
+            summary=f"{(intelligence_profile or {}).get('workspace_name') or 'Workspace'} AI generated a response.",
+            metadata={
+                "conversation_id": conversation_id,
+                "assistant_message_id": str(completed_assistant_message["id"]),
+                "source_count": len(sources),
+                "search_mode": payload.search_mode,
+                "ai_specialization": (intelligence_profile or {}).get("ai_specialization"),
+            },
+        )
+
     hydrated_conversation = (
         await hydrate_conversation_history([conversation], user_id, workspace_id)
     )[0]
@@ -1323,6 +1339,21 @@ async def chat_stream(
             )
         except Exception:
             logger.exception("Failed to finalize streaming assistant message.")
+
+        if workspace_id and final_content:
+            await log_workspace_activity(
+                workspace_id=workspace_id,
+                actor_user_id=user_id,
+                event_type="workspace.ai_response_generated",
+                summary=f"{(intelligence_profile or {}).get('workspace_name') or 'Workspace'} AI generated a response.",
+                metadata={
+                    "conversation_id": conversation_id,
+                    "assistant_message_id": str(assistant_message["id"]),
+                    "source_count": len(sources),
+                    "search_mode": payload.search_mode,
+                    "ai_specialization": (intelligence_profile or {}).get("ai_specialization"),
+                },
+            )
 
         done_payload = {"type": "done", "conversation_id": conversation_id}
         yield f"data: {json.dumps(done_payload)}\n\n"

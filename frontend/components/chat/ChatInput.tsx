@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Database, FileText, Globe2, Layers3, Paperclip, Send, Sparkles, X, type LucideIcon } from "lucide-react";
+import { Database, FileText, Globe2, Layers3, Paperclip, Send, Square, Sparkles, X, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { UploadDropzone } from "@/components/upload/UploadDropzone";
 import type { MessageAttachment, SearchMode } from "@/components/chat/types";
@@ -11,12 +11,14 @@ import { cn } from "@/lib/utils";
 type ChatInputProps = {
   onSend: (message: string) => void;
   loading: boolean;
+  onCancel?: () => void;
   conversationId?: string;
   attachments?: MessageAttachment[];
   searchMode: SearchMode;
   onSearchModeChange: (mode: SearchMode) => void;
   onUploadSuccess?: (file: MessageAttachment) => void;
   onRemoveAttachment?: (fileId: string) => void;
+  onTypingChange?: (isTyping: boolean) => void;
 };
 
 const searchModes: Array<{
@@ -43,12 +45,14 @@ function formatBytes(size?: number) {
 export function ChatInput({
   onSend,
   loading,
+  onCancel,
   conversationId,
   attachments = [],
   searchMode,
   onSearchModeChange,
   onUploadSuccess,
   onRemoveAttachment,
+  onTypingChange,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
@@ -66,6 +70,7 @@ export function ChatInput({
     const trimmed = value.trim();
     if (!trimmed || loading) return;
     onSend(trimmed);
+    onTypingChange?.(false);
     setValue("");
   }
 
@@ -152,9 +157,19 @@ export function ChatInput({
         <textarea
           ref={textareaRef}
           value={value}
-          onChange={(event) => setValue(event.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            setValue(nextValue);
+            onTypingChange?.(Boolean(nextValue.trim()));
+          }}
+          onFocus={() => {
+            setFocused(true);
+            if (value.trim()) onTypingChange?.(true);
+          }}
+          onBlur={() => {
+            setFocused(false);
+            onTypingChange?.(false);
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
@@ -207,18 +222,30 @@ export function ChatInput({
           <span className="hidden text-[10px] tracking-[0.04em] text-[var(--omnix-text-3)] sm:inline">
             Return to send
           </span>
-        <Button
-          type="button"
-          size="icon"
-          aria-label="Send message"
-          title="Send message"
-          isLoading={loading}
-          disabled={!value.trim()}
-          onClick={submit}
-          className="h-[30px] w-[30px] rounded-lg border-0 bg-[var(--omnix-grad-primary)] text-[#050c17] shadow-[var(--omnix-glow-sm)] hover:shadow-[var(--omnix-glow-md)] disabled:bg-[var(--omnix-surface)] disabled:text-[var(--omnix-text-3)] disabled:shadow-none"
-        >
-          <Send className="h-4 w-4" />
-        </Button>
+        {loading ? (
+          <Button
+            type="button"
+            size="icon"
+            aria-label="Stop generating"
+            title="Stop generating"
+            onClick={() => onCancel?.()}
+            className="h-[30px] w-[30px] rounded-lg border-0 bg-rose-500/20 text-rose-300 shadow-[var(--omnix-glow-sm)] hover:bg-rose-500/40 hover:text-white"
+          >
+            <Square className="h-3.5 w-3.5 fill-current" />
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            size="icon"
+            aria-label="Send message"
+            title="Send message"
+            disabled={!value.trim()}
+            onClick={submit}
+            className="h-[30px] w-[30px] rounded-lg border-0 bg-[var(--omnix-grad-primary)] text-[#050c17] shadow-[var(--omnix-glow-sm)] hover:shadow-[var(--omnix-glow-md)] disabled:bg-[var(--omnix-surface)] disabled:text-[var(--omnix-text-3)] disabled:shadow-none"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        )}
         </div>
       </div>
     </motion.div>
