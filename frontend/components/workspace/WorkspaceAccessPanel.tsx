@@ -216,7 +216,7 @@ export function WorkspaceAccessPanel() {
               }}
               className="rounded-full border-[var(--omnix-border)] bg-[var(--omnix-surface)] hover:bg-[var(--omnix-surface-hover)]"
             >
-              Invite teammate
+              Assign member
             </Button>
           ) : null}
         </div>
@@ -229,7 +229,7 @@ export function WorkspaceAccessPanel() {
 
         {!activeWorkspace ? (
           <div className="mt-5 rounded-lg border border-dashed border-[var(--omnix-border)] px-4 py-5 text-sm text-[var(--omnix-text-2)]">
-            Select a workspace to manage its team.
+            Awaiting assignment to collaborative spaces.
           </div>
         ) : (
           <div className="relative z-10 mt-6 overflow-hidden rounded-2xl border border-[var(--omnix-border)] bg-[rgba(6,8,16,0.6)] backdrop-blur-xl">
@@ -366,20 +366,20 @@ export function WorkspaceAccessPanel() {
         <div className="relative z-10 mt-4 space-y-2.5">
           {!activeWorkspace ? (
               <div className="rounded-lg border border-dashed border-[var(--omnix-border)] px-4 py-5 text-sm text-[var(--omnix-text-3)]">
-              Select a workspace to view invites.
+              Your workspace access will appear here.
             </div>
           ) : !isWorkspaceFounderRole(activeWorkspace.current_user_role) ? (
               <div className="rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-4 py-4 text-sm text-[var(--omnix-text-2)]">
-              Only the workspace founder can manage outgoing invites.
+              Visibility scope is restricted to operational leaders.
             </div>
           ) : invitesLoading ? (
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading invitations
+              Loading access requests
             </div>
           ) : outgoingInvites.length === 0 ? (
               <div className="rounded-lg border border-dashed border-[var(--omnix-border)] px-4 py-5 text-sm text-[var(--omnix-text-3)]">
-              No outgoing invitations yet.
+              No pending access requests.
             </div>
           ) : (
             outgoingInvites.map((invite) => {

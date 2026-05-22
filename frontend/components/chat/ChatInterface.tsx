@@ -34,7 +34,7 @@ import { useProfile } from "@/lib/profile-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
-import { initialsFromText, isWorkspaceFounderRole, workspaceRoleLabel } from "@/lib/workspace-roles";
+import { initialsFromText, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { WorkspaceMember } from "@/lib/workspace-types";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 import { WorkspacePresenceCluster } from "@/components/workspace/WorkspacePresenceCluster";
@@ -634,10 +634,10 @@ export function ChatInterface() {
         icon: Database,
         label: "AI context",
         value: activeWorkspaceIntelligence
-          ? `${activeWorkspaceIntelligence.workspace_name} knowledge`
+          ? `Using ${activeWorkspaceIntelligence.workspace_name} operational context`
           : activeWorkspace?.is_shared
-          ? `Shared with ${activeWorkspace.member_count} members`
-          : "Private to this workspace",
+          ? `Organizational memory scoped to ${activeWorkspace.member_count} members`
+          : "Workspace-scoped retrieval active",
         color: "text-emerald-200",
       },
       {
@@ -655,14 +655,12 @@ export function ChatInterface() {
       },
       {
         icon: ShieldCheck,
-        label: "Sources",
+        label: "Trust scope",
         value: activeWorkspaceIntelligence
-          ? `Using ${activeWorkspaceIntelligence.source_count} connected ${activeWorkspaceIntelligence.source_count === 1 ? "source" : "sources"}`
-          : isWorkspaceFounderRole(activeWorkspace?.current_user_role)
-          ? "Founder controls"
+          ? `Using ${activeWorkspaceIntelligence.source_count} authorized ${activeWorkspaceIntelligence.source_count === 1 ? "source" : "sources"}`
           : activeWorkspace?.current_user_role
-          ? workspaceRoleLabel(activeWorkspace.current_user_role)
-          : session?.user?.email ?? "Collaborator",
+          ? `Authorized as ${workspaceRoleLabel(activeWorkspace.current_user_role)}`
+          : "Scoped authorization",
         color: "text-amber-200",
       },
       {
@@ -676,7 +674,7 @@ export function ChatInterface() {
         color: "text-emerald-200",
       },
     ],
-    [activeLiveStatus, activeWorkspace, activeWorkspaceIntelligence, presence, searchMode, session?.user?.email],
+    [activeLiveStatus, activeWorkspace, activeWorkspaceIntelligence, presence, searchMode],
   );
 
   const sendMessage = useCallback(

@@ -78,7 +78,7 @@ export function WorkspaceIntelligencePanel({
           <div className="h-8 w-px bg-white/5" />
           <div className="text-right">
              <div className="text-[10px] font-bold uppercase tracking-wider text-white/30">Scope</div>
-             <div className="text-sm font-bold text-cyan-400">{profile?.retrieval_scope === "global" ? "Federated" : "Isolated"}</div>
+             <div className="text-sm font-bold text-cyan-400">{profile?.retrieval_scope === "global" ? "Federated" : "Scoped workspace"}</div>
           </div>
         </div>
       </div>
@@ -136,7 +136,7 @@ export function WorkspaceIntelligencePanel({
                 </div>
               )) : (
                 <div className="col-span-2 rounded-xl border border-dashed border-white/5 bg-white/[0.01] p-4 text-center text-[11px] font-medium text-white/20">
-                  Connect workspace assets to hydrate retrieval memory.
+                  Connect assets to expand operational intelligence.
                 </div>
               )}
             </div>
