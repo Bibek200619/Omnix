@@ -628,7 +628,7 @@ function WorkspaceSelector() {
                         setInviteOpen(true);
                       }}
                     >
-                      Invite teammate
+                      Assign member
                     </Button>
                   </>
                 ) : null}
@@ -698,7 +698,7 @@ function WorkspaceSelector() {
                     className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5 text-[11px] font-medium text-emerald-300/85 transition hover:bg-emerald-500/10 hover:text-emerald-200"
                   >
                     <Plus className="h-4 w-4" />
-                    New team subspace
+                    New operational subspace
                   </button>
                 ) : null}
               </div>

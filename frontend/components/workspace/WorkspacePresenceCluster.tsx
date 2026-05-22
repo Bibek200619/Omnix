@@ -52,7 +52,7 @@ export function WorkspacePresenceCluster({
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200/60">
             <Radio className={cn("h-3 w-3", onlineCount > 0 && "animate-pulse text-[var(--omnix-green)]")} />
-            Workspace Pulse
+            Scoped Pulse
           </div>
           <div className="mt-1 flex items-center gap-2">
             <span className={cn(
@@ -64,7 +64,7 @@ export function WorkspacePresenceCluster({
                 : "bg-white/20"
             )} />
             <p className="truncate text-sm font-bold tracking-tight text-white">
-              {onlineCount ? `${onlineCount} member${onlineCount === 1 ? '' : 's'} live` : recentCount ? `${recentCount} recently active` : "Workspace quiet"}
+              {onlineCount ? `${onlineCount} member${onlineCount === 1 ? '' : 's'} live` : recentCount ? `${recentCount} recently active` : "Scoped space quiet"}
             </p>
           </div>
         </div>
