@@ -40,9 +40,9 @@ type CollaborationContextType = {
 
 const CollaborationContext = createContext<CollaborationContextType | undefined>(undefined);
 
-const HEARTBEAT_INTERVAL_MS = 45_000; // Slower heartbeat since we have realtime updates
-const STATUS_INTERVAL_MS = 60_000;
-const TYPING_THROTTLE_MS = 2_500;
+const HEARTBEAT_INTERVAL_MS = 60_000; // Calmer heartbeat
+const STATUS_INTERVAL_MS = 90_000;    // Less frequent status polling
+const TYPING_THROTTLE_MS = 3_000;
 
 function currentViewFromPath(pathname: string | null) {
   if (!pathname) return "workspace";
@@ -82,7 +82,21 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       return null;
     }
 
-    setLoadingPresence(true);
+    try {
+      const snapshot = await apiClient.get<WorkspacePresenceSnapshot>(
+        `/workspaces/${activeWorkspaceId}/presence`
+      );
+      setPresence(snapshot);
+      return snapshot;
+    } catch (err) {
+      console.warn("Unable to refresh workspace presence snapshot", err);
+      return null;
+    }
+  }, [activeWorkspaceId, session]);
+
+  const heartbeatPresence = useCallback(async () => {
+    if (!session || !activeWorkspaceId) return null;
+
     try {
       const snapshot = await apiClient.post<WorkspacePresenceSnapshot>(
         `/workspaces/${activeWorkspaceId}/presence/heartbeat`,
@@ -95,10 +109,8 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       setPresence(snapshot);
       return snapshot;
     } catch (err) {
-      console.warn("Unable to refresh workspace presence", err);
+      console.warn("Unable to send workspace heartbeat", err);
       return null;
-    } finally {
-      setLoadingPresence(false);
     }
   }, [activeWorkspace?.name, activeWorkspaceId, pathname, session]);
 
@@ -249,7 +261,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
 
   // Periodic Refresh / Heartbeat
   useEffect(() => {
-    void refreshPresence();
+    void heartbeatPresence();
     void refreshActivity();
     void refreshLiveStatuses();
 
@@ -258,14 +270,14 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
         void leaveWorkspace(activeWorkspaceId);
       }
     };
-  }, [activeWorkspaceId, leaveWorkspace, refreshActivity, refreshLiveStatuses, refreshPresence]);
+  }, [activeWorkspaceId, leaveWorkspace, refreshActivity, refreshLiveStatuses, heartbeatPresence]);
 
   useEffect(() => {
     if (!session) return;
 
     const heartbeatId = window.setInterval(() => {
       if (document.visibilityState === "visible") {
-        void refreshPresence();
+        void heartbeatPresence();
       }
     }, HEARTBEAT_INTERVAL_MS);
     
@@ -276,7 +288,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     }, STATUS_INTERVAL_MS);
 
     const handleFocus = () => {
-      void refreshPresence();
+      void heartbeatPresence();
       void refreshActivity();
       void refreshLiveStatuses();
     };
@@ -300,7 +312,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       realtimeStatus,
       loadingPresence,
       loadingActivity,
-      refreshPresence,
+      refreshPresence: heartbeatPresence,
       refreshActivity,
       refreshLiveStatuses,
       leaveWorkspace,
@@ -317,7 +329,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       presence,
       refreshActivity,
       refreshLiveStatuses,
-      refreshPresence,
+      heartbeatPresence,
       leaveWorkspace,
       sendTypingSignal,
     ],
