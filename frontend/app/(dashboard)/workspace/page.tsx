@@ -28,7 +28,9 @@ import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStac
 import { WorkspaceIntelligencePanel } from "@/components/workspace/WorkspaceIntelligencePanel";
 import { WorkspacePresenceCluster } from "@/components/workspace/WorkspacePresenceCluster";
 import { WorkspaceActivityFeed } from "@/components/workspace/WorkspaceActivityFeed";
+import { WorkspaceOperationalTimeline } from "@/components/workspace/WorkspaceOperationalTimeline";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
+import { useWorkspaceContinuity } from "@/lib/workspace-continuity-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import {
@@ -661,6 +663,26 @@ export default function WorkspacePage() {
                 />
               </label>
               {subspaceError ? (
+                <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
+                  {subspaceError}
+                </div>
+              ) : null}
+              <div className="flex items-center justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={() => setSubspaceOpen(false)} disabled={creatingSubspace}>
+                  Cancel
+                </Button>
+                <Button type="submit" leftIcon={<Plus className="h-4 w-4" />} isLoading={creatingSubspace} disabled={!subspaceName.trim() || !subspaceParentId}>
+                  Create subworkspace
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+subspaceError ? (
                 <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
                   {subspaceError}
                 </div>
