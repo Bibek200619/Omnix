@@ -228,7 +228,7 @@ function WorkspaceSelector() {
     setCreateError(null);
   }
 
-  async function handleInvite(target: string, role: "co_owner" | "member") {
+  async function handleInvite(target: string, role: WorkspaceRole) {
     try {
       setInviting(true);
       setInviteError(null);
