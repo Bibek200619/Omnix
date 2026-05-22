@@ -6,12 +6,16 @@ from typing import List, Optional
 from .schemas import ContextPayload, Citation, ContextSourceType
 from ..rag.startup import get_vector_store
 from ..retrieval.hybrid_search import HybridSearchEngine
+from ..retrieval.router import intelligence_router
 
 logger = logging.getLogger(__name__)
 
 
 class RetrievalManager:
-    """Centralizes semantic, keyword, and hybrid retrieval operations."""
+    """
+    Centralizes federated semantic, keyword, and hybrid retrieval operations.
+    Uses the IntelligenceRouter to determine the optimal retrieval scope.
+    """
 
     def __init__(self, vector_store=None):
         self.vector_store = vector_store or get_vector_store()
@@ -20,16 +24,21 @@ class RetrievalManager:
     async def retrieve(
         self, payload: ContextPayload, top_k: int = 3
     ) -> List[Citation]:
-        """Orchestrate retrieval and map to unified Citation objects."""
+        """Orchestrate retrieval across federated workspace scopes."""
         if not payload.query or not payload.query.strip():
             logger.warning("Empty query provided to RetrievalManager.")
             return []
 
         try:
+            # 1. Determine optimal retrieval scope via Intelligence Router
+            routing = await intelligence_router.route_query(payload)
+            scope_ids = routing.get("scope_ids", [])
+            
+            # 2. Execute hybrid search across the determined scope
             response = await self.hybrid_engine.search(
                 payload.query,
                 user_id=payload.user_id,
-                workspace_id=payload.workspace_id,
+                workspace_id=scope_ids, # Passing list for federated search
                 top_k=top_k,
             )
             
@@ -42,11 +51,14 @@ class RetrievalManager:
                         content=res.content,
                         file_id=res.file_id,
                         file_name=res.file_name or "Unknown File",
-                        metadata=res.metadata,
+                        metadata={
+                            **(res.metadata or {}),
+                            "routing": routing # Include routing diagnostics
+                        },
                         score=res.score,
                     )
                 )
             return citations
-        except Exception as exc:
-            logger.exception("RetrievalManager failed during search.")
+        except Exception:
+            logger.exception("RetrievalManager failed during federated search.")
             return []

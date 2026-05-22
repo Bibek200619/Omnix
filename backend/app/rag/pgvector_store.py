@@ -23,7 +23,13 @@ class PgVectorStore(VectorStore):
         # This method is retained for interface compatibility.
         pass
 
-    def search(self, query_embedding: list[float], user_id: str, workspace_id: str | None = None, top_k: int = 3) -> list[tuple[str, float]]:
+    def search(
+        self, 
+        query_embedding: list[float], 
+        user_id: str, 
+        workspace_id: str | list[str] | None = None, 
+        top_k: int = 3
+    ) -> list[tuple[str, float]]:
         if not query_embedding:
             return []
 
@@ -31,12 +37,18 @@ class PgVectorStore(VectorStore):
 
         supabase = get_supabase()
         try:
+            # Normalize workspace_id to an array for the federated RPC
+            workspace_ids = None
+            if isinstance(workspace_id, list):
+                workspace_ids = workspace_id
+            elif isinstance(workspace_id, str):
+                workspace_ids = [workspace_id]
+
             logger.info(
-                "Starting pgvector semantic search (top_k=%d, user_id=%s, workspace_id=%s, dimension=%d).",
+                "Starting pgvector federated search (top_k=%d, user_id=%s, workspace_ids=%s).",
                 top_k,
                 user_id,
-                workspace_id,
-                EMBEDDING_DIMENSION,
+                workspace_ids,
             )
             response = execute_query_sync(
                 supabase.rpc(
@@ -45,7 +57,7 @@ class PgVectorStore(VectorStore):
                         "q": query_embedding,
                         "p_top_k": top_k,
                         "p_user": user_id,
-                        "p_workspace": workspace_id,
+                        "p_workspace_ids": workspace_ids,
                     },
                 ),
                 operation="pgvector semantic search",
