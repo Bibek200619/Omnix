@@ -68,20 +68,20 @@ export function WorkspaceOperationalTimeline({
               key={initiative.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="group relative overflow-hidden rounded-xl border border-white/5 bg-[rgba(6,10,20,0.6)] p-4 transition-all hover:border-cyan-500/30 hover:shadow-[0_0_20px_rgba(34,211,238,0.1)]"
+              className="group relative overflow-hidden rounded-xl border border-white/5 bg-[rgba(6,10,20,0.6)] p-4 transition-all hover:border-white/10 hover:bg-white/[0.02]"
             >
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-[10px] font-medium uppercase tracking-widest text-emerald-400/70">Focus Area</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500/80" />
+                    <span className="text-[10px] font-medium uppercase tracking-widest text-emerald-400/60">Focus Area</span>
                   </div>
-                  <h4 className="text-sm font-bold text-white group-hover:text-cyan-200 transition-colors truncate">
+                  <h4 className="text-sm font-medium text-white/90 group-hover:text-white transition-colors truncate">
                     {initiative.name}
                   </h4>
                 </div>
                 <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center">
-                  <Compass className="h-4 w-4 text-cyan-400" />
+                  <Compass className="h-4 w-4 text-cyan-400/80" />
                 </div>
               </div>
               <div className="mt-4 flex items-center gap-3">
@@ -89,7 +89,7 @@ export function WorkspaceOperationalTimeline({
                   <motion.div 
                     initial={{ width: 0 }}
                     animate={{ width: `${Math.min(initiative.momentum_score * 10, 100)}%` }}
-                    className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 shadow-[0_0_8px_rgba(34,211,238,0.5)]"
+                    className="h-full bg-gradient-to-r from-cyan-500/80 to-emerald-500/80"
                   />
                 </div>
                 <span className="text-[10px] font-medium text-white/40">
@@ -158,5 +158,8 @@ export function WorkspaceOperationalTimeline({
         </div>
       </div>
     </section>
+  );
+}
+ion>
   );
 }
