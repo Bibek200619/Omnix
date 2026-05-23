@@ -75,7 +75,6 @@ from ..services.workspace_collaboration_service import (
     list_workspace_live_statuses,
     list_workspace_presence,
     log_workspace_activity,
-    update_workspace_typing,
 )
 
 logger = logging.getLogger(__name__)
