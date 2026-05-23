@@ -113,9 +113,19 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
                 {active.title}
               </span>
             </div>
-            <p className="mt-px truncate text-[10px] tracking-[0.03em] text-[rgba(255,255,255,0.28)]">
-              {active.subtitle}
-            </p>
+            <div className="flex items-center gap-1.5 overflow-hidden">
+               <span className={cn(
+                 "shrink-0 rounded-[4px] border border-white/10 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/40 sm:hidden",
+                 activeWorkspace?.current_user_role === "founder" && "border-rose-500/30 bg-rose-500/10 text-rose-300/80",
+                 activeWorkspace?.current_user_role === "co_owner" && "border-amber-500/30 bg-amber-500/10 text-amber-300/80",
+                 activeWorkspace?.current_user_role === "team_lead" && "border-indigo-500/30 bg-indigo-500/10 text-indigo-300/80"
+               )}>
+                 {activeWorkspace?.current_user_role?.replace(/_/g, ' ') || "member"}
+               </span>
+               <p className="mt-px truncate text-[10px] tracking-[0.03em] text-[rgba(255,255,255,0.28)]">
+                 {active.subtitle}
+               </p>
+            </div>
           </div>
         </div>
 
@@ -125,11 +135,14 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
           <Button
             type="button"
             variant="secondary"
-            leftIcon={<MessageSquarePlus className="h-3.5 w-3.5" />}
+            size="icon"
             onClick={() => router.push("/chat")}
-            className="hidden h-9 rounded-[10px] border-[var(--omnix-cyan)] bg-transparent px-4 text-xs font-bold tracking-[0.03em] text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] hover:-translate-y-px hover:border-[var(--omnix-cyan)] hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] sm:inline-flex"
+            className="h-9 w-9 rounded-[10px] border-[var(--omnix-cyan)] bg-transparent text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] sm:w-auto sm:px-4"
+            aria-label="Start new chat"
+            title="Start new chat"
           >
-            New Chat
+            <MessageSquarePlus className="h-4 w-4 sm:mr-2 sm:h-3.5 sm:w-3.5" />
+            <span className="hidden sm:inline text-xs font-bold tracking-[0.03em]">New Chat</span>
           </Button>
           <ProfileMenu user={user} signingOut={signingOut} onSignOut={handleSignOut} />
         </div>
