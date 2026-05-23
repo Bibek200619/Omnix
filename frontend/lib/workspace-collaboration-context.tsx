@@ -71,7 +71,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
   const [activity, setActivity] = useState<WorkspaceActivityEvent[]>([]);
   const [liveStatuses, setLiveStatuses] = useState<Record<string, WorkspaceLiveStatus>>({});
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
-  const [loadingPresence, setLoadingPresence] = useState(false);
+  const [loadingPresence] = useState(false);
   const [loadingActivity, setLoadingActivity] = useState(false);
   const typingSentAtRef = useRef(0);
   const typingInFlightRef = useRef<Promise<void> | null>(null);
@@ -302,7 +302,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleFocus);
     };
-  }, [refreshActivity, refreshLiveStatuses, refreshPresence, session]);
+  }, [refreshActivity, refreshLiveStatuses, heartbeatPresence, session]);
 
   const value = useMemo<CollaborationContextType>(
     () => ({
