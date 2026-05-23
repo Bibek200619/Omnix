@@ -49,16 +49,16 @@ export function WorkspaceIntelligencePanel({
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400/60">Operational Intelligence</p>
+              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-cyan-400/60">Workspace AI</p>
               {profile?.is_global && (
-                <span className="flex items-center gap-1 rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[9px] font-bold text-purple-300 uppercase tracking-tight">
+                <span className="flex items-center gap-1 rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[9px] font-medium text-purple-300 uppercase tracking-tight">
                   <Globe2 className="h-2.5 w-2.5" />
-                  Global Context
+                  Organization Wide
                 </span>
               )}
             </div>
-            <h3 className="mt-1.5 text-xl font-bold tracking-tight text-white/90">
-              {profile ? profile.workspace_name : "Identity Offline"}
+            <h3 className="mt-1.5 text-xl font-medium tracking-tight text-white/90">
+              {profile ? profile.workspace_name : "Waking up..."}
             </h3>
             {expertise && (
               <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-emerald-400/90">
@@ -72,23 +72,23 @@ export function WorkspaceIntelligencePanel({
         
         <div className="shrink-0 flex items-center gap-3">
           <div className="text-right">
-             <div className="text-[10px] font-bold uppercase tracking-wider text-white/30">AI Strategy</div>
-             <div className="text-sm font-bold text-white/80">{modeLabels[mode]}</div>
+             <div className="text-[10px] font-medium uppercase tracking-wider text-white/30">Specialization</div>
+             <div className="text-sm font-medium text-white/80">{modeLabels[mode]}</div>
           </div>
           <div className="h-8 w-px bg-white/5" />
           <div className="text-right">
-             <div className="text-[10px] font-bold uppercase tracking-wider text-white/30">Scope</div>
-             <div className="text-sm font-bold text-cyan-400">{profile?.retrieval_scope === "global" ? "Federated" : "Scoped workspace"}</div>
+             <div className="text-[10px] font-medium uppercase tracking-wider text-white/30">Search Scope</div>
+             <div className="text-sm font-medium text-cyan-400">{profile?.retrieval_scope === "global" ? "Everything" : "This workspace only"}</div>
           </div>
         </div>
       </div>
 
       <div className={cn("relative z-10 mt-8 grid gap-4", compact ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2 lg:grid-cols-4")}>
         {[
-          { label: "Knowledge Sources", value: profile?.source_count ?? 0, icon: Database, color: "#22d3ee" },
-          { label: "Memory Threads", value: profile?.conversation_count ?? 0, icon: Layers3, color: "#c084fc" },
-          { label: "Collaboration Depth", value: profile?.member_count ?? 0, icon: Users, color: "#fbbf24" },
-          { label: "Retrieved Domains", value: domains.length, icon: Globe2, color: "#10b981" },
+          { label: "Connected Files", value: profile?.source_count ?? 0, icon: Database, color: "#22d3ee" },
+          { label: "Conversations", value: profile?.conversation_count ?? 0, icon: Layers3, color: "#c084fc" },
+          { label: "Team Members", value: profile?.member_count ?? 0, icon: Users, color: "#fbbf24" },
+          { label: "Topics", value: domains.length, icon: Globe2, color: "#10b981" },
         ].slice(0, compact ? 4 : 4).map((item) => {
           const Icon = item.icon;
           return (
@@ -98,7 +98,7 @@ export function WorkspaceIntelligencePanel({
               </div>
               <div>
                 <div className="text-lg font-bold tracking-tight text-white/90">{item.value}</div>
-                <div className="text-[9px] font-bold uppercase tracking-wider text-white/30">{item.label}</div>
+                <div className="text-[9px] font-medium uppercase tracking-wider text-white/30">{item.label}</div>
               </div>
             </div>
           );
@@ -162,12 +162,6 @@ export function WorkspaceIntelligencePanel({
           </div>
         </div>
       ) : null}
-    </section>
-  );
-}
- );
-}
-) : null}
     </section>
   );
 }
