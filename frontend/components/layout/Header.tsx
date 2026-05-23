@@ -116,12 +116,9 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
             </div>
             <div className="flex items-center gap-1.5 overflow-hidden">
                <span className={cn(
-                 "shrink-0 rounded-[4px] border border-white/10 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/40 sm:hidden",
-                 activeWorkspace?.current_user_role === "founder" && "border-rose-500/30 bg-rose-500/10 text-rose-300/80",
-                 activeWorkspace?.current_user_role === "co_owner" && "border-amber-500/30 bg-amber-500/10 text-amber-300/80",
-                 activeWorkspace?.current_user_role === "team_lead" && "border-indigo-500/30 bg-indigo-500/10 text-indigo-300/80"
+                 "shrink-0 rounded-[4px] border border-white/5 bg-white/5 px-1.5 py-0.5 text-[9px] font-medium capitalize tracking-wide text-white/50 sm:hidden",
                )}>
-                 {activeWorkspace?.current_user_role?.replace(/_/g, ' ') || "member"}
+                 {activeWorkspace?.current_user_role?.replace(/_/g, ' ') || "Member"}
                </span>
                <p className="mt-px truncate text-[10px] tracking-[0.03em] text-[rgba(255,255,255,0.28)]">
                  {active.subtitle}

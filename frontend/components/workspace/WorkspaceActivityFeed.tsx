@@ -168,11 +168,14 @@ export function WorkspaceActivityFeed({
       
       {!compact && visibleActivity.length > 0 && (
         <div className="mt-6 flex justify-center">
-          <button className="text-[10px] font-bold uppercase tracking-widest text-white/20 hover:text-cyan-300 transition-colors">
-            View full audit trail
+          <button className="text-[10px] font-medium uppercase tracking-widest text-white/30 hover:text-cyan-300 transition-colors">
+            View all activity
           </button>
         </div>
       )}
     </section>
+  );
+}
+
   );
 }
