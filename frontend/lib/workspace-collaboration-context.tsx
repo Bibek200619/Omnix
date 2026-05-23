@@ -309,7 +309,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
               table: "authority_revocations",
               filter: `user_id=eq.${session.user.id}`,
             },
-            (payload: any) => {
+            (payload: { new: { workspace_id: string; revocation_type: string } }) => {
               console.warn("[realtime] authority revocation detected", payload);
               const { workspace_id, revocation_type } = payload.new;
               handleAuthorityRevocation(workspace_id, revocation_type);
