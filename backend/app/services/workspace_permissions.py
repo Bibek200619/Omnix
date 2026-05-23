@@ -3,6 +3,7 @@ from typing import Any, Mapping
 from app.core.rbac import (
     ROLE_SUPER_FOUNDER,
     ROLE_SUB_LEADER,
+    ROLE_TEAM_LEAD,
     ROLE_SUB_MEMBER,
     LEGACY_ROLE_FOUNDER,
     LEGACY_ROLE_OWNER,
@@ -12,6 +13,7 @@ from app.core.rbac import (
     WorkspacePermission,
     SUPER_FOUNDER_PERMISSIONS,
     SUB_LEADER_PERMISSIONS,
+    TEAM_LEAD_PERMISSIONS,
     SUB_MEMBER_PERMISSIONS,
     PERMISSION_VIEW_WORKSPACE,
     PERMISSION_MANAGE_MEMBERS,
@@ -49,6 +51,9 @@ class OrganizationalAccessAuthority:
         if raw_role in {LEGACY_ROLE_CO_OWNER, ROLE_SUB_LEADER}:
             return ROLE_SUPER_FOUNDER if is_root else ROLE_SUB_LEADER
 
+        if raw_role == ROLE_TEAM_LEAD:
+            return ROLE_TEAM_LEAD
+
         if raw_role in {LEGACY_ROLE_MEMBER, ROLE_SUB_MEMBER}:
             return ROLE_SUB_MEMBER
 
@@ -62,6 +67,8 @@ class OrganizationalAccessAuthority:
             return SUPER_FOUNDER_PERMISSIONS
         if canonical_role == ROLE_SUB_LEADER:
             return SUB_LEADER_PERMISSIONS
+        if canonical_role == ROLE_TEAM_LEAD:
+            return TEAM_LEAD_PERMISSIONS
         return SUB_MEMBER_PERMISSIONS
 
     @classmethod
