@@ -39,9 +39,12 @@ async def test_super_workspace_creation_auto_creates_global_space(monkeypatch: p
 
     assert workspace["id"] == "super-1"
     assert inserted_workspaces[0]["workspace_type"] == "super_workspace"
+    assert inserted_workspaces[0]["workspace_focus"] == "general"
+    assert inserted_workspaces[0]["ai_specialization"] == "general"
     assert inserted_workspaces[0]["parent_workspace_id"] is None
     assert inserted_workspaces[1]["name"] == "Global"
     assert inserted_workspaces[1]["workspace_type"] == "global_workspace"
+    assert inserted_workspaces[1]["workspace_focus"] == "general"
     assert inserted_workspaces[1]["parent_workspace_id"] == "super-1"
     assert inserted_workspaces[1]["is_global"] is True
     assert inserted_memberships == [

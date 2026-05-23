@@ -19,12 +19,13 @@ from .supabase_service import (
     select_one_trusted,
 )
 from .profile_service import get_user_profile_map
+from .workspace_cognition import WorkspaceFocus, normalize_workspace_focus
 
 logger = logging.getLogger(__name__)
 
 WORKSPACE_COLUMNS = (
     "id,user_id,name,description,parent_workspace_id,workspace_type,is_global,"
-    "expertise_area,ai_specialization,ai_instructions,intelligence_preferences,"
+    "expertise_area,workspace_focus,ai_specialization,ai_instructions,intelligence_preferences,"
     "created_at,updated_at"
 )
 WORKSPACE_MEMBER_COLUMNS = "workspace_id,user_id,role,created_at,updated_at"
@@ -37,9 +38,9 @@ MEMBERS_PREVIEW_LIMIT = 3
 WorkspaceRole = Literal["founder", "co_owner", "team_lead", "member"]
 WorkspaceInviteStatus = Literal["pending", "accepted", "declined", "revoked"]
 WorkspaceType = Literal["workspace", "super_workspace", "subworkspace", "global_workspace"]
-WorkspaceAIMode = Literal["research", "coding", "design", "strategy", "analytics", "general"]
+WorkspaceAIMode = WorkspaceFocus
 WORKSPACE_TYPES: set[str] = {"workspace", "super_workspace", "subworkspace", "global_workspace", "super", "sub"}
-WORKSPACE_AI_MODES: set[str] = {"research", "coding", "design", "strategy", "analytics", "general"}
+WORKSPACE_AI_MODES: set[str] = {"general", "engineering", "design", "research", "strategy"}
 GLOBAL_SPACE_NAME = "Global"
 
 
@@ -125,7 +126,12 @@ def normalize_workspace_record(workspace: dict[str, Any]) -> dict[str, Any]:
     )
     normalized["is_global"] = bool(normalized.get("is_global"))
     normalized["expertise_area"] = _clean_optional_text(normalized.get("expertise_area"))
-    normalized["ai_specialization"] = normalize_ai_specialization(normalized.get("ai_specialization"))
+    workspace_focus = normalize_workspace_focus(
+        normalized.get("workspace_focus") or normalized.get("ai_specialization")
+    )
+    normalized["workspace_focus"] = workspace_focus
+    # Compatibility for older clients that still read/write ai_specialization.
+    normalized["ai_specialization"] = workspace_focus
     normalized["ai_instructions"] = _clean_optional_text(normalized.get("ai_instructions"))
     normalized["intelligence_preferences"] = normalize_intelligence_preferences(
         normalized.get("intelligence_preferences"),
@@ -142,10 +148,7 @@ def _clean_optional_text(value: Any) -> str | None:
 
 
 def normalize_ai_specialization(value: Any) -> WorkspaceAIMode:
-    mode = str(value or "").strip().lower().replace("-", "_")
-    if mode in WORKSPACE_AI_MODES:
-        return mode  # type: ignore[return-value]
-    return "general"
+    return normalize_workspace_focus(value)
 
 
 def normalize_intelligence_preferences(
@@ -944,7 +947,9 @@ def _workspace_insert_payload(
     parent_workspace_id: str | None,
     is_global: bool,
     timestamp: str,
+    workspace_focus: Any = "general",
 ) -> dict[str, Any]:
+    focus = normalize_workspace_focus(workspace_focus)
     return {
         "user_id": user_id,
         "name": _normalized_workspace_name(name),
@@ -952,6 +957,8 @@ def _workspace_insert_payload(
         "parent_workspace_id": parent_workspace_id,
         "workspace_type": workspace_type,
         "is_global": is_global,
+        "workspace_focus": focus,
+        "ai_specialization": focus,
         "updated_at": timestamp,
     }
 
@@ -1055,6 +1062,7 @@ async def create_subspace_for_user(
     parent_workspace_id: str | None,
     name: str,
     description: str | None = None,
+    workspace_focus: Any = "general",
     is_global: bool = False,
     timestamp: str | None = None,
 ) -> dict[str, Any]:
@@ -1073,6 +1081,7 @@ async def create_subspace_for_user(
             workspace_type="global_workspace" if is_global else "subworkspace",
             parent_workspace_id=parent_workspace_id,
             is_global=is_global,
+            workspace_focus=workspace_focus,
             timestamp=timestamp or utc_now_iso(),
         ),
     )
@@ -1093,6 +1102,7 @@ async def create_workspace_for_user(
     user_id: str,
     name: str,
     description: str | None = None,
+    workspace_focus: Any = "general",
     workspace_type: Any = "super_workspace",
     parent_workspace_id: str | None = None,
     is_global: bool = False,
@@ -1113,6 +1123,7 @@ async def create_workspace_for_user(
             parent_workspace_id=parent_workspace_id,
             name=name,
             description=description,
+            workspace_focus=workspace_focus,
             is_global=is_global,
             timestamp=timestamp,
         )
@@ -1133,6 +1144,7 @@ async def create_workspace_for_user(
                 workspace_type=normalized_type,
                 parent_workspace_id=None,
                 is_global=False,
+                workspace_focus=workspace_focus,
                 timestamp=timestamp,
             ),
         )
