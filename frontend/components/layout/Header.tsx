@@ -74,7 +74,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
   }
 
   return (
-    <header className="relative z-30 shrink-0 select-none border-b border-[rgba(0,255,255,0.08)] bg-[var(--omnix-header-glass)] backdrop-blur-[24px]">
+    <header className="relative z-30 shrink-0 select-none border-b border-[rgba(0,255,255,0.08)] bg-[var(--omnix-header-glass)] pt-safe backdrop-blur-[24px]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent_0%,rgba(0,255,255,0.25)_40%,rgba(0,255,255,0.5)_55%,rgba(0,255,255,0.25)_70%,transparent_100%)]" />
       <InviteNotificationBar />
       <div className="relative flex h-[var(--omnix-header-h)] w-full items-center gap-3 px-5 sm:px-[22px]">

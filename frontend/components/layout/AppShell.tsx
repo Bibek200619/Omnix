@@ -80,7 +80,7 @@ export function AppShell({ children }: AppShellProps) {
           <ProfileProvider>
             <ConversationHistoryProvider>
               <WorkspaceOnboardingGate>
-                <div className="omnix-app-bg omnix-auth-shell relative h-screen overflow-hidden text-white">
+                <div className="omnix-app-bg omnix-auth-shell relative h-[100dvh] overflow-hidden text-white sm:h-screen">
                   <div className="omnix-ambient-layer" aria-hidden="true" />
                   <div className="omnix-shell-scanline" aria-hidden="true" />
                   <div
@@ -95,7 +95,7 @@ export function AppShell({ children }: AppShellProps) {
                   />
                   <div
                     className={cn(
-                      "relative z-[1] flex h-screen min-h-0 flex-col transition-[padding] duration-200 ease-out",
+                      "relative z-[1] flex h-full min-h-0 flex-col transition-[padding] duration-200 ease-out",
                       isSidebarCollapsed ? "lg:pl-0" : "lg:pl-[var(--omnix-sidebar-w)]",
                     )}
                   >
@@ -104,7 +104,7 @@ export function AppShell({ children }: AppShellProps) {
                       onMenuClick={() => setIsSidebarOpen(true)}
                       onExpandSidebar={() => setIsSidebarCollapsed(false)}
                     />
-                    <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+                    <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-safe">
                       <PageTransition className="flex min-h-0 flex-1 flex-col">{children}</PageTransition>
                     </main>
                   </div>

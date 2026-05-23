@@ -103,7 +103,7 @@ export function WorkspaceOperationalTimeline({
 
       {/* Timeline Feed */}
       <div className="relative">
-        <div className="absolute left-[19px] top-4 bottom-4 w-px bg-gradient-to-b from-cyan-500/40 via-white/5 to-transparent" />
+        <div className="absolute left-[17px] top-4 bottom-4 w-px bg-gradient-to-b from-cyan-500/40 via-white/5 to-transparent sm:left-[19px]" />
         
         <div className="space-y-8">
           {events.map((event, index) => {
@@ -114,34 +114,34 @@ export function WorkspaceOperationalTimeline({
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="relative pl-12"
+                className="relative pl-10 sm:pl-12"
               >
-                <div className="absolute left-0 top-0 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-[#060a14] shadow-[var(--omnix-glow-xs)]">
-                  <Icon className="h-4 w-4 text-cyan-400" />
+                <div className="absolute left-0 top-0 flex h-[34px] w-[34px] items-center justify-center rounded-xl border border-white/10 bg-[#060a14] shadow-[var(--omnix-glow-xs)] sm:h-10 sm:w-10">
+                  <Icon className="h-3.5 w-3.5 text-cyan-400 sm:h-4 sm:w-4" />
                   {index === 0 && (
-                    <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-cyan-500 animate-pulse border-2 border-[#060a14]" />
+                    <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-cyan-500 animate-pulse border-2 border-[#060a14] sm:h-3 sm:w-3" />
                   )}
                 </div>
                 
                 <div className="group">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1.5">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1.5">
+                    <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.12em] sm:tracking-[0.15em] text-white/30">
                       <ClientTime value={event.created_at} fallback="Recently" />
                     </span>
                     <span className="hidden sm:inline-block h-1 w-1 rounded-full bg-white/10" />
-                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-white/5 bg-white/[0.03] text-[9px] font-bold text-cyan-200/60 uppercase tracking-tight">
+                    <span className="inline-flex w-fit items-center gap-1.5 px-2 py-0.5 rounded-full border border-white/5 bg-white/[0.03] text-[8px] sm:text-[9px] font-bold text-cyan-200/60 uppercase tracking-tight">
                       {event.event_type.replace(/_/g, ' ')}
                     </span>
                   </div>
                   
-                  <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02] p-4 transition-all hover:bg-white/[0.04] hover:border-white/10">
+                  <div className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-white/5 bg-white/[0.02] p-3 sm:p-4 transition-all hover:bg-white/[0.04] hover:border-white/10">
                     <div className="relative z-10">
-                      <p className="text-sm font-medium leading-relaxed text-slate-300">
+                      <p className="text-xs sm:text-sm font-medium leading-relaxed text-slate-300">
                         {event.summary}
                       </p>
                       {typeof event.metadata?.initiative_name === "string" && (
-                        <div className="mt-3 flex items-center gap-2 text-[10px] font-bold text-white/30">
-                          <Milestone className="h-3 w-3" />
+                        <div className="mt-2.5 sm:mt-3 flex items-center gap-2 text-[9px] sm:text-[10px] font-bold text-white/30">
+                          <Milestone className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                           <span>Part of <span className="text-white/60">{event.metadata.initiative_name}</span></span>
                         </div>
                       )}
