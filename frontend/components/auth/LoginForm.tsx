@@ -57,7 +57,6 @@ export function LoginForm() {
 
       await refreshSession();
       router.replace(redirectFromWindow());
-      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
       setLoading(false);
