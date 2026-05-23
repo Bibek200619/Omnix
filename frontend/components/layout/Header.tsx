@@ -49,13 +49,15 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
   const pathname = usePathname();
   const router = useRouter();
   const { signOut, user } = useAuth();
-  const { activeWorkspace } = useWorkspace();
+  const { activeWorkspace, workspaces } = useWorkspace();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
-  const active =
-    routeTitles.find((route) => pathname.startsWith(route.match)) ??
-    routeTitles[0];
-  const workspaceName = activeWorkspace?.name || "Omnix Labs";
+  
+  const active = routeTitles.find((route) => pathname.startsWith(route.match)) ?? routeTitles[0];
+  
+  // Dynamic Hierarchy Orientation
+  const parentWorkspace = workspaces.find(w => w.id === activeWorkspace?.parent_workspace_id);
+  const isSubspace = !!activeWorkspace?.parent_workspace_id;
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -105,28 +107,27 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
             </Button>
           ) : null}
           <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-[5px]">
-              <span className="truncate text-[11px] font-normal text-[rgba(0,255,255,0.45)]">
-                {workspaceName}
-              </span>
-              <ChevronRight className="h-[11px] w-[11px] shrink-0 text-[rgba(0,255,255,0.3)]" strokeWidth={2} />
-              <span className="omnix-display truncate text-sm font-bold tracking-[0.01em] text-[rgba(255,255,255,0.92)]">
-                {active.title}
-              </span>
-            </div>
             <div className="flex items-center gap-1.5 overflow-hidden">
-               <span className={cn(
-                 "shrink-0 rounded-[4px] border border-white/10 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/40 sm:hidden",
-                 activeWorkspace?.current_user_role === "founder" && "border-rose-500/30 bg-rose-500/10 text-rose-300/80",
-                 activeWorkspace?.current_user_role === "co_owner" && "border-amber-500/30 bg-amber-500/10 text-amber-300/80",
-                 activeWorkspace?.current_user_role === "team_lead" && "border-indigo-500/30 bg-indigo-500/10 text-indigo-300/80"
+              {isSubspace && parentWorkspace ? (
+                <>
+                  <span className="truncate text-xs font-medium text-[rgba(255,255,255,0.35)]">
+                    {parentWorkspace.name}
+                  </span>
+                  <ChevronRight className="h-3 w-3 shrink-0 text-white/10" />
+                </>
+              ) : null}
+              <span className="omnix-display truncate text-sm font-bold tracking-[0.01em] text-[rgba(255,255,255,0.92)]">
+                {activeWorkspace?.name || active.title}
+              </span>
+              <span className={cn(
+                 "shrink-0 rounded-[4px] border border-white/5 bg-white/5 px-1.5 py-0.5 text-[9px] font-medium capitalize tracking-wide text-white/30",
                )}>
-                 {activeWorkspace?.current_user_role?.replace(/_/g, ' ') || "member"}
-               </span>
-               <p className="mt-px truncate text-[10px] tracking-[0.03em] text-[rgba(255,255,255,0.28)]">
-                 {active.subtitle}
-               </p>
+                 {activeWorkspace?.current_user_role?.replace(/_/g, ' ') || "Member"}
+              </span>
             </div>
+            <p className="mt-px truncate text-[10px] tracking-[0.03em] text-[rgba(255,255,255,0.22)]">
+               {activeWorkspace ? (isSubspace ? "Operational Subspace" : "Super Workspace") : active.subtitle}
+            </p>
           </div>
         </div>
 

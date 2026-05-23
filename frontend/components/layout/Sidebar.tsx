@@ -118,6 +118,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
   const [createSubspaceError, setCreateSubspaceError] = useState<string | null>(null);
   const [expandedWorkspaceIds, setExpandedWorkspaceIds] = useState<Set<string>>(() => new Set());
 
+  const [showManageActions, setShowManageActions] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -489,7 +490,6 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
   }
 
   const canManageActive = isWorkspaceFounderRole(active?.current_user_role);
-  const canEditActiveWorkspace = canManageActive && !active?.is_global;
   const ActiveWorkspaceIcon = active ? workspaceIcon(active) : Layers3;
 
   return (
@@ -512,7 +512,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
               <ActiveWorkspaceIcon className="h-4.5 w-4.5 sm:h-4 sm:w-4" />
             </div>
             {realtimeStatus === "connected" && (
-              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#060a14] bg-[var(--omnix-green)] shadow-[0_0_8px_var(--omnix-green)]" />
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#060a14] bg-[var(--omnix-green)] opacity-80" />
             )}
           </div>
           <div className="min-w-0 flex-1">
@@ -589,131 +589,139 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
               )}
             </div>
 
-            {createError && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="border-t border-white/6 px-3 py-2"
-              >
-                <div className="rounded-md border border-rose-400/25 bg-rose-400/10 p-2 text-xs text-rose-100">
-                  {createError}
-                </div>
-              </motion.div>
-            )}
-
-            <div className="border-t border-[var(--omnix-border)] p-[5px]">
-              <div className="space-y-2">
-                {canManageActive ? (
-                  <>
-                    {canEditActiveWorkspace ? (
-                      <div className="grid grid-cols-2 gap-2">
+            <div className="border-t border-white/5 bg-black/10 p-2">
+              <div className="space-y-1">
+                {showManageActions ? (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    className="space-y-2 pb-2"
+                  >
+                    {createError && (
+                      <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[10px] text-rose-200">
+                         {createError}
+                      </div>
+                    )}
+                    
+                    {canManageActive && (
+                      <div className="grid grid-cols-2 gap-1.5 px-1">
                         <Button
                           type="button"
-                          variant="secondary"
+                          variant="ghost"
                           size="sm"
-                          className="w-full justify-start"
-                          leftIcon={<Edit3 className="h-3.5 w-3.5" />}
+                          className="h-8 justify-start text-[9px] uppercase tracking-wider text-white/40 hover:text-white"
+                          leftIcon={<Edit3 className="h-3 w-3" />}
                           onClick={openRenameWorkspace}
                         >
                           Rename
                         </Button>
                         <Button
                           type="button"
-                          variant="danger"
+                          variant="ghost"
                           size="sm"
-                          className="w-full justify-start"
-                          leftIcon={<Trash2 className="h-3.5 w-3.5" />}
+                          className="h-8 justify-start text-[9px] uppercase tracking-wider text-rose-400/50 hover:text-rose-400"
+                          leftIcon={<Trash2 className="h-3 w-3" />}
                           onClick={openDeleteWorkspace}
                         >
                           Delete
                         </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="col-span-2 h-8 justify-start text-[9px] uppercase tracking-wider text-white/40 hover:text-white"
+                          leftIcon={<UserPlus className="h-3 w-3" />}
+                          onClick={() => {
+                            setInviteError(null);
+                            setInviteOpen(true);
+                          }}
+                        >
+                          Manage Members
+                        </Button>
                       </div>
-                    ) : null}
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="w-full justify-start"
-                      leftIcon={<UserPlus className="h-3.5 w-3.5" />}
-                      onClick={() => {
-                        setInviteError(null);
-                        setInviteOpen(true);
-                      }}
-                    >
-                      Assign member
-                    </Button>
-                  </>
-                ) : null}
-
-                {showCreateForm ? (
-                  <motion.form
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.16 }}
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleCreate();
-                    }}
-                    className="space-y-2"
-                  >
-                    <Input
-                      value={newWorkspaceName}
-                      onChange={(e) => {
-                        setNewWorkspaceName(e.target.value);
-                        setCreateError(null);
-                      }}
-                      placeholder="Super workspace name"
-                      autoFocus
-                      disabled={creatingWorkspace}
-                      className="h-9 rounded-md"
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        type="submit"
-                        size="sm"
-                        disabled={!newWorkspaceName.trim() || creatingWorkspace}
-                        className="flex-1"
-                      >
-                        {creatingWorkspace ? "Creating" : "Create"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleCancel}
-                        disabled={creatingWorkspace}
-                        className="flex-1"
-                      >
-                        Cancel
-                      </Button>
+                    )}
+                    
+                    <div className="px-1 space-y-1">
+                      {showCreateForm ? (
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            handleCreate();
+                          }}
+                          className="space-y-1.5"
+                        >
+                          <Input
+                            value={newWorkspaceName}
+                            onChange={(e) => {
+                              setNewWorkspaceName(e.target.value);
+                              setCreateError(null);
+                            }}
+                            placeholder="Workspace name"
+                            autoFocus
+                            disabled={creatingWorkspace}
+                            className="h-7 text-[11px] rounded-md"
+                          />
+                          <div className="flex gap-1.5">
+                            <Button
+                              type="submit"
+                              size="sm"
+                              disabled={!newWorkspaceName.trim() || creatingWorkspace}
+                              className="h-7 flex-1 text-[10px]"
+                            >
+                              {creatingWorkspace ? "..." : "Create"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleCancel}
+                              disabled={creatingWorkspace}
+                              className="h-7 flex-1 text-[10px]"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowCreateForm(true)}
+                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[9px] font-medium uppercase tracking-wider text-cyan-400/60 transition hover:bg-cyan-400/10 hover:text-cyan-400"
+                        >
+                          <Plus className="h-3 w-3" /> New Workspace
+                        </button>
+                      )}
+                      {canCreateSubspace && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCreateSubspaceError(null);
+                            setShowCreateSubspaceModal(true);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[9px] font-medium uppercase tracking-wider text-emerald-400/60 transition hover:bg-emerald-400/10 hover:text-emerald-400"
+                        >
+                          <Plus className="h-3 w-3" /> New Subspace
+                        </button>
+                      )}
                     </div>
-                  </motion.form>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setShowManageActions(false)}
+                      className="w-full py-1 text-[8px] font-bold uppercase tracking-[0.2em] text-white/10 hover:text-white/20 transition-colors"
+                    >
+                      Close Settings
+                    </button>
+                  </motion.div>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setShowCreateForm(true)}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-[var(--omnix-border-2)] bg-transparent px-2 py-1.5 text-[11px] font-medium text-[var(--omnix-text-3)] transition hover:bg-[var(--omnix-surface)] hover:text-[var(--omnix-cyan)]"
+                    onClick={() => setShowManageActions(true)}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg py-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-white/20 transition hover:bg-white/5 hover:text-white/40"
                   >
-                    <Plus className="h-4 w-4" />
-                    New super workspace
+                    <Settings className="h-3 w-3" /> Workspace Management
                   </button>
                 )}
-
-                {canCreateSubspace ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCreateSubspaceError(null);
-                      setShowCreateSubspaceModal(true);
-                    }}
-                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5 text-[11px] font-medium text-emerald-300/85 transition hover:bg-emerald-500/10 hover:text-emerald-200"
-                  >
-                    <Plus className="h-4 w-4" />
-                    New operational subspace
-                  </button>
-                ) : null}
               </div>
             </div>
           </motion.div>
@@ -979,19 +987,9 @@ function WorkspaceHierarchyMini({ onClose }: { onClose: () => void }) {
   return (
     <div className="px-2.5 pb-3">
       <div className="mb-2 flex items-center justify-between px-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--omnix-text-3)]">
-          Hierarchy
+        <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/20">
+          Orientation
         </p>
-        <button
-          type="button"
-          onClick={() => {
-            router.push("/workspace");
-            onClose();
-          }}
-          className="text-[10px] font-semibold text-[var(--omnix-cyan)] transition hover:text-white"
-        >
-          Manage
-        </button>
       </div>
       <div className="omnix-tree-card px-2.5 py-2.5">
         <button
@@ -1000,22 +998,22 @@ function WorkspaceHierarchyMini({ onClose }: { onClose: () => void }) {
             router.push("/workspace");
             onClose();
           }}
-          className="relative z-10 flex w-full items-center gap-2 rounded-[8px] border border-cyan-300/18 bg-cyan-300/[0.055] px-2 py-2 text-left shadow-[var(--omnix-glow-xs)] transition hover:bg-cyan-300/[0.08]"
+          className="relative z-10 flex w-full items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-2 py-2 text-left transition hover:bg-white/[0.05]"
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded-md border border-cyan-300/30 bg-cyan-300/12 text-[11px] font-bold text-[var(--omnix-cyan)]">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/5 text-[10px] font-bold text-cyan-300/80">
             {(activeWorkspace?.name || "O").charAt(0).toUpperCase()}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-xs font-semibold text-white">
-              {activeWorkspace?.name || "No workspace"}
+            <span className="block truncate text-[11px] font-medium text-white/90">
+              {activeWorkspace?.name || "Global Context"}
             </span>
-            <span className={cn("mt-0.5 inline-flex rounded-full border px-1.5 py-px text-[9px] font-semibold", workspaceRoleBadgeClass(activeWorkspace?.current_user_role))}>
+            <span className={cn("mt-0.5 inline-flex rounded-full border border-white/5 bg-white/5 px-1.5 py-px text-[8px] font-medium text-white/40")}>
               {workspaceRoleLabel(activeWorkspace?.current_user_role)}
             </span>
           </span>
-          <Network className="h-3.5 w-3.5 text-[var(--omnix-text-3)]" />
+          <Network className="h-3 w-3 text-white/10" />
         </button>
-        <div className="relative z-10 ml-5 mt-2 border-l border-cyan-300/15 pl-3">
+        <div className="relative z-10 ml-5 mt-2 border-l border-white/5 pl-3">
           {spaces.map((space) => (
             <button
               key={space.label}
@@ -1024,28 +1022,22 @@ function WorkspaceHierarchyMini({ onClose }: { onClose: () => void }) {
                 router.push(space.label === "Knowledge" ? "/sources" : space.label === "Team" ? "/team" : "/workspace");
                 onClose();
               }}
-              className="group relative mb-1.5 flex w-full items-center gap-2 rounded-[7px] border border-transparent px-2 py-1.5 text-left transition hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface)]"
+              className="group relative mb-1.5 flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition hover:bg-white/[0.04]"
             >
               <span
-                className="absolute -left-[13px] top-1/2 h-px w-3 -translate-y-1/2"
-                style={{ background: "rgba(0,255,255,0.16)" }}
+                className="absolute -left-[13px] top-1/2 h-px w-3 -translate-y-1/2 bg-white/5"
               />
               <span
-                className="h-2 w-2 shrink-0 rounded-full shadow-[0_0_8px_currentColor]"
-                style={{ background: space.color, color: space.color }}
+                className="h-1.5 w-1.5 shrink-0 rounded-full opacity-60"
+                style={{ background: space.color }}
               />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[11px] font-medium text-[var(--omnix-text-2)] group-hover:text-white">
+                <span className="block truncate text-[10px] font-medium text-white/40 group-hover:text-white/70">
                   {space.label}
-                </span>
-                <span className="block truncate text-[10px] text-[var(--omnix-text-3)]">
-                  {space.meta}
                 </span>
               </span>
               {space.count ? (
-                <span className="rounded-full border border-white/8 bg-white/[0.035] px-1.5 py-px text-[9px] text-[var(--omnix-text-3)]">
-                  {space.count}
-                </span>
+                <span className="text-[9px] font-medium text-white/10">{space.count}</span>
               ) : null}
             </button>
           ))}
