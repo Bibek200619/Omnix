@@ -9,6 +9,8 @@ export function workspaceRoleLabel(role?: WorkspaceRole | string | null) {
     case "sub_leader":
     case "co_owner":
       return "Operational Lead";
+    case "team_lead":
+      return "Team Lead";
     case "sub_member":
     case "member":
       return "Workspace Member";
@@ -26,6 +28,8 @@ export function workspaceRoleBadgeClass(role?: WorkspaceRole | string | null) {
     case "sub_leader":
     case "co_owner":
       return "border-amber-300/25 bg-amber-400/10 text-amber-200 shadow-[var(--omnix-glow-xs)]";
+    case "team_lead":
+      return "border-indigo-300/25 bg-indigo-400/10 text-indigo-200 shadow-[var(--omnix-glow-xs)]";
     case "sub_member":
     case "member":
       return "border-cyan-300/20 bg-cyan-400/5 text-cyan-100";
@@ -43,6 +47,8 @@ export function workspaceRoleAvatarClass(role?: WorkspaceRole | string | null) {
     case "sub_leader":
     case "co_owner":
       return "border-amber-300/35 bg-amber-400/15 text-amber-100";
+    case "team_lead":
+      return "border-indigo-300/35 bg-indigo-400/15 text-indigo-100";
     case "sub_member":
     case "member":
       return "border-cyan-300/30 bg-cyan-400/10 text-cyan-100";

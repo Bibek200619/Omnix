@@ -943,8 +943,8 @@ async def update_workspace_member_role(
             detail="Only the original founder can have the founder role.",
         )
 
-    # In the scoped model, subleaders and co-owners cannot escalate their own privileges or demote founders
-    if access.role in {"co_owner", "sub_leader"} and (current_member_role not in {"member", "sub_member"} or next_role not in {"member", "sub_member"}):
+    # In the scoped model, subleaders, team leads and co-owners cannot escalate their own privileges or demote founders
+    if access.role in {"co_owner", "sub_leader", "team_lead"} and (current_member_role not in {"member", "sub_member"} or next_role not in {"member", "sub_member"}):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only manage standard members.",
