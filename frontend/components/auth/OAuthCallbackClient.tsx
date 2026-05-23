@@ -72,6 +72,7 @@ export function OAuthCallbackClient() {
   const [state, setState] = useState<CallbackState>("loading");
   const [error, setError] = useState<string | null>(null);
   const [nextPath, setNextPath] = useState("/dashboard");
+  const [retryNonce, setRetryNonce] = useState(0);
   const processedRef = useRef(false);
 
   useEffect(() => {
@@ -129,7 +130,6 @@ export function OAuthCallbackClient() {
 
         window.setTimeout(() => {
           router.replace(next);
-          router.refresh();
         }, 450);
       } catch (err) {
         setState("error");
@@ -138,7 +138,14 @@ export function OAuthCallbackClient() {
     }
 
     void completeOAuth();
-  }, [authError, isConfigured, refreshSession, router]);
+  }, [authError, isConfigured, refreshSession, retryNonce, router]);
+
+  function retryCallback() {
+    processedRef.current = false;
+    setState("loading");
+    setError(null);
+    setRetryNonce((value) => value + 1);
+  }
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#061020] px-4 py-10 text-white">
@@ -198,7 +205,7 @@ export function OAuthCallbackClient() {
               <Button type="button" className="flex-1" onClick={() => router.replace("/login")}>
                 Return to sign in
               </Button>
-              <Button type="button" variant="secondary" className="flex-1" onClick={() => window.location.reload()}>
+              <Button type="button" variant="secondary" className="flex-1" onClick={retryCallback}>
                 Retry callback
               </Button>
             </>
