@@ -630,9 +630,9 @@ textarea {
   border: 1px solid var(--omnix-border);
   border-radius: 16px;
   background:
-    radial-gradient(circle at 100% 0%, rgba(0, 255, 255, 0.08), transparent 32%),
+    radial-gradient(circle at 100% 0%, rgba(0, 255, 255, 0.04), transparent 32%),
     var(--omnix-surface);
-  box-shadow: var(--omnix-glow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(20px);
 }
 
@@ -643,7 +643,7 @@ textarea {
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--omnix-cyan), transparent);
   content: "";
-  opacity: 0.44;
+  opacity: 0.18;
 }
 
 .omnix-ai-card::after {
@@ -653,10 +653,10 @@ textarea {
   width: 10rem;
   height: 10rem;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(0, 255, 255, 0.12), transparent 72%);
+  background: radial-gradient(circle, rgba(0, 255, 255, 0.08), transparent 72%);
   content: "";
   filter: blur(28px);
-  opacity: 0.5;
+  opacity: 0.3;
   pointer-events: none;
 }
 

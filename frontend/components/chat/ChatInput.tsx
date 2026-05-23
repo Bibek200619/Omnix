@@ -29,7 +29,7 @@ const searchModes: Array<{
   { value: "auto", label: "Auto", icon: Sparkles },
   { value: "workspace", label: "Workspace", icon: Database },
   { value: "web", label: "Web", icon: Globe2 },
-  { value: "hybrid", label: "Hybrid", icon: Layers3 },
+  { value: "hybrid", label: "Synthesis", icon: Layers3 },
 ];
 
 function attachmentName(file: MessageAttachment) {
@@ -98,9 +98,9 @@ export function ChatInput({
                 setValue(label === "Summarize" ? "Summarize this workspace context." : "Suggest ideas for this workspace.");
               }
             }}
-            className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 text-[11px] text-[var(--omnix-text-2)] shadow-[0_10px_30px_rgba(0,0,0,0.16)] backdrop-blur-md transition hover:border-[var(--omnix-border-2)] hover:bg-[var(--omnix-surface-2)] hover:text-white hover:shadow-[var(--omnix-glow-xs)]"
+            className="inline-flex h-7 items-center gap-1.5 rounded-full border border-white/5 bg-white/[0.02] px-3 text-[10px] font-medium uppercase tracking-wider text-white/40 transition hover:border-white/10 hover:bg-white/[0.04] hover:text-white"
           >
-            <Sparkles className="h-2.5 w-2.5 text-[var(--omnix-cyan)]" />
+            <Sparkles className="h-2.5 w-2.5 text-cyan-400/40" />
             {label}
           </button>
         ))}
