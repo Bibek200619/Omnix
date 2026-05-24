@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Download, Edit3, Ellipsis, Eraser, Loader2, Trash2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { apiClient } from "@/lib/api";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import type { ApiMessage } from "@/components/chat/types";
@@ -16,6 +17,7 @@ export function ActionsMenu({ className }: { className?: string }) {
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [error, setError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuContentRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
   const params = useSearchParams();
   const {
@@ -33,7 +35,8 @@ export function ActionsMenu({ className }: { className?: string }) {
     if (!open) return;
 
     function handlePointerDown(event: MouseEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (!menuRef.current?.contains(target) && !menuContentRef.current?.contains(target)) {
         setOpen(false);
       }
     }
@@ -157,10 +160,11 @@ export function ActionsMenu({ className }: { className?: string }) {
       </Button>
 
       {open ? (
+        <FloatingMenuLayer anchorRef={menuRef} contentRef={menuContentRef} placement="bottom-end" width={256} zIndex={145}>
         <div
           role="menu"
           aria-label="Conversation actions"
-          className="omnix-floating-card absolute right-0 top-full z-[100] mt-2 w-64 overflow-hidden p-1 ring-1 ring-black/40"
+          className="omnix-floating-card w-full overflow-hidden p-1 ring-1 ring-black/40"
         >
           <div className="border-b border-white/8 px-3 py-2">
             <p className="truncate text-sm font-medium text-white">
@@ -203,6 +207,7 @@ export function ActionsMenu({ className }: { className?: string }) {
             </div>
           ) : null}
         </div>
+        </FloatingMenuLayer>
       ) : null}
     </div>
   );

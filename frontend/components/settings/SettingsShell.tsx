@@ -24,6 +24,7 @@ const settingsNav = [
   { href: "/settings/team", label: "Team Management", description: "Roles, members, invites", icon: Users },
   { href: "/settings/ai", label: "AI Settings", description: "Model behavior and context", icon: BrainCircuit },
   { href: "/settings/about", label: "About", description: "Product notes and policies", icon: FileText },
+  { href: "/settings/terms", label: "Terms", description: "Policies and product terms", icon: FileText },
 ];
 
 type SettingsShellProps = {
@@ -84,13 +85,41 @@ export function SettingsShell({ title, description, children }: SettingsShellPro
         </nav>
       </aside>
 
-      <section className="omnix-scrollbar min-w-0 flex-1 overflow-y-auto px-6 py-7 sm:px-8">
+      <section className="omnix-scrollbar min-w-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7">
         <div className="relative z-10 max-w-[88rem] pb-12">
-        <div className="mb-5 max-w-[640px]">
-          <h2 className="omnix-display text-[22px] font-bold leading-tight text-white">{title}</h2>
-          <p className="mt-1 text-[13px] leading-6 text-[var(--omnix-text-3)]">{description}</p>
-        </div>
-        <div>{children}</div>
+          <div className="sticky top-0 z-20 -mx-4 mb-5 border-b border-[rgba(0,255,255,0.08)] bg-[rgba(5,12,23,0.92)] px-4 pb-3 pt-1 backdrop-blur-xl md:hidden">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Settings</p>
+              <span className="h-px min-w-10 flex-1 bg-[linear-gradient(90deg,rgba(0,255,255,0.16),transparent)]" />
+            </div>
+            <nav className="omnix-scrollbar flex snap-x gap-2 overflow-x-auto pb-1" aria-label="Settings sections">
+              {settingsNav.map((item) => {
+                const Icon = item.icon;
+                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "inline-flex h-11 min-w-[8.75rem] snap-start items-center gap-2 rounded-lg border px-3 text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
+                      active
+                        ? "border-cyan-300/25 bg-cyan-300/10 text-white shadow-[var(--omnix-glow-xs)]"
+                        : "border-[var(--omnix-border)] bg-[rgba(0,255,255,0.03)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white",
+                    )}
+                  >
+                    <Icon className={cn("h-4 w-4 shrink-0", active ? "text-cyan-100" : "text-[var(--omnix-text-3)]")} />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+          <div className="mb-5 max-w-[640px]">
+            <h2 className="omnix-display text-[22px] font-bold leading-tight text-white">{title}</h2>
+            <p className="mt-1 text-[13px] leading-6 text-[var(--omnix-text-3)]">{description}</p>
+          </div>
+          <div>{children}</div>
         </div>
       </section>
     </div>
