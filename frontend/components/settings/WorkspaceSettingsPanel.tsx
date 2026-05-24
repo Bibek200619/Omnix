@@ -5,6 +5,7 @@ import { BrainCircuit, Check, GitBranch, Layers3, Loader2, Plus, Settings, Shiel
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Toggle } from "@/components/ui/Toggle";
 import { useWorkspace } from "@/lib/workspace-context";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { Workspace } from "@/lib/workspace-types";
@@ -397,27 +398,25 @@ export function WorkspaceSettingsPanel() {
             </label>
           </div>
 
-          <aside className="rounded-xl border border-[var(--omnix-border)] bg-black/15 p-4">
-            <div className="text-sm font-semibold text-white">Memory controls</div>
-            <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">
-              Source retrieval remains workspace-scoped by default. Global spaces can use organization-wide scope.
-            </p>
-            <label className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-[var(--omnix-border)] bg-black/15 px-3 py-3">
-              <span>
-                <span className="block text-sm font-medium text-white">Workspace memory</span>
-                <span className="block text-xs text-[var(--omnix-text-3)]">Include workspace profile and continuity context. Cognitive focus stays active.</span>
-              </span>
-              <input
-                type="checkbox"
-                checked={memoryEnabled}
-                disabled={!canEdit || savingIntelligence}
-                onChange={(event) => setMemoryEnabled(event.target.checked)}
-                className="h-4 w-4 accent-cyan-300"
-              />
-            </label>
-            <div className="mt-4 grid gap-2 text-xs text-[var(--omnix-text-2)]">
-              <InfoRow label="Retrieval scope" value={activeWorkspace.is_global ? "Global" : "Workspace"} />
-              <InfoRow label="Detected domains" value={(activeWorkspaceIntelligence?.active_domains ?? []).slice(0, 2).join(", ") || "None yet"} />
+          <aside className="space-y-4">
+            <div className="rounded-xl border border-[var(--omnix-border)] bg-black/15 p-4">
+              <div className="text-sm font-semibold text-white">Memory controls</div>
+              <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">
+                Source retrieval remains workspace-scoped by default. Global spaces can use organization-wide scope.
+              </p>
+              <div className="mt-4">
+                <Toggle
+                  label="Workspace memory"
+                  description="Include workspace profile and continuity context."
+                  checked={memoryEnabled}
+                  disabled={!canEdit || savingIntelligence}
+                  onChange={(event) => setMemoryEnabled(event.target.checked)}
+                />
+              </div>
+              <div className="mt-4 grid gap-2 text-xs text-[var(--omnix-text-2)]">
+                <InfoRow label="Retrieval scope" value={activeWorkspace.is_global ? "Global" : "Workspace"} />
+                <InfoRow label="Detected domains" value={(activeWorkspaceIntelligence?.active_domains ?? []).slice(0, 2).join(", ") || "None yet"} />
+              </div>
             </div>
           </aside>
         </div>

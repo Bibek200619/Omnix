@@ -52,18 +52,27 @@ export default function AppearanceSettingsPage() {
             checked={ambientMotion}
             onChange={(event) => updateMotion(event.target.checked)}
           />
+          <Toggle
+            label="Adaptive themes"
+            description="Dynamically adjust colors based on active workspace focus. Arriving in next rollout."
+            checked={false}
+            disabled
+          />
         </div>
-        <div className="relative z-10 mt-5 grid gap-3 rounded-xl border border-[var(--omnix-border)] bg-black/15 p-4 sm:grid-cols-3">
-          {[
-            ["Primary", "var(--omnix-cyan)"],
-            ["Intelligence", "var(--omnix-blue-bright)"],
-            ["Signal", "var(--omnix-green)"],
-          ].map(([label, color]) => (
-            <div key={label} className="flex items-center gap-2 text-sm text-[var(--omnix-text-2)]">
-              <span className="h-5 w-5 rounded-md border border-[var(--omnix-border)] shadow-[var(--omnix-glow-xs)]" style={{ background: color }} />
-              {label}
-            </div>
-          ))}
+        <div className="relative z-10 mt-5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--omnix-text-3)] mb-3">Theme engine in rollout — Preview only</div>
+          <div className="grid gap-3 rounded-xl border border-[var(--omnix-border)] bg-black/15 p-4 sm:grid-cols-3">
+            {[
+              ["Primary", "var(--omnix-cyan)"],
+              ["Intelligence", "var(--omnix-blue-bright)"],
+              ["Signal", "var(--omnix-green)"],
+            ].map(([label, color]) => (
+              <div key={label} className="flex items-center gap-2 text-sm text-[var(--omnix-text-2)]">
+                <span className="h-5 w-5 rounded-md border border-[var(--omnix-border)] shadow-[var(--omnix-glow-xs)]" style={{ background: color }} />
+                {label}
+              </div>
+            ))}
+          </div>
         </div>
         <div className="relative z-10 mt-5 rounded-lg border border-[var(--omnix-border)] bg-black/15 p-4 text-sm leading-6 text-[var(--omnix-text-2)]">
           <LayoutPanelTop className="mr-2 inline h-4 w-4 text-amber-200" />

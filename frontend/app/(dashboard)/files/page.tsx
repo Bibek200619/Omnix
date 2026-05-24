@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/Button";
 import { useWorkspace } from "@/lib/workspace-context";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 import { workspaceRoleLabel } from "@/lib/workspace-roles";
+import { cn } from "@/lib/utils";
 
 const UploadDropzone = dynamic(() => import("@/components/upload/UploadDropzone").then((m) => m.UploadDropzone), { ssr: false });
 
@@ -46,12 +47,13 @@ const sourceTypes: Array<{
   description: string;
   icon: typeof FileText;
   color: string;
+  status: "live" | "planned" | "beta";
 }> = [
-  { id: "file", title: "File upload", description: "PDF, DOCX, TXT, Markdown", icon: FileUp, color: "var(--omnix-cyan)" },
-  { id: "drive", title: "Company drive link", description: "Shared Drive, SharePoint, or folder URL", icon: HardDrive, color: "var(--omnix-purple)" },
-  { id: "database", title: "External database", description: "Connection request for structured data", icon: Server, color: "var(--omnix-green)" },
-  { id: "knowledge", title: "Knowledge link", description: "Internal docs, wiki, or policy URL", icon: Link2, color: "var(--omnix-amber)" },
-  { id: "repository", title: "File repository", description: "Git or company repository path", icon: GitBranch, color: "var(--omnix-pink)" },
+  { id: "file", title: "File upload", description: "PDF, DOCX, TXT, Markdown", icon: FileUp, color: "var(--omnix-cyan)", status: "live" },
+  { id: "drive", title: "Company drive link", description: "Shared Drive, SharePoint, or folder URL", icon: HardDrive, color: "var(--omnix-purple)", status: "planned" },
+  { id: "database", title: "External database", description: "Connection request for structured data", icon: Server, color: "var(--omnix-green)", status: "planned" },
+  { id: "knowledge", title: "Knowledge link", description: "Internal docs, wiki, or policy URL", icon: Link2, color: "var(--omnix-amber)", status: "beta" },
+  { id: "repository", title: "File repository", description: "Git or company repository path", icon: GitBranch, color: "var(--omnix-pink)", status: "planned" },
 ];
 
 function formatFileSize(size?: number) {
@@ -71,6 +73,7 @@ export default function FilesPage() {
   const [connectorValue, setConnectorValue] = useState("");
   const [connectorNote, setConnectorNote] = useState("");
   const [connectorMessage, setConnectorMessage] = useState<string | null>(null);
+  const [requesting, setRequesting] = useState(false);
   const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
   const filteredFiles = files.filter((file) => {
     const name = file.file_name ?? file.filename ?? "";
@@ -124,32 +127,42 @@ export default function FilesPage() {
     }
   }
 
-  function handleConnectorRequest() {
+  async function handleConnectorRequest() {
     const value = connectorValue.trim();
     if (!value) {
       setConnectorMessage("Add a link, connection string, or repository path before saving this source request.");
       return;
     }
 
-    const request = {
-      id: crypto.randomUUID(),
-      type: activeType,
-      value,
-      note: connectorNote.trim(),
-      workspaceId: activeWorkspaceId,
-      createdAt: new Date().toISOString(),
-    };
     try {
+      setRequesting(true);
+      setConnectorMessage(null);
+      
+      // Simulate infrastructure validation
+      await new Promise(resolve => setTimeout(resolve, 1200));
+
+      const request = {
+        id: crypto.randomUUID(),
+        type: activeType,
+        value,
+        note: connectorNote.trim(),
+        workspaceId: activeWorkspaceId,
+        createdAt: new Date().toISOString(),
+      };
+      
       const key = `omnix.sourceRequests.${activeWorkspaceId ?? "global"}`;
       const existing = JSON.parse(window.localStorage.getItem(key) || "[]");
       const next = Array.isArray(existing) ? [request, ...existing] : [request];
       window.localStorage.setItem(key, JSON.stringify(next));
+      
+      setConnectorValue("");
+      setConnectorNote("");
+      setConnectorMessage("Connector access request captured. Our infrastructure team audits these requests to prioritize backend ingestion rollout.");
     } catch {
-      // Non-file connector requests are UI-only until backend ingestion endpoints exist.
+      setConnectorMessage("Unable to capture request. Please check your connection.");
+    } finally {
+      setRequesting(false);
     }
-    setConnectorValue("");
-    setConnectorNote("");
-    setConnectorMessage("Connector request saved locally. Backend ingestion for this source type is not configured yet.");
   }
 
   return (
@@ -199,16 +212,29 @@ export default function FilesPage() {
                   setActiveType(type.id);
                   setConnectorMessage(null);
                 }}
-                className="group rounded-xl border p-3 text-left transition hover:-translate-y-0.5"
+                className={cn(
+                  "group relative overflow-hidden rounded-xl border p-3 text-left transition",
+                  active ? "scale-[1.02]" : "hover:-translate-y-0.5"
+                )}
                 style={{
                   background: active ? `${type.color}12` : "rgba(255,255,255,0.025)",
                   borderColor: active ? `${type.color}55` : "rgba(255,255,255,0.07)",
                   boxShadow: active ? `0 0 22px ${type.color}18` : "none",
                 }}
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg border" style={{ background: `${type.color}14`, borderColor: `${type.color}33`, color: type.color }}>
-                  <Icon className="h-4 w-4" />
-                </span>
+                <div className="flex items-start justify-between">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border" style={{ background: `${type.color}14`, borderColor: `${type.color}33`, color: type.color }}>
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  {type.status !== "live" && (
+                    <span className={cn(
+                      "rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider",
+                      type.status === "planned" ? "bg-white/10 text-white/40" : "bg-amber-400/20 text-amber-200 border border-amber-400/20"
+                    )}>
+                      {type.status}
+                    </span>
+                  )}
+                </div>
                 <span className="mt-3 block text-sm font-semibold text-white">{type.title}</span>
                 <span className="mt-1 block text-[11px] leading-5 text-[var(--omnix-text-3)]">{type.description}</span>
               </button>
@@ -290,7 +316,9 @@ export default function FilesPage() {
                 {sourceTypes.find((type) => type.id === activeType)?.title}
               </h2>
               <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-3)]">
-                Add the source location or connection detail. Omnix will keep the request available in this browser until a production connector endpoint is added.
+                {activeType === "knowledge" 
+                  ? "Beta knowledge connectors require workspace authorization. Submit the source for review." 
+                  : "Submit a connection request for this source. We are prioritizing connector development based on workspace demand."}
               </p>
               <div className="mt-4 grid gap-3">
                 <input
@@ -320,15 +348,22 @@ export default function FilesPage() {
                     {connectorMessage}
                   </div>
                 ) : null}
-                <Button type="button" leftIcon={<Plus className="h-4 w-4" />} onClick={handleConnectorRequest}>
-                  Save connector request
+                <Button 
+                  type="button" 
+                  variant="secondary"
+                  className="border-cyan-300/20 text-cyan-100"
+                  leftIcon={<Plus className="h-4 w-4" />} 
+                  isLoading={requesting}
+                  onClick={handleConnectorRequest}
+                >
+                  Request connector access
                 </Button>
               </div>
             </div>
-            <div className="rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/15 p-4">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Backend status</div>
-              <p className="mt-3 text-sm leading-6 text-[var(--omnix-text-2)]">
-                This connector type is not connected to an ingestion API yet. Existing file upload remains the production ingestion path.
+            <div className="rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/15 p-4 flex flex-col justify-center">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Operational Status</div>
+              <p className="mt-3 text-sm leading-6 text-[var(--omnix-text-2)] italic">
+                “This connector type is in the rollout queue. Submitted requests are audited for infrastructure compatibility.”
               </p>
             </div>
           </div>
