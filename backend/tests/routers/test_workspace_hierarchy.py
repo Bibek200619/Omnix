@@ -3,7 +3,38 @@ from __future__ import annotations
 from fastapi import HTTPException
 import pytest
 
+from app.schemas.chat import WorkspaceRead, WorkspaceTreeRead
 from app.services import workspace_service
+
+
+def test_workspace_response_models_accept_team_lead_roles() -> None:
+    workspace = WorkspaceRead.model_validate(
+        {
+            "id": "sub-1",
+            "user_id": "owner-1",
+            "name": "Design Team",
+            "current_user_role": "team_lead",
+        }
+    )
+    assert workspace.current_user_role == "team_lead"
+
+    hierarchy = WorkspaceTreeRead.model_validate(
+        {
+            "id": "super-1",
+            "user_id": "owner-1",
+            "name": "Omnix HQ",
+            "current_user_role": "founder",
+            "subspaces": [
+                {
+                    "id": "sub-1",
+                    "user_id": "owner-1",
+                    "name": "Design Team",
+                    "current_user_role": "team_lead",
+                }
+            ],
+        }
+    )
+    assert hierarchy.subspaces[0].current_user_role == "team_lead"
 
 
 @pytest.mark.asyncio
