@@ -23,7 +23,7 @@ export type WorkspaceMember = {
 
 export type WorkspacePotentialMember = {
   user_id: string;
-  email: string;
+  email?: string | null;
   full_name?: string | null;
   handle?: string | null;
   avatar_url?: string | null;
