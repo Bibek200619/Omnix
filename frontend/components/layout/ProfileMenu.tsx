@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import { LogOut, Settings, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { useProfile } from "@/lib/profile-context";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
   const { profile } = useProfile();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuContentRef = useRef<HTMLDivElement | null>(null);
   const displayName = profile?.display_name || userDisplayName(user);
   const email = profile?.email || user?.email || "";
   const username = profile?.username || profile?.handle || null;
@@ -34,7 +36,8 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
     if (!open) return;
 
     function handlePointerDown(event: MouseEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (!menuRef.current?.contains(target) && !menuContentRef.current?.contains(target)) {
         setOpen(false);
       }
     }
@@ -84,9 +87,10 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
       </button>
 
       {open ? (
+        <FloatingMenuLayer anchorRef={menuRef} contentRef={menuContentRef} placement="bottom-end" width={256} zIndex={150}>
         <div
           role="menu"
-          className="omnix-floating-card absolute right-0 top-full z-[110] mt-2 w-64 overflow-hidden ring-1 ring-black/40"
+          className="omnix-floating-card w-full overflow-hidden ring-1 ring-black/40"
         >
           <div className="border-b border-[var(--omnix-border)] px-4 py-3">
             <div className="flex items-center gap-3">
@@ -142,6 +146,7 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
             </button>
           </div>
         </div>
+        </FloatingMenuLayer>
       ) : null}
     </div>
   );
