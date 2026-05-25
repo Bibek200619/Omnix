@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html import unescape
+from html.parser import HTMLParser
 import ipaddress
 import logging
 import re
@@ -11,8 +12,12 @@ from typing import Any
 from urllib.parse import urljoin, urlparse
 
 import httpx
-from bs4 import BeautifulSoup
 from fastapi import HTTPException, status
+
+try:
+    from bs4 import BeautifulSoup
+except ModuleNotFoundError:
+    BeautifulSoup = None
 
 from ..schemas.connectors import ConnectorCreate, ConnectorStatus
 from ..services.document_context_service import store_extracted_text_chunks
@@ -58,6 +63,38 @@ class LinkFetchResult:
     text: str = ""
     error: str | None = None
     auth_required: bool = False
+
+
+class _HTMLTextExtractor(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._skip_depth = 0
+        self._title_depth = 0
+        self.title_parts: list[str] = []
+        self.text_parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in {"script", "style", "noscript", "svg"}:
+            self._skip_depth += 1
+        if tag == "title":
+            self._title_depth += 1
+        if tag in {"br", "p", "div", "section", "article", "li", "tr", "h1", "h2", "h3"}:
+            self.text_parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style", "noscript", "svg"} and self._skip_depth:
+            self._skip_depth -= 1
+        if tag == "title" and self._title_depth:
+            self._title_depth -= 1
+        if tag in {"p", "div", "section", "article", "li", "tr", "h1", "h2", "h3"}:
+            self.text_parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        if self._skip_depth:
+            return
+        if self._title_depth:
+            self.title_parts.append(data)
+        self.text_parts.append(data)
 
 
 def _utc_now_iso() -> str:
@@ -612,12 +649,7 @@ def _parse_link_response(response: httpx.Response, url: str) -> LinkFetchResult:
     decoded = raw.decode(response.encoding or "utf-8", errors="ignore")
     title: str | None = None
     if content_type and ("html" in content_type or "xml" in content_type):
-        soup = BeautifulSoup(decoded, "html.parser")
-        for element in soup(["script", "style", "noscript", "svg"]):
-            element.decompose()
-        if soup.title and soup.title.string:
-            title = _clean_text(soup.title.string, max_chars=160)
-        text = soup.get_text("\n")
+        title, text = _extract_html_text(decoded)
     else:
         text = decoded
 
@@ -633,6 +665,21 @@ def _parse_link_response(response: httpx.Response, url: str) -> LinkFetchResult:
         content_type=content_type,
         text=normalized,
     )
+
+
+def _extract_html_text(decoded: str) -> tuple[str | None, str]:
+    if BeautifulSoup is not None:
+        soup = BeautifulSoup(decoded, "html.parser")
+        for element in soup(["script", "style", "noscript", "svg"]):
+            element.decompose()
+        title = _clean_text(soup.title.string, max_chars=160) if soup.title and soup.title.string else None
+        return title, soup.get_text("\n")
+
+    parser = _HTMLTextExtractor()
+    parser.feed(decoded)
+    parser.close()
+    title = _clean_text(" ".join(parser.title_parts), max_chars=160)
+    return title, "\n".join(parser.text_parts)
 
 
 def _clean_link_text(value: str) -> str:
