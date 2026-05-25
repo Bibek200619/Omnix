@@ -178,3 +178,20 @@ def test_private_knowledge_urls_are_not_fetchable() -> None:
     assert connectors._is_safe_http_url("https://example.com/docs") is True
     assert connectors._is_safe_http_url("http://localhost:8080/docs") is False
     assert connectors._is_safe_http_url("http://127.0.0.1/docs") is False
+
+
+def test_html_link_parser_falls_back_when_bs4_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(connectors, "BeautifulSoup", None)
+    response = connectors.httpx.Response(
+        200,
+        headers={"content-type": "text/html; charset=utf-8"},
+        content=b"<html><head><title>Policy</title><script>ignore()</script></head><body><h1>Policy</h1><p>Readable body.</p></body></html>",
+        request=connectors.httpx.Request("GET", "https://example.com/policy"),
+    )
+
+    result = connectors._parse_link_response(response, "https://example.com/policy")
+
+    assert result.ok is True
+    assert result.title == "Policy"
+    assert "Readable body." in result.text
+    assert "ignore()" not in result.text
