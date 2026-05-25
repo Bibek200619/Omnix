@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
+  BadgeCheck,
   CircleDot,
   ClipboardCheck,
   CornerDownRight,
@@ -29,6 +30,8 @@ import type {
   WorkspaceChannelMessage,
   WorkspaceConversationAssistance,
   WorkspaceConversationAssistanceMode,
+  WorkspaceDecision,
+  WorkspaceDecisionStatus,
   WorkspaceTask,
 } from "@/lib/workspace-types";
 
@@ -40,11 +43,22 @@ type TaskSource =
   | { kind: "message"; message: WorkspaceChannelMessage }
   | { kind: "assistance"; assistance: WorkspaceConversationAssistance };
 
+type DecisionSource = {
+  message: WorkspaceChannelMessage;
+};
+
 const assistanceLabels: Record<WorkspaceConversationAssistanceMode, string> = {
   summary: "Summarize",
   decisions: "Decisions",
   actions: "Actions",
   blockers: "Blockers",
+};
+
+const decisionStatusLabels: Record<WorkspaceDecisionStatus, string> = {
+  proposed: "Proposed",
+  accepted: "Accepted",
+  rejected: "Rejected",
+  superseded: "Superseded",
 };
 
 function chronological(messages: DisplayMessage[]) {
@@ -110,6 +124,13 @@ export function WorkspaceConversationSurface() {
   const [taskDescription, setTaskDescription] = useState("");
   const [creatingTask, setCreatingTask] = useState(false);
   const [taskConfirmation, setTaskConfirmation] = useState<string | null>(null);
+  const [decisionSource, setDecisionSource] = useState<DecisionSource | null>(null);
+  const [decisionTitle, setDecisionTitle] = useState("");
+  const [decisionDescription, setDecisionDescription] = useState("");
+  const [decisionReason, setDecisionReason] = useState("");
+  const [decisionStatus, setDecisionStatus] = useState<WorkspaceDecisionStatus>("accepted");
+  const [creatingDecision, setCreatingDecision] = useState(false);
+  const [decisionConfirmation, setDecisionConfirmation] = useState<string | null>(null);
   const workspaceRef = useRef(activeWorkspaceId);
   const selectedChannelRef = useRef(selectedChannelId);
   const channelRequestRef = useRef(0);
@@ -226,6 +247,8 @@ export function WorkspaceConversationSurface() {
     setAssistance(null);
     setTaskSource(null);
     setTaskConfirmation(null);
+    setDecisionSource(null);
+    setDecisionConfirmation(null);
     void loadChannels();
   }, [activeWorkspaceId, loadChannels]);
 
@@ -466,6 +489,15 @@ export function WorkspaceConversationSurface() {
     setTaskDescription(message.content);
   }
 
+  function openMessageDecision(message: WorkspaceChannelMessage) {
+    const title = message.content.replace(/\s+/g, " ").trim();
+    setDecisionSource({ message });
+    setDecisionTitle(title.length > 110 ? `${title.slice(0, 107).trim()}...` : title);
+    setDecisionDescription(message.content);
+    setDecisionReason("");
+    setDecisionStatus("accepted");
+  }
+
   function openAssistanceTask(result: WorkspaceConversationAssistance) {
     setTaskSource({ kind: "assistance", assistance: result });
     setTaskTitle("");
@@ -510,6 +542,33 @@ export function WorkspaceConversationSurface() {
       setError(err instanceof Error ? err.message : "Unable to open task from discussion.");
     } finally {
       setCreatingTask(false);
+    }
+  }
+
+  async function createDecisionFromContext(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!activeWorkspaceId || !selectedChannelId || !decisionSource || !decisionTitle.trim()) return;
+    try {
+      setCreatingDecision(true);
+      const created = await apiClient.post<WorkspaceDecision>(
+        `/workspaces/${activeWorkspaceId}/decisions/from-message/${selectedChannelId}/${decisionSource.message.id}`,
+        {
+          title: decisionTitle.trim(),
+          description: decisionDescription.trim() || null,
+          decision_reason: decisionReason.trim() || null,
+          status: decisionStatus,
+        },
+      );
+      setDecisionConfirmation(`Decision recorded: ${created.title}`);
+      setDecisionSource(null);
+      setDecisionTitle("");
+      setDecisionDescription("");
+      setDecisionReason("");
+      setDecisionStatus("accepted");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to record decision from discussion.");
+    } finally {
+      setCreatingDecision(false);
     }
   }
 
@@ -571,6 +630,14 @@ export function WorkspaceConversationSurface() {
                   <ClipboardCheck className="h-3.5 w-3.5" />
                   Track as task
                 </button>
+                <button
+                  type="button"
+                  onClick={() => openMessageDecision(message)}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-1 text-[11px] text-[var(--omnix-text-3)] transition hover:text-cyan-100 md:min-h-0 md:px-0"
+                >
+                  <BadgeCheck className="h-3.5 w-3.5" />
+                  Convert to Decision
+                </button>
               </div>
             ) : null}
           </div>
@@ -618,6 +685,12 @@ export function WorkspaceConversationSurface() {
         <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-emerald-300/18 bg-emerald-300/[0.06] px-3 py-2 text-xs text-emerald-100">
           <span>{taskConfirmation}. Source context is preserved.</span>
           <button type="button" onClick={() => setTaskConfirmation(null)} aria-label="Dismiss confirmation"><X className="h-3.5 w-3.5" /></button>
+        </div>
+      ) : null}
+      {decisionConfirmation ? (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-cyan-300/18 bg-cyan-300/[0.06] px-3 py-2 text-xs text-cyan-100">
+          <span>{decisionConfirmation}. Source message and channel are preserved.</span>
+          <button type="button" onClick={() => setDecisionConfirmation(null)} aria-label="Dismiss decision confirmation"><X className="h-3.5 w-3.5" /></button>
         </div>
       ) : null}
 
@@ -835,6 +908,57 @@ export function WorkspaceConversationSurface() {
               <Button type="button" size="sm" variant="ghost" onClick={() => setTaskSource(null)}>Cancel</Button>
               <Button type="submit" size="sm" isLoading={creatingTask} disabled={!taskTitle.trim()} leftIcon={<ClipboardCheck className="h-3.5 w-3.5" />}>
                 Open task
+              </Button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+      {decisionSource ? (
+        <div className="omnix-mobile-sheet-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6">
+          <form onSubmit={createDecisionFromContext} className="omnix-mobile-sheet omnix-panel-strong max-h-[calc(100dvh_-_2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-cyan-300/15 p-4 shadow-2xl sm:p-5">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Discussion to decision</p>
+                <h2 className="mt-1 text-base font-semibold text-white">Record linked decision</h2>
+              </div>
+              <button type="button" onClick={() => setDecisionSource(null)} className="rounded-md p-1.5 text-white/45 hover:text-white" aria-label="Close decision conversion">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <Input value={decisionTitle} onChange={(event) => setDecisionTitle(event.target.value)} placeholder="Name the organizational choice" className="h-10 text-sm" autoFocus />
+            <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
+              <textarea
+                value={decisionReason}
+                onChange={(event) => setDecisionReason(event.target.value)}
+                className="omnix-input min-h-[96px] w-full resize-none rounded-lg p-3 text-sm leading-6"
+                placeholder="Reason, if explicitly known"
+              />
+              <label className="block">
+                <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Status</span>
+                <select
+                  value={decisionStatus}
+                  onChange={(event) => setDecisionStatus(event.target.value as WorkspaceDecisionStatus)}
+                  className="omnix-input h-10 w-full rounded-lg px-3 text-sm"
+                >
+                  {Object.entries(decisionStatusLabels).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <textarea
+              value={decisionDescription}
+              onChange={(event) => setDecisionDescription(event.target.value)}
+              className="omnix-input mt-2 min-h-[92px] w-full resize-none rounded-lg p-3 text-sm leading-6"
+              placeholder="Source description"
+            />
+            <p className="mt-2 text-[11px] leading-5 text-[var(--omnix-text-3)]">
+              This creates one decision linked to the selected message, channel, and workspace. It does not infer agreement beyond what you record here.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button type="button" size="sm" variant="ghost" onClick={() => setDecisionSource(null)}>Cancel</Button>
+              <Button type="submit" size="sm" isLoading={creatingDecision} disabled={!decisionTitle.trim()} leftIcon={<BadgeCheck className="h-3.5 w-3.5" />}>
+                Record decision
               </Button>
             </div>
           </form>

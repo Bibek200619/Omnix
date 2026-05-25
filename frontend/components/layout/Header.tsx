@@ -20,6 +20,7 @@ const routeTitles = [
   { match: "/dashboard", title: "Dashboard", subtitle: "Welcome back" },
   { match: "/chat", title: "AI Chat", subtitle: "Omnix Intelligence" },
   { match: "/conversations", title: "Conversations", subtitle: "Operational discussion" },
+  { match: "/decisions", title: "Decisions", subtitle: "Organizational memory" },
   { match: "/tasks", title: "Tasks", subtitle: "Shared execution" },
   { match: "/initiatives", title: "Initiatives", subtitle: "Shared operational direction" },
   { match: "/workspace", title: "Workspaces", subtitle: "Manage your super workspaces and sub-spaces" },
