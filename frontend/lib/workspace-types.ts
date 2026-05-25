@@ -430,3 +430,22 @@ export type WorkspaceTaskAssistance = {
   source_task_count: number;
   generated_at: string;
 };
+
+export type WorkspaceDecisionStatus = "proposed" | "accepted" | "rejected" | "superseded";
+
+export type WorkspaceDecision = {
+  id: string;
+  workspace_id: string;
+  title: string;
+  description?: string | null;
+  decision_reason?: string | null;
+  status: WorkspaceDecisionStatus;
+  source_message_id?: string | null;
+  source_channel_id?: string | null;
+  created_by: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+  creator_name?: string | null;
+  creator_email?: string | null;
+  creator_avatar_label?: string | null;
+};
