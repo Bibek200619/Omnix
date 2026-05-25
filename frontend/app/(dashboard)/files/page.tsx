@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertCircle,
   CheckCircle2,
@@ -36,6 +37,18 @@ import { cn } from "@/lib/utils";
 import type { MessageAttachment } from "@/components/chat/types";
 
 const UploadDropzone = dynamic(() => import("@/components/upload/UploadDropzone").then((m) => m.UploadDropzone), { ssr: false });
+
+function DocumentPortal({ children }: { children: ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(children, document.body);
+}
 
 interface FileData {
   id: string;
@@ -790,7 +803,8 @@ export default function FilesPage() {
       </div>
 
       {setupType && setupMeta ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 px-3 py-4 backdrop-blur-md sm:items-center">
+        <DocumentPortal>
+        <div className="fixed inset-0 z-[160] flex items-end justify-center bg-black/70 px-3 py-4 backdrop-blur-md sm:items-center">
           <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(12,18,28,0.98),rgba(3,6,12,0.98))] p-5 shadow-2xl sm:rounded-2xl sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
@@ -1034,6 +1048,7 @@ export default function FilesPage() {
             </div>
           </div>
         </div>
+        </DocumentPortal>
       ) : null}
     </section>
   );
