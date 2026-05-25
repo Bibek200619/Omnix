@@ -38,6 +38,7 @@ import {
 import { OmnixMark } from "@/components/brand/OmnixMark";
 import { Button } from "@/components/ui/Button";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
+import { Portal } from "@/components/ui/Portal";
 import { ClientTime } from "@/components/ui/ClientTime";
 import { Input } from "@/components/ui/Input";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -776,203 +777,209 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
             onSubmit={handleInvite}
           />
           {showCreateSubspaceModal && activeSuperWorkspace ? (
-            <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
-              <div className="omnix-modal-card w-full max-w-md p-5">
-                <div className="relative z-10 flex items-start justify-between gap-4">
-                  <div>
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/10 text-emerald-100 shadow-[var(--omnix-glow-xs)]">
-                      <Users className="h-4 w-4" />
+            <Portal>
+              <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
+                <div className="omnix-modal-card w-full max-w-md p-5">
+                  <div className="relative z-10 flex items-start justify-between gap-4">
+                    <div>
+                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/10 text-emerald-100 shadow-[var(--omnix-glow-xs)]">
+                        <Users className="h-4 w-4" />
+                      </div>
+                      <h2 className="mt-4 text-lg font-semibold text-white">Create team subspace</h2>
+                      <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">
+                        Add a team space under <span className="font-medium text-slate-200">{activeSuperWorkspace.name}</span>.
+                      </p>
                     </div>
-                    <h2 className="mt-4 text-lg font-semibold text-white">Create team subspace</h2>
-                    <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">
-                      Add a team space under <span className="font-medium text-slate-200">{activeSuperWorkspace.name}</span>.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9"
-                    aria-label="Close create subspace modal"
-                    title="Close create subspace modal"
-                    onClick={handleCancelSubspace}
-                    disabled={creatingSubspace}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <form
-                  className="relative z-10 mt-5 space-y-4"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    handleCreateSubspace();
-                  }}
-                >
-                  <Input
-                    id="workspace-subspace-create"
-                    label="Subspace name"
-                    value={newSubspaceName}
-                    onChange={(event) => {
-                      setNewSubspaceName(event.target.value);
-                      setCreateSubspaceError(null);
-                    }}
-                    placeholder="Design Team"
-                    disabled={creatingSubspace}
-                    autoFocus
-                  />
-
-                  {createSubspaceError ? (
-                    <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
-                      {createSubspaceError}
-                    </div>
-                  ) : null}
-
-                  <div className="flex items-center justify-end gap-2">
-                    <Button type="button" variant="ghost" onClick={handleCancelSubspace} disabled={creatingSubspace}>
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      leftIcon={<Plus className="h-4 w-4" />}
-                      isLoading={creatingSubspace}
-                      disabled={!newSubspaceName.trim()}
-                    >
-                      Create
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          ) : null}
-          {renameOpen ? (
-            <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
-              <div className="omnix-modal-card w-full max-w-md p-5">
-                <div className="relative z-10 flex items-start justify-between gap-4">
-                  <div>
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
-                      <Edit3 className="h-4 w-4" />
-                    </div>
-                    <h2 className="mt-4 text-lg font-semibold text-white">Rename workspace</h2>
-                    <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">
-                      Update the visible name for this workspace.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9"
-                    aria-label="Close rename modal"
-                    title="Close rename modal"
-                    onClick={() => setRenameOpen(false)}
-                    disabled={renaming}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <form
-                  className="relative z-10 mt-5 space-y-4"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    handleRenameWorkspace();
-                  }}
-                >
-                  <Input
-                    id="workspace-rename"
-                    label="Workspace name"
-                    value={renameDraft}
-                    onChange={(event) => {
-                      setRenameDraft(event.target.value);
-                      setRenameError(null);
-                    }}
-                    disabled={renaming}
-                    autoFocus
-                  />
-
-                  {renameError ? (
-                    <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
-                      {renameError}
-                    </div>
-                  ) : null}
-
-                  <div className="flex items-center justify-end gap-2">
-                    <Button type="button" variant="ghost" onClick={() => setRenameOpen(false)} disabled={renaming}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" leftIcon={<Check className="h-4 w-4" />} isLoading={renaming} disabled={!renameDraft.trim()}>
-                      Save
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          ) : null}
-          {deleteOpen ? (
-            <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
-              <div className="omnix-modal-card w-full max-w-md border-rose-400/25 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.5),0_0_24px_rgba(244,63,94,0.14)]">
-                <div className="relative z-10 flex items-start justify-between gap-4">
-                  <div>
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-rose-300/30 bg-rose-400/10 text-rose-100">
-                      <AlertTriangle className="h-4 w-4" />
-                    </div>
-                    <h2 className="mt-4 text-lg font-semibold text-white">Delete workspace</h2>
-                    <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">
-                      This removes <span className="font-medium text-slate-200">{active.name}</span> from the workspace list and clears it from the active session.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9"
-                    aria-label="Close delete modal"
-                    title="Close delete modal"
-                    onClick={() => setDeleteOpen(false)}
-                    disabled={deleting}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <div className="relative z-10 mt-5 space-y-4">
-                  <Input
-                    id="workspace-delete-confirm"
-                    label={`Type "${active.name}" to confirm`}
-                    value={deleteConfirmText}
-                    onChange={(event) => {
-                      setDeleteConfirmText(event.target.value);
-                      setDeleteError(null);
-                    }}
-                    disabled={deleting}
-                    autoFocus
-                  />
-
-                  {deleteError ? (
-                    <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
-                      {deleteError}
-                    </div>
-                  ) : null}
-
-                  <div className="flex items-center justify-end gap-2">
-                    <Button type="button" variant="ghost" onClick={() => setDeleteOpen(false)} disabled={deleting}>
-                      Cancel
-                    </Button>
                     <Button
                       type="button"
-                      variant="danger"
-                      leftIcon={<Trash2 className="h-4 w-4" />}
-                      isLoading={deleting}
-                      disabled={deleteConfirmText !== active.name}
-                      onClick={handleDeleteWorkspace}
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      aria-label="Close create subspace modal"
+                      title="Close create subspace modal"
+                      onClick={handleCancelSubspace}
+                      disabled={creatingSubspace}
                     >
-                      Delete workspace
+                      <X className="h-4 w-4" />
                     </Button>
+                  </div>
+
+                  <form
+                    className="relative z-10 mt-5 space-y-4"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      handleCreateSubspace();
+                    }}
+                  >
+                    <Input
+                      id="workspace-subspace-create"
+                      label="Subspace name"
+                      value={newSubspaceName}
+                      onChange={(event) => {
+                        setNewSubspaceName(event.target.value);
+                        setCreateSubspaceError(null);
+                      }}
+                      placeholder="Design Team"
+                      disabled={creatingSubspace}
+                      autoFocus
+                    />
+
+                    {createSubspaceError ? (
+                      <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
+                        {createSubspaceError}
+                      </div>
+                    ) : null}
+
+                    <div className="flex items-center justify-end gap-2">
+                      <Button type="button" variant="ghost" onClick={handleCancelSubspace} disabled={creatingSubspace}>
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        leftIcon={<Plus className="h-4 w-4" />}
+                        isLoading={creatingSubspace}
+                        disabled={!newSubspaceName.trim()}
+                      >
+                        Create
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </Portal>
+          ) : null}
+          {renameOpen ? (
+            <Portal>
+              <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
+                <div className="omnix-modal-card w-full max-w-md p-5">
+                  <div className="relative z-10 flex items-start justify-between gap-4">
+                    <div>
+                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
+                        <Edit3 className="h-4 w-4" />
+                      </div>
+                      <h2 className="mt-4 text-lg font-semibold text-white">Rename workspace</h2>
+                      <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">
+                        Update the visible name for this workspace.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      aria-label="Close rename modal"
+                      title="Close rename modal"
+                      onClick={() => setRenameOpen(false)}
+                      disabled={renaming}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <form
+                    className="relative z-10 mt-5 space-y-4"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      handleRenameWorkspace();
+                    }}
+                  >
+                    <Input
+                      id="workspace-rename"
+                      label="Workspace name"
+                      value={renameDraft}
+                      onChange={(event) => {
+                        setRenameDraft(event.target.value);
+                        setRenameError(null);
+                      }}
+                      disabled={renaming}
+                      autoFocus
+                    />
+
+                    {renameError ? (
+                      <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
+                        {renameError}
+                      </div>
+                    ) : null}
+
+                    <div className="flex items-center justify-end gap-2">
+                      <Button type="button" variant="ghost" onClick={() => setRenameOpen(false)} disabled={renaming}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" leftIcon={<Check className="h-4 w-4" />} isLoading={renaming} disabled={!renameDraft.trim()}>
+                        Save
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </Portal>
+          ) : null}
+          {deleteOpen ? (
+            <Portal>
+              <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
+                <div className="omnix-modal-card w-full max-w-md border-rose-400/25 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.5),0_0_24px_rgba(244,63,94,0.14)]">
+                  <div className="relative z-10 flex items-start justify-between gap-4">
+                    <div>
+                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-rose-300/30 bg-rose-400/10 text-rose-100">
+                        <AlertTriangle className="h-4 w-4" />
+                      </div>
+                      <h2 className="mt-4 text-lg font-semibold text-white">Delete workspace</h2>
+                      <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">
+                        This removes <span className="font-medium text-slate-200">{active.name}</span> from the workspace list and clears it from the active session.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      aria-label="Close delete modal"
+                      title="Close delete modal"
+                      onClick={() => setDeleteOpen(false)}
+                      disabled={deleting}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="relative z-10 mt-5 space-y-4">
+                    <Input
+                      id="workspace-delete-confirm"
+                      label={`Type "${active.name}" to confirm`}
+                      value={deleteConfirmText}
+                      onChange={(event) => {
+                        setDeleteConfirmText(event.target.value);
+                        setDeleteError(null);
+                      }}
+                      disabled={deleting}
+                      autoFocus
+                    />
+
+                    {deleteError ? (
+                      <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
+                        {deleteError}
+                      </div>
+                    ) : null}
+
+                    <div className="flex items-center justify-end gap-2">
+                      <Button type="button" variant="ghost" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        leftIcon={<Trash2 className="h-4 w-4" />}
+                        isLoading={deleting}
+                        disabled={deleteConfirmText !== active.name}
+                        onClick={handleDeleteWorkspace}
+                      >
+                        Delete workspace
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </Portal>
           ) : null}
         </>
       ) : null}
