@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
     AlertCircle,
     AlertTriangle,
+    BadgeCheck,
     BarChart2,
     Check,
     ChevronDown,
@@ -55,6 +56,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/chat", label: "AI Chat", icon: MessageSquare },
   { href: "/conversations", label: "Conversations", icon: MessagesSquare },
+  { href: "/decisions", label: "Decisions", icon: BadgeCheck },
   { href: "/tasks", label: "Tasks", icon: ClipboardCheck },
   { href: "/initiatives", label: "Initiatives", icon: Compass },
   { href: "/workspace", label: "Workspaces", icon: Layers3 },
