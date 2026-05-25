@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Portal } from "@/components/ui/Portal";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 import { WorkspaceIntelligencePanel } from "@/components/workspace/WorkspaceIntelligencePanel";
 import { WorkspacePresenceCluster } from "@/components/workspace/WorkspacePresenceCluster";
@@ -560,156 +561,160 @@ export default function WorkspacePage() {
       </div>
 
       {createOpen ? (
-        <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
-          <div className="omnix-modal-card w-full max-w-md p-5">
-            <div className="relative z-10 flex items-start justify-between gap-4">
-              <div>
-                <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
-                  <Plus className="h-4 w-4" />
+        <Portal>
+          <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
+            <div className="omnix-modal-card w-full max-w-md p-5">
+              <div className="relative z-10 flex items-start justify-between gap-4">
+                <div>
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
+                    <Plus className="h-4 w-4" />
+                  </div>
+                  <h2 className="mt-4 text-lg font-semibold text-white">Create workspace</h2>
+                  <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">Add a new root workspace to the Omnix hierarchy.</p>
                 </div>
-                <h2 className="mt-4 text-lg font-semibold text-white">Create workspace</h2>
-                <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">Add a new root workspace to the Omnix hierarchy.</p>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9"
-                aria-label="Close create workspace modal"
-                title="Close create workspace modal"
-                onClick={() => setCreateOpen(false)}
-                disabled={creating}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <form className="relative z-10 mt-5 space-y-4" onSubmit={handleCreate}>
-              <Input
-                id="workspace-name"
-                label="Workspace name"
-                value={newName}
-                onChange={(event) => {
-                  setNewName(event.target.value);
-                  setCreateError(null);
-                }}
-                disabled={creating}
-                autoFocus
-              />
-              <label className="block">
-                <span className="text-sm font-medium text-slate-200">Description</span>
-                <textarea
-                  value={newDescription}
-                  onChange={(event) => setNewDescription(event.target.value)}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  aria-label="Close create workspace modal"
+                  title="Close create workspace modal"
+                  onClick={() => setCreateOpen(false)}
                   disabled={creating}
-                  rows={3}
-                  className="omnix-input mt-2 w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                  placeholder="Main AI workspace for this team."
-                />
-              </label>
-              {createError ? (
-                <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
-                  {createError}
-                </div>
-              ) : null}
-              <div className="flex items-center justify-end gap-2">
-                <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)} disabled={creating}>
-                  Cancel
-                </Button>
-                <Button type="submit" leftIcon={<Plus className="h-4 w-4" />} isLoading={creating} disabled={!newName.trim()}>
-                  Create
+                >
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
-            </form>
+
+              <form className="relative z-10 mt-5 space-y-4" onSubmit={handleCreate}>
+                <Input
+                  id="workspace-name"
+                  label="Workspace name"
+                  value={newName}
+                  onChange={(event) => {
+                    setNewName(event.target.value);
+                    setCreateError(null);
+                  }}
+                  disabled={creating}
+                  autoFocus
+                />
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-200">Description</span>
+                  <textarea
+                    value={newDescription}
+                    onChange={(event) => setNewDescription(event.target.value)}
+                    disabled={creating}
+                    rows={3}
+                    className="omnix-input mt-2 w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    placeholder="Main AI workspace for this team."
+                  />
+                </label>
+                {createError ? (
+                  <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
+                    {createError}
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-end gap-2">
+                  <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)} disabled={creating}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" leftIcon={<Plus className="h-4 w-4" />} isLoading={creating} disabled={!newName.trim()}>
+                    Create
+                  </Button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       ) : null}
 
       {subspaceOpen ? (
-        <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
-          <div className="omnix-modal-card w-full max-w-lg p-5">
-            <div className="relative z-10 flex items-start justify-between gap-4">
-              <div>
-                <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
-                  <Layers3 className="h-4 w-4" />
+        <Portal>
+          <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
+            <div className="omnix-modal-card w-full max-w-lg p-5">
+              <div className="relative z-10 flex items-start justify-between gap-4">
+                <div>
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
+                    <Layers3 className="h-4 w-4" />
+                  </div>
+                  <h2 className="mt-4 text-lg font-semibold text-white">Create subworkspace</h2>
+                  <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">
+                    Add a real child workspace under an existing parent. It will appear in the hierarchy after creation.
+                  </p>
                 </div>
-                <h2 className="mt-4 text-lg font-semibold text-white">Create subworkspace</h2>
-                <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">
-                  Add a real child workspace under an existing parent. It will appear in the hierarchy after creation.
-                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  aria-label="Close create subworkspace modal"
+                  title="Close create subworkspace modal"
+                  onClick={() => setSubspaceOpen(false)}
+                  disabled={creatingSubspace}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9"
-                aria-label="Close create subworkspace modal"
-                title="Close create subworkspace modal"
-                onClick={() => setSubspaceOpen(false)}
-                disabled={creatingSubspace}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
 
-            <form className="relative z-10 mt-5 space-y-4" onSubmit={handleCreateSubspace}>
-              <label className="block space-y-2">
-                <span className="text-sm font-medium text-slate-200">Parent workspace</span>
-                <select
-                  value={subspaceParentId}
+              <form className="relative z-10 mt-5 space-y-4" onSubmit={handleCreateSubspace}>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-slate-200">Parent workspace</span>
+                  <select
+                    value={subspaceParentId}
+                    onChange={(event) => {
+                      setSubspaceParentId(event.target.value);
+                      setSubspaceError(null);
+                    }}
+                    disabled={creatingSubspace}
+                    className="omnix-input h-11 w-full rounded-lg bg-black/20 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <option value="">Choose parent</option>
+                    {workspaces.map((workspace) => (
+                      <option key={workspace.id} value={workspace.id}>
+                        {workspace.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Input
+                  id="subworkspace-name"
+                  label="Subworkspace name"
+                  value={subspaceName}
                   onChange={(event) => {
-                    setSubspaceParentId(event.target.value);
+                    setSubspaceName(event.target.value);
                     setSubspaceError(null);
                   }}
                   disabled={creatingSubspace}
-                  className="omnix-input h-11 w-full rounded-lg bg-black/20 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <option value="">Choose parent</option>
-                  {workspaces.map((workspace) => (
-                    <option key={workspace.id} value={workspace.id}>
-                      {workspace.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <Input
-                id="subworkspace-name"
-                label="Subworkspace name"
-                value={subspaceName}
-                onChange={(event) => {
-                  setSubspaceName(event.target.value);
-                  setSubspaceError(null);
-                }}
-                disabled={creatingSubspace}
-                autoFocus
-              />
-              <label className="block">
-                <span className="text-sm font-medium text-slate-200">Description</span>
-                <textarea
-                  value={subspaceDescription}
-                  onChange={(event) => setSubspaceDescription(event.target.value)}
-                  disabled={creatingSubspace}
-                  rows={3}
-                  className="omnix-input mt-2 w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                  placeholder="Focused space for a team, project, or knowledge domain."
+                  autoFocus
                 />
-              </label>
-              {subspaceError ? (
-                <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
-                  {subspaceError}
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-200">Description</span>
+                  <textarea
+                    value={subspaceDescription}
+                    onChange={(event) => setSubspaceDescription(event.target.value)}
+                    disabled={creatingSubspace}
+                    rows={3}
+                    className="omnix-input mt-2 w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    placeholder="Focused space for a team, project, or knowledge domain."
+                  />
+                </label>
+                {subspaceError ? (
+                  <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
+                    {subspaceError}
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-end gap-2">
+                  <Button type="button" variant="ghost" onClick={() => setSubspaceOpen(false)} disabled={creatingSubspace}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" leftIcon={<Plus className="h-4 w-4" />} isLoading={creatingSubspace} disabled={!subspaceName.trim() || !subspaceParentId}>
+                    Create subworkspace
+                  </Button>
                 </div>
-              ) : null}
-              <div className="flex items-center justify-end gap-2">
-                <Button type="button" variant="ghost" onClick={() => setSubspaceOpen(false)} disabled={creatingSubspace}>
-                  Cancel
-                </Button>
-                <Button type="submit" leftIcon={<Plus className="h-4 w-4" />} isLoading={creatingSubspace} disabled={!subspaceName.trim() || !subspaceParentId}>
-                  Create subworkspace
-                </Button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       ) : null}
     </section>
   );
