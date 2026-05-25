@@ -51,6 +51,7 @@ function currentViewFromPath(pathname: string | null) {
   if (!pathname) return "workspace";
   if (pathname.includes("/chat")) return "chat";
   if (pathname.includes("/conversations")) return "conversations";
+  if (pathname.includes("/decisions")) return "decisions";
   if (pathname.includes("/tasks")) return "tasks";
   if (pathname.includes("/initiatives")) return "initiatives";
   if (pathname.includes("/workspace")) return "workspace";
