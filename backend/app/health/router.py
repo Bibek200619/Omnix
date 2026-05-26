@@ -1,5 +1,5 @@
 from __future__ import annotations
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from .checks import run_all_checks
 from ..runtime.manager import RuntimeManager
 

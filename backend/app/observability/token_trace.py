@@ -1,4 +1,3 @@
-from typing import Dict, Any
 from .metrics import MetricsCollector
 
 class TokenTrace:

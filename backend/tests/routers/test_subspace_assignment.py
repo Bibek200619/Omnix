@@ -4,7 +4,6 @@ from fastapi import HTTPException
 import pytest
 
 from app.services import workspace_service
-from app.services.workspace_permissions import OrganizationalAccessAuthority
 
 @pytest.mark.asyncio
 async def test_list_potential_subspace_members(monkeypatch: pytest.MonkeyPatch) -> None:

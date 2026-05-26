@@ -10,7 +10,6 @@ from ..core.security import get_current_user
 from ..services.supabase_service import (
     SupabaseServiceError,
     insert_one,
-    insert_many,
     select_all_trusted,
     select_one_trusted,
     update_one_trusted,

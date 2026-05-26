@@ -223,7 +223,6 @@ def _workspace_not_found() -> HTTPException:
 
 
 from app.services.workspace_permissions import OrganizationalAccessAuthority
-from app.core.rbac import ROLE_SUPER_FOUNDER, ROLE_SUB_LEADER, ROLE_SUB_MEMBER
 
 async def resolve_workspace_access(
     workspace_id: str,

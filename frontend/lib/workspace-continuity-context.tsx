@@ -16,7 +16,7 @@ type ContinuityContextType = {
   loading: boolean;
   error: string | null;
   refreshContinuity: () => Promise<void>;
-  createInitiative: (name: string, description?: string) => Promise<WorkspaceInitiative>;
+  createInitiative: (title: string, description?: string) => Promise<WorkspaceInitiative>;
 };
 
 const ContinuityContext = createContext<ContinuityContextType | undefined>(undefined);
@@ -79,12 +79,11 @@ export function WorkspaceContinuityProvider({ children }: { children: ReactNode 
     }
   }, [activeWorkspaceId]);
 
-  const createInitiative = useCallback(async (name: string, description?: string) => {
+  const createInitiative = useCallback(async (title: string, description?: string) => {
     if (!activeWorkspaceId) throw new Error("No active workspace.");
     
     const initiative = await apiClient.post<WorkspaceInitiative>(`/workspaces/${activeWorkspaceId}/initiatives`, {
-      workspace_id: activeWorkspaceId,
-      name,
+      title,
       description
     });
     

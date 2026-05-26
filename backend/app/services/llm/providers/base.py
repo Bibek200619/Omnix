@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, List, Any
+from typing import AsyncGenerator
 from ..schemas import ChatRequest, ChatResponse, StreamChunk, EmbeddingRequest, EmbeddingResponse
 from ..utils import get_logger
 

@@ -1,4 +1,3 @@
-import uuid
 from typing import AsyncGenerator
 from .base import BaseLLMProvider
 from ..schemas import ChatRequest, ChatResponse, StreamChunk, EmbeddingRequest, EmbeddingResponse

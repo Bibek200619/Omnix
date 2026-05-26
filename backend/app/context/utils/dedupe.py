@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Dict, Any
+from typing import List
 
 def deduplicate_text(texts: List[str]) -> List[str]:
     """Remove exact duplicate text blocks."""
