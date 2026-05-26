@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Dict, Any
+from typing import List
 
 from .schemas import AssembledContext, Citation, ContextSourceType
 from .citations import CitationManager

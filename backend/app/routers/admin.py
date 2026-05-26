@@ -1,7 +1,6 @@
 from __future__ import annotations
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from ..runtime.manager import RuntimeManager
-from ..core.security import get_current_user
 
 router = APIRouter(prefix="/admin/runtime", tags=["admin"])
 

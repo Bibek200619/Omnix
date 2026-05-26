@@ -31,7 +31,7 @@ async def connect_google_drive(request: Request, workspace_id: str | None = None
     """Return the Google OAuth authorize URL for the client to redirect the user to."""
     user = current_user
     user_id = str(user.get("sub"))
-    base = os.environ.get("OMNIX_BASE_URL") or f"http://localhost:8000"
+    base = os.environ.get("OMNIX_BASE_URL") or "http://localhost:8000"
     redirect_uri = f"{base.rstrip('/')}/integrations/google_drive/callback"
     # encode state as user_id|workspace_id
     state = f"{user_id}|{workspace_id or ''}"
@@ -52,7 +52,7 @@ async def oauth_callback(code: str | None = None, state: str | None = None) -> A
         user_id = parts[0] if parts and parts[0] else None
         workspace_id = parts[1] if len(parts) > 1 and parts[1] else None
 
-    base = os.environ.get("OMNIX_BASE_URL") or f"http://localhost:8000"
+    base = os.environ.get("OMNIX_BASE_URL") or "http://localhost:8000"
     redirect_uri = f"{base.rstrip('/')}/integrations/google_drive/callback"
 
     try:

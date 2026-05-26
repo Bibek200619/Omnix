@@ -5,7 +5,7 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 
 from .schemas import Citation, ContextSourceType
-from ..services import workspace_service, supabase_service
+from ..services import workspace_service
 
 logger = logging.getLogger(__name__)
 

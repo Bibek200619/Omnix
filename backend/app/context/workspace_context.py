@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from typing import List
 
 from .schemas import ContextPayload, Citation, ContextSourceType
-from ..services import workspace_service, supabase_service, workspace_intelligence_service
+from ..services import supabase_service, workspace_intelligence_service
 
 logger = logging.getLogger(__name__)
 

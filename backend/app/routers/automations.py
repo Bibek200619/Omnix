@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..core.security import get_current_user
 from ..services.supabase_service import (

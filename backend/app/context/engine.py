@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict
+from typing import Any
 
-from .schemas import ContextPayload, AssembledContext, Citation
+from .schemas import ContextPayload, AssembledContext
 from .retrieval import RetrievalManager
 from .memory import MemoryManager
 from .workspace_context import WorkspaceContextManager

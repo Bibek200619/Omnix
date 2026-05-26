@@ -26,10 +26,10 @@ async def generate_insights(request: Request, workspace_id: str, current_user: d
 
     # Ensure user has access
     try:
-        access = await require_workspace_access(workspace_id, user_id)
+        await require_workspace_access(workspace_id, user_id)
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception:
         logger.exception("Workspace access check failed")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
