@@ -313,12 +313,14 @@ class WorkspaceMemberRead(BaseModel):
     handle: str | None = None
     avatar_url: str | None = None
     avatar_label: str = "U"
+    operational_label: str | None = Field(default=None, max_length=80)
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
 
 class WorkspaceMemberRoleUpdate(BaseModel):
     role: WorkspaceRole
+    operational_label: str | None = Field(default=None, max_length=80)
 
 
 class WorkspaceMemberAssign(BaseModel):

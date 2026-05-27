@@ -17,6 +17,7 @@ export type WorkspaceMember = {
   handle?: string | null;
   avatar_url?: string | null;
   avatar_label: string;
+  operational_label?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -329,6 +330,12 @@ export type ExecutionContextLink = {
   label?: string | null;
 };
 
+export type WorkspaceConversationAuthorIdentity = {
+  role_label?: string | null;
+  operational_label?: string | null;
+  display_label?: string | null;
+};
+
 export type WorkspaceChannelMessage = {
   id: string;
   workspace_id: string;
@@ -346,6 +353,7 @@ export type WorkspaceChannelMessage = {
   author_email?: string | null;
   author_avatar_url?: string | null;
   author_avatar_label: string;
+  author_identity?: WorkspaceConversationAuthorIdentity | null;
   thread_reply_count: number;
 };
 
