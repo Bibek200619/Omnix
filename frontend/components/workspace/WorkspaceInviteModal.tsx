@@ -59,7 +59,7 @@ export function WorkspaceInviteModal({
 
   return (
     <div className="omnix-modal-backdrop fixed inset-0 z-[150] flex items-center justify-center p-4 backdrop-blur-md">
-      <div className="omnix-modal-card relative flex max-h-[90dvh] w-full max-w-md flex-col p-5">
+      <div className="omnix-modal-card relative flex max-h-[90dvh] w-full max-w-md flex-col p-4 sm:p-5">
         <div className="relative z-10 flex shrink-0 items-start justify-between gap-4">
           <div>
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
@@ -132,11 +132,11 @@ export function WorkspaceInviteModal({
           </div>
         </form>
 
-        <div className="relative z-10 mt-5 flex shrink-0 items-center justify-end gap-2 pt-2 pb-safe">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
+        <div className="relative z-10 mt-5 flex shrink-0 items-center gap-2 pt-2 pb-safe">
+          <Button type="button" variant="ghost" className="flex-1 sm:flex-none" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button type="submit" form={formId} leftIcon={<UserPlus className="h-4 w-4" />} isLoading={loading}>
+          <Button type="submit" form={formId} className="flex-1 sm:flex-none" leftIcon={<UserPlus className="h-4 w-4" />} isLoading={loading}>
             Assign Scope
           </Button>
         </div>

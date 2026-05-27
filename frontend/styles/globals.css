@@ -1000,8 +1000,14 @@ textarea {
 }
 
 @media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
   .omnix-page-frame {
-    padding: 16px;
+    padding: 12px;
   }
 
   .omnix-page-hero {
@@ -1016,6 +1022,46 @@ textarea {
 
   .omnix-page-subtitle {
     font-size: 12px;
+  }
+
+  .omnix-content-max {
+    padding-bottom: 12px;
+  }
+
+  .omnix-modal-backdrop {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .omnix-modal-card {
+    width: 100%;
+    max-width: none;
+    max-height: min(88dvh, 46rem);
+    overflow-y: auto;
+    border-radius: 20px 20px 0 0;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .omnix-mobile-sheet-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .omnix-mobile-sheet {
+    max-height: min(88dvh, 46rem);
+    border-radius: 20px 20px 0 0;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .omnix-cinematic-card,
+  .omnix-glass-band,
+  .omnix-section-card {
+    border-radius: 14px;
+  }
+
+  button,
+  a {
+    touch-action: manipulation;
   }
 }
 
