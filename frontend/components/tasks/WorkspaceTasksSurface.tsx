@@ -260,14 +260,14 @@ export function WorkspaceTasksSurface() {
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
-      <header className="mb-3 flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-4 sm:px-5">
+    <section className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
+      <header className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
             <ClipboardCheck className="h-3.5 w-3.5" /> Execution layer
           </p>
           <h1 className="omnix-display text-xl font-semibold text-white">Workspace Tasks</h1>
-          <p className="mt-1 text-sm text-[var(--omnix-text-2)]">
+          <p className="mt-1 hidden text-sm text-[var(--omnix-text-2)] md:block">
             {activeWorkspace?.name} next steps, ownership, and recorded blockers.
           </p>
         </div>
@@ -286,14 +286,14 @@ export function WorkspaceTasksSurface() {
         </div>
       ) : null}
 
-      <div className="mb-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="omnix-scrollbar mb-3 flex shrink-0 gap-2 overflow-x-auto pb-1 xl:grid xl:grid-cols-5 xl:overflow-visible xl:pb-0">
         {flow.map((phase) => (
           <button
             key={phase.value}
             type="button"
             onClick={() => setFilter(phase.value)}
             className={cn(
-              "rounded-xl border px-3 py-3 text-left transition",
+              "min-w-[7.75rem] shrink-0 rounded-xl border px-3 py-3 text-left transition xl:min-w-0",
               filter === phase.value ? "border-cyan-300/30 bg-cyan-300/[0.08]" : "border-[var(--omnix-border)] bg-black/10 hover:bg-white/[0.025]",
             )}
           >
@@ -303,8 +303,8 @@ export function WorkspaceTasksSurface() {
         ))}
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <main className="omnix-panel flex min-h-[28rem] min-w-0 flex-col rounded-xl p-3 sm:p-4">
+      <div className="grid shrink-0 gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <main className="omnix-panel flex min-w-0 flex-col rounded-xl p-3 sm:p-4 xl:min-h-[28rem]">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setFilter("open")} className={cn("rounded-full border px-3 py-1.5 text-xs transition", filter === "open" ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100" : "border-[var(--omnix-border)] text-[var(--omnix-text-2)]")}>Open flow</button>
@@ -337,7 +337,7 @@ export function WorkspaceTasksSurface() {
               </div>
             </form>
           ) : null}
-          <div className="omnix-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto">
+          <div className="space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
             {loading ? <Loader2 className="mx-auto mt-10 h-5 w-5 animate-spin text-cyan-100/50" /> : null}
             {!loading && displayedTasks.length === 0 ? (
               <div className="mx-auto mt-14 max-w-sm text-center">
@@ -357,14 +357,14 @@ export function WorkspaceTasksSurface() {
                     value={task.status}
                     disabled={updatingId === task.id}
                     onChange={(event) => void patchTask(task, { status: event.target.value as WorkspaceTaskStatus })}
-                    className="omnix-input h-8 rounded-lg px-2 text-xs"
+                    className="omnix-input h-10 rounded-lg px-2 text-xs md:h-8"
                     aria-label={`Status for ${task.title}`}
                   >
                     {flow.map((phase) => <option key={phase.value} value={phase.value}>{phase.label}</option>)}
                   </select>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <label className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--omnix-border)] px-2 py-1 text-[11px] text-[var(--omnix-text-2)]">
+                  <label className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--omnix-border)] px-3 py-2 text-[11px] text-[var(--omnix-text-2)] md:min-h-0 md:px-2 md:py-1">
                     <UserRound className="h-3.5 w-3.5" />
                     <select
                       value={task.owner_user_id || ""}
@@ -377,7 +377,7 @@ export function WorkspaceTasksSurface() {
                       {members.map((member) => <option key={member.user_id} value={member.user_id}>{member.full_name || member.email || member.handle || member.user_id}</option>)}
                     </select>
                   </label>
-                  <label className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--omnix-border)] px-2 py-1 text-[11px] text-[var(--omnix-text-2)]">
+                  <label className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--omnix-border)] px-3 py-2 text-[11px] text-[var(--omnix-text-2)] md:min-h-0 md:px-2 md:py-1">
                     <CalendarDays className="h-3.5 w-3.5" />
                     <input
                       type="date"
@@ -394,7 +394,7 @@ export function WorkspaceTasksSurface() {
                       <Link2 className="h-3 w-3" /> {link.label || link.context_type}
                     </span>
                   ))}
-                  <label className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.045] px-2 py-1 text-[11px] text-cyan-100/80">
+                  <label className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.045] px-3 py-2 text-[11px] text-cyan-100/80 md:min-h-0 md:px-2 md:py-1">
                     <Compass className="h-3 w-3" />
                     <select
                       value={task.initiative_id || ""}
@@ -430,7 +430,7 @@ export function WorkspaceTasksSurface() {
                       }
                     }}
                     placeholder={task.blockers.length ? "Add blocker" : "Record blocker"}
-                    className="h-7 min-w-[9rem] rounded-md border border-dashed border-[var(--omnix-border)] bg-transparent px-2 text-[11px] text-[var(--omnix-text-2)] outline-none focus:border-cyan-300/30"
+                    className="h-10 min-w-[9rem] rounded-md border border-dashed border-[var(--omnix-border)] bg-transparent px-2 text-[11px] text-[var(--omnix-text-2)] outline-none focus:border-cyan-300/30 md:h-7"
                   />
                 </div>
               </article>

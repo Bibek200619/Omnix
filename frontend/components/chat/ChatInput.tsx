@@ -87,7 +87,7 @@ export function ChatInput({
   }
 
   return (
-    <div className="relative mx-auto w-full max-w-[860px] pb-safe">
+    <div className="relative mx-auto w-full max-w-[860px]">
       <div className="absolute -top-9 left-0 hidden items-center gap-1.5 sm:flex">
         {["Suggest ideas", "Summarize"].map((label) => (
           <button
