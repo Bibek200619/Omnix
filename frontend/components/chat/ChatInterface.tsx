@@ -1149,7 +1149,7 @@ export function ChatInterface() {
       ) : null}
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.85)] px-[18px] shadow-[0_12px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+        <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.85)] px-3 shadow-[0_12px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl sm:px-[18px]">
           <div className="flex min-w-0 items-center gap-2.5">
             {!historyOpen ? (
               <button
@@ -1176,7 +1176,7 @@ export function ChatInterface() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
             {activeWorkspace ? (
               <WorkspaceMemberStack
                 members={workspaceMembers}
@@ -1258,7 +1258,7 @@ export function ChatInterface() {
           onRetry={handleRetry}
           onRegenerate={handleRegenerate}
         />
-        <div className="shrink-0 bg-gradient-to-t from-[var(--omnix-bg)] via-[rgba(5,12,23,0.94)] to-transparent px-3 pb-[18px] pt-10 sm:px-[22px]">
+        <div className="shrink-0 bg-gradient-to-t from-[var(--omnix-bg)] via-[rgba(5,12,23,0.94)] to-transparent px-2.5 pb-2.5 pt-3 sm:px-[22px] sm:pb-[18px] sm:pt-10">
           <ChatInput
             onSend={sendMessage}
             loading={responding}

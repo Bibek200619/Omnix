@@ -99,7 +99,7 @@ export function WorkspaceActivityFeed({
 
       <div className="relative z-10 space-y-4">
         {visibleActivity.length ? (
-          <div className="relative space-y-3 before:absolute before:left-[1.35rem] before:top-2 before:h-[calc(100%-16px)] before:w-px before:bg-gradient-to-b before:from-white/10 before:via-white/5 before:to-transparent">
+          <div className="relative space-y-3 before:absolute before:left-[1.35rem] before:top-2 before:h-[calc(100%_-_16px)] before:w-px before:bg-gradient-to-b before:from-white/10 before:via-white/5 before:to-transparent">
             {visibleActivity.map((item) => {
               const Icon = eventIcon[item.event_type as keyof typeof eventIcon] ?? Activity;
               const isAI = item.event_type.includes("ai_") || item.actor_user_id === "system";

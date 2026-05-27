@@ -45,7 +45,7 @@ export function WorkspaceIntelligencePanel({
       <button 
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="group relative z-10 flex w-full flex-col md:flex-row md:items-start justify-between gap-6 p-6 text-left outline-none"
+        className="group relative z-10 flex w-full flex-col justify-between gap-4 p-4 text-left outline-none sm:p-6 md:flex-row md:items-start md:gap-6"
       >
         <div className="flex min-w-0 gap-4">
           <div className="relative shrink-0">
@@ -100,7 +100,7 @@ export function WorkspaceIntelligencePanel({
 
       {/* Expanded Content Area */}
       {expanded && (
-        <div className="relative z-10 px-6 pb-6 pt-2 border-t border-white/5 animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="relative z-10 border-t border-white/5 px-4 pb-4 pt-2 animate-in fade-in slide-in-from-top-4 duration-300 sm:px-6 sm:pb-6">
           <div className={cn("grid gap-4", compact ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2 lg:grid-cols-4")}>
             {[
               { label: "Connected Files", value: profile?.source_count ?? 0, icon: Database, color: "#22d3ee" },

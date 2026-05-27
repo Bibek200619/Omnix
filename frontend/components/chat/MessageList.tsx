@@ -64,14 +64,14 @@ export function MessageList({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.24, ease: "easeOut" }}
-        className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 py-10 text-center sm:p-8"
+        className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 py-6 text-center sm:p-8"
       >
         <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-md)]">
           <span className="absolute inset-0 rounded-xl bg-cyan-300/10 blur-xl" />
           <span className="absolute -inset-4 rounded-full bg-[radial-gradient(circle,rgba(0,255,255,0.2),transparent_70%)] opacity-70 [animation:auth-drift_12s_ease-in-out_infinite]" />
           <MessageSquare className="h-5 w-5" />
         </div>
-        <h2 className="omnix-display mt-5 text-xl font-semibold text-white">
+        <h2 className="omnix-display mt-5 text-lg font-semibold text-white sm:text-xl">
           Ask Omnix anything your workspace should know
         </h2>
         <p className="mt-2 max-w-md text-sm leading-6 text-[var(--omnix-text-2)]">
@@ -83,7 +83,7 @@ export function MessageList({
   }
 
   return (
-    <div className="omnix-scrollbar flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 pb-36 sm:gap-7 sm:px-7 lg:px-9">
+    <div className="omnix-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-4 pb-5 sm:gap-7 sm:px-7 sm:py-6 sm:pb-7 lg:px-9">
       <AnimatePresence initial={false}>
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} onRetry={onRetry} onRegenerate={onRegenerate} />

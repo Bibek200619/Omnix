@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { MobileDock } from "@/components/layout/MobileDock";
 import { PageTransition } from "@/components/layout/PageTransition";
 import { ConversationHistoryProvider } from "@/lib/conversation-history-context";
 import { ProfileProvider } from "@/lib/profile-context";
@@ -104,9 +105,10 @@ export function AppShell({ children }: AppShellProps) {
                       onMenuClick={() => setIsSidebarOpen(true)}
                       onExpandSidebar={() => setIsSidebarCollapsed(false)}
                     />
-                    <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-safe">
+                    <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4.25rem_+_env(safe-area-inset-bottom))] lg:pb-0">
                       <PageTransition className="flex min-h-0 flex-1 flex-col">{children}</PageTransition>
                     </main>
+                    <MobileDock />
                   </div>
                 </div>
               </WorkspaceOnboardingGate>
