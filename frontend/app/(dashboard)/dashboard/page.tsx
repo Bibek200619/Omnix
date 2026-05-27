@@ -25,6 +25,7 @@ import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { workspaceRoleLabel } from "@/lib/workspace-roles";
+import { cn } from "@/lib/utils";
 import { WorkspaceIntelligencePanel } from "@/components/workspace/WorkspaceIntelligencePanel";
 import { WorkspaceActivityFeed } from "@/components/workspace/WorkspaceActivityFeed";
 import { WorkspacePresenceCluster } from "@/components/workspace/WorkspacePresenceCluster";
@@ -98,15 +99,18 @@ export default function DashboardPage() {
               A real-time operating surface for workspace knowledge, AI sessions, hierarchy, and team access.
             </p>
             </div>
-            <div className="grid w-full min-w-0 gap-2 min-[380px]:grid-cols-3 xl:min-w-[28rem] xl:w-auto">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:min-w-[28rem]">
               {[
                 { label: "Role", value: workspaceRoleLabel(activeWorkspace?.current_user_role), icon: ShieldCheck },
                 { label: "Access", value: activeWorkspace?.is_shared ? "Shared" : "Private", icon: Users },
                 { label: "Roots", value: workspaces.length, icon: Layers3 },
-              ].map((item) => {
+              ].map((item, i) => {
                 const Icon = item.icon;
                 return (
-                  <div key={item.label} className="rounded-xl border border-white/[0.07] bg-white/[0.035] p-3">
+                  <div key={item.label} className={cn(
+                    "rounded-xl border border-white/[0.07] bg-white/[0.035] p-3 transition-colors hover:bg-white/[0.05]",
+                    i === 2 && "col-span-2 sm:col-span-1"
+                  )}>
                     <Icon className="h-4 w-4 text-cyan-200" />
                     <div className="mt-3 text-[10px] uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">{item.label}</div>
                     <div className="mt-1 truncate text-sm font-semibold text-white">{item.value}</div>
