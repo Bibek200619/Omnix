@@ -99,7 +99,7 @@ export function WorkspaceActivityFeed({
 
       <div className="relative z-10 space-y-4">
         {visibleActivity.length ? (
-          <div className="relative space-y-3 before:absolute before:left-[1.35rem] before:top-2 before:h-[calc(100%_-_16px)] before:w-px before:bg-gradient-to-b before:from-white/10 before:via-white/5 before:to-transparent">
+          <div className="relative space-y-3 before:absolute before:left-[1.1rem] sm:before:left-[1.35rem] before:top-2 before:h-[calc(100%-16px)] before:w-px before:bg-gradient-to-b before:from-white/10 before:via-white/5 before:to-transparent">
             {visibleActivity.map((item) => {
               const Icon = eventIcon[item.event_type as keyof typeof eventIcon] ?? Activity;
               const isAI = item.event_type.includes("ai_") || item.actor_user_id === "system";
@@ -107,7 +107,7 @@ export function WorkspaceActivityFeed({
               return (
                 <div
                   key={item.id}
-                  className="group relative flex gap-4 pl-0 transition-all duration-300"
+                  className="group relative flex gap-3 sm:gap-4 pl-0 transition-all duration-300"
                 >
                   <div className="relative z-10 shrink-0">
                     <ProfileAvatar
@@ -115,37 +115,37 @@ export function WorkspaceActivityFeed({
                       email={item.actor_email}
                       avatarUrl={item.actor_avatar_url}
                       className={cn(
-                        "h-11 w-11 rounded-xl border bg-black/40 text-sm font-medium transition-all duration-500 group-hover:scale-[1.02]",
+                        "h-9 w-9 sm:h-11 sm:w-11 rounded-lg sm:rounded-xl border bg-black/40 text-xs sm:text-sm font-medium transition-all duration-500 group-hover:scale-[1.02]",
                         isAI 
                           ? "border-purple-500/20" 
                           : "border-cyan-500/10"
                       )}
                     />
                     <div className={cn(
-                      "absolute -right-1 -top-1 rounded-full border border-white/10 p-1 shadow-sm backdrop-blur-md",
+                      "absolute -right-1 -top-1 rounded-full border border-white/10 p-0.5 sm:p-1 shadow-sm backdrop-blur-md",
                       isAI ? "bg-purple-600/80" : "bg-cyan-600/80"
                     )}>
-                      <Icon className="h-2.5 w-2.5 text-white/90" />
+                      <Icon className="h-2 w-2 sm:h-2.5 sm:w-2.5 text-white/90" />
                     </div>
                   </div>
                   <div className="min-w-0 flex-1 pt-0.5">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-[13px] font-medium text-white/90 group-hover:text-cyan-100 transition-colors">
+                      <p className="truncate text-[12px] sm:text-[13px] font-medium text-white/90 group-hover:text-cyan-100 transition-colors">
                         {item.summary}
                       </p>
-                      <span className="shrink-0 text-[10px] font-medium text-white/30">
+                      <span className="shrink-0 text-[9px] sm:text-[10px] font-medium text-white/30">
                         {formatRelativeTime(item.created_at)}
                       </span>
                     </div>
-                    <div className="mt-1 flex items-center gap-2">
+                    <div className="mt-0.5 sm:mt-1 flex items-center gap-1.5 sm:gap-2">
                       <span className={cn(
-                        "text-[10px] font-bold tracking-wide",
+                        "text-[9px] sm:text-[10px] font-bold tracking-wide",
                         isAI ? "text-purple-400/80" : "text-cyan-400/80"
                       )}>
                         {actorName(item)}
                       </span>
                       <span className="h-0.5 w-0.5 rounded-full bg-white/10" />
-                      <span className="text-[10px] font-medium text-white/20 uppercase tracking-tight">
+                      <span className="text-[9px] sm:text-[10px] font-medium text-white/20 uppercase tracking-tight truncate">
                         {item.event_type.split('.').pop()?.replace('_', ' ')}
                       </span>
                     </div>
