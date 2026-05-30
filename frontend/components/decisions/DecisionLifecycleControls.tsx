@@ -31,36 +31,36 @@ export function DecisionLifecycleControls({ decision, onUpdate }: DecisionLifecy
 
   if (decision.status === "rejected") {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-rose-300/10 bg-rose-300/[0.03] px-3 py-2">
-        <XCircle className="h-4 w-4 text-rose-300/60" />
-        <span className="text-[11px] font-medium uppercase tracking-wider text-rose-100/70">Decision Rejected (Read-only)</span>
+      <div className="flex items-center gap-2 rounded-full border border-rose-400/20 bg-rose-400/[0.05] px-4 py-1.5 shadow-[0_0_15px_rgba(251,113,133,0.05)]">
+        <XCircle className="h-3.5 w-3.5 text-rose-400" />
+        <span className="text-[10px] font-bold uppercase tracking-widest text-rose-400/90">Decision Rejected</span>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2.5">
       {decision.status === "proposed" && (
         <>
           <Button
             size="sm"
             variant="ghost"
-            className="h-8 border border-emerald-300/20 bg-emerald-300/[0.05] text-emerald-100 hover:bg-emerald-300/[0.1] hover:text-emerald-50"
+            className="h-8 rounded-full border border-emerald-400/30 bg-emerald-400/[0.08] px-4 text-[10px] font-bold uppercase tracking-widest text-emerald-400 hover:bg-emerald-400/[0.15] hover:text-emerald-300 shadow-[0_2px_10px_rgba(52,211,153,0.05)]"
             onClick={() => updateStatus("accepted")}
             disabled={!!loading}
             leftIcon={loading === "accepted" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
           >
-            Accept
+            Finalize Choice
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            className="h-8 border border-rose-300/20 bg-rose-300/[0.05] text-rose-100 hover:bg-rose-300/[0.1] hover:text-rose-50"
+            className="h-8 rounded-full border border-rose-400/20 bg-rose-400/[0.05] px-4 text-[10px] font-bold uppercase tracking-widest text-rose-400/80 hover:bg-rose-400/[0.1] hover:text-rose-300"
             onClick={() => updateStatus("rejected")}
             disabled={!!loading}
             leftIcon={loading === "rejected" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
           >
-            Reject
+            Decline
           </Button>
         </>
       )}
@@ -69,7 +69,7 @@ export function DecisionLifecycleControls({ decision, onUpdate }: DecisionLifecy
         <Button
           size="sm"
           variant="ghost"
-          className="h-8 border border-amber-300/20 bg-amber-300/[0.05] text-amber-100 hover:bg-amber-300/[0.1] hover:text-amber-50"
+          className="h-8 rounded-full border border-amber-400/30 bg-amber-400/[0.08] px-4 text-[10px] font-bold uppercase tracking-widest text-amber-400 hover:bg-amber-400/[0.15] hover:text-amber-300 shadow-[0_2px_10px_rgba(251,191,36,0.05)]"
           onClick={() => updateStatus("superseded")}
           disabled={!!loading}
           leftIcon={loading === "superseded" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <History className="h-3.5 w-3.5" />}
@@ -79,11 +79,12 @@ export function DecisionLifecycleControls({ decision, onUpdate }: DecisionLifecy
       )}
 
       {decision.status === "superseded" && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-300/10 bg-amber-300/[0.03] px-3 py-2">
-          <History className="h-4 w-4 text-amber-300/60" />
-          <span className="text-[11px] font-medium uppercase tracking-wider text-amber-100/70">Decision Superseded</span>
+        <div className="flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/[0.05] px-4 py-1.5 shadow-[0_0_15px_rgba(251,191,36,0.05)]">
+          <History className="h-3.5 w-3.5 text-amber-400" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400/90">Superseded</span>
         </div>
       )}
     </div>
   );
 }
+
