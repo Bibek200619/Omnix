@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import date, datetime, timedelta, timezone
+import logging
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -24,6 +25,7 @@ TASK_COLUMNS = (
 )
 TASK_STATUSES = ("idea", "planned", "active", "review", "complete")
 DECISION_PREVIEW_COLUMNS = "id,title,status,decision_reason,created_at"
+logger = logging.getLogger(__name__)
 
 
 def _database_error() -> HTTPException:
@@ -90,18 +92,18 @@ async def _hydrate_tasks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             decision_links = await select_all_trusted(
                 "workspace_decision_tasks",
                 "decision_id",
-                {"task_id": row["id"]},
+                {"task_id": row["id"], "workspace_id": row["workspace_id"]},
             )
             if decision_links:
                 decision_ids = [str(dl["decision_id"]) for dl in decision_links]
                 decisions = await select_all_trusted(
                     "workspace_decisions",
                     DECISION_PREVIEW_COLUMNS,
-                    {"id": ("in", decision_ids)},
+                    {"id": decision_ids, "workspace_id": row["workspace_id"]},
                 )
                 linked_decisions = decisions
         except SupabaseServiceError:
-            pass
+            logger.warning("Task linked decision hydration failed | task_id=%s", row.get("id"), exc_info=True)
 
         hydrated.append(
             {
