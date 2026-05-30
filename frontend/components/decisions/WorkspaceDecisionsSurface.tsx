@@ -76,7 +76,8 @@ export function WorkspaceDecisionsSurface() {
       setError(null);
     } catch (err) {
       if (requestId === requestRef.current) {
-        setError(err instanceof Error ? err.message : "Unable to load decisions.");
+        console.error("Failed to load decisions", err);
+        setError("Unable to load decisions.");
       }
     } finally {
       if (requestId === requestRef.current) setLoading(false);
@@ -383,4 +384,3 @@ export function WorkspaceDecisionsSurface() {
     </section>
   );
 }
-

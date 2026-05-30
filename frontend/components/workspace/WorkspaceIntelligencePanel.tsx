@@ -16,11 +16,13 @@ const focusLabels: Record<WorkspaceIntelligenceProfile["workspace_focus"], strin
 export function WorkspaceIntelligencePanel({
   profile,
   loading,
+  error,
   compact = false,
   className,
 }: {
   profile: WorkspaceIntelligenceProfile | null;
   loading?: boolean;
+  error?: string | null;
   compact?: boolean;
   className?: string;
 }) {
@@ -29,7 +31,7 @@ export function WorkspaceIntelligencePanel({
   const domains = profile?.active_domains ?? [];
   const sources = profile?.connected_sources ?? [];
   const insights = profile?.recent_insights ?? [];
-  const summary = profile?.context_summary ?? "Intelligence awaiting workspace context synchronization.";
+  const summary = error ?? profile?.context_summary ?? "Intelligence awaiting workspace context synchronization.";
   const focus = profile?.workspace_focus ?? profile?.ai_specialization ?? "general";
   const expertise = profile?.expertise_area;
 
@@ -66,7 +68,7 @@ export function WorkspaceIntelligencePanel({
               )}
             </div>
             <h3 className="mt-1 text-lg sm:text-xl font-medium tracking-tight text-white/90 group-hover:text-white transition-colors">
-              {profile ? profile.workspace_name : "Waking up..."}
+              {error ? "Workspace intelligence unavailable" : profile ? profile.workspace_name : "Waking up..."}
             </h3>
             {expertise && (
               <div className="mt-1 flex items-center gap-1.5 text-[11px] sm:text-xs font-medium text-emerald-400/90">

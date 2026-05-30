@@ -305,7 +305,8 @@ export default function FilesPage() {
       const data = await apiClient.get<WorkspaceConnector[]>("/connectors");
       setConnectors(data);
     } catch (err) {
-      setConnectorError(err instanceof Error ? err.message : String(err));
+      console.error("Failed to load connectors", err);
+      setConnectorError("Unable to load connectors.");
     } finally {
       setConnectorsLoading(false);
     }
@@ -461,7 +462,8 @@ export default function FilesPage() {
       setSetupType(null);
       setSetupMessage(null);
     } catch (err) {
-      setSetupMessage(err instanceof Error ? err.message : String(err));
+      console.error("Failed to save connector", err);
+      setSetupMessage("Unable to save connector.");
     } finally {
       setSavingConnector(false);
     }
@@ -474,7 +476,8 @@ export default function FilesPage() {
       const updated = await apiClient.post<WorkspaceConnector>(`/connectors/${connector.id}/retry`, {});
       upsertConnector(updated);
     } catch (err) {
-      setConnectorError(err instanceof Error ? err.message : String(err));
+      console.error("Failed to retry connector", err);
+      setConnectorError("Unable to retry connector.");
     } finally {
       setActionConnectorId(null);
     }
@@ -490,7 +493,8 @@ export default function FilesPage() {
         setFiles((current) => current.filter((file) => file.id !== connector.source_file_id));
       }
     } catch (err) {
-      setConnectorError(err instanceof Error ? err.message : String(err));
+      console.error("Failed to remove connector", err);
+      setConnectorError("Unable to delete connector.");
     } finally {
       setActionConnectorId(null);
     }
@@ -504,7 +508,8 @@ export default function FilesPage() {
       const result = await apiClient.get<{ authorize_url: string }>(`/integrations/google_drive/connect${suffix}`);
       window.location.assign(result.authorize_url);
     } catch (err) {
-      setConnectorError(err instanceof Error ? err.message : String(err));
+      console.error("Failed to start connector authentication", err);
+      setConnectorError("Unable to start connector authentication.");
     } finally {
       setAuthConnectorId(null);
     }

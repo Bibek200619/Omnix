@@ -117,6 +117,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
   const [uploadedSources, setUploadedSources] = useState<string[]>([]);
 
   const hasWorkspaces = workspaces.length > 0;
+  const workspaceLoadFailed = !loading && Boolean(error) && !hasWorkspaces;
   const onboardingWorkspace = useMemo(
     () =>
       activeWorkspaceFromList(workspaces, onboardingWorkspaceId) ||
@@ -128,12 +129,16 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
   const hasWorkspaceForFlow = Boolean(onboardingWorkspace);
 
   useEffect(() => {
-    if (!loading && !hasWorkspaces) {
+    if (!loading && !hasWorkspaces && !error) {
       setOnboardingStarted(true);
     }
-  }, [hasWorkspaces, loading]);
+    if (workspaceLoadFailed) {
+      setOnboardingStarted(true);
+      setStep("workspace");
+    }
+  }, [error, hasWorkspaces, loading, workspaceLoadFailed]);
 
-  const isBlocked = !loading && (!hasWorkspaces || (onboardingStarted && !onboardingComplete));
+  const isBlocked = !loading && (workspaceLoadFailed || !hasWorkspaces || (onboardingStarted && !onboardingComplete));
 
   if (!isBlocked) {
     return <>{children}</>;
@@ -393,7 +398,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
                   </div>
                 ) : null}
 
-                {pendingInvites.length > 0 ? (
+                {!error && pendingInvites.length > 0 ? (
                   <div className="space-y-3">
                     <div>
                       <h3 className="text-sm font-semibold text-white">Join an existing workspace</h3>
@@ -442,70 +447,72 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
                   </div>
                 ) : null}
 
-                <form onSubmit={handleCreate} className="space-y-4 rounded-xl border border-white/8 bg-white/[0.03] p-4 sm:p-5">
-                  <div>
-                    <h3 className="text-sm font-semibold text-white">Create a workspace</h3>
-                    <p className="mt-1 text-xs text-[var(--omnix-text-3)]">This creates the root workspace that unlocks the app.</p>
-                  </div>
-                  <Input
-                    id="onboarding-workspace-name"
-                    label="Workspace name"
-                    value={workspaceName}
-                    onChange={(event) => {
-                      setWorkspaceName(event.target.value);
-                      setCreateError(null);
-                    }}
-                    disabled={creating}
-                    autoFocus
-                    placeholder="Acme Operations"
-                  />
-                  <label className="block space-y-2">
-                    <span className="text-sm font-medium text-slate-200">Description</span>
-                    <textarea
-                      value={workspaceDescription}
-                      onChange={(event) => setWorkspaceDescription(event.target.value)}
+                {!error ? (
+                  <form onSubmit={handleCreate} className="space-y-4 rounded-xl border border-white/8 bg-white/[0.03] p-4 sm:p-5">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white">Create a workspace</h3>
+                      <p className="mt-1 text-xs text-[var(--omnix-text-3)]">This creates the root workspace that unlocks the app.</p>
+                    </div>
+                    <Input
+                      id="onboarding-workspace-name"
+                      label="Workspace name"
+                      value={workspaceName}
+                      onChange={(event) => {
+                        setWorkspaceName(event.target.value);
+                        setCreateError(null);
+                      }}
                       disabled={creating}
-                      rows={3}
-                      className="omnix-input w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                      placeholder="What will this workspace help your team do?"
+                      autoFocus
+                      placeholder="Acme Operations"
                     />
-                  </label>
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium text-slate-200">Workspace focus</span>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {focusOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => setWorkspaceFocus(option.value)}
-                          className={cn(
-                            "rounded-xl border px-3 py-3 text-left transition",
-                            workspaceFocus === option.value
-                              ? "border-cyan-300/35 bg-cyan-300/10 text-white"
-                              : "border-white/10 bg-white/[0.025] text-[var(--omnix-text-2)] hover:border-white/20",
-                          )}
-                        >
-                          <span className="block text-sm font-semibold">{option.label}</span>
-                          <span className="mt-1 block text-xs leading-5 text-[var(--omnix-text-3)]">{option.description}</span>
-                        </button>
-                      ))}
+                    <label className="block space-y-2">
+                      <span className="text-sm font-medium text-slate-200">Description</span>
+                      <textarea
+                        value={workspaceDescription}
+                        onChange={(event) => setWorkspaceDescription(event.target.value)}
+                        disabled={creating}
+                        rows={3}
+                        className="omnix-input w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                        placeholder="What will this workspace help your team do?"
+                      />
+                    </label>
+                    <div className="space-y-2">
+                      <span className="text-sm font-medium text-slate-200">Workspace focus</span>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {focusOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setWorkspaceFocus(option.value)}
+                            className={cn(
+                              "rounded-xl border px-3 py-3 text-left transition",
+                              workspaceFocus === option.value
+                                ? "border-cyan-300/35 bg-cyan-300/10 text-white"
+                                : "border-white/10 bg-white/[0.025] text-[var(--omnix-text-2)] hover:border-white/20",
+                            )}
+                          >
+                            <span className="block text-sm font-semibold">{option.label}</span>
+                            <span className="mt-1 block text-xs leading-5 text-[var(--omnix-text-3)]">{option.description}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  {createError ? (
-                    <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
-                      {createError}
-                    </div>
-                  ) : null}
-                  <Button
-                    type="submit"
-                    className="w-full omnix-primary-action"
-                    isLoading={creating}
-                    disabled={!workspaceName.trim()}
-                    leftIcon={<Plus className="h-4 w-4" />}
-                  >
-                    Create workspace
-                  </Button>
-                </form>
+                    {createError ? (
+                      <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
+                        {createError}
+                      </div>
+                    ) : null}
+                    <Button
+                      type="submit"
+                      className="w-full omnix-primary-action"
+                      isLoading={creating}
+                      disabled={!workspaceName.trim()}
+                      leftIcon={<Plus className="h-4 w-4" />}
+                    >
+                      Create workspace
+                    </Button>
+                  </form>
+                ) : null}
               </div>
             ) : null}
 

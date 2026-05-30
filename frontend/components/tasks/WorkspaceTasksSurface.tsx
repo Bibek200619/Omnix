@@ -117,7 +117,8 @@ export function WorkspaceTasksSurface() {
       setError(null);
     } catch (err) {
       if (requestId === requestRef.current) {
-        setError(err instanceof Error ? err.message : "Unable to load workspace tasks.");
+        console.error("Failed to load tasks", err);
+        setError("Unable to load tasks.");
       }
     } finally {
       if (requestId === requestRef.current) setLoading(false);
@@ -279,7 +280,8 @@ export function WorkspaceTasksSurface() {
       void loadExecution();
     } catch (err) {
       setTasks((current) => current.filter((task) => task.client_nonce !== nonce));
-      setError(err instanceof Error ? err.message : "Unable to open task.");
+      console.error("Failed to open task", err);
+      setError("Unable to open task.");
     } finally {
       setCreating(false);
     }
@@ -296,7 +298,8 @@ export function WorkspaceTasksSurface() {
       void loadExecution();
     } catch (err) {
       setTasks((current) => current.map((item) => (item.id === task.id ? before : item)));
-      setError(err instanceof Error ? err.message : "Unable to update task.");
+      console.error("Failed to update task", err);
+      setError("Unable to update task.");
     } finally {
       setUpdatingId(null);
     }
@@ -315,7 +318,8 @@ export function WorkspaceTasksSurface() {
       setAssisting(mode);
       setAssistance(await apiClient.post<WorkspaceTaskAssistance>(`/workspaces/${activeWorkspaceId}/tasks/assist`, { mode }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Execution assistance is unavailable.");
+      console.error("Failed to load task assistance", err);
+      setError("Execution assistance is unavailable.");
     } finally {
       setAssisting(null);
     }
