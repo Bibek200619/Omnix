@@ -19,6 +19,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
+import { Portal } from "@/components/ui/Portal";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { useWorkspace } from "@/lib/workspace-context";
 import {
@@ -566,49 +567,51 @@ export function WorkspaceAccessPanel() {
       ) : null}
 
       {confirmAction ? (
-        <div className="omnix-modal-backdrop fixed inset-0 z-[120] flex items-center justify-center px-4">
-          <div className="omnix-modal-card w-full max-w-md p-5">
-            <div className="relative z-10 flex items-start gap-3">
-              <ProfileAvatar
-                name={workspaceMemberName(confirmAction.member)}
-                email={confirmAction.member.email}
-                handle={confirmAction.member.handle}
-                avatarUrl={confirmAction.member.avatar_url}
-                className={cn("h-10 w-10", workspaceRoleAvatarClass(confirmAction.member.role))}
-              />
-              <div>
-                <h3 className="text-base font-semibold text-white">
+        <Portal>
+          <div className="omnix-modal-backdrop fixed inset-0 z-[120] flex items-center justify-center px-4">
+            <div className="omnix-modal-card w-full max-w-md p-5">
+              <div className="relative z-10 flex items-start gap-3">
+                <ProfileAvatar
+                  name={workspaceMemberName(confirmAction.member)}
+                  email={confirmAction.member.email}
+                  handle={confirmAction.member.handle}
+                  avatarUrl={confirmAction.member.avatar_url}
+                  className={cn("h-10 w-10", workspaceRoleAvatarClass(confirmAction.member.role))}
+                />
+                <div>
+                  <h3 className="text-base font-semibold text-white">
+                    {confirmAction.type === "remove" 
+                      ? (isSuper ? "Remove from organization?" : "Remove from workspace?") 
+                      : "Change workspace role?"}
+                  </h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">
+                    {confirmAction.type === "remove"
+                      ? (isSuper 
+                          ? `${workspaceMemberName(confirmAction.member)} will lose all access to the organization, its subspaces, and all collaborative memory.`
+                          : `${workspaceMemberName(confirmAction.member)} will lose access to this specific workspace scope.`)
+                      : `${workspaceMemberName(confirmAction.member)} will become ${workspaceRoleLabel(confirmAction.role).toLowerCase()}.`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="relative z-10 mt-5 flex items-center justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={() => setConfirmAction(null)} disabled={Boolean(busyKey)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant={confirmAction.type === "remove" ? "danger" : "primary"}
+                  isLoading={Boolean(busyKey)}
+                  onClick={handleConfirmAction}
+                >
                   {confirmAction.type === "remove" 
-                    ? (isSuper ? "Remove from organization?" : "Remove from workspace?") 
-                    : "Change workspace role?"}
-                </h3>
-                <p className="mt-1 text-sm leading-6 text-slate-400">
-                  {confirmAction.type === "remove"
-                    ? (isSuper 
-                        ? `${workspaceMemberName(confirmAction.member)} will lose all access to the organization, its subspaces, and all collaborative memory.`
-                        : `${workspaceMemberName(confirmAction.member)} will lose access to this specific workspace scope.`)
-                    : `${workspaceMemberName(confirmAction.member)} will become ${workspaceRoleLabel(confirmAction.role).toLowerCase()}.`}
-                </p>
+                    ? (isSuper ? "Remove from organization" : "Remove member") 
+                    : "Update role"}
+                </Button>
               </div>
             </div>
-
-            <div className="relative z-10 mt-5 flex items-center justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setConfirmAction(null)} disabled={Boolean(busyKey)}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant={confirmAction.type === "remove" ? "danger" : "primary"}
-                isLoading={Boolean(busyKey)}
-                onClick={handleConfirmAction}
-              >
-                {confirmAction.type === "remove" 
-                  ? (isSuper ? "Remove from organization" : "Remove member") 
-                  : "Update role"}
-              </Button>
-            </div>
           </div>
-        </div>
+        </Portal>
       ) : null}
     </section>
   );

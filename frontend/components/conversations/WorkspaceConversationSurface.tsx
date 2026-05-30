@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Portal } from "@/components/ui/Portal";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { realtimeRegistry } from "@/lib/realtime-registry";
@@ -883,86 +884,90 @@ export function WorkspaceConversationSurface() {
         ) : null}
       </div>
       {taskSource ? (
-        <div className="omnix-mobile-sheet-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6">
-          <form onSubmit={createTaskFromContext} className="omnix-mobile-sheet omnix-panel-strong max-h-[calc(100dvh_-_2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-cyan-300/15 p-4 shadow-2xl sm:p-5">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Discussion to execution</p>
-                <h2 className="mt-1 text-base font-semibold text-white">Open linked task</h2>
+        <Portal>
+          <div className="omnix-mobile-sheet-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6">
+            <form onSubmit={createTaskFromContext} className="omnix-mobile-sheet omnix-panel-strong max-h-[calc(100dvh_-_2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-cyan-300/15 p-4 shadow-2xl sm:p-5">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Discussion to execution</p>
+                  <h2 className="mt-1 text-base font-semibold text-white">Open linked task</h2>
+                </div>
+                <button type="button" onClick={() => setTaskSource(null)} className="rounded-md p-1.5 text-white/45 hover:text-white" aria-label="Close task conversion">
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <button type="button" onClick={() => setTaskSource(null)} className="rounded-md p-1.5 text-white/45 hover:text-white" aria-label="Close task conversion">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <Input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} placeholder="Name the specific next step" className="h-10 text-sm" autoFocus />
-            <textarea
-              value={taskDescription}
-              onChange={(event) => setTaskDescription(event.target.value)}
-              className="omnix-input mt-2 min-h-[104px] w-full resize-none rounded-lg p-3 text-sm leading-6"
-              placeholder="Carry forward the operational context"
-            />
-            <p className="mt-2 text-[11px] leading-5 text-[var(--omnix-text-3)]">
-              This creates one Idea task linked to {taskSource.kind === "message" ? "the source message" : "the selected AI extraction and channel"}. Ownership and dates remain unset unless recorded later.
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button type="button" size="sm" variant="ghost" onClick={() => setTaskSource(null)}>Cancel</Button>
-              <Button type="submit" size="sm" isLoading={creatingTask} disabled={!taskTitle.trim()} leftIcon={<ClipboardCheck className="h-3.5 w-3.5" />}>
-                Open task
-              </Button>
-            </div>
-          </form>
-        </div>
+              <Input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} placeholder="Name the specific next step" className="h-10 text-sm" autoFocus />
+              <textarea
+                value={taskDescription}
+                onChange={(event) => setTaskDescription(event.target.value)}
+                className="omnix-input mt-2 min-h-[104px] w-full resize-none rounded-lg p-3 text-sm leading-6"
+                placeholder="Carry forward the operational context"
+              />
+              <p className="mt-2 text-[11px] leading-5 text-[var(--omnix-text-3)]">
+                This creates one Idea task linked to {taskSource.kind === "message" ? "the source message" : "the selected AI extraction and channel"}. Ownership and dates remain unset unless recorded later.
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <Button type="button" size="sm" variant="ghost" onClick={() => setTaskSource(null)}>Cancel</Button>
+                <Button type="submit" size="sm" isLoading={creatingTask} disabled={!taskTitle.trim()} leftIcon={<ClipboardCheck className="h-3.5 w-3.5" />}>
+                  Open task
+                </Button>
+              </div>
+            </form>
+          </div>
+        </Portal>
       ) : null}
       {decisionSource ? (
-        <div className="omnix-mobile-sheet-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6">
-          <form onSubmit={createDecisionFromContext} className="omnix-mobile-sheet omnix-panel-strong max-h-[calc(100dvh_-_2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-cyan-300/15 p-4 shadow-2xl sm:p-5">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Discussion to decision</p>
-                <h2 className="mt-1 text-base font-semibold text-white">Record linked decision</h2>
+        <Portal>
+          <div className="omnix-mobile-sheet-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6">
+            <form onSubmit={createDecisionFromContext} className="omnix-mobile-sheet omnix-panel-strong max-h-[calc(100dvh_-_2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-cyan-300/15 p-4 shadow-2xl sm:p-5">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Discussion to decision</p>
+                  <h2 className="mt-1 text-base font-semibold text-white">Record linked decision</h2>
+                </div>
+                <button type="button" onClick={() => setDecisionSource(null)} className="rounded-md p-1.5 text-white/45 hover:text-white" aria-label="Close decision conversion">
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <button type="button" onClick={() => setDecisionSource(null)} className="rounded-md p-1.5 text-white/45 hover:text-white" aria-label="Close decision conversion">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <Input value={decisionTitle} onChange={(event) => setDecisionTitle(event.target.value)} placeholder="Name the organizational choice" className="h-10 text-sm" autoFocus />
-            <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
+              <Input value={decisionTitle} onChange={(event) => setDecisionTitle(event.target.value)} placeholder="Name the organizational choice" className="h-10 text-sm" autoFocus />
+              <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
+                <textarea
+                  value={decisionReason}
+                  onChange={(event) => setDecisionReason(event.target.value)}
+                  className="omnix-input min-h-[96px] w-full resize-none rounded-lg p-3 text-sm leading-6"
+                  placeholder="Reason, if explicitly known"
+                />
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Status</span>
+                  <select
+                    value={decisionStatus}
+                    onChange={(event) => setDecisionStatus(event.target.value as WorkspaceDecisionStatus)}
+                    className="omnix-input h-10 w-full rounded-lg px-3 text-sm"
+                  >
+                    {Object.entries(decisionStatusLabels).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <textarea
-                value={decisionReason}
-                onChange={(event) => setDecisionReason(event.target.value)}
-                className="omnix-input min-h-[96px] w-full resize-none rounded-lg p-3 text-sm leading-6"
-                placeholder="Reason, if explicitly known"
+                value={decisionDescription}
+                onChange={(event) => setDecisionDescription(event.target.value)}
+                className="omnix-input mt-2 min-h-[92px] w-full resize-none rounded-lg p-3 text-sm leading-6"
+                placeholder="Source description"
               />
-              <label className="block">
-                <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Status</span>
-                <select
-                  value={decisionStatus}
-                  onChange={(event) => setDecisionStatus(event.target.value as WorkspaceDecisionStatus)}
-                  className="omnix-input h-10 w-full rounded-lg px-3 text-sm"
-                >
-                  {Object.entries(decisionStatusLabels).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <textarea
-              value={decisionDescription}
-              onChange={(event) => setDecisionDescription(event.target.value)}
-              className="omnix-input mt-2 min-h-[92px] w-full resize-none rounded-lg p-3 text-sm leading-6"
-              placeholder="Source description"
-            />
-            <p className="mt-2 text-[11px] leading-5 text-[var(--omnix-text-3)]">
-              This creates one decision linked to the selected message, channel, and workspace. It does not infer agreement beyond what you record here.
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button type="button" size="sm" variant="ghost" onClick={() => setDecisionSource(null)}>Cancel</Button>
-              <Button type="submit" size="sm" isLoading={creatingDecision} disabled={!decisionTitle.trim()} leftIcon={<BadgeCheck className="h-3.5 w-3.5" />}>
-                Record decision
-              </Button>
-            </div>
-          </form>
-        </div>
+              <p className="mt-2 text-[11px] leading-5 text-[var(--omnix-text-3)]">
+                This creates one decision linked to the selected message, channel, and workspace. It does not infer agreement beyond what you record here.
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <Button type="button" size="sm" variant="ghost" onClick={() => setDecisionSource(null)}>Cancel</Button>
+                <Button type="submit" size="sm" isLoading={creatingDecision} disabled={!decisionTitle.trim()} leftIcon={<BadgeCheck className="h-3.5 w-3.5" />}>
+                  Record decision
+                </Button>
+              </div>
+            </form>
+          </div>
+        </Portal>
       ) : null}
     </section>
   );

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
+import { Portal } from "@/components/ui/Portal";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModal";
 import { useAuth } from "@/lib/auth-context";
@@ -595,117 +596,121 @@ export default function TeamPage() {
       />
 
       {roleMember ? (
-        <div className="omnix-modal-backdrop fixed inset-0 z-[120] flex items-end justify-center px-3 py-3 sm:items-center sm:px-4">
-          <div className="omnix-modal-card max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto p-5 sm:p-6">
-            <div className="relative z-10 flex items-start gap-3">
-              <ProfileAvatar
-                name={memberName(roleMember)}
-                email={roleMember.email}
-                handle={roleMember.handle}
-                avatarUrl={roleMember.avatar_url}
-                className="h-10 w-10 border-cyan-300/25 bg-cyan-300/10 text-sm"
-              />
-              <div className="min-w-0">
-                <h3 className="text-base font-semibold text-white">Update Role</h3>
-                <p className="mt-1 truncate text-sm text-[var(--omnix-text-2)]">{memberName(roleMember)}</p>
+        <Portal>
+          <div className="omnix-modal-backdrop fixed inset-0 z-[120] flex items-end justify-center px-3 py-3 sm:items-center sm:px-4">
+            <div className="omnix-modal-card max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto p-5 sm:p-6">
+              <div className="relative z-10 flex items-start gap-3">
+                <ProfileAvatar
+                  name={memberName(roleMember)}
+                  email={roleMember.email}
+                  handle={roleMember.handle}
+                  avatarUrl={roleMember.avatar_url}
+                  className="h-10 w-10 border-cyan-300/25 bg-cyan-300/10 text-sm"
+                />
+                <div className="min-w-0">
+                  <h3 className="text-base font-semibold text-white">Update Role</h3>
+                  <p className="mt-1 truncate text-sm text-[var(--omnix-text-2)]">{memberName(roleMember)}</p>
+                </div>
+              </div>
+
+              <div className="relative z-10 mt-5 space-y-2">
+                {roleOptions.map((option) => {
+                  const Icon = option.icon;
+                  const active = selectedRole === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setSelectedRole(option.value)}
+                      className={cn(
+                        "flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition",
+                        active
+                          ? "border-cyan-300/35 bg-cyan-300/10 text-white shadow-[var(--omnix-glow-xs)]"
+                          : "border-[var(--omnix-border)] bg-white/[0.03] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-white/[0.05]",
+                      )}
+                    >
+                      <span className={cn("mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", active ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100" : "border-white/10 bg-black/15 text-[var(--omnix-text-3)]")}>
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold">{option.label}</span>
+                        <span className="mt-1 block text-xs leading-5 text-[var(--omnix-text-3)]">{option.description}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="relative z-10 mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={Boolean(busyAction)}
+                  onClick={() => {
+                    setRoleMember(null);
+                    setSelectedRole(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  className="omnix-primary-action"
+                  disabled={!selectedRole || selectedRole === roleMember.role}
+                  isLoading={busyAction === `role:${roleMember.user_id}`}
+                  onClick={handleUpdateRole}
+                >
+                  Update Role
+                </Button>
               </div>
             </div>
-
-            <div className="relative z-10 mt-5 space-y-2">
-              {roleOptions.map((option) => {
-                const Icon = option.icon;
-                const active = selectedRole === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setSelectedRole(option.value)}
-                    className={cn(
-                      "flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition",
-                      active
-                        ? "border-cyan-300/35 bg-cyan-300/10 text-white shadow-[var(--omnix-glow-xs)]"
-                        : "border-[var(--omnix-border)] bg-white/[0.03] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-white/[0.05]",
-                    )}
-                  >
-                    <span className={cn("mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", active ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100" : "border-white/10 bg-black/15 text-[var(--omnix-text-3)]")}>
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold">{option.label}</span>
-                      <span className="mt-1 block text-xs leading-5 text-[var(--omnix-text-3)]">{option.description}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="relative z-10 mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={Boolean(busyAction)}
-                onClick={() => {
-                  setRoleMember(null);
-                  setSelectedRole(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                className="omnix-primary-action"
-                disabled={!selectedRole || selectedRole === roleMember.role}
-                isLoading={busyAction === `role:${roleMember.user_id}`}
-                onClick={handleUpdateRole}
-              >
-                Update Role
-              </Button>
-            </div>
           </div>
-        </div>
+        </Portal>
       ) : null}
 
       {removeMember ? (
-        <div className="omnix-modal-backdrop fixed inset-0 z-[120] flex items-end justify-center px-3 py-3 sm:items-center sm:px-4">
-          <div className="omnix-modal-card max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto p-5 sm:p-6">
-            <div className="relative z-10">
-              <h3 className="text-base font-semibold text-white">Remove Member</h3>
-              <p className="mt-3 text-sm leading-6 text-[var(--omnix-text-2)]">
-                Remove this member from the workspace?
-              </p>
-              <p className="mt-4 text-sm leading-6 text-[var(--omnix-text-2)]">
-                They will immediately lose access to:
-              </p>
-              <ul className="mt-3 space-y-2 text-sm text-[var(--omnix-text-2)]">
-                {["Conversations", "Tasks", "Initiatives", "Workspace collaboration"].map((item) => (
-                  <li key={item} className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-cyan-300/80" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
+        <Portal>
+          <div className="omnix-modal-backdrop fixed inset-0 z-[120] flex items-end justify-center px-3 py-3 sm:items-center sm:px-4">
+            <div className="omnix-modal-card max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto p-5 sm:p-6">
+              <div className="relative z-10">
+                <h3 className="text-base font-semibold text-white">Remove Member</h3>
+                <p className="mt-3 text-sm leading-6 text-[var(--omnix-text-2)]">
+                  Remove this member from the workspace?
+                </p>
+                <p className="mt-4 text-sm leading-6 text-[var(--omnix-text-2)]">
+                  They will immediately lose access to:
+                </p>
+                <ul className="mt-3 space-y-2 text-sm text-[var(--omnix-text-2)]">
+                  {["Conversations", "Tasks", "Initiatives", "Workspace collaboration"].map((item) => (
+                    <li key={item} className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-cyan-300/80" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-            <div className="relative z-10 mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={Boolean(busyAction)}
-                onClick={() => setRemoveMember(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="danger"
-                isLoading={busyAction === `remove:${removeMember.user_id}`}
-                onClick={handleRemoveMember}
-              >
-                Remove
-              </Button>
+              <div className="relative z-10 mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={Boolean(busyAction)}
+                  onClick={() => setRemoveMember(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  isLoading={busyAction === `remove:${removeMember.user_id}`}
+                  onClick={handleRemoveMember}
+                >
+                  Remove
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       ) : null}
     </section>
   );
