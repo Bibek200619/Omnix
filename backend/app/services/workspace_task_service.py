@@ -71,6 +71,24 @@ def _normalize_links(links: Any) -> list[dict[str, Any]]:
     return normalized[:12]
 
 
+def _serialize_supabase_value(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, Mapping):
+        return {key: _serialize_supabase_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_serialize_supabase_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [_serialize_supabase_value(item) for item in value]
+    return value
+
+
+def _serialize_supabase_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: _serialize_supabase_value(value) for key, value in payload.items()}
+
+
 async def _hydrate_tasks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ids = sorted(
         {
@@ -227,7 +245,7 @@ async def create_task(
         "updated_at": timestamp,
     }
     try:
-        created = await insert_one_trusted("workspace_tasks", record)
+        created = await insert_one_trusted("workspace_tasks", _serialize_supabase_payload(record))
     except SupabaseServiceError as exc:
         raise _database_error() from exc
     await log_workspace_activity(
@@ -283,7 +301,7 @@ async def update_task(
         changed = await update_one_trusted(
             "workspace_tasks",
             {"id": task_id, "workspace_id": workspace_id},
-            update,
+            _serialize_supabase_payload(update),
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc

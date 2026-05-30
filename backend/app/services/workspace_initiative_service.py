@@ -65,6 +65,24 @@ def _as_datetime(value: Any) -> datetime | None:
     return None
 
 
+def _serialize_supabase_value(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, Mapping):
+        return {key: _serialize_supabase_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_serialize_supabase_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [_serialize_supabase_value(item) for item in value]
+    return value
+
+
+def _serialize_supabase_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: _serialize_supabase_value(value) for key, value in payload.items()}
+
+
 def _momentum(initiative: Mapping[str, Any], tasks: list[dict[str, Any]], channels: list[dict[str, Any]]) -> dict[str, Any]:
     today = date.today()
     due_threshold = today + timedelta(days=7)
@@ -298,16 +316,16 @@ async def create_initiative(*, workspace_id: str, user_id: str, payload: Mapping
         "updated_at": timestamp,
     }
     try:
-        created = await insert_one_trusted("workspace_initiatives", record)
+        created = await insert_one_trusted("workspace_initiatives", _serialize_supabase_payload(record))
         await insert_one_trusted(
             "workspace_operational_timeline",
-            {
+            _serialize_supabase_payload({
                 "workspace_id": workspace_id,
                 "initiative_id": created["id"],
                 "event_type": "initiative_started",
                 "summary": f"Initiative opened: {title}.",
                 "metadata": {"actor_user_id": user_id, "initiative_name": title},
-            },
+            }),
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
@@ -358,7 +376,7 @@ async def update_initiative(
         changed = await update_one_trusted(
             "workspace_initiatives",
             {"id": initiative_id, "workspace_id": workspace_id},
-            update,
+            _serialize_supabase_payload(update),
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
@@ -404,12 +422,12 @@ async def attach_channel(*, workspace_id: str, initiative_id: str, channel_id: s
         if existing is None:
             await insert_one_trusted(
                 "workspace_initiative_channels",
-                {
+                _serialize_supabase_payload({
                     "workspace_id": workspace_id,
                     "initiative_id": initiative_id,
                     "channel_id": channel_id,
                     "attached_by": user_id,
-                },
+                }),
             )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
