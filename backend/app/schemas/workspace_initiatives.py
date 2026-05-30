@@ -105,3 +105,6 @@ class WorkspaceInitiativeAssistanceRead(BaseModel):
     source_channel_count: int
     source_message_count: int
     generated_at: datetime
+
+
+WorkspaceInitiativeRead.model_rebuild()
