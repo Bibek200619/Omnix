@@ -30,6 +30,7 @@ import type {
   WorkspaceTaskMomentum,
   WorkspaceTaskStatus,
 } from "@/lib/workspace-types";
+import { DecisionTraceabilityList } from "../decisions/DecisionTraceabilityList";
 
 const flow: Array<{ value: WorkspaceTaskStatus; label: string }> = [
   { value: "idea", label: "Idea" },
@@ -249,6 +250,7 @@ export function WorkspaceTasksSurface() {
       momentum_metadata: {},
       initiative_id: initiativeId || null,
       client_nonce: nonce,
+      linked_decisions: [],
       owner_name: members.find((member) => member.user_id === ownerId)?.full_name ?? null,
     };
     setTasks((current) => mergeTask(current, optimistic));
@@ -529,6 +531,9 @@ export function WorkspaceTasksSurface() {
                       ))}
                     </div>
                   )}
+
+                  {/* Phase 3: Linked Decisions */}
+                  <DecisionTraceabilityList decisions={task.linked_decisions} />
                   
                   {/* Inline Blocker Adder (Simplified) */}
                   <div className="mt-2.5 border-t border-white/[0.04] pt-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
