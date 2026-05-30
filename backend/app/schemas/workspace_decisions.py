@@ -34,9 +34,26 @@ class WorkspaceDecisionRead(BaseModel):
     status: DecisionStatus
     source_message_id: str | None = None
     source_channel_id: str | None = None
+    initiative_id: str | None = None
     created_by: str
     created_at: datetime | None = None
     updated_at: datetime | None = None
     creator_name: str | None = None
     creator_email: str | None = None
     creator_avatar_label: str | None = None
+
+    # Linkage expansion
+    linked_tasks: list[dict[str, Any]] = Field(default_factory=list)
+    initiative: dict[str, Any] | None = None
+
+
+class WorkspaceDecisionStatusUpdate(BaseModel):
+    status: DecisionStatus
+
+
+class WorkspaceDecisionLinkTask(BaseModel):
+    task_id: str
+
+
+class WorkspaceDecisionLinkInitiative(BaseModel):
+    initiative_id: str | None
