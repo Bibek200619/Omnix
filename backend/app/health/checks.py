@@ -7,6 +7,7 @@ import httpx
 from ..db.supabase_client import get_supabase
 from ..rag.startup import get_vector_store
 from ..core.config import get_settings
+from ..services.workspace_schema_health_service import check_workspace_schema_health
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ async def check_ollama() -> Dict[str, Any]:
 async def run_all_checks() -> Dict[str, Any]:
     results = await asyncio.gather(
         check_supabase(),
+        check_workspace_schema_health(),
         check_vector_store(),
         check_redis(),
         check_ollama(),
@@ -85,7 +87,8 @@ async def run_all_checks() -> Dict[str, Any]:
     
     return {
         "supabase": results[0] if not isinstance(results[0], Exception) else {"status": "error", "error": str(results[0])},
-        "vector_store": results[1] if not isinstance(results[1], Exception) else {"status": "error", "error": str(results[1])},
-        "redis": results[2] if not isinstance(results[2], Exception) else {"status": "error", "error": str(results[2])},
-        "ollama": results[3] if not isinstance(results[3], Exception) else {"status": "error", "error": str(results[3])},
+        "workspace_schema": results[1] if not isinstance(results[1], Exception) else {"status": "error", "error": str(results[1])},
+        "vector_store": results[2] if not isinstance(results[2], Exception) else {"status": "error", "error": str(results[2])},
+        "redis": results[3] if not isinstance(results[3], Exception) else {"status": "error", "error": str(results[3])},
+        "ollama": results[4] if not isinstance(results[4], Exception) else {"status": "error", "error": str(results[4])},
     }

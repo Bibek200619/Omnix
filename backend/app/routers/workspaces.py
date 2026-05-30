@@ -574,9 +574,11 @@ async def list_workspaces(
     user_id = _user_id_from_claims(current_user)
     try:
         return await list_user_workspaces(user_id)
-    except Exception:
-        logger.exception("Failed to list user workspaces; returning empty list instead of 500.")
-        return []
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to list user workspaces.")
+        raise _database_error() from exc
 
 
 @router.get("/hierarchy", response_model=list[WorkspaceTreeRead])
