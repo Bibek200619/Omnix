@@ -148,7 +148,8 @@ export function WorkspaceInitiativesSurface() {
       setError(null);
     } catch (err) {
       if (requestId === requestRef.current) {
-        setError(err instanceof Error ? err.message : "Unable to load initiatives.");
+        console.error("Failed to load initiatives", err);
+        setError("Unable to load initiatives.");
       }
     } finally {
       if (requestId === requestRef.current) setLoading(false);
@@ -269,7 +270,8 @@ export function WorkspaceInitiativesSurface() {
       void loadInitiatives(true);
     } catch (err) {
       setInitiatives((current) => current.filter((initiative) => initiative.client_nonce !== nonce));
-      setError(err instanceof Error ? err.message : "Unable to open initiative.");
+      console.error("Failed to open initiative", err);
+      setError("Unable to open initiative.");
     } finally {
       setCreating(false);
     }
@@ -288,7 +290,8 @@ export function WorkspaceInitiativesSurface() {
       setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
     } catch (err) {
       setInitiatives((current) => current.map((item) => (item.id === before.id ? before : item)));
-      setError(err instanceof Error ? err.message : "Unable to update initiative.");
+      console.error("Failed to update initiative", err);
+      setError("Unable to update initiative.");
     } finally {
       setUpdating(false);
     }
@@ -305,7 +308,8 @@ export function WorkspaceInitiativesSurface() {
       setTaskToAttach("");
       void loadInitiatives(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to attach task.");
+      console.error("Failed to attach task to initiative", err);
+      setError("Unable to attach task.");
     } finally {
       setUpdating(false);
     }
@@ -318,7 +322,8 @@ export function WorkspaceInitiativesSurface() {
       await apiClient.patch<WorkspaceTask>(`/workspaces/${activeWorkspaceId}/tasks/${task.id}`, { initiative_id: null });
       void loadInitiatives(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to detach task.");
+      console.error("Failed to detach task from initiative", err);
+      setError("Unable to detach task.");
     } finally {
       setUpdating(false);
     }
@@ -335,7 +340,8 @@ export function WorkspaceInitiativesSurface() {
       setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
       setChannelToAttach("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to attach conversation.");
+      console.error("Failed to attach conversation to initiative", err);
+      setError("Unable to attach conversation.");
     } finally {
       setUpdating(false);
     }
@@ -348,7 +354,8 @@ export function WorkspaceInitiativesSurface() {
       await apiClient.delete(`/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels/${channelId}`);
       void loadInitiatives(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to detach conversation.");
+      console.error("Failed to detach conversation from initiative", err);
+      setError("Unable to detach conversation.");
     } finally {
       setUpdating(false);
     }
@@ -379,7 +386,8 @@ export function WorkspaceInitiativesSurface() {
         ),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Initiative assistance is unavailable.");
+      console.error("Failed to load initiative assistance", err);
+      setError("Initiative assistance is unavailable.");
     } finally {
       setAssisting(null);
     }
