@@ -204,10 +204,14 @@ class ApiClient {
     return request;
   }
 
-  async delete(endpoint: string): Promise<void> {
-    await this.request(endpoint, {
+  async delete<T = void>(endpoint: string): Promise<T> {
+    const response = await this.request(endpoint, {
       method: "DELETE",
     });
+    if (response.status === 204) {
+      return undefined as unknown as T;
+    }
+    return response.json() as Promise<T>;
   }
 }
 

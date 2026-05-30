@@ -7,6 +7,7 @@ import { apiClient } from "@/lib/api";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { WorkspaceDecision, WorkspaceDecisionStatus } from "@/lib/workspace-types";
+import { DecisionContextPanel } from "./DecisionContextPanel";
 
 const statusLabels: Record<WorkspaceDecisionStatus, string> = {
   proposed: "Proposed",
@@ -22,23 +23,6 @@ function statusClass(status: WorkspaceDecisionStatus) {
   return "border-cyan-300/20 bg-cyan-300/[0.07] text-cyan-100";
 }
 
-function readableDate(value?: string | null) {
-  if (!value) return "Not recorded";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Not recorded";
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function creatorLabel(decision: WorkspaceDecision) {
-  return decision.creator_name || decision.creator_email || decision.created_by;
-}
-
 export function WorkspaceDecisionsSurface() {
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const [decisions, setDecisions] = useState<WorkspaceDecision[]>([]);
@@ -51,6 +35,10 @@ export function WorkspaceDecisionsSurface() {
     () => decisions.find((decision) => decision.id === selectedId) ?? decisions[0] ?? null,
     [decisions, selectedId],
   );
+
+  const handleDecisionUpdate = useCallback((updated: WorkspaceDecision) => {
+    setDecisions((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+  }, []);
 
   const loadDecisions = useCallback(async () => {
     if (!activeWorkspaceId) {
@@ -168,12 +156,12 @@ export function WorkspaceDecisionsSurface() {
         <main className="omnix-panel min-h-0 min-w-0 overflow-hidden rounded-xl">
           {selected ? (
             <div className="flex h-full min-h-0 flex-col">
-              <div className="border-b border-[var(--omnix-border)] px-4 py-4 sm:px-5">
+              <header className="border-b border-[var(--omnix-border)] px-4 py-4 sm:px-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="mb-2 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">
                       <CircleDot className="h-3.5 w-3.5 text-cyan-100/60" />
-                      Decision detail
+                      Decision context
                     </p>
                     <h2 className="omnix-display max-w-4xl text-2xl font-semibold leading-tight text-white">{selected.title}</h2>
                   </div>
@@ -181,40 +169,9 @@ export function WorkspaceDecisionsSurface() {
                     {statusLabels[selected.status]}
                   </span>
                 </div>
-              </div>
-              <div className="omnix-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
-                  <section className="rounded-xl border border-[var(--omnix-border)] bg-black/10 p-4">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Reason</p>
-                    <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[var(--omnix-text)]">
-                      {selected.decision_reason || "No reason recorded."}
-                    </p>
-                    {selected.description ? (
-                      <div className="mt-5 border-t border-[var(--omnix-border)] pt-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Description</p>
-                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--omnix-text-2)]">{selected.description}</p>
-                      </div>
-                    ) : null}
-                  </section>
-                  <section className="rounded-xl border border-[var(--omnix-border)] bg-cyan-300/[0.025] p-4">
-                    <dl className="space-y-4">
-                      <div>
-                        <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Created by</dt>
-                        <dd className="mt-1 break-words text-sm text-white">{creatorLabel(selected)}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Created date</dt>
-                        <dd className="mt-1 text-sm text-white">{readableDate(selected.created_at)}</dd>
-                      </div>
-                      {selected.source_message_id ? (
-                        <div>
-                          <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Source</dt>
-                          <dd className="mt-1 text-sm text-cyan-100/80">Conversation message</dd>
-                        </div>
-                      ) : null}
-                    </dl>
-                  </section>
-                </div>
+              </header>
+              <div className="min-h-0 flex-1">
+                <DecisionContextPanel decision={selected} onUpdate={handleDecisionUpdate} />
               </div>
             </div>
           ) : (
