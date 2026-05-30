@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import re
 import time
 from collections.abc import Mapping
 from typing import Any
 
-from ..services.supabase_service import select_all_trusted
+from fastapi import HTTPException
+
+from ..services.supabase_service import SupabaseServiceError, select_all_trusted
 from .workspace_cognition import build_workspace_focus_prompt, normalize_workspace_focus
 from .workspace_service import (
     list_workspace_members,
@@ -17,6 +20,7 @@ from .workspace_service import (
 FILE_COLUMNS = "id,file_name,file_type,workspace_id,metadata,created_at"
 CONVERSATION_COLUMNS = "id,title,workspace_id,last_message_at,updated_at,created_at"
 DOMAIN_RE = re.compile(r"[A-Za-z][A-Za-z0-9+#-]{2,}")
+logger = logging.getLogger(__name__)
 
 # Cache for intelligence profiles to reduce massive read amplification
 # Structure: {(workspace_id, user_id): (timestamp, profile_dict)}
@@ -162,6 +166,29 @@ async def workspace_retrieval_scope_ids(
     return list(dict.fromkeys(ids))
 
 
+async def _optional_select_all(
+    table: str,
+    columns: str,
+    *,
+    filters: Mapping[str, Any] | None = None,
+    order_by: str | None = None,
+    desc: bool = False,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    try:
+        return await select_all_trusted(
+            table,
+            columns,
+            filters=filters,
+            order_by=order_by,
+            desc=desc,
+            limit=limit,
+        )
+    except SupabaseServiceError:
+        logger.warning("Workspace intelligence optional read failed | table=%s", table, exc_info=True)
+        return []
+
+
 async def build_workspace_intelligence_profile(
     workspace_id: str,
     user_id: str,
@@ -176,7 +203,7 @@ async def build_workspace_intelligence_profile(
     workspace = normalize_workspace_record(access.workspace)
     scope_ids = await workspace_retrieval_scope_ids(workspace, user_id)
 
-    files = await select_all_trusted(
+    files = await _optional_select_all(
         "files",
         FILE_COLUMNS,
         filters={"workspace_id": scope_ids},
@@ -188,7 +215,7 @@ async def build_workspace_intelligence_profile(
         row for row in files if str(row.get("workspace_id") or "") in set(scope_ids)
     ]
 
-    conversations = await select_all_trusted(
+    conversations = await _optional_select_all(
         "conversations",
         CONVERSATION_COLUMNS,
         filters={"workspace_id": scope_ids},
@@ -200,10 +227,16 @@ async def build_workspace_intelligence_profile(
         row for row in conversations if str(row.get("workspace_id") or "") in set(scope_ids)
     ]
 
-    members = await list_workspace_members(workspace)
+    try:
+        members = await list_workspace_members(workspace)
+    except HTTPException as exc:
+        if exc.status_code < 500:
+            raise
+        logger.warning("Workspace intelligence member hydration failed | workspace_id=%s", workspace_id, exc_info=True)
+        members = []
 
     # Initiative direction is injected as recorded context only; health is derived at the initiative surface.
-    initiatives = await select_all_trusted(
+    initiatives = await _optional_select_all(
         "workspace_initiatives",
         "*",
         filters={"workspace_id": scope_ids, "status": ["active", "focused", "at_risk"]},
@@ -212,7 +245,7 @@ async def build_workspace_intelligence_profile(
         limit=5,
     )
 
-    unresolved_continuity = await select_all_trusted(
+    unresolved_continuity = await _optional_select_all(
         "workspace_intelligence_memory",
         "*",
         filters={

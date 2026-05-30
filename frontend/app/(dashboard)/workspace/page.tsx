@@ -71,6 +71,7 @@ export default function WorkspacePage() {
     activeMembers,
     activeInvites,
     activeWorkspaceIntelligence,
+    intelligenceError,
     createWorkspace,
     createSubspace,
     loading,
@@ -351,7 +352,7 @@ export default function WorkspacePage() {
           </aside>
 
           <div className="space-y-5">
-            <WorkspaceIntelligencePanel profile={activeWorkspaceIntelligence} />
+            <WorkspaceIntelligencePanel profile={activeWorkspaceIntelligence} error={intelligenceError} />
             <WorkspacePresenceCluster
               presence={presence}
               workspaceName={selected?.name}
