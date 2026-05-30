@@ -36,6 +36,7 @@ import type {
   WorkspaceMember,
   WorkspaceTask,
 } from "@/lib/workspace-types";
+import { DecisionTraceabilityList } from "../decisions/DecisionTraceabilityList";
 
 const statuses: Array<{ value: WorkspaceInitiativeStatus; label: string }> = [
   { value: "draft", label: "Draft" },
@@ -241,6 +242,7 @@ export function WorkspaceInitiativesSurface() {
       client_nonce: nonce,
       linked_tasks: [],
       linked_channels: [],
+      linked_decisions: [],
       owner_name: members.find((member) => member.user_id === ownerId)?.full_name ?? null,
       momentum: quietMomentum(),
     };
@@ -533,6 +535,11 @@ export function WorkspaceInitiativesSurface() {
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--omnix-text)]">{selected.initiative_context}</p>
                 </div>
               ) : null}
+
+              {/* Phase 3: Linked Decisions */}
+              <div className="mb-8">
+                <DecisionTraceabilityList decisions={selected.linked_decisions} title="Related Decisions" />
+              </div>
 
               {/* Blockers Visibility */}
               {selected.momentum.blocked_task_count > 0 && (

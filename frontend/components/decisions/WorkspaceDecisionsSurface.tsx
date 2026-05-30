@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { BadgeCheck, CircleDot, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { apiClient } from "@/lib/api";
@@ -25,6 +26,7 @@ function statusClass(status: WorkspaceDecisionStatus) {
 
 export function WorkspaceDecisionsSurface() {
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
+  const searchParams = useSearchParams();
   const [decisions, setDecisions] = useState<WorkspaceDecision[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,9 +67,14 @@ export function WorkspaceDecisionsSurface() {
   }, [activeWorkspaceId]);
 
   useEffect(() => {
-    setSelectedId(null);
+    const id = searchParams?.get("id");
+    if (id) {
+      setSelectedId(id);
+    } else {
+      setSelectedId(null);
+    }
     void loadDecisions();
-  }, [activeWorkspaceId, loadDecisions]);
+  }, [activeWorkspaceId, loadDecisions, searchParams]);
 
   if (!activeWorkspaceId) {
     return (

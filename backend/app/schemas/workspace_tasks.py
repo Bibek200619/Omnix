@@ -93,6 +93,7 @@ class WorkspaceTaskRead(BaseModel):
     owner_email: str | None = None
     owner_avatar_label: str | None = None
     creator_name: str | None = None
+    linked_decisions: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class WorkspaceTaskMomentumRead(BaseModel):
