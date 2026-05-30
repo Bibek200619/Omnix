@@ -7,9 +7,11 @@ from fastapi import HTTPException, status
 
 from .supabase_service import (
     SupabaseServiceError,
+    delete_one_trusted,
     insert_one_trusted,
     select_all_trusted,
     select_one_trusted,
+    update_one_trusted,
 )
 from .workspace_collaboration_service import log_workspace_activity
 from .workspace_conversation_service import MESSAGE_COLUMNS, _require_channel_access
@@ -17,8 +19,10 @@ from .workspace_service import get_profiles, require_workspace_access, utc_now_i
 
 DECISION_COLUMNS = (
     "id,workspace_id,title,description,decision_reason,status,source_message_id,"
-    "source_channel_id,created_by,created_at,updated_at"
+    "source_channel_id,initiative_id,created_by,created_at,updated_at"
 )
+TASK_PREVIEW_COLUMNS = "id,title,status,owner_user_id"
+INITIATIVE_PREVIEW_COLUMNS = "id,title,status,momentum_state"
 DECISION_STATUSES = ("proposed", "accepted", "rejected", "superseded")
 
 
@@ -44,20 +48,53 @@ def _title_from_text(content: Any) -> str:
     return normalized if len(normalized) <= 110 else f"{normalized[:107].rstrip()}..."
 
 
-async def _hydrate_decisions(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+async def _hydrate_decisions(rows: list[dict[str, Any]], expand_links: bool = False) -> list[dict[str, Any]]:
     creator_ids = sorted({str(row.get("created_by")) for row in rows if row.get("created_by")})
     profiles = await get_profiles(creator_ids)
     hydrated: list[dict[str, Any]] = []
     for row in rows:
         creator = profiles.get(str(row.get("created_by") or ""), {})
-        hydrated.append(
-            {
-                **row,
-                "creator_name": creator.get("full_name") or creator.get("handle") or creator.get("email"),
-                "creator_email": creator.get("email"),
-                "creator_avatar_label": creator.get("avatar_label"),
-            }
-        )
+        item = {
+            **row,
+            "creator_name": creator.get("full_name") or creator.get("handle") or creator.get("email"),
+            "creator_email": creator.get("email"),
+            "creator_avatar_label": creator.get("avatar_label"),
+            "linked_tasks": [],
+            "initiative": None,
+        }
+
+        if expand_links:
+            # Fetch linked tasks
+            try:
+                task_links = await select_all_trusted(
+                    "workspace_decision_tasks",
+                    "task_id",
+                    {"decision_id": row["id"]},
+                )
+                if task_links:
+                    task_ids = [str(tl["task_id"]) for tl in task_links]
+                    tasks = await select_all_trusted(
+                        "workspace_tasks",
+                        TASK_PREVIEW_COLUMNS,
+                        {"id": ("in", task_ids)},
+                    )
+                    item["linked_tasks"] = tasks
+            except SupabaseServiceError:
+                pass  # Partial failure okay for hydration
+
+            # Fetch initiative
+            if row.get("initiative_id"):
+                try:
+                    initiative = await select_one_trusted(
+                        "workspace_initiatives",
+                        INITIATIVE_PREVIEW_COLUMNS,
+                        {"id": row["initiative_id"]},
+                    )
+                    item["initiative"] = initiative
+                except SupabaseServiceError:
+                    pass
+
+        hydrated.append(item)
     return hydrated
 
 
@@ -101,7 +138,116 @@ async def require_decision(*, workspace_id: str, decision_id: str, user_id: str)
 
 async def get_decision(*, workspace_id: str, decision_id: str, user_id: str) -> dict[str, Any]:
     row = await require_decision(workspace_id=workspace_id, decision_id=decision_id, user_id=user_id)
-    return (await _hydrate_decisions([row]))[0]
+    return (await _hydrate_decisions([row], expand_links=True))[0]
+
+
+async def update_decision_status(
+    *,
+    workspace_id: str,
+    decision_id: str,
+    user_id: str,
+    status: str,
+) -> dict[str, Any]:
+    await require_decision(workspace_id=workspace_id, decision_id=decision_id, user_id=user_id)
+    timestamp = utc_now_iso()
+    try:
+        updated = await update_one_trusted(
+            "workspace_decisions",
+            {"status": _normalize_status(status), "updated_at": timestamp},
+            {"id": decision_id, "workspace_id": workspace_id},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+    if updated is None:
+        raise _not_found()
+
+    await log_workspace_activity(
+        workspace_id=workspace_id,
+        actor_user_id=user_id,
+        event_type="decision.status_updated",
+        summary=f"Decision status updated to {status}: {updated.get('title')}.",
+        metadata={"decision_id": decision_id, "status": status},
+    )
+    return (await _hydrate_decisions([updated], expand_links=True))[0]
+
+
+async def link_task_to_decision(
+    *,
+    workspace_id: str,
+    decision_id: str,
+    task_id: str,
+    user_id: str,
+) -> dict[str, Any]:
+    await require_decision(workspace_id=workspace_id, decision_id=decision_id, user_id=user_id)
+    # Verify task exists in workspace
+    try:
+        task = await select_one_trusted("workspace_tasks", "id", {"id": task_id, "workspace_id": workspace_id})
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found in this workspace.")
+
+    try:
+        await insert_one_trusted(
+            "workspace_decision_tasks",
+            {"decision_id": decision_id, "task_id": task_id, "workspace_id": workspace_id},
+        )
+    except SupabaseServiceError as exc:
+        # Check if already linked (Pkey violation)
+        if "duplicate key" not in str(exc).lower():
+            raise _database_error() from exc
+
+    return await get_decision(workspace_id=workspace_id, decision_id=decision_id, user_id=user_id)
+
+
+async def unlink_task_from_decision(
+    *,
+    workspace_id: str,
+    decision_id: str,
+    task_id: str,
+    user_id: str,
+) -> dict[str, Any]:
+    await require_decision(workspace_id=workspace_id, decision_id=decision_id, user_id=user_id)
+    try:
+        await delete_one_trusted(
+            "workspace_decision_tasks",
+            {"decision_id": decision_id, "task_id": task_id, "workspace_id": workspace_id},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    return await get_decision(workspace_id=workspace_id, decision_id=decision_id, user_id=user_id)
+
+
+async def link_initiative_to_decision(
+    *,
+    workspace_id: str,
+    decision_id: str,
+    initiative_id: str | None,
+    user_id: str,
+) -> dict[str, Any]:
+    await require_decision(workspace_id=workspace_id, decision_id=decision_id, user_id=user_id)
+
+    if initiative_id:
+        # Verify initiative exists
+        try:
+            init = await select_one_trusted("workspace_initiatives", "id", {"id": initiative_id, "workspace_id": workspace_id})
+        except SupabaseServiceError as exc:
+            raise _database_error() from exc
+        if not init:
+            raise HTTPException(status_code=404, detail="Initiative not found in this workspace.")
+
+    timestamp = utc_now_iso()
+    try:
+        updated = await update_one_trusted(
+            "workspace_decisions",
+            {"initiative_id": initiative_id, "updated_at": timestamp},
+            {"id": decision_id, "workspace_id": workspace_id},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    return (await _hydrate_decisions([updated], expand_links=True))[0]
 
 
 async def create_decision(

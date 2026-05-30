@@ -442,10 +442,25 @@ export type WorkspaceDecision = {
   status: WorkspaceDecisionStatus;
   source_message_id?: string | null;
   source_channel_id?: string | null;
+  initiative_id?: string | null;
   created_by: string;
   created_at?: string | null;
   updated_at?: string | null;
   creator_name?: string | null;
   creator_email?: string | null;
   creator_avatar_label?: string | null;
+
+  // Linkages
+  linked_tasks: Array<{
+    id: string;
+    title: string;
+    status: WorkspaceTaskStatus;
+    owner_user_id?: string | null;
+  }>;
+  initiative?: {
+    id: string;
+    title: string;
+    status: WorkspaceInitiativeStatus;
+    momentum_state: Record<string, unknown>;
+  } | null;
 };
