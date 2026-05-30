@@ -23,6 +23,7 @@ TASK_COLUMNS = (
     "completed_at,created_at,updated_at"
 )
 TASK_STATUSES = ("idea", "planned", "active", "review", "complete")
+DECISION_PREVIEW_COLUMNS = "id,title,status,decision_reason,created_at"
 
 
 def _database_error() -> HTTPException:
@@ -82,6 +83,26 @@ async def _hydrate_tasks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for row in rows:
         owner = profiles.get(str(row.get("owner_user_id") or ""), {})
         creator = profiles.get(str(row.get("created_by") or ""), {})
+
+        # Fetch linked decisions
+        linked_decisions = []
+        try:
+            decision_links = await select_all_trusted(
+                "workspace_decision_tasks",
+                "decision_id",
+                {"task_id": row["id"]},
+            )
+            if decision_links:
+                decision_ids = [str(dl["decision_id"]) for dl in decision_links]
+                decisions = await select_all_trusted(
+                    "workspace_decisions",
+                    DECISION_PREVIEW_COLUMNS,
+                    {"id": ("in", decision_ids)},
+                )
+                linked_decisions = decisions
+        except SupabaseServiceError:
+            pass
+
         hydrated.append(
             {
                 **row,
@@ -93,6 +114,7 @@ async def _hydrate_tasks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "owner_email": owner.get("email"),
                 "owner_avatar_label": owner.get("avatar_label"),
                 "creator_name": creator.get("full_name") or creator.get("handle") or creator.get("email"),
+                "linked_decisions": linked_decisions,
             }
         )
     return hydrated
