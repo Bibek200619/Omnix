@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import logging
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -24,6 +25,7 @@ DECISION_COLUMNS = (
 TASK_PREVIEW_COLUMNS = "id,title,status,owner_user_id"
 INITIATIVE_PREVIEW_COLUMNS = "id,title,status,momentum_state"
 DECISION_STATUSES = ("proposed", "accepted", "rejected", "superseded")
+logger = logging.getLogger(__name__)
 
 
 def _database_error() -> HTTPException:
@@ -64,35 +66,45 @@ async def _hydrate_decisions(rows: list[dict[str, Any]], expand_links: bool = Fa
         }
 
         if expand_links:
+            workspace_id = row.get("workspace_id")
             # Fetch linked tasks
             try:
+                link_filters: dict[str, Any] = {"decision_id": row["id"]}
+                if workspace_id:
+                    link_filters["workspace_id"] = workspace_id
                 task_links = await select_all_trusted(
                     "workspace_decision_tasks",
                     "task_id",
-                    {"decision_id": row["id"]},
+                    link_filters,
                 )
                 if task_links:
                     task_ids = [str(tl["task_id"]) for tl in task_links]
+                    task_filters: dict[str, Any] = {"id": task_ids}
+                    if workspace_id:
+                        task_filters["workspace_id"] = workspace_id
                     tasks = await select_all_trusted(
                         "workspace_tasks",
                         TASK_PREVIEW_COLUMNS,
-                        {"id": ("in", task_ids)},
+                        task_filters,
                     )
                     item["linked_tasks"] = tasks
             except SupabaseServiceError:
-                pass  # Partial failure okay for hydration
+                logger.warning("Decision linked task hydration failed | decision_id=%s", row.get("id"), exc_info=True)
 
             # Fetch initiative
             if row.get("initiative_id"):
                 try:
+                    initiative_filters: dict[str, Any] = {"id": row["initiative_id"]}
+                    if workspace_id:
+                        initiative_filters["workspace_id"] = workspace_id
                     initiative = await select_one_trusted(
                         "workspace_initiatives",
                         INITIATIVE_PREVIEW_COLUMNS,
-                        {"id": row["initiative_id"]},
+                        initiative_filters,
                     )
                     item["initiative"] = initiative
                 except SupabaseServiceError:
-                    pass
+                    logger.warning("Decision initiative hydration failed | decision_id=%s", row.get("id"), exc_info=True)
 
         hydrated.append(item)
     return hydrated
@@ -153,8 +165,8 @@ async def update_decision_status(
     try:
         updated = await update_one_trusted(
             "workspace_decisions",
-            {"status": _normalize_status(status), "updated_at": timestamp},
             {"id": decision_id, "workspace_id": workspace_id},
+            {"status": _normalize_status(status), "updated_at": timestamp},
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
@@ -241,11 +253,14 @@ async def link_initiative_to_decision(
     try:
         updated = await update_one_trusted(
             "workspace_decisions",
-            {"initiative_id": initiative_id, "updated_at": timestamp},
             {"id": decision_id, "workspace_id": workspace_id},
+            {"initiative_id": initiative_id, "updated_at": timestamp},
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
+
+    if updated is None:
+        raise _not_found()
 
     return (await _hydrate_decisions([updated], expand_links=True))[0]
 
