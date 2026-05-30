@@ -121,3 +121,6 @@ class WorkspaceTaskAssistanceRead(BaseModel):
     content: str
     source_task_count: int
     generated_at: datetime
+
+
+WorkspaceTaskRead.model_rebuild()
