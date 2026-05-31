@@ -3,6 +3,10 @@
 .env.*
 !.env.example
 
+# Logs
+*.log
+logs/
+
 # IDEs and Editors
 .idea/
 .vscode/
@@ -27,7 +31,12 @@ venv/
 env/
 .venv/
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyre/
+.pytype/
 .coverage
+coverage/
 htmlcov/
 backend/data/
 
@@ -40,6 +49,8 @@ pnpm-debug.log*
 .next/
 out/
 dist/
+coverage/
+*.tsbuildinfo
 
 # Uploads and User Data
 uploads/
