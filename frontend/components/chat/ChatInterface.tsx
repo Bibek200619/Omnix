@@ -1251,6 +1251,7 @@ export function ChatInterface() {
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         <MessageList
+          key={`${activeWorkspaceId}-${currentConversation || "new"}`}
           messages={messages}
           loading={responding}
           loadingConversation={loadingConversation}
