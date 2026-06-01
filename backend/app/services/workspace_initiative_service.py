@@ -24,6 +24,7 @@ INITIATIVE_COLUMNS = (
     "initiative_context,linked_resources,activity_metadata,completed_at,client_nonce,created_at,updated_at"
 )
 CHANNEL_LINK_COLUMNS = "initiative_id,workspace_id,channel_id,attached_by,created_at"
+DECISION_PREVIEW_COLUMNS = "id,title,status,decision_reason,created_at"
 
 
 def _database_error() -> HTTPException:
@@ -177,6 +178,19 @@ async def _hydrate_initiatives(
         ]
         owner = profiles.get(str(row.get("owner_user_id") or ""), {})
         creator = profiles.get(str(row.get("created_by") or ""), {})
+
+        # Fetch linked decisions
+        linked_decisions = []
+        try:
+            decisions = await select_all_trusted(
+                "workspace_decisions",
+                DECISION_PREVIEW_COLUMNS,
+                {"initiative_id": initiative_id},
+            )
+            linked_decisions = decisions
+        except SupabaseServiceError:
+            pass
+
         hydrated.append(
             {
                 **row,
@@ -188,6 +202,7 @@ async def _hydrate_initiatives(
                 "creator_name": creator.get("full_name") or creator.get("handle") or creator.get("email"),
                 "linked_tasks": linked_tasks,
                 "linked_channels": linked_channels,
+                "linked_decisions": linked_decisions,
                 "momentum": _momentum(row, linked_tasks, linked_channels),
             }
         )

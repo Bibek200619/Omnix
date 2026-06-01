@@ -247,6 +247,13 @@ export type WorkspaceInitiative = {
   creator_name?: string | null;
   linked_tasks: WorkspaceTask[];
   linked_channels: WorkspaceInitiativeChannel[];
+  linked_decisions: Array<{
+    id: string;
+    title: string;
+    status: WorkspaceDecisionStatus;
+    decision_reason?: string | null;
+    created_at?: string | null;
+  }>;
   momentum: WorkspaceInitiativeMomentum;
 };
 
@@ -404,6 +411,13 @@ export type WorkspaceTask = {
   owner_email?: string | null;
   owner_avatar_label?: string | null;
   creator_name?: string | null;
+  linked_decisions: Array<{
+    id: string;
+    title: string;
+    status: WorkspaceDecisionStatus;
+    decision_reason?: string | null;
+    created_at?: string | null;
+  }>;
 };
 
 export type WorkspaceTaskMomentum = {
