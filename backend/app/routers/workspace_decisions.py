@@ -8,13 +8,20 @@ from ..core.security import get_current_user
 from ..schemas.workspace_decisions import (
     WorkspaceDecisionCreate,
     WorkspaceDecisionFromMessageCreate,
+    WorkspaceDecisionLinkInitiative,
+    WorkspaceDecisionLinkTask,
     WorkspaceDecisionRead,
+    WorkspaceDecisionStatusUpdate,
 )
 from ..services.workspace_decision_service import (
     create_decision,
     create_decision_from_message,
     get_decision,
+    link_initiative_to_decision,
+    link_task_to_decision,
     list_decisions,
+    unlink_task_from_decision,
+    update_decision_status,
 )
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/decisions", tags=["workspace-decisions"])
@@ -75,5 +82,65 @@ async def get_workspace_decision(
     return await get_decision(
         workspace_id=workspace_id,
         decision_id=decision_id,
+        user_id=_user_id(current_user),
+    )
+
+
+@router.patch("/{decision_id}/status", response_model=WorkspaceDecisionRead)
+async def patch_workspace_decision_status(
+    workspace_id: str,
+    decision_id: str,
+    payload: WorkspaceDecisionStatusUpdate,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    return await update_decision_status(
+        workspace_id=workspace_id,
+        decision_id=decision_id,
+        user_id=_user_id(current_user),
+        status=payload.status,
+    )
+
+
+@router.post("/{decision_id}/tasks", response_model=WorkspaceDecisionRead)
+async def post_workspace_decision_link_task(
+    workspace_id: str,
+    decision_id: str,
+    payload: WorkspaceDecisionLinkTask,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    return await link_task_to_decision(
+        workspace_id=workspace_id,
+        decision_id=decision_id,
+        task_id=payload.task_id,
+        user_id=_user_id(current_user),
+    )
+
+
+@router.delete("/{decision_id}/tasks/{task_id}", response_model=WorkspaceDecisionRead)
+async def delete_workspace_decision_link_task(
+    workspace_id: str,
+    decision_id: str,
+    task_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    return await unlink_task_from_decision(
+        workspace_id=workspace_id,
+        decision_id=decision_id,
+        task_id=task_id,
+        user_id=_user_id(current_user),
+    )
+
+
+@router.patch("/{decision_id}/initiative", response_model=WorkspaceDecisionRead)
+async def patch_workspace_decision_initiative(
+    workspace_id: str,
+    decision_id: str,
+    payload: WorkspaceDecisionLinkInitiative,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    return await link_initiative_to_decision(
+        workspace_id=workspace_id,
+        decision_id=decision_id,
+        initiative_id=payload.initiative_id,
         user_id=_user_id(current_user),
     )
