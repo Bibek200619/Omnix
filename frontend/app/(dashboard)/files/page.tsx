@@ -2,10 +2,14 @@
 
 import dynamic from "next/dynamic";
 import type { CSSProperties } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  AlertCircle,
+  CheckCircle2,
+  Clock3,
   Database,
   Download,
+  ExternalLink,
   FileText,
   FileUp,
   GitBranch,
@@ -13,11 +17,15 @@ import {
   LayoutGrid,
   Link2,
   List,
+  Loader2,
+  LockKeyhole,
   Plus,
+  RefreshCw,
   Search,
   Server,
-  ShieldCheck,
   Trash2,
+  Unplug,
+  X,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
@@ -25,9 +33,9 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 import { workspaceRoleLabel } from "@/lib/workspace-roles";
 import { cn } from "@/lib/utils";
+import type { MessageAttachment } from "@/components/chat/types";
 
 const UploadDropzone = dynamic(() => import("@/components/upload/UploadDropzone").then((m) => m.UploadDropzone), { ssr: false });
-
 
 interface FileData {
   id: string;
@@ -37,9 +45,65 @@ interface FileData {
   content_type?: string;
   size_bytes?: number;
   storage_path?: string;
+  metadata?: Record<string, unknown> | null;
 }
 
-type SourceType = "file" | "drive" | "database" | "knowledge" | "repository";
+type ConnectorType = "knowledge_link" | "file_repository" | "company_drive" | "external_database";
+type SourceType = "file" | ConnectorType;
+
+type ConnectorStatus =
+  | "live"
+  | "connecting"
+  | "connected"
+  | "syncing"
+  | "failed"
+  | "pending_ingestion"
+  | "request_submitted"
+  | "needs_authentication";
+
+type ConnectorJob = {
+  id: string;
+  type?: string | null;
+  status?: string | null;
+  progress?: number | null;
+  attempts?: number | null;
+  error?: string | null;
+  created_at?: string | null;
+};
+
+type WorkspaceConnector = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  connector_type: ConnectorType;
+  display_name: string;
+  status: ConnectorStatus;
+  config: Record<string, unknown>;
+  last_error?: string | null;
+  job_id?: string | null;
+  source_file_id?: string | null;
+  last_synced_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  job?: ConnectorJob | null;
+};
+
+type ConnectorFormState = {
+  displayName: string;
+  url: string;
+  repository: string;
+  branch: string;
+  authMode: "none" | "token_reference" | "ssh_key_reference" | "needs_setup";
+  credentialReference: string;
+  provider: string;
+  engine: "postgres" | "mysql" | "mssql" | "snowflake" | "bigquery" | "redshift" | "other";
+  host: string;
+  port: string;
+  database: string;
+  schema: string;
+  dbAuthMode: "credential_reference" | "iam" | "oauth" | "network_allowlist" | "needs_setup";
+  notes: string;
+};
 
 const sourceTypes: Array<{
   id: SourceType;
@@ -47,14 +111,38 @@ const sourceTypes: Array<{
   description: string;
   icon: typeof FileText;
   color: string;
-  status: "live" | "planned" | "beta";
+  action: string;
 }> = [
-  { id: "file", title: "File upload", description: "PDF, DOCX, TXT, Markdown", icon: FileUp, color: "var(--omnix-cyan)", status: "live" },
-  { id: "drive", title: "Company drive link", description: "Shared Drive, SharePoint, or folder URL", icon: HardDrive, color: "var(--omnix-purple)", status: "planned" },
-  { id: "database", title: "External database", description: "Connection request for structured data", icon: Server, color: "var(--omnix-green)", status: "planned" },
-  { id: "knowledge", title: "Knowledge link", description: "Internal docs, wiki, or policy URL", icon: Link2, color: "var(--omnix-amber)", status: "beta" },
-  { id: "repository", title: "File repository", description: "Git or company repository path", icon: GitBranch, color: "var(--omnix-pink)", status: "planned" },
+  { id: "file", title: "File upload", description: "PDF, DOCX, TXT, Markdown", icon: FileUp, color: "var(--omnix-cyan)", action: "Upload" },
+  { id: "knowledge_link", title: "Knowledge link", description: "Docs, wiki, or policy URL", icon: Link2, color: "var(--omnix-amber)", action: "Sync link" },
+  { id: "file_repository", title: "File repository", description: "Git URL or internal repo path", icon: GitBranch, color: "var(--omnix-pink)", action: "Set up" },
+  { id: "company_drive", title: "Company drive link", description: "Shared Drive, SharePoint, or folder URL", icon: HardDrive, color: "var(--omnix-purple)", action: "Connect" },
+  { id: "external_database", title: "External database", description: "Structured connection request", icon: Server, color: "var(--omnix-green)", action: "Request" },
 ];
+
+const statusLabel: Record<ConnectorStatus | "not_configured", string> = {
+  live: "Live",
+  connecting: "Connecting",
+  connected: "Connected",
+  syncing: "Syncing",
+  failed: "Failed",
+  pending_ingestion: "Pending Ingestion",
+  request_submitted: "Request Submitted",
+  needs_authentication: "Needs Authentication",
+  not_configured: "Not Configured",
+};
+
+const statusStyle: Record<ConnectorStatus | "not_configured", string> = {
+  live: "border-emerald-300/25 bg-emerald-300/10 text-emerald-200",
+  connecting: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
+  connected: "border-emerald-300/25 bg-emerald-300/10 text-emerald-200",
+  syncing: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
+  failed: "border-rose-300/30 bg-rose-300/10 text-rose-100",
+  pending_ingestion: "border-amber-300/25 bg-amber-300/10 text-amber-100",
+  request_submitted: "border-violet-300/25 bg-violet-300/10 text-violet-100",
+  needs_authentication: "border-amber-300/25 bg-amber-300/10 text-amber-100",
+  not_configured: "border-white/10 bg-white/[0.04] text-white/45",
+};
 
 function formatFileSize(size?: number) {
   if (!size) return "Unknown size";
@@ -62,25 +150,123 @@ function formatFileSize(size?: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatDate(value?: string | null) {
+  if (!value) return "Not synced yet";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not synced yet";
+  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function connectorIcon(type: ConnectorType) {
+  return sourceTypes.find((item) => item.id === type)?.icon ?? Database;
+}
+
+function connectorColor(type: ConnectorType) {
+  return sourceTypes.find((item) => item.id === type)?.color ?? "var(--omnix-cyan)";
+}
+
+function emptyForm(type: ConnectorType): ConnectorFormState {
+  return {
+    displayName: "",
+    url: "",
+    repository: "",
+    branch: "",
+    authMode: "none",
+    credentialReference: "",
+    provider: type === "company_drive" ? "auto" : "",
+    engine: "postgres",
+    host: "",
+    port: "",
+    database: "",
+    schema: "",
+    dbAuthMode: "credential_reference",
+    notes: "",
+  };
+}
+
+function valueFromConfig(config: Record<string, unknown>, key: string) {
+  const value = config[key];
+  return typeof value === "string" ? value : "";
+}
+
+function formFromConnector(type: ConnectorType, connector?: WorkspaceConnector): ConnectorFormState {
+  const form = emptyForm(type);
+  if (!connector) return form;
+  const config = connector.config || {};
+  return {
+    ...form,
+    displayName: connector.display_name || "",
+    url: valueFromConfig(config, "url"),
+    repository: valueFromConfig(config, "repository"),
+    branch: valueFromConfig(config, "branch"),
+    authMode: (valueFromConfig(config, "auth_mode") as ConnectorFormState["authMode"]) || form.authMode,
+    credentialReference: valueFromConfig(config, "credential_reference"),
+    provider: valueFromConfig(config, "provider") || form.provider,
+    engine: (valueFromConfig(config, "engine") as ConnectorFormState["engine"]) || form.engine,
+    host: valueFromConfig(config, "host"),
+    port: valueFromConfig(config, "port"),
+    database: valueFromConfig(config, "database"),
+    schema: valueFromConfig(config, "schema"),
+    dbAuthMode: (valueFromConfig(config, "auth_mode") as ConnectorFormState["dbAuthMode"]) || form.dbAuthMode,
+    notes: valueFromConfig(config, "notes"),
+  };
+}
+
+function connectorSummary(connector: WorkspaceConnector) {
+  const config = connector.config || {};
+  if (connector.connector_type === "knowledge_link" || connector.connector_type === "company_drive") {
+    return valueFromConfig(config, "url") || "No URL saved";
+  }
+  if (connector.connector_type === "file_repository") {
+    return valueFromConfig(config, "repository") || "No repository saved";
+  }
+  const engine = valueFromConfig(config, "engine").toUpperCase() || "Database";
+  const host = valueFromConfig(config, "host");
+  const database = valueFromConfig(config, "database");
+  return [engine, host, database].filter(Boolean).join(" / ") || "Connection details saved";
+}
+
+function newestConnector(connectors: WorkspaceConnector[], type: ConnectorType) {
+  return connectors
+    .filter((connector) => connector.connector_type === type)
+    .sort((a, b) => Date.parse(b.created_at || "") - Date.parse(a.created_at || ""))[0];
+}
+
 export default function FilesPage() {
   const { activeWorkspace, activeMembers, activeWorkspaceId, activeWorkspaceIntelligence } = useWorkspace();
   const [files, setFiles] = useState<FileData[]>([]);
+  const [connectors, setConnectors] = useState<WorkspaceConnector[]>([]);
   const [loading, setLoading] = useState(false);
+  const [connectorsLoading, setConnectorsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connectorError, setConnectorError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [activeType, setActiveType] = useState<SourceType>("file");
-  const [connectorValue, setConnectorValue] = useState("");
-  const [connectorNote, setConnectorNote] = useState("");
-  const [connectorMessage, setConnectorMessage] = useState<string | null>(null);
-  const [requesting, setRequesting] = useState(false);
+  const [setupType, setSetupType] = useState<ConnectorType | null>(null);
+  const [setupForm, setSetupForm] = useState<ConnectorFormState>(emptyForm("knowledge_link"));
+  const [setupMessage, setSetupMessage] = useState<string | null>(null);
+  const [savingConnector, setSavingConnector] = useState(false);
+  const [actionConnectorId, setActionConnectorId] = useState<string | null>(null);
+  const [authConnectorId, setAuthConnectorId] = useState<string | null>(null);
   const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
+
   const filteredFiles = files.filter((file) => {
     const name = file.file_name ?? file.filename ?? "";
     const type = file.file_type ?? file.content_type ?? "";
     const query = searchQuery.toLowerCase();
     return name.toLowerCase().includes(query) || type.toLowerCase().includes(query);
   });
+
+  const connectorCounts = useMemo(() => {
+    return connectors.reduce<Record<ConnectorType, number>>(
+      (counts, connector) => {
+        counts[connector.connector_type] += 1;
+        return counts;
+      },
+      { knowledge_link: 0, file_repository: 0, company_drive: 0, external_database: 0 },
+    );
+  }, [connectors]);
 
   const loadFiles = useCallback(async () => {
     setLoading(true);
@@ -95,9 +281,52 @@ export default function FilesPage() {
     }
   }, []);
 
+  const loadConnectors = useCallback(async () => {
+    if (!activeWorkspaceId) {
+      setConnectors([]);
+      return;
+    }
+    setConnectorsLoading(true);
+    setConnectorError(null);
+    try {
+      const data = await apiClient.get<WorkspaceConnector[]>("/connectors");
+      setConnectors(data);
+    } catch (err) {
+      setConnectorError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setConnectorsLoading(false);
+    }
+  }, [activeWorkspaceId]);
+
   useEffect(() => {
     void loadFiles();
-  }, [activeWorkspaceId, loadFiles]);
+    void loadConnectors();
+  }, [activeWorkspaceId, loadFiles, loadConnectors]);
+
+  function upsertConnector(connector: WorkspaceConnector) {
+    setConnectors((current) => {
+      const exists = current.some((item) => item.id === connector.id);
+      if (exists) {
+        return current.map((item) => (item.id === connector.id ? connector : item));
+      }
+      return [connector, ...current];
+    });
+  }
+
+  function openSetup(type: ConnectorType, connector?: WorkspaceConnector) {
+    setActiveType(type);
+    setSetupType(type);
+    setSetupForm(formFromConnector(type, connector));
+    setSetupMessage(null);
+    setConnectorError(null);
+  }
+
+  function scrollToUpload() {
+    setActiveType("file");
+    window.setTimeout(() => {
+      document.getElementById("workspace-upload-dropzone")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+  }
 
   async function handleDelete(id: string) {
     try {
@@ -127,304 +356,709 @@ export default function FilesPage() {
     }
   }
 
-  async function handleConnectorRequest() {
-    const value = connectorValue.trim();
-    if (!value) {
-      setConnectorMessage("Add a link, connection string, or repository path before saving this source request.");
+  function handleUploadSuccess(uploaded: MessageAttachment) {
+    if (!uploaded?.id) return;
+    setFiles((current) => {
+      if (current.some((file) => file.id === uploaded.id)) return current;
+      return [uploaded as FileData, ...current];
+    });
+  }
+
+  function buildConnectorPayload() {
+    if (!setupType) return null;
+    const displayName = setupForm.displayName.trim() || undefined;
+    if (setupType === "knowledge_link") {
+      if (!setupForm.url.trim()) return { error: "Add a docs, wiki, or policy URL before saving." };
+      return {
+        payload: {
+          workspace_id: activeWorkspaceId,
+          connector_type: setupType,
+          display_name: displayName,
+          config: { url: setupForm.url.trim(), notes: setupForm.notes.trim() || undefined },
+        },
+      };
+    }
+    if (setupType === "file_repository") {
+      if (!setupForm.repository.trim()) return { error: "Add a repository URL or internal path before saving." };
+      return {
+        payload: {
+          workspace_id: activeWorkspaceId,
+          connector_type: setupType,
+          display_name: displayName,
+          config: {
+            repository: setupForm.repository.trim(),
+            branch: setupForm.branch.trim() || undefined,
+            auth_mode: setupForm.authMode,
+            credential_reference: setupForm.credentialReference.trim() || undefined,
+            notes: setupForm.notes.trim() || undefined,
+          },
+        },
+      };
+    }
+    if (setupType === "company_drive") {
+      if (!setupForm.url.trim()) return { error: "Add a shared drive or folder URL before saving." };
+      return {
+        payload: {
+          workspace_id: activeWorkspaceId,
+          connector_type: setupType,
+          display_name: displayName,
+          config: {
+            url: setupForm.url.trim(),
+            provider: setupForm.provider === "auto" ? undefined : setupForm.provider,
+            notes: setupForm.notes.trim() || undefined,
+          },
+        },
+      };
+    }
+    if (!setupForm.host.trim() || !setupForm.database.trim()) {
+      return { error: "Add the database host and database name before saving." };
+    }
+    return {
+      payload: {
+        workspace_id: activeWorkspaceId,
+        connector_type: setupType,
+        display_name: displayName,
+        config: {
+          engine: setupForm.engine,
+          host: setupForm.host.trim(),
+          port: setupForm.port.trim() || undefined,
+          database: setupForm.database.trim(),
+          schema: setupForm.schema.trim() || undefined,
+          auth_mode: setupForm.dbAuthMode,
+          credential_reference: setupForm.credentialReference.trim() || undefined,
+          notes: setupForm.notes.trim() || undefined,
+        },
+      },
+    };
+  }
+
+  async function handleSaveConnector() {
+    if (!setupType) return;
+    const built = buildConnectorPayload();
+    if (!built || "error" in built) {
+      setSetupMessage(built?.error ?? "Connector setup is incomplete.");
       return;
     }
 
     try {
-      setRequesting(true);
-      setConnectorMessage(null);
-      
-      // Simulate infrastructure validation
-      await new Promise(resolve => setTimeout(resolve, 1200));
-
-      const request = {
-        id: crypto.randomUUID(),
-        type: activeType,
-        value,
-        note: connectorNote.trim(),
-        workspaceId: activeWorkspaceId,
-        createdAt: new Date().toISOString(),
-      };
-      
-      const key = `omnix.sourceRequests.${activeWorkspaceId ?? "global"}`;
-      const existing = JSON.parse(window.localStorage.getItem(key) || "[]");
-      const next = Array.isArray(existing) ? [request, ...existing] : [request];
-      window.localStorage.setItem(key, JSON.stringify(next));
-      
-      setConnectorValue("");
-      setConnectorNote("");
-      setConnectorMessage("Connector access request captured. Our infrastructure team audits these requests to prioritize backend ingestion rollout.");
-    } catch {
-      setConnectorMessage("Unable to capture request. Please check your connection.");
+      setSavingConnector(true);
+      setSetupMessage(null);
+      const connector = await apiClient.post<WorkspaceConnector>("/connectors", built.payload);
+      upsertConnector(connector);
+      setSetupType(null);
+      setSetupMessage(null);
+    } catch (err) {
+      setSetupMessage(err instanceof Error ? err.message : String(err));
     } finally {
-      setRequesting(false);
+      setSavingConnector(false);
     }
   }
+
+  async function handleRetryConnector(connector: WorkspaceConnector) {
+    try {
+      setActionConnectorId(connector.id);
+      setConnectorError(null);
+      const updated = await apiClient.post<WorkspaceConnector>(`/connectors/${connector.id}/retry`, {});
+      upsertConnector(updated);
+    } catch (err) {
+      setConnectorError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setActionConnectorId(null);
+    }
+  }
+
+  async function handleRemoveConnector(connector: WorkspaceConnector) {
+    try {
+      setActionConnectorId(connector.id);
+      setConnectorError(null);
+      await apiClient.delete(`/connectors/${connector.id}`);
+      setConnectors((current) => current.filter((item) => item.id !== connector.id));
+      if (connector.source_file_id) {
+        setFiles((current) => current.filter((file) => file.id !== connector.source_file_id));
+      }
+    } catch (err) {
+      setConnectorError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setActionConnectorId(null);
+    }
+  }
+
+  async function handleDriveAuth(connector?: WorkspaceConnector) {
+    try {
+      setAuthConnectorId(connector?.id ?? "setup");
+      setConnectorError(null);
+      const suffix = activeWorkspaceId ? `?workspace_id=${encodeURIComponent(activeWorkspaceId)}` : "";
+      const result = await apiClient.get<{ authorize_url: string }>(`/integrations/google_drive/connect${suffix}`);
+      window.location.assign(result.authorize_url);
+    } catch (err) {
+      setConnectorError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAuthConnectorId(null);
+    }
+  }
+
+  const setupMeta = setupType ? sourceTypes.find((item) => item.id === setupType) : null;
 
   return (
     <section className="omnix-page-frame omnix-scrollbar">
       <div className="omnix-content-max flex flex-col gap-[18px]">
-      <div className="omnix-page-hero">
-        <div>
-          <h1 className="omnix-page-title flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/[0.08] shadow-[var(--omnix-glow-sm)]">
-              <Database className="h-4 w-4 text-[var(--omnix-cyan)] drop-shadow-[0_0_6px_rgba(0,255,255,0.8)]" />
-            </span>
-            <span className="omnix-gradient-text">{activeWorkspace?.name ?? "Workspace"} sources</span>
-          </h1>
-          <p className="omnix-page-subtitle">
-            {activeWorkspace?.is_shared
-              ? "Shared documents become part of this workspace AI context for every member."
-              : "Upload documents to this workspace AI context. Supported: PDF, DOCX, TXT, Markdown."}
-          </p>
-        </div>
-        {activeWorkspace ? (
-          <div className="flex items-center gap-3 rounded-[var(--omnix-radius)] border border-[rgba(0,255,255,0.12)] bg-[rgba(0,255,255,0.05)] px-4 py-3 shadow-[var(--omnix-glow-xs)]">
-            <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} size="md" />
-            <div className="text-right text-xs">
-              <div className="font-semibold text-white">{activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "member" : "members"}</div>
-              <div className="text-[var(--omnix-cyan)] opacity-70">{workspaceRoleLabel(activeWorkspace.current_user_role)}</div>
-            </div>
+        <div className="omnix-page-hero">
+          <div>
+            <h1 className="omnix-page-title flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/[0.08] shadow-[var(--omnix-glow-sm)]">
+                <Database className="h-4 w-4 text-[var(--omnix-cyan)] drop-shadow-[0_0_6px_rgba(0,255,255,0.8)]" />
+              </span>
+              <span className="omnix-gradient-text">{activeWorkspace?.name ?? "Workspace"} sources</span>
+            </h1>
+            <p className="omnix-page-subtitle">
+              Manage workspace knowledge connectors with saved configuration, honest status, and retrievable source continuity.
+            </p>
           </div>
-        ) : null}
-      </div>
-
-      <div className="omnix-cinematic-card p-5">
-        <div className="relative z-10 mb-4">
-          <h2 className="omnix-display text-[16px] font-bold text-white">Knowledge connector hub</h2>
-          <p className="mt-1 text-sm text-[var(--omnix-text-3)]">
-            Choose how this workspace should receive knowledge. File upload is live; other connectors are captured as setup requests until backend ingestion is enabled.
-          </p>
+          {activeWorkspace ? (
+            <div className="flex items-center gap-3 rounded-[var(--omnix-radius)] border border-[rgba(0,255,255,0.12)] bg-[rgba(0,255,255,0.05)] px-4 py-3 shadow-[var(--omnix-glow-xs)]">
+              <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} size="md" />
+              <div className="text-right text-xs">
+                <div className="font-semibold text-white">{activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "member" : "members"}</div>
+                <div className="text-[var(--omnix-cyan)] opacity-70">{workspaceRoleLabel(activeWorkspace.current_user_role)}</div>
+              </div>
+            </div>
+          ) : null}
         </div>
-        <div className="relative z-10 grid gap-2 md:grid-cols-5">
-          {sourceTypes.map((type) => {
-            const Icon = type.icon;
-            const active = activeType === type.id;
-            return (
-              <button
-                key={type.id}
-                type="button"
-                onClick={() => {
-                  setActiveType(type.id);
-                  setConnectorMessage(null);
-                }}
-                className={cn(
-                  "group relative overflow-hidden rounded-xl border p-3 text-left transition",
-                  active ? "scale-[1.02]" : "hover:-translate-y-0.5"
-                )}
-                style={{
-                  background: active ? `${type.color}12` : "rgba(255,255,255,0.025)",
-                  borderColor: active ? `${type.color}55` : "rgba(255,255,255,0.07)",
-                  boxShadow: active ? `0 0 22px ${type.color}18` : "none",
-                }}
-              >
-                <div className="flex items-start justify-between">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border" style={{ background: `${type.color}14`, borderColor: `${type.color}33`, color: type.color }}>
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  {type.status !== "live" && (
-                    <span className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider",
-                      type.status === "planned" ? "bg-white/10 text-white/40" : "bg-amber-400/20 text-amber-200 border border-amber-400/20"
-                    )}>
-                      {type.status}
-                    </span>
+
+        <div className="omnix-cinematic-card p-5">
+          <div className="relative z-10 mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="omnix-display text-[16px] font-bold text-white">Knowledge connector hub</h2>
+              <p className="mt-1 text-sm text-[var(--omnix-text-3)]">
+                Configure sources for this workspace. Public knowledge links sync immediately when reachable; repository, drive, and database connectors save setup requests for rollout.
+              </p>
+            </div>
+            {connectorsLoading ? (
+              <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[11px] text-cyan-100">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Reconciling
+              </span>
+            ) : null}
+          </div>
+          <div className="relative z-10 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+            {sourceTypes.map((type) => {
+              const Icon = type.icon;
+              const active = activeType === type.id;
+              const latest = type.id === "file" ? null : newestConnector(connectors, type.id);
+              const cardStatus = type.id === "file" ? "live" : latest?.status ?? "not_configured";
+              const count = type.id === "file" ? files.length : connectorCounts[type.id];
+              return (
+                <button
+                  key={type.id}
+                  type="button"
+                  onClick={() => {
+                    if (type.id === "file") {
+                      scrollToUpload();
+                    } else {
+                      openSetup(type.id, latest ?? undefined);
+                    }
+                  }}
+                  className={cn(
+                    "group relative flex min-h-[154px] flex-col justify-between overflow-hidden rounded-xl border p-3 text-left transition",
+                    active ? "scale-[1.01]" : "hover:-translate-y-0.5",
                   )}
+                  style={{
+                    background: active ? `${type.color}12` : "rgba(255,255,255,0.025)",
+                    borderColor: active ? `${type.color}55` : "rgba(255,255,255,0.07)",
+                    boxShadow: active ? `0 0 22px ${type.color}18` : "none",
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border" style={{ background: `${type.color}14`, borderColor: `${type.color}33`, color: type.color }}>
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className={cn("rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-wider", statusStyle[cardStatus])}>
+                      {statusLabel[cardStatus]}
+                    </span>
+                  </div>
+                  <span>
+                    <span className="mt-3 block text-sm font-semibold text-white">{type.title}</span>
+                    <span className="mt-1 block text-[11px] leading-5 text-[var(--omnix-text-3)]">{type.description}</span>
+                  </span>
+                  <span className="mt-3 flex items-center justify-between border-t border-white/5 pt-3 text-[11px]">
+                    <span className="text-white/40">{count} saved</span>
+                    <span className="font-semibold" style={{ color: type.color }}>{type.action}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          {[
+            { label: "Uploaded sources", value: files.length, icon: FileText, color: "var(--omnix-cyan)" },
+            { label: "Configured connectors", value: connectors.length, icon: Link2, color: "var(--omnix-amber)" },
+            { label: "AI context", value: activeWorkspaceIntelligence?.retrieval_scope === "global" ? "Global" : "Scoped", icon: Database, color: "var(--omnix-purple)" },
+          ].map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <div key={stat.label} className="omnix-metric-card p-4" style={{ "--metric-color": stat.color } as CSSProperties}>
+                <div className="relative z-10 flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg border" style={{ background: `${stat.color}14`, borderColor: `${stat.color}33` }}>
+                    <Icon className="h-4 w-4" style={{ color: stat.color }} />
+                  </span>
+                  <span>
+                    <span className="omnix-display block text-xl font-semibold text-white">{stat.value}</span>
+                    <span className="text-xs text-[var(--omnix-text-3)]">{stat.label}</span>
+                  </span>
                 </div>
-                <span className="mt-3 block text-sm font-semibold text-white">{type.title}</span>
-                <span className="mt-1 block text-[11px] leading-5 text-[var(--omnix-text-3)]">{type.description}</span>
-              </button>
+              </div>
             );
           })}
         </div>
-      </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        {[
-          { label: "Uploaded sources", value: files.length, icon: FileText, color: "var(--omnix-cyan)" },
-          { label: "Workspace access", value: activeWorkspace?.is_shared ? "Shared" : "Private", icon: ShieldCheck, color: "var(--omnix-green)" },
-          { label: "AI context", value: activeWorkspaceIntelligence?.retrieval_scope === "global" ? "Global" : "Scoped", icon: Database, color: "var(--omnix-purple)" },
-        ].map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div key={stat.label} className="omnix-metric-card p-4" style={{ "--metric-color": stat.color } as CSSProperties}>
-              <div className="relative z-10 flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg border" style={{ background: `${stat.color}14`, borderColor: `${stat.color}33` }}>
-                  <Icon className="h-4 w-4" style={{ color: stat.color }} />
-                </span>
-                <span>
-                  <span className="omnix-display block text-xl font-semibold text-white">{stat.value}</span>
-                  <span className="text-xs text-[var(--omnix-text-3)]">{stat.label}</span>
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2.5">
-        <div className="relative w-full min-w-0 flex-1 sm:min-w-[220px]">
-          <Search className="absolute left-[11px] top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-white/25" />
-          <input
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search knowledge sources..."
-            className="omnix-input h-9 w-full rounded-[var(--omnix-radius-sm)] py-2 pl-8 pr-3 text-xs"
-          />
-        </div>
-        <div className="flex overflow-hidden rounded-[9px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.03)]">
-          {(["grid", "list"] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setView(mode)}
-              className="flex h-9 w-10 items-center justify-center transition"
-              style={{
-                background: view === mode ? "rgba(0,255,255,0.1)" : "transparent",
-                color: view === mode ? "var(--omnix-cyan)" : "rgba(255,255,255,0.3)",
-              }}
-              aria-label={`${mode} view`}
-              title={`${mode} view`}
-            >
-              {mode === "grid" ? <LayoutGrid className="h-3.5 w-3.5" /> : <List className="h-3.5 w-3.5" />}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => document.getElementById("workspace-upload-dropzone")?.scrollIntoView({ behavior: "smooth", block: "center" })}
-          className="inline-flex h-9 items-center gap-1.5 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-cyan)] bg-transparent px-4 text-xs font-bold text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] transition hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)]"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Add Source
-        </button>
-      </div>
-
-      {activeType === "file" ? (
-        <div id="workspace-upload-dropzone" className="omnix-cinematic-card p-4">
-          <UploadDropzone />
-        </div>
-      ) : (
         <div className="omnix-cinematic-card p-5">
-          <div className="relative z-10 grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-            <div>
-              <h2 className="omnix-display text-[15px] font-bold text-white">
-                {sourceTypes.find((type) => type.id === activeType)?.title}
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-3)]">
-                {activeType === "knowledge" 
-                  ? "Beta knowledge connectors require workspace authorization. Submit the source for review." 
-                  : "Submit a connection request for this source. We are prioritizing connector development based on workspace demand."}
-              </p>
-              <div className="mt-4 grid gap-3">
-                <input
-                  value={connectorValue}
-                  onChange={(event) => {
-                    setConnectorValue(event.target.value);
-                    setConnectorMessage(null);
-                  }}
-                  placeholder={
-                    activeType === "database"
-                      ? "Database host, connection alias, or secure setup reference"
-                      : activeType === "repository"
-                      ? "Repository URL or internal repo path"
-                      : "https://company.example.com/source"
-                  }
-                  className="omnix-input h-10 w-full rounded-lg px-3 text-sm"
-                />
-                <textarea
-                  value={connectorNote}
-                  onChange={(event) => setConnectorNote(event.target.value)}
-                  rows={3}
-                  placeholder="Access notes, schema scope, folder path, or ingestion instructions"
-                  className="omnix-input w-full resize-none rounded-lg px-3 py-2 text-sm"
-                />
-                {connectorMessage ? (
-                  <div className="rounded-lg border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-sm text-cyan-100">
-                    {connectorMessage}
+          <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+              <Link2 className="h-4 w-4 text-amber-200" />
+              Saved connectors
+            </h2>
+            <Button type="button" size="sm" variant="ghost" leftIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={() => void loadConnectors()} isLoading={connectorsLoading}>
+              Recheck
+            </Button>
+          </div>
+          {connectorError ? (
+            <div className="relative z-10 mt-4 rounded-lg border border-rose-300/20 bg-rose-300/10 px-3 py-2 text-sm text-rose-100">
+              {connectorError}
+            </div>
+          ) : null}
+          {connectorsLoading && connectors.length === 0 ? (
+            <div className="relative z-10 mt-4 grid gap-2">
+              {[0, 1].map((item) => <div key={item} className="shimmer h-16 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)]" />)}
+            </div>
+          ) : connectors.length === 0 ? (
+            <div className="relative z-10 mt-4 rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 p-6 text-center">
+              <p className="text-sm font-semibold text-white">No connector configuration saved yet.</p>
+              <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">Choose a connector above to save a real workspace-scoped setup.</p>
+            </div>
+          ) : (
+            <div className="relative z-10 mt-4 grid gap-3">
+              {connectors.map((connector) => {
+                const Icon = connectorIcon(connector.connector_type);
+                const color = connectorColor(connector.connector_type);
+                const busy = actionConnectorId === connector.id;
+                const googleDriveNeedsAuth =
+                  connector.connector_type === "company_drive" &&
+                  connector.status === "needs_authentication" &&
+                  valueFromConfig(connector.config, "provider") === "google_drive";
+                return (
+                  <div key={connector.id} className="omnix-source-card flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex min-w-0 gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border" style={{ background: `${color}14`, borderColor: `${color}33`, color }}>
+                        <Icon className="h-[18px] w-[18px]" />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="omnix-display max-w-full truncate text-[13px] font-bold text-white">{connector.display_name}</p>
+                          <span className={cn("rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-wider", statusStyle[connector.status])}>
+                            {statusLabel[connector.status]}
+                          </span>
+                        </div>
+                        <p className="mt-1 max-w-3xl break-words text-[11px] leading-5 text-white/45">{connectorSummary(connector)}</p>
+                        <p className="mt-1 text-[11px] text-white/35">
+                          {connector.status === "connected" ? `Last synced ${formatDate(connector.last_synced_at)}` : connector.job?.status ? `Job ${connector.job.status}` : "Configuration persisted"}
+                        </p>
+                        {connector.last_error ? (
+                          <p className="mt-2 max-w-3xl text-[11px] leading-5 text-amber-100/80">{connector.last_error}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                      {googleDriveNeedsAuth ? (
+                        <Button type="button" size="sm" variant="secondary" leftIcon={<ExternalLink className="h-3.5 w-3.5" />} isLoading={authConnectorId === connector.id} onClick={() => void handleDriveAuth(connector)}>
+                          Authenticate
+                        </Button>
+                      ) : null}
+                      <Button type="button" size="sm" variant="ghost" leftIcon={<RefreshCw className="h-3.5 w-3.5" />} isLoading={busy} onClick={() => void handleRetryConnector(connector)}>
+                        Retry
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => openSetup(connector.connector_type, connector)}>
+                        Configure
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" className="text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Unplug className="h-3.5 w-3.5" />} isLoading={busy} onClick={() => void handleRemoveConnector(connector)}>
+                        Remove
+                      </Button>
+                    </div>
                   </div>
-                ) : null}
-                <Button 
-                  type="button" 
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="relative w-full min-w-0 flex-1 sm:min-w-[220px]">
+            <Search className="absolute left-[11px] top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-white/25" />
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search knowledge sources..."
+              className="omnix-input h-9 w-full rounded-[var(--omnix-radius-sm)] py-2 pl-8 pr-3 text-xs"
+            />
+          </div>
+          <div className="flex overflow-hidden rounded-[9px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.03)]">
+            {(["grid", "list"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setView(mode)}
+                className="flex h-9 w-10 items-center justify-center transition"
+                style={{
+                  background: view === mode ? "rgba(0,255,255,0.1)" : "transparent",
+                  color: view === mode ? "var(--omnix-cyan)" : "rgba(255,255,255,0.3)",
+                }}
+                aria-label={`${mode} view`}
+                title={`${mode} view`}
+              >
+                {mode === "grid" ? <LayoutGrid className="h-3.5 w-3.5" /> : <List className="h-3.5 w-3.5" />}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={scrollToUpload}
+            className="inline-flex h-9 items-center gap-1.5 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-cyan)] bg-transparent px-4 text-xs font-bold text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] transition hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)]"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Upload File
+          </button>
+        </div>
+
+        <div id="workspace-upload-dropzone" className="omnix-cinematic-card p-4">
+          <UploadDropzone onUploadSuccess={handleUploadSuccess} onUploadComplete={(result) => result.hasSuccess && void loadFiles()} />
+        </div>
+
+        <div className="omnix-cinematic-card p-5">
+          <h2 className="relative z-10 flex items-center gap-2 text-sm font-semibold text-white">
+            <FileText className="h-4 w-4 text-cyan-200" />
+            {activeWorkspace?.is_shared ? "Shared files" : "Workspace files"}
+          </h2>
+          {loading ? (
+            <div className="relative z-10 mt-4 grid gap-2">
+              {[0, 1, 2].map((item) => (
+                <div key={item} className="shimmer h-16 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)]" />
+              ))}
+            </div>
+          ) : error ? (
+            <p className="relative z-10 mt-4 text-rose-300">{error}</p>
+          ) : files.length === 0 ? (
+            <div className="relative z-10 mt-4 flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 p-6 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]">
+                <FileUp className="h-5 w-5" />
+              </div>
+              <p className="mt-4 text-sm font-semibold text-white">No files uploaded yet.</p>
+              <p className="mt-1 max-w-sm text-sm leading-6 text-[var(--omnix-text-2)]">
+                Drop a document above to make it available to Omnix retrieval.
+              </p>
+            </div>
+          ) : filteredFiles.length === 0 ? (
+            <div className="relative z-10 mt-4 flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 p-6 text-center">
+              <Search className="h-7 w-7 text-cyan-200/35" />
+              <p className="mt-3 text-sm font-semibold text-white">No sources match this search.</p>
+              <p className="mt-1 max-w-sm text-sm leading-6 text-[var(--omnix-text-2)]">
+                Clear the search field to view all uploaded workspace files.
+              </p>
+            </div>
+          ) : (
+            <div className={view === "grid" ? "relative z-10 mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3" : "relative z-10 mt-3 grid gap-2"}>
+              {filteredFiles.map((f) => (
+                <div key={f.id} className={view === "grid" ? "omnix-source-card flex min-h-[154px] flex-col justify-between gap-3 p-[18px]" : "omnix-source-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"}>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_0_14px_rgba(0,255,255,0.12)]">
+                      <FileText className="h-[19px] w-[19px]" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="omnix-display truncate text-[13px] font-bold text-white">{f.file_name ?? f.filename}</p>
+                      <p className="mt-1 text-[11px] text-white/35">{f.file_type ?? f.content_type ?? "Document"} - {formatFileSize(f.size_bytes)}</p>
+                    </div>
+                  </div>
+                  <div className={view === "grid" ? "flex items-center gap-2 border-t border-white/5 pt-3" : "flex items-center gap-2"}>
+                    <Button type="button" size="sm" variant="ghost" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
+                    <Button type="button" size="sm" variant="ghost" className="text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {setupType && setupMeta ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 px-3 py-4 backdrop-blur-md sm:items-center">
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(12,18,28,0.98),rgba(3,6,12,0.98))] p-5 shadow-2xl sm:rounded-2xl sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border" style={{ background: `${setupMeta.color}14`, borderColor: `${setupMeta.color}33`, color: setupMeta.color }}>
+                  <setupMeta.icon className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="omnix-display text-lg font-semibold text-white">{setupMeta.title}</h3>
+                  <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-3)]">{setupMeta.description}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSetupType(null)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
+                aria-label="Close connector setup"
+                title="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-4">
+              <label className="grid gap-2 text-xs font-medium text-white/60">
+                Display name
+                <input
+                  value={setupForm.displayName}
+                  onChange={(event) => setSetupForm((current) => ({ ...current, displayName: event.target.value }))}
+                  placeholder="Optional workspace-facing name"
+                  className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
+                />
+              </label>
+
+              {setupType === "knowledge_link" ? (
+                <ConnectorUrlField
+                  label="Knowledge URL"
+                  value={setupForm.url}
+                  placeholder="https://company.example.com/handbook/security-policy"
+                  onChange={(url) => setSetupForm((current) => ({ ...current, url }))}
+                />
+              ) : null}
+
+              {setupType === "file_repository" ? (
+                <>
+                  <label className="grid gap-2 text-xs font-medium text-white/60">
+                    Repository URL or path
+                    <input
+                      value={setupForm.repository}
+                      onChange={(event) => setSetupForm((current) => ({ ...current, repository: event.target.value }))}
+                      placeholder="https://github.com/company/repo or //repos/platform"
+                      className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
+                    />
+                  </label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="grid gap-2 text-xs font-medium text-white/60">
+                      Branch or path scope
+                      <input
+                        value={setupForm.branch}
+                        onChange={(event) => setSetupForm((current) => ({ ...current, branch: event.target.value }))}
+                        placeholder="main, docs/, or runbooks/"
+                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
+                      />
+                    </label>
+                    <label className="grid gap-2 text-xs font-medium text-white/60">
+                      Authentication
+                      <select
+                        value={setupForm.authMode}
+                        onChange={(event) => setSetupForm((current) => ({ ...current, authMode: event.target.value as ConnectorFormState["authMode"] }))}
+                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
+                      >
+                        <option value="none">No auth required</option>
+                        <option value="token_reference">Token reference</option>
+                        <option value="ssh_key_reference">SSH key reference</option>
+                        <option value="needs_setup">Needs setup</option>
+                      </select>
+                    </label>
+                  </div>
+                </>
+              ) : null}
+
+              {setupType === "company_drive" ? (
+                <>
+                  <ConnectorUrlField
+                    label="Drive or folder URL"
+                    value={setupForm.url}
+                    placeholder="https://drive.google.com/drive/folders/..."
+                    onChange={(url) => setSetupForm((current) => ({ ...current, url }))}
+                  />
+                  <label className="grid gap-2 text-xs font-medium text-white/60">
+                    Provider
+                    <select
+                      value={setupForm.provider}
+                      onChange={(event) => setSetupForm((current) => ({ ...current, provider: event.target.value }))}
+                      className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
+                    >
+                      <option value="auto">Detect from URL</option>
+                      <option value="google_drive">Google Drive</option>
+                      <option value="sharepoint">SharePoint</option>
+                      <option value="onedrive">OneDrive</option>
+                      <option value="shared_drive">Other shared drive</option>
+                    </select>
+                  </label>
+                </>
+              ) : null}
+
+              {setupType === "external_database" ? (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="grid gap-2 text-xs font-medium text-white/60">
+                      Engine
+                      <select
+                        value={setupForm.engine}
+                        onChange={(event) => setSetupForm((current) => ({ ...current, engine: event.target.value as ConnectorFormState["engine"] }))}
+                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
+                      >
+                        <option value="postgres">Postgres</option>
+                        <option value="mysql">MySQL</option>
+                        <option value="mssql">SQL Server</option>
+                        <option value="snowflake">Snowflake</option>
+                        <option value="bigquery">BigQuery</option>
+                        <option value="redshift">Redshift</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </label>
+                    <label className="grid gap-2 text-xs font-medium text-white/60">
+                      Auth method
+                      <select
+                        value={setupForm.dbAuthMode}
+                        onChange={(event) => setSetupForm((current) => ({ ...current, dbAuthMode: event.target.value as ConnectorFormState["dbAuthMode"] }))}
+                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
+                      >
+                        <option value="credential_reference">Credential reference</option>
+                        <option value="iam">IAM or service account</option>
+                        <option value="oauth">OAuth</option>
+                        <option value="network_allowlist">Network allowlist</option>
+                        <option value="needs_setup">Needs setup</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
+                    <label className="grid gap-2 text-xs font-medium text-white/60">
+                      Host
+                      <input
+                        value={setupForm.host}
+                        onChange={(event) => setSetupForm((current) => ({ ...current, host: event.target.value }))}
+                        placeholder="warehouse.company.internal"
+                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
+                      />
+                    </label>
+                    <label className="grid gap-2 text-xs font-medium text-white/60">
+                      Port
+                      <input
+                        value={setupForm.port}
+                        onChange={(event) => setSetupForm((current) => ({ ...current, port: event.target.value }))}
+                        placeholder="5432"
+                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
+                      />
+                    </label>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="grid gap-2 text-xs font-medium text-white/60">
+                      Database
+                      <input
+                        value={setupForm.database}
+                        onChange={(event) => setSetupForm((current) => ({ ...current, database: event.target.value }))}
+                        placeholder="analytics"
+                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
+                      />
+                    </label>
+                    <label className="grid gap-2 text-xs font-medium text-white/60">
+                      Schema or tables
+                      <input
+                        value={setupForm.schema}
+                        onChange={(event) => setSetupForm((current) => ({ ...current, schema: event.target.value }))}
+                        placeholder="public.docs, policies"
+                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
+                      />
+                    </label>
+                  </div>
+                </>
+              ) : null}
+
+              {(setupType === "file_repository" || setupType === "external_database") ? (
+                <label className="grid gap-2 text-xs font-medium text-white/60">
+                  Credential reference
+                  <input
+                    value={setupForm.credentialReference}
+                    onChange={(event) => setSetupForm((current) => ({ ...current, credentialReference: event.target.value }))}
+                    placeholder="Vault path, secret alias, or ticket reference. Do not paste raw passwords."
+                    className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
+                  />
+                </label>
+              ) : null}
+
+              <label className="grid gap-2 text-xs font-medium text-white/60">
+                Access notes
+                <textarea
+                  value={setupForm.notes}
+                  onChange={(event) => setSetupForm((current) => ({ ...current, notes: event.target.value }))}
+                  rows={4}
+                  placeholder="Folder scope, access constraints, schema scope, or ingestion instructions"
+                  className="omnix-input min-h-[96px] w-full resize-none rounded-lg px-3 py-2 text-sm"
+                />
+              </label>
+
+              {setupType === "company_drive" && (setupForm.provider === "google_drive" || setupForm.url.includes("drive.google.com")) ? (
+                <div className="rounded-xl border border-amber-300/20 bg-amber-300/10 p-3 text-sm leading-6 text-amber-50/85">
+                  Google Drive folder setup may require OAuth before Omnix can validate access.
+                  <button type="button" onClick={() => void handleDriveAuth()} className="ml-2 inline-flex font-semibold text-amber-100 underline underline-offset-4">
+                    Start authentication
+                  </button>
+                </div>
+              ) : null}
+
+              {setupMessage ? (
+                <div className="rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-50">
+                  {setupMessage}
+                </div>
+              ) : null}
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button type="button" variant="ghost" onClick={() => setSetupType(null)}>Cancel</Button>
+                <Button
+                  type="button"
                   variant="secondary"
                   className="border-cyan-300/20 text-cyan-100"
-                  leftIcon={<Plus className="h-4 w-4" />} 
-                  isLoading={requesting}
-                  onClick={handleConnectorRequest}
+                  leftIcon={setupType === "knowledge_link" ? <CheckCircle2 className="h-4 w-4" /> : setupType === "external_database" ? <LockKeyhole className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}
+                  isLoading={savingConnector}
+                  onClick={() => void handleSaveConnector()}
                 >
-                  Request connector access
+                  {setupType === "knowledge_link" ? "Save and sync" : "Save setup"}
                 </Button>
               </div>
-            </div>
-            <div className="rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/15 p-4 flex flex-col justify-center">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Operational Status</div>
-              <p className="mt-3 text-sm leading-6 text-[var(--omnix-text-2)] italic">
-                “This connector type is in the rollout queue. Submitted requests are audited for infrastructure compatibility.”
-              </p>
+
+              {setupType !== "knowledge_link" ? (
+                <div className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[12px] leading-5 text-white/50">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-200/70" />
+                  This connector setup is persisted now. Ingestion remains in request state until the matching backend importer is available.
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
-      )}
-
-      <div className="omnix-cinematic-card p-5">
-        <h2 className="relative z-10 flex items-center gap-2 text-sm font-semibold text-white">
-          <FileText className="h-4 w-4 text-cyan-200" />
-          {activeWorkspace?.is_shared ? "Shared files" : "Workspace files"}
-        </h2>
-        {loading ? (
-          <div className="relative z-10 mt-4 grid gap-2">
-            {[0, 1, 2].map((item) => (
-              <div key={item} className="shimmer h-16 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)]" />
-            ))}
-          </div>
-        ) : error ? (
-          <p className="relative z-10 mt-4 text-rose-300">{error}</p>
-        ) : files.length === 0 ? (
-          <div className="relative z-10 mt-4 flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 p-6 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]">
-              <FileUp className="h-5 w-5" />
-            </div>
-            <p className="mt-4 text-sm font-semibold text-white">No files uploaded yet.</p>
-            <p className="mt-1 max-w-sm text-sm leading-6 text-[var(--omnix-text-2)]">
-              Drop a document above to make it available to Omnix retrieval.
-            </p>
-          </div>
-        ) : filteredFiles.length === 0 ? (
-          <div className="relative z-10 mt-4 flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 p-6 text-center">
-            <Search className="h-7 w-7 text-cyan-200/35" />
-            <p className="mt-3 text-sm font-semibold text-white">No sources match this search.</p>
-            <p className="mt-1 max-w-sm text-sm leading-6 text-[var(--omnix-text-2)]">
-              Clear the search field to view all uploaded workspace files.
-            </p>
-          </div>
-        ) : (
-          <div className={view === "grid" ? "relative z-10 mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3" : "relative z-10 mt-3 grid gap-2"}>
-            {filteredFiles.map((f) => (
-              <div key={f.id} className={view === "grid" ? "omnix-source-card flex min-h-[154px] flex-col justify-between gap-3 p-[18px]" : "omnix-source-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"}>
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_0_14px_rgba(0,255,255,0.12)]">
-                    <FileText className="h-[19px] w-[19px]" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="omnix-display truncate text-[13px] font-bold text-white">{f.file_name ?? f.filename}</p>
-                    <p className="mt-1 text-[11px] text-white/35">{f.file_type ?? f.content_type ?? "Document"} - {formatFileSize(f.size_bytes)}</p>
-                  </div>
-                </div>
-                <div className={view === "grid" ? "flex items-center gap-2 border-t border-white/5 pt-3" : "flex items-center gap-2"}>
-                  <Button type="button" size="sm" variant="ghost" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
-                  <Button type="button" size="sm" variant="ghost" className="text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      </div>
+      ) : null}
     </section>
+  );
+}
+
+function ConnectorUrlField({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="grid gap-2 text-xs font-medium text-white/60">
+      {label}
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
+      />
+    </label>
   );
 }
