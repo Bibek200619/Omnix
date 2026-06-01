@@ -1,6 +1,8 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 from app.services import workspace_decision_service as service
+from app.services import workspace_initiative_service as init_service
+from app.services import workspace_task_service as task_service
 from app.services.supabase_service import SupabaseServiceError
 
 @pytest.fixture
@@ -65,3 +67,45 @@ async def test_link_initiative_to_decision(mock_user_id, mock_workspace_id):
         )
         assert result["initiative_id"] == initiative_id
         mock_update.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_task_hydration_with_decisions(mock_user_id, mock_workspace_id):
+    task_id = "task-1"
+    decision_id = "dec-1"
+    
+    with patch("app.services.workspace_task_service.require_workspace_access", AsyncMock()), \
+         patch("app.services.workspace_task_service.select_all_trusted") as mock_select, \
+         patch("app.services.workspace_task_service.get_profiles", AsyncMock(return_value={})):
+        
+        # Mocking task select, then decision_tasks select, then decisions select
+        mock_select.side_effect = [
+            [{"id": task_id, "workspace_id": mock_workspace_id, "owner_user_id": mock_user_id, "created_by": mock_user_id}], # tasks
+            [{"decision_id": decision_id}], # decision_tasks links
+            [{"id": decision_id, "title": "Decision 1", "status": "accepted"}] # decisions
+        ]
+        
+        result = await task_service.list_tasks(workspace_id=mock_workspace_id, user_id=mock_user_id)
+        assert len(result) == 1
+        assert len(result[0]["linked_decisions"]) == 1
+        assert result[0]["linked_decisions"][0]["title"] == "Decision 1"
+
+@pytest.mark.asyncio
+async def test_initiative_hydration_with_decisions(mock_user_id, mock_workspace_id):
+    init_id = "init-1"
+    decision_id = "dec-1"
+    
+    with patch("app.services.workspace_initiative_service.require_workspace_access", AsyncMock()), \
+         patch("app.services.workspace_initiative_service._base_records", AsyncMock(return_value=([], [], []))), \
+         patch("app.services.workspace_initiative_service.select_all_trusted") as mock_select, \
+         patch("app.services.workspace_initiative_service.get_profiles", AsyncMock(return_value={})):
+        
+        # Mocking initiative select, then decisions select
+        mock_select.side_effect = [
+            [{"id": init_id, "workspace_id": mock_workspace_id, "created_by": mock_user_id}], # initiatives
+            [{"id": decision_id, "title": "Decision 1", "status": "accepted"}] # decisions
+        ]
+        
+        result = await init_service.list_initiatives(workspace_id=mock_workspace_id, user_id=mock_user_id)
+        assert len(result) == 1
+        assert len(result[0]["linked_decisions"]) == 1
+        assert result[0]["linked_decisions"][0]["title"] == "Decision 1"

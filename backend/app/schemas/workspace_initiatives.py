@@ -90,6 +90,7 @@ class WorkspaceInitiativeRead(BaseModel):
     creator_name: str | None = None
     linked_tasks: list[dict[str, Any]] = Field(default_factory=list)
     linked_channels: list[InitiativeChannelRead] = Field(default_factory=list)
+    linked_decisions: list[dict[str, Any]] = Field(default_factory=list)
     momentum: InitiativeMomentumRead
 
 
