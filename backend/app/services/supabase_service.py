@@ -943,6 +943,21 @@ async def upsert_one(table: str, payload: Mapping[str, Any], on_conflict: str) -
         _raise_supabase_error("Upsert", table, exc)
 
 
+async def delete_one_trusted(
+    table: str,
+    filters: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    try:
+        client = await _async_client()
+        query = client.table(table).delete()
+        query = _apply_filters(query, filters)
+        response = await _execute_with_retry_async(query, operation=f"trusted delete one {table}")
+        data = getattr(response, "data", None) or []
+        return data[0] if data else None
+    except Exception as exc:
+        _raise_supabase_error("Trusted delete one", table, exc)
+
+
 async def delete_many_trusted(
     table: str,
     filters: Mapping[str, Any],
