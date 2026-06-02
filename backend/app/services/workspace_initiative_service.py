@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import date, datetime, timedelta, timezone
+import logging
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -25,6 +26,7 @@ INITIATIVE_COLUMNS = (
 )
 CHANNEL_LINK_COLUMNS = "initiative_id,workspace_id,channel_id,attached_by,created_at"
 DECISION_PREVIEW_COLUMNS = "id,title,status,decision_reason,created_at"
+logger = logging.getLogger(__name__)
 
 
 def _database_error() -> HTTPException:
@@ -136,8 +138,22 @@ async def _validate_owner(workspace: dict[str, Any], owner_user_id: str | None) 
 
 
 async def _base_records(workspace_id: str, user_id: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-    tasks = await list_tasks(workspace_id=workspace_id, user_id=user_id)
-    channels = await list_channels(workspace_id=workspace_id, user_id=user_id)
+    try:
+        tasks = await list_tasks(workspace_id=workspace_id, user_id=user_id)
+    except HTTPException as exc:
+        if exc.status_code < 500:
+            raise
+        logger.warning("Initiative task hydration failed | workspace_id=%s", workspace_id, exc_info=True)
+        tasks = []
+
+    try:
+        channels = await list_channels(workspace_id=workspace_id, user_id=user_id)
+    except HTTPException as exc:
+        if exc.status_code < 500:
+            raise
+        logger.warning("Initiative channel hydration failed | workspace_id=%s", workspace_id, exc_info=True)
+        channels = []
+
     try:
         links = await select_all_trusted(
             "workspace_initiative_channels",
@@ -145,7 +161,8 @@ async def _base_records(workspace_id: str, user_id: str) -> tuple[list[dict[str,
             filters={"workspace_id": workspace_id},
         )
     except SupabaseServiceError as exc:
-        raise _database_error() from exc
+        logger.warning("Initiative channel link hydration failed | workspace_id=%s", workspace_id, exc_info=True)
+        links = []
     return tasks, channels, links
 
 
@@ -185,11 +202,11 @@ async def _hydrate_initiatives(
             decisions = await select_all_trusted(
                 "workspace_decisions",
                 DECISION_PREVIEW_COLUMNS,
-                {"initiative_id": initiative_id},
+                {"initiative_id": initiative_id, "workspace_id": workspace_id},
             )
             linked_decisions = decisions
         except SupabaseServiceError:
-            pass
+            logger.warning("Initiative linked decision hydration failed | initiative_id=%s", initiative_id, exc_info=True)
 
         hydrated.append(
             {

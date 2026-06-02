@@ -35,6 +35,7 @@ type WorkspaceContextType = {
   activeInvites: WorkspaceInvite[];
   pendingInvites: WorkspaceInvite[];
   activeWorkspaceIntelligence: WorkspaceIntelligenceProfile | null;
+  intelligenceError: string | null;
   membersLoading: boolean;
   invitesLoading: boolean;
   pendingInvitesLoading: boolean;
@@ -384,6 +385,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [activeInvites, setActiveInvites] = useState<WorkspaceInvite[]>([]);
   const [pendingInvites, setPendingInvites] = useState<WorkspaceInvite[]>([]);
   const [activeWorkspaceIntelligence, setActiveWorkspaceIntelligence] = useState<WorkspaceIntelligenceProfile | null>(null);
+  const [intelligenceError, setIntelligenceError] = useState<string | null>(null);
   const [membersLoading, setMembersLoading] = useState(false);
   const [invitesLoading, setInvitesLoading] = useState(false);
   const [pendingInvitesLoading, setPendingInvitesLoading] = useState(false);
@@ -470,13 +472,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         if (!options?.silent) {
           setLoading(true);
         }
-        let data: WorkspaceApiRecord[] = [];
-        try {
-          data = await apiClient.get<WorkspaceApiRecord[]>("/workspaces/hierarchy");
-        } catch (hierarchyError) {
-          console.warn("[workspace] hierarchy fetch failed; falling back to flat workspaces", hierarchyError);
-          data = await apiClient.get<WorkspaceApiRecord[]>("/workspaces");
-        }
+        const data = await apiClient.get<WorkspaceApiRecord[]>("/workspaces/hierarchy");
         if (workspaceFetchIdRef.current !== requestId) {
           return;
         }
@@ -487,7 +483,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         if (workspaceFetchIdRef.current !== requestId) {
           return;
         }
-        setError(err instanceof Error ? err.message : "Failed to load workspaces");
+        console.error("[workspace] failed to load hierarchy", err);
+        setError("Unable to load workspaces.");
       } finally {
         if (workspaceFetchIdRef.current === requestId && !options?.silent) {
           setLoading(false);
@@ -521,7 +518,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         return tree ?? null;
       } catch (err) {
         if (!options?.silent) {
-          setError(err instanceof Error ? err.message : "Failed to load workspace hierarchy");
+          console.error("[workspace] failed to load workspace hierarchy", err);
+          setError("Unable to load workspaces.");
         }
         return null;
       } finally {
@@ -731,6 +729,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const refreshWorkspaceIntelligence = useCallback(async (options?: RefreshOptions) => {
     if (!activeWorkspaceId) {
       setActiveWorkspaceIntelligence(null);
+      setIntelligenceError(null);
       return null;
     }
 
@@ -755,6 +754,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           requestGenerationRef.current === generation
         ) {
           setActiveWorkspaceIntelligence(profile);
+          setIntelligenceError(null);
         }
         return profile;
       } catch (err) {
@@ -765,6 +765,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           requestGenerationRef.current === generation
         ) {
           setActiveWorkspaceIntelligence(null);
+          setIntelligenceError("Unable to load workspace intelligence.");
         }
         return null;
       } finally {
@@ -1122,6 +1123,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setActiveInvites([]);
       setPendingInvites([]);
       setActiveWorkspaceIntelligence(null);
+      setIntelligenceError(null);
       setSubspaceLoadingByParentId({});
       setSubspaceErrorByParentId({});
       setLoading(false);
@@ -1218,6 +1220,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       activeInvites,
       pendingInvites,
       activeWorkspaceIntelligence,
+      intelligenceError,
       membersLoading,
       invitesLoading,
       pendingInvitesLoading,
@@ -1255,6 +1258,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       activeInvites,
       pendingInvites,
       activeWorkspaceIntelligence,
+      intelligenceError,
       membersLoading,
       invitesLoading,
       pendingInvitesLoading,
