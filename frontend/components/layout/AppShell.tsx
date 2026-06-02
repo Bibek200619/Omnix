@@ -108,7 +108,7 @@ export function AppShell({ children }: AppShellProps) {
                     <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4.25rem_+_env(safe-area-inset-bottom))] lg:pb-0">
                       <PageTransition className="flex min-h-0 flex-1 flex-col">{children}</PageTransition>
                     </main>
-                    <MobileDock />
+                    <MobileDock onMoreClick={() => setIsSidebarOpen(true)} />
                   </div>
                 </div>
               </WorkspaceOnboardingGate>
