@@ -5,6 +5,63 @@ export const API_BASE_URL =
 
 export type ApiStatus = "idle" | "loading" | "success" | "error";
 
+type ApiErrorPayload = {
+  endpoint: string;
+  url: string;
+  method: string;
+  status?: number;
+  statusText?: string;
+  responsePayload?: unknown;
+  rawMessage?: string;
+};
+
+export class ApiError extends Error {
+  endpoint: string;
+  url: string;
+  method: string;
+  status?: number;
+  statusText?: string;
+  responsePayload?: unknown;
+  rawMessage?: string;
+
+  constructor(message: string, payload: ApiErrorPayload) {
+    super(message);
+    this.name = "ApiError";
+    this.endpoint = payload.endpoint;
+    this.url = payload.url;
+    this.method = payload.method;
+    this.status = payload.status;
+    this.statusText = payload.statusText;
+    this.responsePayload = payload.responsePayload;
+    this.rawMessage = payload.rawMessage;
+  }
+}
+
+function extractErrorMessage(errorData: { detail?: string | { msg?: string }[]; message?: string }) {
+  if (typeof errorData.detail === "string") {
+    return errorData.detail;
+  }
+  if (Array.isArray(errorData.detail)) {
+    const firstError = errorData.detail[0];
+    return firstError?.msg ? String(firstError.msg) : JSON.stringify(errorData.detail);
+  }
+  if (errorData.message) {
+    return errorData.message;
+  }
+  return null;
+}
+
+function logApiError(error: ApiError) {
+  console.error("[api] request failed", {
+    error,
+    endpoint: error.endpoint,
+    method: error.method,
+    status: error.status,
+    responsePayload: error.responsePayload,
+    rawMessage: error.rawMessage,
+  });
+}
+
 class ApiClient {
   private inFlightGets = new Map<string, Promise<unknown>>();
 
@@ -69,16 +126,34 @@ class ApiClient {
         ...options,
         headers,
       });
-    } catch {
-      throw new Error(
-        `Unable to reach the Omnix API at ${API_BASE_URL}. Start the FastAPI service or check NEXT_PUBLIC_API_BASE_URL.`,
-      );
+    } catch (exc) {
+      const error = new ApiError("Omnix API is unreachable.", {
+        endpoint,
+        url,
+        method: options.method ?? "GET",
+        rawMessage: exc instanceof Error ? exc.message : String(exc),
+      });
+      logApiError(error);
+      throw error;
     }
 
     if (response.status === 401) {
+      const errorData = (await response.json().catch(() => ({}))) as {
+        detail?: string | { msg?: string }[];
+        message?: string;
+      };
       await supabase?.auth.signOut();
-
-      throw new Error("Unauthorized");
+      const error = new ApiError("Authentication is required.", {
+        endpoint,
+        url,
+        method: options.method ?? "GET",
+        status: response.status,
+        statusText: response.statusText,
+        responsePayload: errorData,
+        rawMessage: extractErrorMessage(errorData) ?? "Unauthorized",
+      });
+      logApiError(error);
+      throw error;
     }
 
     if (!response.ok) {
@@ -87,22 +162,17 @@ class ApiClient {
         message?: string;
       };
 
-      let errorMessage = "An error occurred";
-      if (typeof errorData.detail === "string") {
-        errorMessage = errorData.detail;
-      } else if (Array.isArray(errorData.detail)) {
-        // FastAPI validation errors often look like [{ "msg": "...", ... }]
-        const firstError = errorData.detail[0];
-        errorMessage = firstError?.msg
-          ? String(firstError.msg)
-          : JSON.stringify(errorData.detail);
-      } else if (errorData.message) {
-        errorMessage = errorData.message;
-      } else {
-        errorMessage = `HTTP ${response.status}`;
-      }
-
-      throw new Error(errorMessage);
+      const error = new ApiError("Omnix API request failed.", {
+        endpoint,
+        url,
+        method: options.method ?? "GET",
+        status: response.status,
+        statusText: response.statusText,
+        responsePayload: errorData,
+        rawMessage: extractErrorMessage(errorData) ?? `HTTP ${response.status}`,
+      });
+      logApiError(error);
+      throw error;
     }
 
     return response;
@@ -133,13 +203,34 @@ class ApiClient {
         ...options,
         headers,
       });
-    } catch {
-      throw new Error(`Unable to reach the Omnix API at ${API_BASE_URL}. Start the FastAPI service or check NEXT_PUBLIC_API_BASE_URL.`);
+    } catch (exc) {
+      const error = new ApiError("Omnix API is unreachable.", {
+        endpoint,
+        url,
+        method: options.method ?? "POST",
+        rawMessage: exc instanceof Error ? exc.message : String(exc),
+      });
+      logApiError(error);
+      throw error;
     }
 
     if (response.status === 401) {
+      const errorData = (await response.json().catch(() => ({}))) as {
+        detail?: string | { msg?: string }[];
+        message?: string;
+      };
       await supabase?.auth.signOut();
-      throw new Error("Unauthorized");
+      const error = new ApiError("Authentication is required.", {
+        endpoint,
+        url,
+        method: options.method ?? "POST",
+        status: response.status,
+        statusText: response.statusText,
+        responsePayload: errorData,
+        rawMessage: extractErrorMessage(errorData) ?? "Unauthorized",
+      });
+      logApiError(error);
+      throw error;
     }
 
     if (!response.ok && response.status !== 200) {
@@ -149,21 +240,17 @@ class ApiClient {
         message?: string;
       };
 
-      let errorMessage = "An error occurred";
-      if (typeof errorData.detail === "string") {
-        errorMessage = errorData.detail;
-      } else if (Array.isArray(errorData.detail)) {
-        const firstError = errorData.detail[0];
-        errorMessage = firstError?.msg
-          ? String(firstError.msg)
-          : JSON.stringify(errorData.detail);
-      } else if (errorData.message) {
-        errorMessage = errorData.message;
-      } else {
-        errorMessage = `HTTP ${response.status}`;
-      }
-
-      throw new Error(errorMessage);
+      const error = new ApiError("Omnix API request failed.", {
+        endpoint,
+        url,
+        method: options.method ?? "POST",
+        status: response.status,
+        statusText: response.statusText,
+        responsePayload: errorData,
+        rawMessage: extractErrorMessage(errorData) ?? `HTTP ${response.status}`,
+      });
+      logApiError(error);
+      throw error;
     }
 
     return response;

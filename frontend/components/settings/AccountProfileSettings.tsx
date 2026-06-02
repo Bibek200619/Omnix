@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { useAuth } from "@/lib/auth-context";
+import { logClientError } from "@/lib/errors";
 import { useProfile } from "@/lib/profile-context";
 
 function metadataName(metadata?: Record<string, unknown>) {
@@ -88,7 +89,8 @@ export function AccountProfileSettings() {
       setMessage("Display name updated.");
       window.setTimeout(() => setMessage(null), 2200);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save display name.");
+      logClientError("Failed to save display name", err, { endpoint: "/profile" });
+      setError("Unable to save display name.");
     } finally {
       setSavingName(false);
     }
@@ -108,7 +110,8 @@ export function AccountProfileSettings() {
       setMessage("Handle reserved.");
       window.setTimeout(() => setMessage(null), 2200);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to reserve handle.");
+      logClientError("Failed to reserve handle", err, { endpoint: "/profile" });
+      setError("Unable to reserve handle.");
     } finally {
       setSavingHandle(false);
     }
@@ -132,7 +135,8 @@ export function AccountProfileSettings() {
       setAvatarPreview(dataUrl);
       setRemoveAvatar(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to prepare avatar.");
+      logClientError("Failed to prepare avatar", err);
+      setError("Unable to prepare avatar.");
     } finally {
       event.target.value = "";
     }
@@ -148,7 +152,8 @@ export function AccountProfileSettings() {
       setMessage("Avatar updated.");
       window.setTimeout(() => setMessage(null), 2200);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save avatar.");
+      logClientError("Failed to save avatar", err, { endpoint: "/profile" });
+      setError("Unable to save avatar.");
     } finally {
       setSavingAvatar(false);
     }

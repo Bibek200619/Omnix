@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -28,6 +29,7 @@ from ..services.workspace_task_service import (
 )
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/tasks", tags=["workspace-tasks"])
+logger = logging.getLogger(__name__)
 
 ASSISTANCE_INSTRUCTIONS = {
     "blockers": "List only explicitly recorded blockers and which task carries them. If there are none, state that clearly.",
@@ -134,7 +136,8 @@ async def assist_execution(
             max_tokens=420,
         )
     except ModelServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+        logger.exception("Failed to generate task assistance")
+        raise HTTPException(status_code=exc.status_code, detail="Task assistance is unavailable.") from exc
     return {
         "mode": request.mode,
         "content": generation.content,
