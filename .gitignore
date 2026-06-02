@@ -29,6 +29,7 @@ __pycache__/
 *$py.class
 venv/
 env/
+ven/
 .venv/
 .pytest_cache/
 .ruff_cache/
@@ -54,3 +55,14 @@ coverage/
 
 # Uploads and User Data
 uploads/
+backend/uploads/
+
+# Codebase analysis / tooling artifacts
+graphify-out/
+graphify.log
+
+# Scratch / one-off scripts (should never be committed)
+patch_*.py
+patch_*.js
+fix_*.py
+fix_*.js
