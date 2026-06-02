@@ -13,6 +13,7 @@ import {
 import type { ConversationSummary } from "@/components/chat/types";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
 
 type ConversationHistoryContextType = {
@@ -134,7 +135,8 @@ export function ConversationHistoryProvider({
           activeWorkspaceIdRef.current === requestWorkspaceId &&
           requestGenerationRef.current === generation
         ) {
-          setError(err instanceof Error ? err.message : "Failed to load conversations");
+          logClientError("Failed to load conversations", err, { endpoint: "/conversations" });
+          setError("Unable to load conversations.");
           if (!options?.silent) {
             setConversations([]);
           }

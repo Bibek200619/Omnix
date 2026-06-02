@@ -2,6 +2,7 @@
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "./api";
+import { logClientError } from "./errors";
 import { useWorkspace } from "./workspace-context";
 import type { 
   WorkspaceInitiative, 
@@ -62,12 +63,12 @@ export function WorkspaceContinuityProvider({ children }: { children: ReactNode 
         setUnresolvedContinuity(unresolvedData);
       }
     } catch (err) {
-      console.error("Failed to refresh operational continuity", err);
+      logClientError("Failed to refresh operational continuity", err, { endpoint: `/workspaces/${requestWorkspaceId}/continuity` });
       if (
         activeWorkspaceIdRef.current === requestWorkspaceId &&
         requestGenerationRef.current === generation
       ) {
-        setError(err instanceof Error ? err.message : "Unable to load continuity data.");
+        setError("Unable to load continuity data.");
       }
     } finally {
       if (

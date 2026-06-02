@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
+import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 import { workspaceRoleLabel } from "@/lib/workspace-roles";
@@ -288,7 +290,8 @@ export default function FilesPage() {
       const data = await apiClient.get<FileData[]>("/files");
       setFiles(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      logClientError("Failed to load files", err, { endpoint: "/files" });
+      setError("Unable to load files.");
     } finally {
       setLoading(false);
     }
@@ -305,7 +308,7 @@ export default function FilesPage() {
       const data = await apiClient.get<WorkspaceConnector[]>("/connectors");
       setConnectors(data);
     } catch (err) {
-      console.error("Failed to load connectors", err);
+      logClientError("Failed to load connectors", err, { endpoint: "/connectors" });
       setConnectorError("Unable to load connectors.");
     } finally {
       setConnectorsLoading(false);
@@ -347,8 +350,8 @@ export default function FilesPage() {
       await apiClient.request(`/files/${id}`, { method: "DELETE" });
       setFiles((s) => s.filter((f) => f.id !== id));
     } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : String(err));
+      logClientError("Failed to delete file", err, { endpoint: `/files/${id}` });
+      setError("Unable to delete file.");
     }
   }
 
@@ -365,8 +368,8 @@ export default function FilesPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : String(err));
+      logClientError("Failed to download file", err, { endpoint: `/files/${id}/download` });
+      setError("Unable to download file.");
     }
   }
 
@@ -462,7 +465,7 @@ export default function FilesPage() {
       setSetupType(null);
       setSetupMessage(null);
     } catch (err) {
-      console.error("Failed to save connector", err);
+      logClientError("Failed to save connector", err, { endpoint: "/connectors" });
       setSetupMessage("Unable to save connector.");
     } finally {
       setSavingConnector(false);
@@ -476,7 +479,7 @@ export default function FilesPage() {
       const updated = await apiClient.post<WorkspaceConnector>(`/connectors/${connector.id}/retry`, {});
       upsertConnector(updated);
     } catch (err) {
-      console.error("Failed to retry connector", err);
+      logClientError("Failed to retry connector", err, { endpoint: `/connectors/${connector.id}/retry` });
       setConnectorError("Unable to retry connector.");
     } finally {
       setActionConnectorId(null);
@@ -493,7 +496,7 @@ export default function FilesPage() {
         setFiles((current) => current.filter((file) => file.id !== connector.source_file_id));
       }
     } catch (err) {
-      console.error("Failed to remove connector", err);
+      logClientError("Failed to remove connector", err, { endpoint: `/connectors/${connector.id}` });
       setConnectorError("Unable to delete connector.");
     } finally {
       setActionConnectorId(null);
@@ -508,7 +511,7 @@ export default function FilesPage() {
       const result = await apiClient.get<{ authorize_url: string }>(`/integrations/google_drive/connect${suffix}`);
       window.location.assign(result.authorize_url);
     } catch (err) {
-      console.error("Failed to start connector authentication", err);
+      logClientError("Failed to start connector authentication", err, { endpoint: "/integrations/google_drive/connect" });
       setConnectorError("Unable to start connector authentication.");
     } finally {
       setAuthConnectorId(null);
@@ -642,9 +645,15 @@ export default function FilesPage() {
             </Button>
           </div>
           {connectorError ? (
-            <div className="relative z-10 mt-4 rounded-lg border border-rose-300/20 bg-rose-300/10 px-3 py-2 text-sm text-rose-100">
-              {connectorError}
-            </div>
+            <OmnixErrorState
+              compact
+              className="relative z-10 mt-4"
+              title={connectorError === "Unable to load connectors." ? "Connectors are unavailable" : "Connector action needs attention"}
+              message={connectorError}
+              onRetry={connectorError === "Unable to load connectors." ? () => void loadConnectors() : undefined}
+              isRetrying={connectorsLoading}
+              onDismiss={() => setConnectorError(null)}
+            />
           ) : null}
           {connectorsLoading && connectors.length === 0 ? (
             <div className="relative z-10 mt-4 grid gap-2">
@@ -764,7 +773,15 @@ export default function FilesPage() {
               ))}
             </div>
           ) : error ? (
-            <p className="relative z-10 mt-4 text-rose-300">{error}</p>
+            <OmnixErrorState
+              compact
+              className="relative z-10 mt-4"
+              title={error === "Unable to load files." ? "Files are unavailable" : "File action needs attention"}
+              message={error}
+              onRetry={error === "Unable to load files." ? () => void loadFiles() : undefined}
+              isRetrying={loading}
+              onDismiss={() => setError(null)}
+            />
           ) : files.length === 0 ? (
             <div className="relative z-10 mt-4 flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 p-6 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]">

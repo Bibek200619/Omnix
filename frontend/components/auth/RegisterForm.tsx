@@ -15,6 +15,7 @@ import {
 import { apiClient } from "@/lib/api";
 import { authLink, redirectFromWindow } from "@/lib/auth-redirects";
 import { useAuth } from "@/lib/auth-context";
+import { logClientError } from "@/lib/errors";
 import { supabase } from "@/lib/supabase";
 
 export function RegisterForm() {
@@ -58,7 +59,8 @@ export function RegisterForm() {
       });
 
       if (signUpError) {
-        setError(signUpError.message || "Registration failed. Please try again.");
+        logClientError("Registration failed", signUpError);
+        setError("Unable to create account. Check the details and try again.");
         setLoading(false);
         return;
       }
@@ -79,7 +81,8 @@ export function RegisterForm() {
       );
       setLoading(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred");
+      logClientError("Unexpected registration failure", err);
+      setError("Unable to create account.");
       setLoading(false);
     }
   }

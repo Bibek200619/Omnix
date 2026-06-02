@@ -5,6 +5,7 @@ import { Check, Clock3, Mail, X } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
+import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
 import { getWorkspaceInviteId } from "@/lib/workspace-types";
 import { workspaceRoleLabel } from "@/lib/workspace-roles";
@@ -51,7 +52,8 @@ export function PendingWorkspaceInvites({
       const workspace = await acceptInvite(inviteId);
       setMessage(`Joined ${workspace.name}.`);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Unable to accept invite.");
+      logClientError("Failed to accept invite", err, { endpoint: `/workspace-invites/${inviteId}/accept` });
+      setActionError("Unable to accept invite.");
     } finally {
       setBusyKey(null);
     }
@@ -65,7 +67,8 @@ export function PendingWorkspaceInvites({
       await declineInvite(inviteId);
       setMessage("Invite declined.");
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Unable to decline invite.");
+      logClientError("Failed to decline invite", err, { endpoint: `/workspace-invites/${inviteId}/decline` });
+      setActionError("Unable to decline invite.");
     } finally {
       setBusyKey(null);
     }
