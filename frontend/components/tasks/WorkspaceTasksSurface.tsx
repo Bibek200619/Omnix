@@ -511,7 +511,7 @@ export function WorkspaceTasksSurface() {
                     </div>
 
                     {/* Secondary metadata hidden until hover/focus */}
-                    <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                       <div className="flex items-center gap-1.5 text-[11px] text-[var(--omnix-text-3)]">
                         <Compass className="h-3 w-3" />
                         <select
@@ -547,7 +547,7 @@ export function WorkspaceTasksSurface() {
                   <DecisionTraceabilityList decisions={task.linked_decisions} />
                   
                   {/* Inline Blocker Adder (Simplified) */}
-                  <div className="mt-2.5 border-t border-white/[0.04] pt-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="mt-2.5 border-t border-white/[0.04] pt-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                     <input
                       value={blockerDrafts[task.id] || ""}
                       onChange={(event) => setBlockerDrafts((current) => ({ ...current, [task.id]: event.target.value }))}

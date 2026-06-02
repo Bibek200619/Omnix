@@ -156,7 +156,7 @@ export function WorkspaceDecisionsSurface() {
       )}
 
       {/* Decision Overview Strip */}
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className={cn("mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4", selectedId && "hidden lg:grid")}>
         {[
           { label: "Accepted", value: stats.accepted, color: "text-emerald-400", bg: "bg-emerald-400/5" },
           { label: "Proposed", value: stats.proposed, color: "text-cyan-400", bg: "bg-cyan-400/5" },
@@ -250,7 +250,10 @@ export function WorkspaceDecisionsSurface() {
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:grid-rows-1">
-          <aside className="omnix-panel flex min-h-0 flex-col rounded-2xl p-4 shadow-xl">
+          <aside className={cn(
+            "omnix-panel flex min-h-0 flex-col rounded-2xl p-4 shadow-xl",
+            selectedId && "hidden lg:flex"
+          )}>
             <div className="mb-4">
               <div className="mb-3 flex items-center justify-between px-1">
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--omnix-text-3)]">Memory Bank</p>
@@ -277,7 +280,7 @@ export function WorkspaceDecisionsSurface() {
                 ))}
               </div>            </div>
 
-            <div className="omnix-scrollbar -mx-1 flex min-h-0 gap-3 overflow-x-auto px-1 pb-1 lg:flex-1 lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0">
+            <div className="omnix-scrollbar -mx-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-1">
               {loading ? <Loader2 className="mx-auto mt-12 h-6 w-6 animate-spin text-cyan-400/40" /> : null}
               
               {!loading && filteredDecisions.length === 0 && decisions.length > 0 ? (
@@ -293,14 +296,14 @@ export function WorkspaceDecisionsSurface() {
               ) : null}
 
               {filteredDecisions.map((decision) => {
-                const active = selected?.id === decision.id;
+                const active = selectedId === decision.id;
                 return (
                   <button
                     key={decision.id}
                     type="button"
                     onClick={() => setSelectedId(decision.id)}
                     className={cn(
-                      "w-[min(18rem,85vw)] shrink-0 group relative flex flex-col rounded-xl border p-4 text-left transition-all duration-300 lg:w-full",
+                      "group relative mb-2 flex flex-col rounded-xl border p-4 text-left transition-all duration-300",
                       active
                         ? "border-cyan-400/30 bg-cyan-400/[0.07] shadow-[0_0_20px_rgba(34,211,238,0.05)]"
                         : "border-transparent hover:border-white/10 hover:bg-white/[0.03]",
@@ -336,13 +339,23 @@ export function WorkspaceDecisionsSurface() {
             </div>
           </aside>
 
-          <main className="omnix-panel min-h-0 min-w-0 overflow-hidden rounded-2xl border-[var(--omnix-border)] shadow-2xl">
+          <main className={cn(
+            "omnix-panel min-h-0 min-w-0 overflow-hidden rounded-2xl border-[var(--omnix-border)] shadow-2xl",
+            !selectedId && "hidden lg:flex"
+          )}>
             {selected ? (
               <div className="flex h-full min-h-0 flex-col">
                 <header className="border-b border-[var(--omnix-border)] bg-white/[0.01] px-6 py-6">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="mb-3 flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedId(null)}
+                          className="flex items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-200 lg:hidden"
+                        >
+                          ‹ Back
+                        </button>
                         <span className={cn(
                           "rounded-full border px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-widest", 
                           statusClass(selected.status)
