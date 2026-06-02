@@ -41,6 +41,7 @@ export default function DashboardPage() {
     activeWorkspace,
     workspaces,
     activeWorkspaceIntelligence,
+    intelligenceError,
     intelligenceLoading,
   } = useWorkspace();
   const { activity, loadingActivity, presence } = useWorkspaceCollaboration();
@@ -136,6 +137,7 @@ export default function DashboardPage() {
         <WorkspaceIntelligencePanel
           profile={activeWorkspaceIntelligence}
           loading={intelligenceLoading}
+          error={intelligenceError}
           compact
         />
 

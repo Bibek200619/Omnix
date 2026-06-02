@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from app.schemas.connectors import ConnectorCreate
 from app.services.document_context_service import StoredDocumentChunks
 from app.services import workspace_connector_service as connectors
+from app.services.supabase_service import SupabaseServiceError
 from app.services.workspace_service import WorkspaceAccess
 
 
@@ -195,3 +196,27 @@ def test_html_link_parser_falls_back_when_bs4_is_missing(monkeypatch: pytest.Mon
     assert result.title == "Policy"
     assert "Readable body." in result.text
     assert "ignore()" not in result.text
+
+
+@pytest.mark.asyncio
+async def test_connector_serialization_survives_missing_job_preview(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_select_one(*args, **kwargs):
+        raise SupabaseServiceError("jobs table unavailable")
+
+    monkeypatch.setattr(connectors, "select_one_trusted", fake_select_one)
+
+    result = await connectors._serialize_connector(
+        {
+            "id": "connector-1",
+            "workspace_id": "workspace-1",
+            "user_id": "user-1",
+            "connector_type": "file_repository",
+            "display_name": "Runbooks",
+            "status": "request_submitted",
+            "config": {"repository": "https://example.com/repo", "access_token": "secret"},
+            "job_id": "job-1",
+        }
+    )
+
+    assert result["job"] is None
+    assert "access_token" not in result["config"]
