@@ -16,6 +16,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import { InviteNotificationBar, InviteNotificationBell } from "@/components/workspace/InviteNotifications";
 import { ProfileMenu } from "@/components/layout/ProfileMenu";
+import { WorkspaceSearch } from "@/components/layout/WorkspaceSearch";
 
 const routeTitles = [
   { match: "/dashboard", title: "Dashboard", subtitle: "Welcome back" },
@@ -136,6 +137,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
         </div>
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <WorkspaceSearch />
           <InviteNotificationBell />
           <div className="hidden h-[22px] w-px bg-[rgba(0,255,255,0.1)] sm:block" />
           <Button
@@ -143,7 +145,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
             variant="secondary"
             size="icon"
             onClick={() => router.push("/chat")}
-            className="hidden h-9 w-9 rounded-[10px] border-[var(--omnix-cyan)] bg-transparent text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] min-[360px]:inline-flex sm:w-auto sm:px-4"
+            className="hidden h-9 w-9 rounded-[10px] border-[var(--omnix-cyan)] bg-transparent text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] sm:inline-flex sm:w-auto sm:px-4"
             aria-label="Start new chat"
             title="Start new chat"
           >
