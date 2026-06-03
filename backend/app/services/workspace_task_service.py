@@ -16,6 +16,11 @@ from .supabase_service import (
 )
 from .workspace_collaboration_service import log_workspace_activity
 from .workspace_conversation_service import MESSAGE_COLUMNS, _require_channel_access
+from .workspace_mention_service import (
+    mention_metadata_for_sources,
+    prepare_mentions_for_workspace,
+    sync_mentions_for_source,
+)
 from .workspace_service import get_profiles, list_workspace_members, require_workspace_access, utc_now_iso
 
 TASK_COLUMNS = (
@@ -90,6 +95,17 @@ def _serialize_supabase_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 
 async def _hydrate_tasks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    mentions_by_source: dict[str, list[dict[str, Any]]] = {}
+    workspace_ids = sorted({str(row.get("workspace_id")) for row in rows if row.get("workspace_id")})
+    for workspace_id in workspace_ids:
+        source_ids = [str(row.get("id")) for row in rows if str(row.get("workspace_id") or "") == workspace_id and row.get("id")]
+        mentions_by_source.update(
+            await mention_metadata_for_sources(
+                workspace_id=workspace_id,
+                source_type="task",
+                source_ids=source_ids,
+            )
+        )
     ids = sorted(
         {
             str(user_id)
@@ -103,6 +119,9 @@ async def _hydrate_tasks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for row in rows:
         owner = profiles.get(str(row.get("owner_user_id") or ""), {})
         creator = profiles.get(str(row.get("created_by") or ""), {})
+        activity_metadata = row.get("activity_metadata") if isinstance(row.get("activity_metadata"), dict) else {}
+        metadata_mentions = activity_metadata.get("mentions") if isinstance(activity_metadata.get("mentions"), list) else []
+        mentions = mentions_by_source.get(str(row.get("id"))) or metadata_mentions
 
         # Fetch linked decisions
         linked_decisions = []
@@ -128,8 +147,9 @@ async def _hydrate_tasks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 **row,
                 "blockers": _normalize_blockers(row.get("blockers")),
                 "linked_context": _normalize_links(row.get("linked_context")),
-                "activity_metadata": row.get("activity_metadata") if isinstance(row.get("activity_metadata"), dict) else {},
+                "activity_metadata": activity_metadata,
                 "momentum_metadata": row.get("momentum_metadata") if isinstance(row.get("momentum_metadata"), dict) else {},
+                "mentions": mentions,
                 "owner_name": owner.get("full_name") or owner.get("handle"),
                 "owner_email": owner.get("email"),
                 "owner_avatar_label": owner.get("avatar_label"),
@@ -212,6 +232,10 @@ async def create_task(
     initiative_id = _clean_text(payload.get("initiative_id"))
     await _validate_owner(access, owner_user_id)
     await _validate_initiative(workspace_id, initiative_id)
+    mentions = await prepare_mentions_for_workspace(
+        workspace=access.workspace,
+        mentions=payload.get("mentions"),
+    )
     client_nonce = _clean_text(payload.get("client_nonce"))
     if client_nonce:
         try:
@@ -237,7 +261,7 @@ async def create_task(
         "due_date": payload.get("due_date"),
         "blockers": _normalize_blockers(payload.get("blockers")),
         "linked_context": _normalize_links(payload.get("linked_context")),
-        "activity_metadata": {"origin": origin},
+        "activity_metadata": {"origin": origin, **({"mentions": mentions} if mentions else {})},
         "momentum_metadata": {},
         "initiative_id": initiative_id,
         "client_nonce": client_nonce,
@@ -248,6 +272,13 @@ async def create_task(
         created = await insert_one_trusted("workspace_tasks", _serialize_supabase_payload(record))
     except SupabaseServiceError as exc:
         raise _database_error() from exc
+    await sync_mentions_for_source(
+        workspace_id=workspace_id,
+        mentioned_by_user_id=user_id,
+        source_type="task",
+        source_id=str(created["id"]),
+        mentions=mentions,
+    )
     await log_workspace_activity(
         workspace_id=workspace_id,
         actor_user_id=user_id,
@@ -289,6 +320,17 @@ async def update_task(
         update["blockers"] = _normalize_blockers(payload.get("blockers"))
     if "linked_context" in payload:
         update["linked_context"] = _normalize_links(payload.get("linked_context"))
+    mentions: list[dict[str, Any]] | None = None
+    if "mentions" in payload:
+        mentions = await prepare_mentions_for_workspace(
+            workspace=access.workspace,
+            mentions=payload.get("mentions"),
+        )
+        current_activity_metadata = current.get("activity_metadata") if isinstance(current.get("activity_metadata"), dict) else {}
+        update["activity_metadata"] = {
+            **current_activity_metadata,
+            "mentions": mentions,
+        }
 
     next_status = str(update.get("status") or current.get("status") or "idea")
     if next_status == "complete" and current.get("status") != "complete":
@@ -307,6 +349,14 @@ async def update_task(
         raise _database_error() from exc
     if changed is None:
         raise _not_found()
+    if mentions is not None:
+        await sync_mentions_for_source(
+            workspace_id=workspace_id,
+            mentioned_by_user_id=user_id,
+            source_type="task",
+            source_id=task_id,
+            mentions=mentions,
+        )
 
     metadata: dict[str, Any] = {"task_id": task_id}
     summary = f"Task updated: {changed.get('title') or current.get('title')}."

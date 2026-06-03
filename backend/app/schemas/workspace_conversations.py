@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .workspace_mentions import WorkspaceMentionInput, WorkspaceMentionMetadata
+
 
 ChannelVisibility = Literal["workspace", "private", "project"]
 ChannelType = Literal["operational", "announcement"]
@@ -52,6 +54,7 @@ class WorkspaceChannelMessageCreate(BaseModel):
     parent_message_id: str | None = None
     client_nonce: str | None = Field(default=None, max_length=100)
     context_links: list[ExecutionContextLink] = Field(default_factory=list, max_length=12)
+    mentions: list[WorkspaceMentionInput] = Field(default_factory=list, max_length=50)
 
 
 class WorkspaceConversationAuthorIdentity(BaseModel):
@@ -71,6 +74,7 @@ class WorkspaceChannelMessageRead(BaseModel):
     content: str
     context_links: list[ExecutionContextLink] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    mentions: list[WorkspaceMentionMetadata] = Field(default_factory=list)
     client_nonce: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

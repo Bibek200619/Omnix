@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
     AlertCircle,
     AlertTriangle,
+    AtSign,
     BadgeCheck,
     BarChart2,
     Check,
@@ -61,6 +62,7 @@ const navItems = [
   { href: "/decisions", label: "Decisions", icon: BadgeCheck },
   { href: "/tasks", label: "Tasks", icon: ClipboardCheck },
   { href: "/initiatives", label: "Initiatives", icon: Compass },
+  { href: "/mentions", label: "Mentions", icon: AtSign },
   { href: "/workspace", label: "Workspaces", icon: Layers3 },
   { href: "/team", label: "Team", icon: Users },
   { href: "/sources", label: "Sources", icon: FileText },

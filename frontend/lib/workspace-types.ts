@@ -343,6 +343,20 @@ export type WorkspaceConversationAuthorIdentity = {
   display_label?: string | null;
 };
 
+export type WorkspaceMentionMetadata = {
+  user_id: string;
+  label?: string | null;
+  display_name?: string | null;
+  email?: string | null;
+  avatar_url?: string | null;
+  avatar_label: string;
+  operational_label?: string | null;
+};
+
+export type WorkspaceMentionInput = {
+  user_id: string;
+};
+
 export type WorkspaceChannelMessage = {
   id: string;
   workspace_id: string;
@@ -352,6 +366,7 @@ export type WorkspaceChannelMessage = {
   content: string;
   context_links: ExecutionContextLink[];
   metadata: Record<string, unknown>;
+  mentions?: WorkspaceMentionMetadata[];
   client_nonce?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -402,6 +417,7 @@ export type WorkspaceTask = {
   linked_context: WorkspaceTaskContextLink[];
   activity_metadata: Record<string, unknown>;
   momentum_metadata: Record<string, unknown>;
+  mentions?: WorkspaceMentionMetadata[];
   initiative_id?: string | null;
   client_nonce?: string | null;
   completed_at?: string | null;
@@ -463,6 +479,7 @@ export type WorkspaceDecision = {
   creator_name?: string | null;
   creator_email?: string | null;
   creator_avatar_label?: string | null;
+  mentions?: WorkspaceMentionMetadata[];
 
   // Linkages
   linked_tasks: Array<{
@@ -501,4 +518,24 @@ export type WorkspaceSearchResponse = {
   tasks: WorkspaceSearchResult[];
   initiatives: WorkspaceSearchResult[];
   decisions: WorkspaceSearchResult[];
+};
+
+export type WorkspaceMentionSourceType = "conversation_message" | "task" | "decision";
+
+export type WorkspaceMentionInboxItem = {
+  id: string;
+  workspace_id: string;
+  mentioned_user_id: string;
+  mentioned_by_user_id: string;
+  source_type: WorkspaceMentionSourceType;
+  source_id: string;
+  created_at?: string | null;
+  read_at?: string | null;
+  mentioned_by_name?: string | null;
+  mentioned_by_email?: string | null;
+  mentioned_by_avatar_label: string;
+  mentioned_user_name?: string | null;
+  source_title: string;
+  source_preview?: string | null;
+  source_url: string;
 };

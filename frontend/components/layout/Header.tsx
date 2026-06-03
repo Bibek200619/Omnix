@@ -25,6 +25,7 @@ const routeTitles = [
   { match: "/decisions", title: "Decisions", subtitle: "Organizational memory" },
   { match: "/tasks", title: "Tasks", subtitle: "Shared execution" },
   { match: "/initiatives", title: "Initiatives", subtitle: "Shared operational direction" },
+  { match: "/mentions", title: "Mentions", subtitle: "Workspace awareness" },
   { match: "/workspace", title: "Workspaces", subtitle: "Manage your super workspaces and sub-spaces" },
   { match: "/team", title: "Team", subtitle: "Manage workspace members" },
   { match: "/sources", title: "Sources", subtitle: "Manage your connected data" },
