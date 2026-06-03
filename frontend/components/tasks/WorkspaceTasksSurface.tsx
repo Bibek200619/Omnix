@@ -60,6 +60,7 @@ export function WorkspaceTasksSurface() {
   const { presence, realtimeStatus } = useWorkspaceCollaboration();
   const searchParams = useSearchParams();
   const routeTaskId = searchParams?.get("id") ?? null;
+  const routeCreateTask = searchParams?.get("create") === "task";
   const [tasks, setTasks] = useState<WorkspaceTask[]>([]);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [initiatives, setInitiatives] = useState<WorkspaceInitiative[]>([]);
@@ -152,6 +153,12 @@ export function WorkspaceTasksSurface() {
     setFocusedTaskId(routeTaskId);
     void loadExecution(true);
   }, [activeWorkspaceId, loadExecution, routeTaskId]);
+
+  useEffect(() => {
+    if (routeCreateTask) {
+      setCreateOpen(true);
+    }
+  }, [routeCreateTask]);
 
   useEffect(() => {
     if (!activeWorkspaceId || !session?.user.id) return;

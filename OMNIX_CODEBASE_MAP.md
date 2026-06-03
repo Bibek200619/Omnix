@@ -127,6 +127,7 @@ frontend/
 │   │   ├── Sidebar.tsx          # MAIN sidebar (68KB) — workspace switcher + nav
 │   │   ├── AppShell.tsx         # Page shell wrapper
 │   │   ├── Header.tsx           # Top header bar
+│   │   ├── CommandPalette.tsx   # Global Ctrl/Cmd+K command palette
 │   │   ├── WorkspaceSearch.tsx  # Header workspace-scoped search UI
 │   │   ├── ProfileMenu.tsx      # User profile dropdown
 │   │   ├── MobileDock.tsx       # Mobile bottom navigation with "More" drawer trigger
@@ -172,6 +173,7 @@ frontend/
 | All TS types | `lib/workspace-types.ts` |
 | Main chat UI | `components/chat/ChatInterface.tsx` |
 | Sidebar nav | `components/layout/Sidebar.tsx` |
+| Command palette | `components/layout/CommandPalette.tsx` |
 | Workspace search UI | `components/layout/WorkspaceSearch.tsx` |
 | Onboarding gate | `components/workspace/WorkspaceOnboardingGate.tsx` |
 
@@ -331,10 +333,10 @@ User uploads file → upload.py router
   → File metadata saved to files table
 ```
 
-### Workspace Search Request
+### Command Palette & Workspace Search Request
 
 ```
-Header search input (components/layout/WorkspaceSearch.tsx)
+Ctrl/Cmd+K or mobile command icon (components/layout/CommandPalette.tsx)
   → apiClient.searchWorkspace(workspaceId, q)
   → GET /workspaces/{workspace_id}/search?q=...
   → workspace_search.py router authenticates user
@@ -416,7 +418,7 @@ super_founder > founder > owner > co_owner > team_lead > sub_leader > member > s
 - Backend router: `backend/app/routers/workspace_search.py`
 - Backend service: `backend/app/services/workspace_search_service.py`
 - Response schema: `backend/app/schemas/workspace_search.py`
-- Frontend UI: `frontend/components/layout/WorkspaceSearch.tsx`
+- Frontend UI: `frontend/components/layout/CommandPalette.tsx` for active header use; `WorkspaceSearch.tsx` remains the standalone search surface
 - API helper/types: `frontend/lib/api.ts` (`apiClient.searchWorkspace`) and `frontend/lib/workspace-types.ts`
 - Scope: active workspace only; no global/cross-workspace search
 - Sources: workspace channels/messages, tasks, initiatives, decisions
@@ -424,6 +426,15 @@ super_founder > founder > owner > co_owner > team_lead > sub_leader > member > s
 - Query method: bounded Supabase `ILIKE` field searches after `require_workspace_access`
 - Conversation privacy: private channel messages are searched only after visible channel filtering
 - Result navigation: `/tasks?id=...`, `/decisions?id=...`, `/initiatives?id=...`, `/conversations?channel=...`
+
+### Command Palette MVP
+- Component: `frontend/components/layout/CommandPalette.tsx`
+- Activation: desktop `Ctrl+K` / `Cmd+K`; mobile command icon in the authenticated header
+- Sections: quick actions, grouped workspace search, recent destinations
+- Quick create actions route to existing flows with `?create=task`, `?create=decision`, or `?create=initiative`
+- Existing create surfaces read those query params in task, decision, and initiative pages; no new entity creation logic exists in the palette
+- Recent destinations are stored locally per active workspace under `omnix.commandPalette.recent.{workspaceId}`
+- Keyboard support: arrow up/down, Enter, Escape, and Tab cycling inside the palette
 
 ### Onboarding Gate
 - Component: `WorkspaceOnboardingGate.tsx`
