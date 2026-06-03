@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Bell, Check, ChevronDown, Loader2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
+import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
 import { getWorkspaceInviteId, type WorkspaceInvite } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
@@ -52,9 +53,10 @@ function InviteActionButtons({
       }
       onSettled?.();
     } catch (err) {
+      logClientError("Invite action failed", err, { endpoint: `/workspace-invites/${inviteId}/${action}` });
       setState({
         busyInviteId: null,
-        error: err instanceof Error ? err.message : "Invite action failed.",
+        error: "Invite action failed.",
       });
       return;
     }

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { logClientError } from "@/lib/errors";
 import type { Workspace } from "@/lib/workspace-types";
 
 function getInviteId() {
@@ -50,7 +51,8 @@ export default function InvitePage() {
           router.replace("/chat");
         }, 700);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to accept this invitation.");
+        logClientError("Failed to accept invitation", err, { endpoint: `/workspace-invites/${inviteId}/accept` });
+        setError("Unable to accept this invitation.");
       } finally {
         setAccepting(false);
       }

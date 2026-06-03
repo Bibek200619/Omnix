@@ -15,6 +15,7 @@ import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Portal } from "@/components/ui/Portal";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { logClientError } from "@/lib/errors";
 import {
   isWorkspaceFounderRole,
 } from "@/lib/workspace-roles";
@@ -58,7 +59,7 @@ export function WorkspaceAssignmentModal({
       );
       setPotentialMembers(data || []);
     } catch (err) {
-      console.error("Failed to fetch potential members", err);
+      logClientError("Failed to fetch potential members", err, { endpoint: `/workspaces/${workspaceId}/potential-members` });
       setError("Unable to load organizational members.");
     } finally {
       setLoading(false);
@@ -96,7 +97,8 @@ export function WorkspaceAssignmentModal({
       setPotentialMembers((prev) => prev.filter((m) => m.user_id !== selectedUserId));
       setSelectedUserId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Assignment failed.");
+      logClientError("Failed to assign workspace member", err, { endpoint: `/workspaces/${workspaceId}/members` });
+      setError("Assignment failed.");
     } finally {
       setAssigningId(null);
     }

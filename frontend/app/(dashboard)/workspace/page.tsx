@@ -32,6 +32,7 @@ import { WorkspaceIntelligencePanel } from "@/components/workspace/WorkspaceInte
 import { WorkspacePresenceCluster } from "@/components/workspace/WorkspacePresenceCluster";
 import { WorkspaceActivityFeed } from "@/components/workspace/WorkspaceActivityFeed";
 import { WorkspaceOperationalTimeline } from "@/components/workspace/WorkspaceOperationalTimeline";
+import { logClientError } from "@/lib/errors";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspaceContinuity } from "@/lib/workspace-continuity-context";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -161,7 +162,8 @@ export default function WorkspacePage() {
       setNewDescription("");
       setCreateOpen(false);
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Unable to create workspace.");
+      logClientError("Failed to create workspace", err, { endpoint: "/workspaces" });
+      setCreateError("Unable to create workspace.");
     } finally {
       setCreating(false);
     }
@@ -192,7 +194,8 @@ export default function WorkspacePage() {
       setSelectedId(selectionId(created.id));
       setSubspaceOpen(false);
     } catch (err) {
-      setSubspaceError(err instanceof Error ? err.message : "Unable to create subworkspace.");
+      logClientError("Failed to create subworkspace", err);
+      setSubspaceError("Unable to create subworkspace.");
     } finally {
       setCreatingSubspace(false);
     }

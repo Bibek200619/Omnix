@@ -11,6 +11,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth-context";
+import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import { InviteNotificationBar, InviteNotificationBell } from "@/components/workspace/InviteNotifications";
@@ -70,8 +71,8 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
     const { error } = await signOut();
 
     if (error) {
-      console.error("Unable to sign out", error);
-      setSignOutError(error.message || "Unable to sign out.");
+      logClientError("Unable to sign out", error);
+      setSignOutError("Unable to sign out.");
       setSigningOut(false);
       return;
     }

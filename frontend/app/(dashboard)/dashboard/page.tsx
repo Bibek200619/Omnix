@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { apiClient } from "@/lib/api";
+import { logClientError } from "@/lib/errors";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -57,7 +58,8 @@ export default function DashboardPage() {
       setFiles(data);
     } catch (err) {
       setFiles([]);
-      setFilesError(err instanceof Error ? err.message : "Unable to load source count");
+      logClientError("Failed to load source count", err, { endpoint: "/files" });
+      setFilesError("Unable to load source count.");
     } finally {
       setFilesLoading(false);
     }

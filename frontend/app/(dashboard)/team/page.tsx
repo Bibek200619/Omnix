@@ -22,10 +22,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
+import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Portal } from "@/components/ui/Portal";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModal";
 import { useAuth } from "@/lib/auth-context";
+import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
@@ -213,6 +215,8 @@ export default function TeamPage() {
     activeWorkspace,
     activeMembers,
     activeInvites,
+    membersError,
+    membersLoading,
     refreshActiveWorkspaceData,
     refreshWorkspaces,
     inviteToActiveWorkspace,
@@ -279,7 +283,8 @@ export default function TeamPage() {
       await inviteToActiveWorkspace(target, role);
       setInviteOpen(false);
     } catch (err) {
-      setInviteError(err instanceof Error ? err.message : "Unable to invite teammate");
+      logClientError("Failed to invite teammate", err);
+      setInviteError("Unable to invite teammate.");
     } finally {
       setInviting(false);
     }
@@ -353,7 +358,8 @@ export default function TeamPage() {
       setRoleMember(null);
       setSelectedRole(null);
     } catch (err) {
-      setMemberActionError(err instanceof Error ? err.message : "Unable to update member role.");
+      logClientError("Failed to update member role", err);
+      setMemberActionError("Unable to update member role.");
       await reconcileTeamState();
     } finally {
       setBusyAction(null);
@@ -371,7 +377,8 @@ export default function TeamPage() {
       await reconcileTeamState();
       setRemoveMember(null);
     } catch (err) {
-      setMemberActionError(err instanceof Error ? err.message : "Unable to remove member.");
+      logClientError("Failed to remove member", err);
+      setMemberActionError("Unable to remove member.");
       await reconcileTeamState();
     } finally {
       setBusyAction(null);
@@ -422,10 +429,22 @@ export default function TeamPage() {
           ))}
         </div>
 
+        {membersError ? (
+          <OmnixErrorState
+            title="Team members are unavailable"
+            message={membersError}
+            onRetry={() => void refreshActiveWorkspaceData({ force: true })}
+            isRetrying={membersLoading}
+          />
+        ) : null}
+
         {memberActionError ? (
-          <div className="rounded-xl border border-rose-400/25 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
-            {memberActionError}
-          </div>
+          <OmnixErrorState
+            compact
+            title="Team action needs attention"
+            message={memberActionError}
+            onDismiss={() => setMemberActionError(null)}
+          />
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2.5">
@@ -458,7 +477,7 @@ export default function TeamPage() {
         </div>
 
         <div className="overflow-hidden rounded-[var(--omnix-radius)] border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)]">
-          {filteredMembers.length ? filteredMembers.map((member) => {
+          {membersError && members.length === 0 ? null : filteredMembers.length ? filteredMembers.map((member) => {
             const key = memberKey(member);
             const RoleIcon = roleIcon(member.role);
             const name = memberName(member);

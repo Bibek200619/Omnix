@@ -18,7 +18,9 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
 import { Input } from "@/components/ui/Input";
+import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { useConversationHistory } from "@/lib/conversation-history-context";
+import { logClientError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 
 export function HistoryList() {
@@ -74,7 +76,8 @@ export function HistoryList() {
       setEditingId(null);
       setDraftTitle("");
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Unable to rename chat.");
+      logClientError("Failed to rename chat", err, { endpoint: `/conversations/${chatId}` });
+      setActionError("Unable to rename chat.");
     } finally {
       setBusyId(null);
     }
@@ -89,7 +92,8 @@ export function HistoryList() {
         router.push("/chat");
       }
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Unable to delete chat.");
+      logClientError("Failed to delete chat", err, { endpoint: `/conversations/${chatId}` });
+      setActionError("Unable to delete chat.");
     } finally {
       setBusyId(null);
     }
@@ -134,21 +138,14 @@ export function HistoryList() {
         />
       </div>
 
-      {error && (
-        <Alert variant="error" title="Conversation history is unavailable">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <span>{error}</span>
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => void refreshConversations()}
-            >
-              Retry
-            </Button>
-          </div>
-        </Alert>
-      )}
+      {error ? (
+        <OmnixErrorState
+          title="Conversation history is unavailable"
+          message={error}
+          onRetry={() => void refreshConversations({ force: true })}
+          isRetrying={loading}
+        />
+      ) : null}
 
       {actionError ? (
         <Alert variant="error" title="History action failed">
