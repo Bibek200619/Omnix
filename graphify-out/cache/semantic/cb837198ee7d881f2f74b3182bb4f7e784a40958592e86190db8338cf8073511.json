@@ -1,1 +1,0 @@
-{"nodes": [{"id": "supabase_service", "label": "Supabase Service", "file_type": "code", "source_file": "backend/app/services/supabase_service.py", "source_location": null}], "edges": [], "hyperedges": []}

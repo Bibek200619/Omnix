@@ -1,1 +1,0 @@
-{"nodes": [{"id": "main_fastapi_app", "label": "FastAPI Application", "file_type": "code", "source_file": "backend/app/main.py", "source_location": null}], "edges": [{"source": "main_fastapi_app", "target": "startup_initialize_vector_store", "relation": "calls", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "backend/app/main.py"}], "hyperedges": []}
