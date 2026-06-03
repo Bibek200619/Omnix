@@ -13,6 +13,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
@@ -57,6 +58,8 @@ export function WorkspaceTasksSurface() {
   const { session } = useAuth();
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const { presence, realtimeStatus } = useWorkspaceCollaboration();
+  const searchParams = useSearchParams();
+  const routeTaskId = searchParams?.get("id") ?? null;
   const [tasks, setTasks] = useState<WorkspaceTask[]>([]);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [initiatives, setInitiatives] = useState<WorkspaceInitiative[]>([]);
@@ -77,6 +80,8 @@ export function WorkspaceTasksSurface() {
   const [blockerDrafts, setBlockerDrafts] = useState<Record<string, string>>({});
   const [assistance, setAssistance] = useState<WorkspaceTaskAssistance | null>(null);
   const [assisting, setAssisting] = useState<WorkspaceTaskAssistanceMode | null>(null);
+  const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
+  const taskRefs = useRef<Record<string, HTMLElement | null>>({});
   const workspaceRef = useRef(activeWorkspaceId);
   const requestRef = useRef(0);
 
@@ -116,6 +121,17 @@ export function WorkspaceTasksSurface() {
       setMomentum(incomingMomentum);
       setInitiatives(incomingInitiatives);
       if (incomingMembers) setMembers(incomingMembers);
+      if (routeTaskId) {
+        const routeTask = incomingTasks.find((task) => task.id === routeTaskId);
+        if (routeTask) {
+          setFocusedTaskId(routeTask.id);
+          setFilter(routeTask.status === "complete" ? "complete" : "open");
+        } else {
+          setFocusedTaskId(null);
+        }
+      } else {
+        setFocusedTaskId(null);
+      }
       setError(null);
     } catch (err) {
       if (requestId === requestRef.current) {
@@ -125,7 +141,7 @@ export function WorkspaceTasksSurface() {
     } finally {
       if (requestId === requestRef.current) setLoading(false);
     }
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, routeTaskId]);
 
   useEffect(() => {
     setTasks([]);
@@ -133,8 +149,9 @@ export function WorkspaceTasksSurface() {
     setInitiatives([]);
     setAssistance(null);
     setFilter("open");
+    setFocusedTaskId(routeTaskId);
     void loadExecution(true);
-  }, [activeWorkspaceId, loadExecution]);
+  }, [activeWorkspaceId, loadExecution, routeTaskId]);
 
   useEffect(() => {
     if (!activeWorkspaceId || !session?.user.id) return;
@@ -197,6 +214,14 @@ export function WorkspaceTasksSurface() {
       return 0;
     });
   }, [filter, tasks, session?.user.id]);
+
+  useEffect(() => {
+    if (!focusedTaskId || loading) return;
+    const timer = window.setTimeout(() => {
+      taskRefs.current[focusedTaskId]?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [displayedTasks, focusedTaskId, loading]);
 
   const executionOverview = useMemo(() => {
     if (!tasks.length) return null;
@@ -452,9 +477,16 @@ export function WorkspaceTasksSurface() {
               const isDueSoon = task.due_date && new Date(task.due_date) <= threeDaysFromNow;
 
               return (
-                <article key={task.id} className={cn(
+                <article
+                  key={task.id}
+                  ref={(node) => {
+                    taskRefs.current[task.id] = node;
+                  }}
+                  className={cn(
                   "group relative rounded-xl border p-3.5 transition",
-                  isBlocked ? "border-amber-400/30 bg-amber-400/[0.03]" : "border-[var(--omnix-border)] bg-black/[0.12] hover:bg-white/[0.03]"
+                  focusedTaskId === task.id
+                    ? "border-cyan-300/45 bg-cyan-300/[0.07] shadow-[var(--omnix-glow-xs)]"
+                    : isBlocked ? "border-amber-400/30 bg-amber-400/[0.03]" : "border-[var(--omnix-border)] bg-black/[0.12] hover:bg-white/[0.03]"
                 )}>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">

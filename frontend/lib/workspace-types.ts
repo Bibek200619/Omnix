@@ -478,3 +478,27 @@ export type WorkspaceDecision = {
     momentum_state: Record<string, unknown>;
   } | null;
 };
+
+export type WorkspaceSearchResultType = "conversation" | "task" | "initiative" | "decision";
+
+export type WorkspaceSearchResult = {
+  id: string;
+  workspace_id: string;
+  type: WorkspaceSearchResultType;
+  title: string;
+  preview?: string | null;
+  context?: string | null;
+  url: string;
+  channel_id?: string | null;
+  message_id?: string | null;
+  matched_field?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type WorkspaceSearchResponse = {
+  conversations: WorkspaceSearchResult[];
+  tasks: WorkspaceSearchResult[];
+  initiatives: WorkspaceSearchResult[];
+  decisions: WorkspaceSearchResult[];
+};
