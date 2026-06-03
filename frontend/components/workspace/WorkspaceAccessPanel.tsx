@@ -349,7 +349,7 @@ export function WorkspaceAccessPanel() {
                   setInviteOpen(true);
                 }
               }}
-              className="rounded-full border-[var(--omnix-border)] bg-[var(--omnix-surface)] hover:bg-[var(--omnix-surface-hover)]"
+              className="min-h-11 w-full rounded-full border-[var(--omnix-border)] bg-[var(--omnix-surface)] hover:bg-[var(--omnix-surface-hover)] sm:w-auto"
             >
               {isSubspace ? "Add Existing Member" : "Invite teammate"}
             </Button>
@@ -439,7 +439,7 @@ export function WorkspaceAccessPanel() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 sm:justify-end">
+                    <div className="flex items-center justify-between gap-3 rounded-lg border border-white/5 bg-black/10 px-3 py-2 sm:border-transparent sm:bg-transparent sm:px-0 sm:py-0 sm:justify-end">
                       <div className="text-xs text-slate-500">
                         Joined <ClientTime value={member.created_at} fallback="recently" />
                       </div>
@@ -484,7 +484,7 @@ export function WorkspaceAccessPanel() {
             </p>
           </div>
           {canManageRoles ? (
-            <Button type="button" variant="ghost" size="sm" leftIcon={<UserPlus className="h-4 w-4" />} onClick={() => setInviteOpen(true)}>
+            <Button type="button" variant="ghost" size="sm" className="min-h-10 w-full sm:w-auto" leftIcon={<UserPlus className="h-4 w-4" />} onClick={() => setInviteOpen(true)}>
               Invite
             </Button>
           ) : null}
@@ -506,7 +506,7 @@ export function WorkspaceAccessPanel() {
             </div>
           ) : outgoingInvites.length === 0 ? (
               <div className="rounded-lg border border-dashed border-[var(--omnix-border)] px-4 py-5 text-sm text-[var(--omnix-text-3)]">
-              No pending access requests.
+              No pending access requests. Use Invite when you need someone new to join this workspace.
             </div>
           ) : (
             outgoingInvites.map((invite) => {

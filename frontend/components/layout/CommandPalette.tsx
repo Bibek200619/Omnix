@@ -449,7 +449,7 @@ export function CommandPalette() {
         onMouseEnter={() => setActiveIndex(index)}
         onClick={() => selectItem(item)}
         className={cn(
-          "group flex min-h-[3.9rem] w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition",
+          "group flex min-h-[4.25rem] w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition active:scale-[0.995] sm:min-h-[3.9rem] sm:py-2.5",
           active
             ? "border-cyan-300/35 bg-cyan-300/[0.08] shadow-[var(--omnix-glow-xs)]"
             : "border-transparent bg-white/[0.018] hover:border-cyan-300/18 hover:bg-white/[0.04]",
@@ -486,7 +486,7 @@ export function CommandPalette() {
           setOpen(true);
           setQuery("");
         }}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] transition hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] md:hidden"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] transition hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] active:scale-[0.97] md:hidden"
         aria-label="Open command palette"
         title="Open command palette"
       >
@@ -521,16 +521,17 @@ export function CommandPalette() {
               aria-modal="true"
               aria-label="Omnix command palette"
               onKeyDown={handleKeyDown}
-              className="fixed inset-x-0 bottom-0 top-[calc(env(safe-area-inset-top)+0.5rem)] flex flex-col overflow-hidden rounded-t-[20px] border border-cyan-300/15 bg-[rgba(3,8,18,0.97)] shadow-[0_-24px_80px_rgba(0,0,0,0.55),var(--omnix-glow-sm)] backdrop-blur-2xl md:bottom-auto md:left-1/2 md:right-auto md:top-[12vh] md:max-h-[min(42rem,calc(100dvh-8rem))] md:w-[min(42rem,calc(100vw-2rem))] md:-translate-x-1/2 md:rounded-2xl"
+              className="fixed inset-x-0 bottom-0 flex max-h-[min(86dvh,44rem)] flex-col overflow-hidden rounded-t-[20px] border border-cyan-300/15 bg-[rgba(3,8,18,0.97)] shadow-[0_-24px_80px_rgba(0,0,0,0.55),var(--omnix-glow-sm)] backdrop-blur-2xl md:bottom-auto md:left-1/2 md:right-auto md:top-[12vh] md:max-h-[min(42rem,calc(100dvh-8rem))] md:w-[min(42rem,calc(100vw-2rem))] md:-translate-x-1/2 md:rounded-2xl"
             >
               <div className="border-b border-white/5 p-3 sm:p-4">
+                <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/15 md:hidden" />
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-100/45">
                       {activeWorkspace?.name || "Omnix"}
                     </p>
                     <p className="mt-0.5 truncate text-xs text-[var(--omnix-text-3)]">
-                      Command palette
+                      Search, create, or jump without opening the sidebar
                     </p>
                   </div>
                   <button
@@ -548,7 +549,7 @@ export function CommandPalette() {
                     ref={inputRef}
                     value={query}
                     onChange={(event) => setQuery(event.target.value.slice(0, 120))}
-                    placeholder="Search Omnix or choose a command..."
+                    placeholder="Type a task, decision, page, or command..."
                     className="h-12 w-full rounded-xl border border-cyan-300/12 bg-black/25 pl-9 pr-11 text-base text-white outline-none placeholder:text-white/25 focus:border-cyan-300/35 focus:shadow-[var(--omnix-glow-xs)]"
                   />
                   {loading ? (
@@ -594,9 +595,12 @@ export function CommandPalette() {
                         Searching workspace
                       </div>
                     ) : !hasSearchResults ? (
-                      <p className="px-2 py-3 text-sm text-[var(--omnix-text-2)]">
-                        No matching workspace information found.
-                      </p>
+                      <div className="rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 px-3 py-4">
+                        <p className="text-sm font-medium text-white">No command or workspace match.</p>
+                        <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">
+                          Try a task title, teammate term, decision phrase, or use a quick action below.
+                        </p>
+                      </div>
                     ) : (
                       <div className="space-y-3">
                         {searchGroups.map((group) => {

@@ -289,10 +289,13 @@ export function WorkspaceDecisionsSurface() {
               
               {!loading && filteredDecisions.length === 0 && decisions.length > 0 ? (
                 <div className="py-12 text-center">
-                  <p className="text-xs text-[var(--omnix-text-3)] italic">No decisions match this filter.</p>
+                  <p className="text-sm font-medium text-white">No decisions match this filter.</p>
+                  <p className="mx-auto mt-1 max-w-xs text-xs leading-5 text-[var(--omnix-text-3)]">
+                    Clear the status filter to return to the full decision memory.
+                  </p>
                   <button 
                     onClick={() => setStatusFilter("all")}
-                    className="mt-2 text-[10px] font-bold uppercase tracking-widest text-cyan-400 hover:text-cyan-300"
+                    className="mt-3 inline-flex min-h-9 items-center rounded-lg border border-cyan-300/14 bg-cyan-300/[0.055] px-3 text-[10px] font-bold uppercase tracking-widest text-cyan-400 hover:text-cyan-300"
                   >
                     Clear filter
                   </button>
