@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { apiClient } from "@/lib/api";
+import { API_BASE_URL, ApiError, apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
 import { realtimeRegistry } from "@/lib/realtime-registry";
@@ -24,6 +24,35 @@ type MentionRealtimePayload = {
 };
 
 const WorkspaceNotificationsContext = createContext<WorkspaceNotificationsContextType | undefined>(undefined);
+
+function notificationLoadErrorMessage(error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return "Unable to load notifications.";
+  }
+
+  if (!error.status) {
+    return `The notification service cannot reach the configured API at ${API_BASE_URL}. Start the backend or update NEXT_PUBLIC_API_BASE_URL.`;
+  }
+
+  if (error.status === 401) {
+    return "Your session expired. Sign in again to load notifications.";
+  }
+
+  if (error.status === 403) {
+    return "You do not have access to notification data in this workspace.";
+  }
+
+  if (error.status === 404) {
+    return "The configured API does not include the in-app mentions endpoints yet. Deploy the notification backend or update NEXT_PUBLIC_API_BASE_URL.";
+  }
+
+  const rawMessage = error.rawMessage ?? "";
+  if (/workspace_mentions|relation .* does not exist|table .* does not exist/i.test(rawMessage)) {
+    return "Mention notification storage is not ready. Run the workspace_mentions migration on the configured database.";
+  }
+
+  return rawMessage ? `Notification service returned: ${rawMessage}` : "Unable to load notifications.";
+}
 
 export function WorkspaceNotificationsProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
@@ -60,7 +89,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
       logClientError("Failed to load workspace notifications", err, {
         endpoint: `/workspaces/${activeWorkspaceId}/mentions`,
       });
-      setError("Unable to load notifications.");
+      setError(notificationLoadErrorMessage(err));
     } finally {
       if (requestId === requestRef.current) setLoading(false);
     }
