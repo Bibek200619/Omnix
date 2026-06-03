@@ -1,10 +1,22 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from types import SimpleNamespace
 
 import pytest
 
 from app.services import workspace_initiative_service as initiatives
+
+
+def _assert_no_raw_dates(value: object) -> None:
+    if isinstance(value, date):
+        raise AssertionError(f"raw date escaped serialization: {value!r}")
+    if isinstance(value, dict):
+        for item in value.values():
+            _assert_no_raw_dates(item)
+    if isinstance(value, list):
+        for item in value:
+            _assert_no_raw_dates(item)
 
 
 def test_momentum_uses_only_linked_recorded_evidence() -> None:
@@ -30,6 +42,93 @@ def test_completed_initiative_reports_completion_without_scoring() -> None:
     assert result["health"] == "completion_flow"
     assert result["summary"] == "This initiative is marked complete."
     assert "score" not in result
+
+
+@pytest.mark.asyncio
+async def test_create_initiative_serializes_target_date_before_insert(monkeypatch: pytest.MonkeyPatch) -> None:
+    target_date = date(2026, 6, 3)
+    captured: dict[str, object] = {}
+
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_insert(table: str, payload: dict[str, object]):
+        _assert_no_raw_dates(payload)
+        if table == "workspace_initiatives":
+            captured.update(payload)
+            return {"id": "initiative-1", "workspace_id": "workspace-1", **payload}
+        if table == "workspace_operational_timeline":
+            return {"id": "timeline-1", **payload}
+        raise AssertionError(table)
+
+    async def fake_activity(**kwargs):
+        return None
+
+    async def fake_hydrate(rows, **kwargs):
+        return rows
+
+    monkeypatch.setattr(initiatives, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(initiatives, "insert_one_trusted", fake_insert)
+    monkeypatch.setattr(initiatives, "log_workspace_activity", fake_activity)
+    monkeypatch.setattr(initiatives, "_hydrate_initiatives", fake_hydrate)
+
+    result = await initiatives.create_initiative(
+        workspace_id="workspace-1",
+        user_id="user-1",
+        payload={"title": "Stabilize platform", "target_date": target_date},
+    )
+
+    assert captured["target_date"] == "2026-06-03"
+    assert result["target_date"] == "2026-06-03"
+
+
+@pytest.mark.asyncio
+async def test_update_initiative_serializes_target_date_before_update(monkeypatch: pytest.MonkeyPatch) -> None:
+    target_date = date(2026, 6, 4)
+    current = {
+        "id": "initiative-1",
+        "workspace_id": "workspace-1",
+        "title": "Stabilize platform",
+        "status": "active",
+        "created_by": "user-1",
+        "completed_at": None,
+    }
+    captured: dict[str, object] = {}
+
+    async def fake_require_initiative(**kwargs):
+        return current
+
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_update(table: str, filters: dict[str, object], payload: dict[str, object]):
+        assert table == "workspace_initiatives"
+        assert filters == {"id": "initiative-1", "workspace_id": "workspace-1"}
+        _assert_no_raw_dates(payload)
+        captured.update(payload)
+        return {**current, **payload}
+
+    async def fake_activity(**kwargs):
+        return None
+
+    async def fake_hydrate(rows, **kwargs):
+        return rows
+
+    monkeypatch.setattr(initiatives, "require_initiative", fake_require_initiative)
+    monkeypatch.setattr(initiatives, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(initiatives, "update_one_trusted", fake_update)
+    monkeypatch.setattr(initiatives, "log_workspace_activity", fake_activity)
+    monkeypatch.setattr(initiatives, "_hydrate_initiatives", fake_hydrate)
+
+    result = await initiatives.update_initiative(
+        workspace_id="workspace-1",
+        initiative_id="initiative-1",
+        user_id="user-1",
+        payload={"target_date": target_date},
+    )
+
+    assert captured["target_date"] == "2026-06-04"
+    assert result["target_date"] == "2026-06-04"
 
 
 @pytest.mark.asyncio
