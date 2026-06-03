@@ -30,6 +30,7 @@ function statusClass(status: WorkspaceDecisionStatus) {
 export function WorkspaceDecisionsSurface() {
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const searchParams = useSearchParams();
+  const routeCreateDecision = searchParams?.get("create") === "decision";
   const [decisions, setDecisions] = useState<WorkspaceDecision[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,8 +92,11 @@ export function WorkspaceDecisionsSurface() {
     if (id) {
       setSelectedId(id);
     }
+    if (routeCreateDecision) {
+      setCreateOpen(true);
+    }
     void loadDecisions();
-  }, [activeWorkspaceId, loadDecisions, searchParams]);
+  }, [activeWorkspaceId, loadDecisions, routeCreateDecision, searchParams]);
 
   if (!activeWorkspaceId) {
     return (
