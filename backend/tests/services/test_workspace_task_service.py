@@ -1,10 +1,22 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from types import SimpleNamespace
 
 import pytest
 
 from app.services import workspace_task_service as tasks
+
+
+def _assert_no_raw_dates(value: object) -> None:
+    if isinstance(value, date):
+        raise AssertionError(f"raw date escaped serialization: {value!r}")
+    if isinstance(value, dict):
+        for item in value.values():
+            _assert_no_raw_dates(item)
+    if isinstance(value, list):
+        for item in value:
+            _assert_no_raw_dates(item)
 
 
 @pytest.mark.asyncio
@@ -43,6 +55,46 @@ async def test_create_from_message_preserves_discussion_provenance(monkeypatch: 
     assert payload["linked_context"][0]["context_type"] == "conversation_message"
     assert payload["linked_context"][0]["context_id"] == "message-1"
     assert payload["linked_context"][1]["context_type"] == "channel"
+
+
+@pytest.mark.asyncio
+async def test_create_task_serializes_due_date_before_insert(monkeypatch: pytest.MonkeyPatch) -> None:
+    due_date = date(2026, 6, 3)
+    captured: dict[str, object] = {}
+
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_insert(table: str, payload: dict[str, object]):
+        assert table == "workspace_tasks"
+        _assert_no_raw_dates(payload)
+        captured.update(payload)
+        return {"id": "task-1", "workspace_id": "workspace-1", **payload}
+
+    async def fake_activity(**kwargs):
+        return None
+
+    monkeypatch.setattr(tasks, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(tasks, "insert_one_trusted", fake_insert)
+    monkeypatch.setattr(tasks, "log_workspace_activity", fake_activity)
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    async def fake_select_all(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(tasks, "get_profiles", fake_profiles)
+    monkeypatch.setattr(tasks, "select_all_trusted", fake_select_all)
+
+    result = await tasks.create_task(
+        workspace_id="workspace-1",
+        user_id="user-1",
+        payload={"title": "Prepare launch", "due_date": due_date},
+    )
+
+    assert captured["due_date"] == "2026-06-03"
+    assert result["due_date"] == "2026-06-03"
 
 
 @pytest.mark.asyncio
@@ -94,6 +146,61 @@ async def test_update_complete_stamps_recorded_transition(monkeypatch: pytest.Mo
 
     assert updated["status"] == "complete"
     assert captured["completed_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_update_task_serializes_due_date_before_update(monkeypatch: pytest.MonkeyPatch) -> None:
+    due_date = date(2026, 6, 4)
+    current = {
+        "id": "task-1",
+        "workspace_id": "workspace-1",
+        "title": "Verify deployment",
+        "status": "active",
+        "created_by": "user-1",
+        "completed_at": None,
+        "blockers": [],
+        "linked_context": [],
+    }
+    captured: dict[str, object] = {}
+
+    async def fake_require_task(**kwargs):
+        return current
+
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_update(table: str, filters: dict[str, object], payload: dict[str, object]):
+        assert table == "workspace_tasks"
+        assert filters == {"id": "task-1", "workspace_id": "workspace-1"}
+        _assert_no_raw_dates(payload)
+        captured.update(payload)
+        return {**current, **payload}
+
+    async def fake_activity(**kwargs):
+        return None
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    async def fake_select_all(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(tasks, "require_task", fake_require_task)
+    monkeypatch.setattr(tasks, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(tasks, "update_one_trusted", fake_update)
+    monkeypatch.setattr(tasks, "log_workspace_activity", fake_activity)
+    monkeypatch.setattr(tasks, "get_profiles", fake_profiles)
+    monkeypatch.setattr(tasks, "select_all_trusted", fake_select_all)
+
+    result = await tasks.update_task(
+        workspace_id="workspace-1",
+        task_id="task-1",
+        user_id="user-1",
+        payload={"due_date": due_date},
+    )
+
+    assert captured["due_date"] == "2026-06-04"
+    assert result["due_date"] == "2026-06-04"
 
 
 @pytest.mark.asyncio
