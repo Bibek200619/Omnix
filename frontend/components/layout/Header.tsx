@@ -16,7 +16,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import { InviteNotificationBar, InviteNotificationBell } from "@/components/workspace/InviteNotifications";
 import { ProfileMenu } from "@/components/layout/ProfileMenu";
-import { WorkspaceSearch } from "@/components/layout/WorkspaceSearch";
+import { CommandPalette } from "@/components/layout/CommandPalette";
 
 const routeTitles = [
   { match: "/dashboard", title: "Dashboard", subtitle: "Welcome back" },
@@ -137,7 +137,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
         </div>
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-          <WorkspaceSearch />
+          <CommandPalette />
           <InviteNotificationBell />
           <div className="hidden h-[22px] w-px bg-[rgba(0,255,255,0.1)] sm:block" />
           <Button
