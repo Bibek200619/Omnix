@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BadgeCheck, Loader2, Plus, RefreshCw, Target, ListTodo } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { apiClient } from "@/lib/api";
+import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { WorkspaceDecision, WorkspaceDecisionStatus } from "@/lib/workspace-types";
@@ -76,7 +78,7 @@ export function WorkspaceDecisionsSurface() {
       setError(null);
     } catch (err) {
       if (requestId === requestRef.current) {
-        console.error("Failed to load decisions", err);
+        logClientError("Failed to load decisions", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions` });
         setError("Unable to load decisions.");
       }
     } finally {
@@ -169,9 +171,14 @@ export function WorkspaceDecisionsSurface() {
       </div>
 
       {error ? (
-        <div className="mb-4 rounded-xl border border-rose-400/20 bg-rose-400/8 px-4 py-3 text-sm text-rose-100">
-          {error}
-        </div>
+        <OmnixErrorState
+          compact
+          className="mb-4"
+          title="Decisions are unavailable"
+          message={error}
+          onRetry={() => void loadDecisions()}
+          isRetrying={loading}
+        />
       ) : null}
 
       {!loading && decisions.length === 0 ? (

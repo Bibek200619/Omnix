@@ -1,3 +1,4 @@
+import logging
 from typing import Any, List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -32,6 +33,7 @@ from ..services.workspace_continuity_service import (
 from ..services.workspace_service import utc_now_iso
 
 router = APIRouter(prefix="/workspaces", tags=["continuity"])
+logger = logging.getLogger(__name__)
 
 ASSISTANCE_INSTRUCTIONS = {
     "state": "Summarize confirmed initiative state from the record and linked evidence. Separate completed state from open work.",
@@ -177,7 +179,8 @@ async def assist_workspace_initiative(
     try:
         generation = await generate_ai_response(prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=480)
     except ModelServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+        logger.exception("Failed to generate initiative assistance")
+        raise HTTPException(status_code=exc.status_code, detail="Initiative assistance is unavailable.") from exc
     return {
         "mode": request.mode,
         "content": generation.content,
@@ -201,10 +204,12 @@ async def get_workspace_timeline(
             initiative_id=initiative_id,
             limit=limit
         )
-    except ValueError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError as exc:
+        logger.warning("Workspace timeline access denied: %s", exc)
+        raise HTTPException(status_code=403, detail="Workspace continuity is unavailable.") from exc
+    except Exception as exc:
+        logger.exception("Failed to load workspace timeline")
+        raise HTTPException(status_code=500, detail="Workspace continuity is unavailable.") from exc
 
 @router.get("/{workspace_id}/continuity/unresolved", response_model=List[dict])
 async def get_unresolved_continuity(
@@ -216,7 +221,9 @@ async def get_unresolved_continuity(
             user_id=UUID(_user_id(user)),
             workspace_id=workspace_id
         )
-    except ValueError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError as exc:
+        logger.warning("Workspace continuity access denied: %s", exc)
+        raise HTTPException(status_code=403, detail="Workspace continuity is unavailable.") from exc
+    except Exception as exc:
+        logger.exception("Failed to load unresolved continuity")
+        raise HTTPException(status_code=500, detail="Workspace continuity is unavailable.") from exc

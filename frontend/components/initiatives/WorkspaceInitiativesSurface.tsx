@@ -19,8 +19,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { logClientError } from "@/lib/errors";
 import { realtimeRegistry } from "@/lib/realtime-registry";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -148,7 +150,7 @@ export function WorkspaceInitiativesSurface() {
       setError(null);
     } catch (err) {
       if (requestId === requestRef.current) {
-        console.error("Failed to load initiatives", err);
+        logClientError("Failed to load initiatives", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives` });
         setError("Unable to load initiatives.");
       }
     } finally {
@@ -270,7 +272,7 @@ export function WorkspaceInitiativesSurface() {
       void loadInitiatives(true);
     } catch (err) {
       setInitiatives((current) => current.filter((initiative) => initiative.client_nonce !== nonce));
-      console.error("Failed to open initiative", err);
+      logClientError("Failed to open initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives` });
       setError("Unable to open initiative.");
     } finally {
       setCreating(false);
@@ -290,7 +292,7 @@ export function WorkspaceInitiativesSurface() {
       setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
     } catch (err) {
       setInitiatives((current) => current.map((item) => (item.id === before.id ? before : item)));
-      console.error("Failed to update initiative", err);
+      logClientError("Failed to update initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}` });
       setError("Unable to update initiative.");
     } finally {
       setUpdating(false);
@@ -308,7 +310,7 @@ export function WorkspaceInitiativesSurface() {
       setTaskToAttach("");
       void loadInitiatives(true);
     } catch (err) {
-      console.error("Failed to attach task to initiative", err);
+      logClientError("Failed to attach task to initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/tasks/${taskToAttach}` });
       setError("Unable to attach task.");
     } finally {
       setUpdating(false);
@@ -322,7 +324,7 @@ export function WorkspaceInitiativesSurface() {
       await apiClient.patch<WorkspaceTask>(`/workspaces/${activeWorkspaceId}/tasks/${task.id}`, { initiative_id: null });
       void loadInitiatives(true);
     } catch (err) {
-      console.error("Failed to detach task from initiative", err);
+      logClientError("Failed to detach task from initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks/${task.id}` });
       setError("Unable to detach task.");
     } finally {
       setUpdating(false);
@@ -340,7 +342,7 @@ export function WorkspaceInitiativesSurface() {
       setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
       setChannelToAttach("");
     } catch (err) {
-      console.error("Failed to attach conversation to initiative", err);
+      logClientError("Failed to attach conversation to initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels` });
       setError("Unable to attach conversation.");
     } finally {
       setUpdating(false);
@@ -354,7 +356,7 @@ export function WorkspaceInitiativesSurface() {
       await apiClient.delete(`/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels/${channelId}`);
       void loadInitiatives(true);
     } catch (err) {
-      console.error("Failed to detach conversation from initiative", err);
+      logClientError("Failed to detach conversation from initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels/${channelId}` });
       setError("Unable to detach conversation.");
     } finally {
       setUpdating(false);
@@ -386,7 +388,7 @@ export function WorkspaceInitiativesSurface() {
         ),
       );
     } catch (err) {
-      console.error("Failed to load initiative assistance", err);
+      logClientError("Failed to load initiative assistance", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/assist` });
       setError("Initiative assistance is unavailable.");
     } finally {
       setAssisting(null);
@@ -418,10 +420,15 @@ export function WorkspaceInitiativesSurface() {
       </header>
 
       {error ? (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-rose-400/20 bg-rose-400/8 px-3 py-2 text-xs text-rose-100">
-          <span>{error}</span>
-          <button type="button" onClick={() => setError(null)} aria-label="Dismiss error"><X className="h-3.5 w-3.5" /></button>
-        </div>
+        <OmnixErrorState
+          compact
+          className="mb-4"
+          title={error === "Unable to load initiatives." ? "Initiatives are unavailable" : "Initiative action needs attention"}
+          message={error}
+          onRetry={error === "Unable to load initiatives." ? () => void loadInitiatives(true) : undefined}
+          isRetrying={loading}
+          onDismiss={() => setError(null)}
+        />
       ) : null}
 
       <div className="grid shrink-0 gap-3 lg:grid-cols-[19rem_minmax(0,1fr)] xl:min-h-0 xl:flex-1 xl:grid-cols-[20rem_minmax(0,1fr)_19rem]">

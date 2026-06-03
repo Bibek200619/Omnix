@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Toggle } from "@/components/ui/Toggle";
+import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { Workspace } from "@/lib/workspace-types";
@@ -117,7 +118,8 @@ export function WorkspaceSettingsPanel() {
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2200);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update workspace.");
+      logClientError("Failed to update workspace", err, { endpoint: `/workspaces/${activeWorkspace.id}` });
+      setError("Unable to update workspace.");
     } finally {
       setSaving(false);
     }
@@ -142,7 +144,8 @@ export function WorkspaceSettingsPanel() {
       setSubspaceDescription("");
       setActiveWorkspace(created.id);
     } catch (err) {
-      setSubspaceError(err instanceof Error ? err.message : "Unable to create subworkspace.");
+      logClientError("Failed to create subworkspace", err);
+      setSubspaceError("Unable to create subworkspace.");
     } finally {
       setCreatingSubspace(false);
     }
@@ -155,7 +158,8 @@ export function WorkspaceSettingsPanel() {
       setDeleteError(null);
       await deleteWorkspace(activeWorkspace.id);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Unable to delete workspace.");
+      logClientError("Failed to delete workspace", err, { endpoint: `/workspaces/${activeWorkspace.id}` });
+      setDeleteError("Unable to delete workspace.");
     } finally {
       setDeleting(false);
     }
@@ -181,7 +185,8 @@ export function WorkspaceSettingsPanel() {
       setIntelligenceSaved(true);
       window.setTimeout(() => setIntelligenceSaved(false), 2200);
     } catch (err) {
-      setIntelligenceError(err instanceof Error ? err.message : "Unable to update intelligence profile.");
+      logClientError("Failed to update intelligence profile", err, { endpoint: `/workspaces/${activeWorkspace.id}/intelligence` });
+      setIntelligenceError("Unable to update intelligence profile.");
     } finally {
       setSavingIntelligence(false);
     }

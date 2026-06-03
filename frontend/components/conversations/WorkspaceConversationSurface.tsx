@@ -17,9 +17,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Portal } from "@/components/ui/Portal";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { logClientError } from "@/lib/errors";
 import { realtimeRegistry } from "@/lib/realtime-registry";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -174,7 +176,8 @@ export function WorkspaceConversationSurface() {
       setError(null);
     } catch (err) {
       if (requestId === channelRequestRef.current) {
-        setError(err instanceof Error ? err.message : "Unable to load workspace conversations.");
+        logClientError("Failed to load workspace conversations", err, { endpoint: `/workspaces/${activeWorkspaceId}/channels` });
+        setError("Unable to load conversations.");
       }
     } finally {
       if (requestId === channelRequestRef.current) setChannelsLoading(false);
@@ -199,7 +202,8 @@ export function WorkspaceConversationSurface() {
       }
     } catch (err) {
       if (requestId === messageRequestRef.current) {
-        setError(err instanceof Error ? err.message : "Unable to load discussion.");
+        logClientError("Failed to load discussion", err, { endpoint: `/workspaces/${activeWorkspaceId}/channels/${channelId}/messages` });
+        setError("Unable to load discussion.");
       }
     } finally {
       if (requestId === messageRequestRef.current) setMessagesLoading(false);
@@ -223,7 +227,8 @@ export function WorkspaceConversationSurface() {
       }
     } catch (err) {
       if (requestId === threadRequestRef.current) {
-        setError(err instanceof Error ? err.message : "Unable to open thread.");
+        logClientError("Failed to open thread", err, { endpoint: `/workspaces/${activeWorkspaceId}/channels/${channelId}/messages` });
+        setError("Unable to open thread.");
       }
     } finally {
       if (requestId === threadRequestRef.current) setThreadLoading(false);
@@ -428,7 +433,8 @@ export function WorkspaceConversationSurface() {
         current.map((message) => (message.client_nonce === nonce ? { ...message, delivery: "failed" as const } : message));
       if (inThread) setThreadMessages(markFailed);
       else setMessages(markFailed);
-      setError(err instanceof Error ? err.message : "Unable to deliver message.");
+      logClientError("Failed to deliver message", err, { endpoint: `/workspaces/${activeWorkspaceId}/channels/${selectedChannelId}/messages` });
+      setError("Unable to deliver message.");
     } finally {
       if (inThread) setThreadSending(false);
       else setSending(false);
@@ -453,7 +459,8 @@ export function WorkspaceConversationSurface() {
       setChannelPurpose("");
       setCreateOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create operational channel.");
+      logClientError("Failed to create operational channel", err, { endpoint: `/workspaces/${activeWorkspaceId}/channels` });
+      setError("Unable to create operational channel.");
     } finally {
       setCreatingChannel(false);
     }
@@ -470,7 +477,8 @@ export function WorkspaceConversationSurface() {
         ),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "AI assistance is unavailable.");
+      logClientError("Failed to load conversation assistance", err, { endpoint: `/workspaces/${activeWorkspaceId}/channels/${selectedChannelId}/assist` });
+      setError("Conversation assistance is unavailable.");
     } finally {
       setAssistanceLoading(null);
     }
@@ -540,7 +548,8 @@ export function WorkspaceConversationSurface() {
       setTaskTitle("");
       setTaskDescription("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to open task from discussion.");
+      logClientError("Failed to open task from discussion", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks` });
+      setError("Unable to open task from discussion.");
     } finally {
       setCreatingTask(false);
     }
@@ -567,7 +576,8 @@ export function WorkspaceConversationSurface() {
       setDecisionReason("");
       setDecisionStatus("accepted");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to record decision from discussion.");
+      logClientError("Failed to record decision from discussion", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions` });
+      setError("Unable to record decision from discussion.");
     } finally {
       setCreatingDecision(false);
     }
@@ -677,10 +687,15 @@ export function WorkspaceConversationSurface() {
       </header>
 
       {error ? (
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-rose-400/20 bg-rose-400/8 px-3 py-2 text-xs text-rose-100">
-          <span>{error}</span>
-          <button type="button" onClick={() => setError(null)} aria-label="Dismiss error"><X className="h-3.5 w-3.5" /></button>
-        </div>
+        <OmnixErrorState
+          compact
+          className="mb-3"
+          title={error === "Unable to load conversations." ? "Conversations are unavailable" : "Conversation action needs attention"}
+          message={error}
+          onRetry={error === "Unable to load conversations." ? () => void loadChannels() : undefined}
+          isRetrying={channelsLoading}
+          onDismiss={() => setError(null)}
+        />
       ) : null}
       {taskConfirmation ? (
         <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-emerald-300/18 bg-emerald-300/[0.06] px-3 py-2 text-xs text-emerald-100">
