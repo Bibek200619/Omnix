@@ -1,19 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { ClipboardCheck, Layers3, LayoutDashboard, MessageSquare, MessagesSquare } from "lucide-react";
+import { ClipboardCheck, LayoutDashboard, MessageSquare, MessagesSquare, MoreHorizontal } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+
+type MobileDockProps = {
+  onMoreClick?: () => void;
+};
 
 const items = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/conversations", label: "Threads", icon: MessagesSquare },
   { href: "/tasks", label: "Tasks", icon: ClipboardCheck },
-  { href: "/workspace", label: "Spaces", icon: Layers3 },
 ];
 
-export function MobileDock() {
+export function MobileDock({ onMoreClick }: MobileDockProps) {
   const pathname = usePathname();
 
   return (
@@ -44,6 +47,15 @@ export function MobileDock() {
             </Link>
           );
         })}
+
+        <button
+          type="button"
+          onClick={onMoreClick}
+          className="relative flex min-h-[48px] flex-col items-center justify-center gap-1 rounded-xl border border-transparent text-[10px] font-medium text-[var(--omnix-text-3)] transition active:bg-white/[0.05]"
+        >
+          <MoreHorizontal className="h-[19px] w-[19px]" />
+          <span>More</span>
+        </button>
       </div>
     </nav>
   );
