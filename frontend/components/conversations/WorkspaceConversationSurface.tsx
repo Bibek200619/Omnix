@@ -20,6 +20,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Portal } from "@/components/ui/Portal";
+import { MentionText } from "@/components/mentions/MentionText";
+import { MentionTextarea, mentionPayload } from "@/components/mentions/MentionTextarea";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
@@ -36,6 +38,7 @@ import type {
   WorkspaceConversationAssistanceMode,
   WorkspaceDecision,
   WorkspaceDecisionStatus,
+  WorkspaceMentionMetadata,
   WorkspaceTask,
 } from "@/lib/workspace-types";
 
@@ -113,6 +116,8 @@ export function WorkspaceConversationSurface() {
   const [threadMessages, setThreadMessages] = useState<DisplayMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [threadDraft, setThreadDraft] = useState("");
+  const [draftMentions, setDraftMentions] = useState<WorkspaceMentionMetadata[]>([]);
+  const [threadDraftMentions, setThreadDraftMentions] = useState<WorkspaceMentionMetadata[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [threadLoading, setThreadLoading] = useState(false);
@@ -128,12 +133,14 @@ export function WorkspaceConversationSurface() {
   const [taskSource, setTaskSource] = useState<TaskSource | null>(null);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
+  const [taskMentions, setTaskMentions] = useState<WorkspaceMentionMetadata[]>([]);
   const [creatingTask, setCreatingTask] = useState(false);
   const [taskConfirmation, setTaskConfirmation] = useState<string | null>(null);
   const [decisionSource, setDecisionSource] = useState<DecisionSource | null>(null);
   const [decisionTitle, setDecisionTitle] = useState("");
   const [decisionDescription, setDecisionDescription] = useState("");
   const [decisionReason, setDecisionReason] = useState("");
+  const [decisionMentions, setDecisionMentions] = useState<WorkspaceMentionMetadata[]>([]);
   const [decisionStatus, setDecisionStatus] = useState<WorkspaceDecisionStatus>("accepted");
   const [creatingDecision, setCreatingDecision] = useState(false);
   const [decisionConfirmation, setDecisionConfirmation] = useState<string | null>(null);
@@ -381,7 +388,12 @@ export function WorkspaceConversationSurface() {
     [currentUserId, selectedChannelId, typingUsers],
   );
 
-  function optimisticMessage(content: string, nonce: string, parentMessageId?: string) {
+  function optimisticMessage(
+    content: string,
+    nonce: string,
+    parentMessageId?: string,
+    mentions: WorkspaceMentionMetadata[] = [],
+  ) {
     return {
       id: `pending-${nonce}`,
       workspace_id: activeWorkspaceId || "",
@@ -390,7 +402,8 @@ export function WorkspaceConversationSurface() {
       parent_message_id: parentMessageId || null,
       content,
       context_links: [],
-      metadata: {},
+      metadata: mentions.length ? { mentions } : {},
+      mentions,
       client_nonce: nonce,
       created_at: new Date().toISOString(),
       author_name: session?.user.user_metadata?.full_name || session?.user.email || "You",
@@ -404,11 +417,11 @@ export function WorkspaceConversationSurface() {
     };
   }
 
-  async function sendMessage(content: string, parentMessageId?: string) {
+  async function sendMessage(content: string, parentMessageId?: string, mentions: WorkspaceMentionMetadata[] = []) {
     if (!activeWorkspaceId || !selectedChannelId || !mayPost || !content.trim()) return;
     const cleaned = content.trim();
     const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-    const optimistic = optimisticMessage(cleaned, nonce, parentMessageId);
+    const optimistic = optimisticMessage(cleaned, nonce, parentMessageId, mentions);
     const inThread = Boolean(parentMessageId);
     if (inThread) setThreadMessages((current) => chronological([...current, optimistic]));
     else setMessages((current) => chronological([...current, optimistic]));
@@ -422,15 +435,18 @@ export function WorkspaceConversationSurface() {
           parent_message_id: parentMessageId || null,
           client_nonce: nonce,
           context_links: [],
+          mentions: mentionPayload(mentions, cleaned),
         },
       );
       if (inThread) {
         setThreadMessages((current) => mergeMessage(current, created));
         setThreadDraft("");
+        setThreadDraftMentions([]);
         void loadMessages(selectedChannelId);
       } else {
         setMessages((current) => mergeMessage(current, created));
         setDraft("");
+        setDraftMentions([]);
       }
       await sendTypingSignal(selectedChannelId, false);
       void loadChannels();
@@ -494,6 +510,7 @@ export function WorkspaceConversationSurface() {
     if (!selectedChannelId) return;
     setThreadRoot(message);
     setThreadDraft("");
+    setThreadDraftMentions([]);
     void loadThread(selectedChannelId, message);
   }
 
@@ -502,6 +519,7 @@ export function WorkspaceConversationSurface() {
     setTaskSource({ kind: "message", message });
     setTaskTitle(title.length > 110 ? `${title.slice(0, 107).trim()}...` : title);
     setTaskDescription(message.content);
+    setTaskMentions(message.mentions || []);
   }
 
   function openMessageDecision(message: WorkspaceChannelMessage) {
@@ -510,6 +528,7 @@ export function WorkspaceConversationSurface() {
     setDecisionTitle(title.length > 110 ? `${title.slice(0, 107).trim()}...` : title);
     setDecisionDescription(message.content);
     setDecisionReason("");
+    setDecisionMentions(message.mentions || []);
     setDecisionStatus("accepted");
   }
 
@@ -517,6 +536,7 @@ export function WorkspaceConversationSurface() {
     setTaskSource({ kind: "assistance", assistance: result });
     setTaskTitle("");
     setTaskDescription(result.content);
+    setTaskMentions([]);
   }
 
   async function createTaskFromContext(event: FormEvent<HTMLFormElement>) {
@@ -534,6 +554,7 @@ export function WorkspaceConversationSurface() {
             description: taskDescription.trim() || null,
             status: "idea",
             client_nonce: nonce,
+            mentions: mentionPayload(taskMentions, taskDescription),
           },
         );
       } else {
@@ -546,6 +567,7 @@ export function WorkspaceConversationSurface() {
             thread_root_id: threadRoot?.id ?? null,
             status: "idea",
             client_nonce: nonce,
+            mentions: mentionPayload(taskMentions, taskDescription),
           },
         );
       }
@@ -553,6 +575,7 @@ export function WorkspaceConversationSurface() {
       setTaskSource(null);
       setTaskTitle("");
       setTaskDescription("");
+      setTaskMentions([]);
     } catch (err) {
       logClientError("Failed to open task from discussion", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks` });
       setError("Unable to open task from discussion.");
@@ -573,6 +596,7 @@ export function WorkspaceConversationSurface() {
           description: decisionDescription.trim() || null,
           decision_reason: decisionReason.trim() || null,
           status: decisionStatus,
+          mentions: mentionPayload(decisionMentions, `${decisionReason}\n${decisionDescription}`),
         },
       );
       setDecisionConfirmation(`Decision recorded: ${created.title}`);
@@ -580,6 +604,7 @@ export function WorkspaceConversationSurface() {
       setDecisionTitle("");
       setDecisionDescription("");
       setDecisionReason("");
+      setDecisionMentions([]);
       setDecisionStatus("accepted");
     } catch (err) {
       logClientError("Failed to record decision from discussion", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions` });
@@ -615,7 +640,7 @@ export function WorkspaceConversationSurface() {
               {message.delivery === "failed" ? <span className="text-[10px] text-rose-200">delivery failed</span> : null}
             </div>
             <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--omnix-text)]">
-              {message.content}
+              <MentionText content={message.content} mentions={message.mentions} />
             </p>
             {message.context_links.length ? (
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -831,19 +856,22 @@ export function WorkspaceConversationSurface() {
             className="border-t border-[var(--omnix-border)] p-3 sm:p-4"
             onSubmit={(event) => {
               event.preventDefault();
-              void sendMessage(draft);
+              void sendMessage(draft, undefined, draftMentions);
             }}
           >
-            <textarea
+            <MentionTextarea
               value={draft}
-              onChange={(event) => {
-                setDraft(event.target.value);
-                void sendTypingSignal(selectedChannelId, Boolean(event.target.value.trim()));
+              onChange={(nextValue) => {
+                setDraft(nextValue);
+                void sendTypingSignal(selectedChannelId, Boolean(nextValue.trim()));
               }}
+              members={activeMembers}
+              mentions={draftMentions}
+              onMentionsChange={setDraftMentions}
               onKeyDown={(event) => {
                 if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
                   event.preventDefault();
-                  void sendMessage(draft);
+                  void sendMessage(draft, undefined, draftMentions);
                 }
               }}
               placeholder={
@@ -882,17 +910,20 @@ export function WorkspaceConversationSurface() {
             </div>
             <form
               className="border-t border-[var(--omnix-border)] p-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void sendMessage(threadDraft, threadRoot.id);
-              }}
-            >
-              <textarea
+            onSubmit={(event) => {
+              event.preventDefault();
+              void sendMessage(threadDraft, threadRoot.id, threadDraftMentions);
+            }}
+          >
+              <MentionTextarea
                 value={threadDraft}
-                onChange={(event) => {
-                  setThreadDraft(event.target.value);
-                  void sendTypingSignal(selectedChannelId, Boolean(event.target.value.trim()));
+                onChange={(nextValue) => {
+                  setThreadDraft(nextValue);
+                  void sendTypingSignal(selectedChannelId, Boolean(nextValue.trim()));
                 }}
+                members={activeMembers}
+                mentions={threadDraftMentions}
+                onMentionsChange={setThreadDraftMentions}
                 placeholder="Add focused follow-through..."
                 disabled={!mayPost || threadSending}
                 className="omnix-input h-20 w-full resize-none rounded-lg p-2.5 text-sm leading-6"
@@ -913,14 +944,17 @@ export function WorkspaceConversationSurface() {
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Discussion to execution</p>
                   <h2 className="mt-1 text-base font-semibold text-white">Open linked task</h2>
                 </div>
-                <button type="button" onClick={() => setTaskSource(null)} className="rounded-md p-1.5 text-white/45 hover:text-white" aria-label="Close task conversion">
+                <button type="button" onClick={() => { setTaskSource(null); setTaskMentions([]); }} className="rounded-md p-1.5 text-white/45 hover:text-white" aria-label="Close task conversion">
                   <X className="h-4 w-4" />
                 </button>
               </div>
               <Input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} placeholder="Name the specific next step" className="h-10 text-sm" autoFocus />
-              <textarea
+              <MentionTextarea
                 value={taskDescription}
-                onChange={(event) => setTaskDescription(event.target.value)}
+                onChange={setTaskDescription}
+                members={activeMembers}
+                mentions={taskMentions}
+                onMentionsChange={setTaskMentions}
                 className="omnix-input mt-2 min-h-[104px] w-full resize-none rounded-lg p-3 text-sm leading-6"
                 placeholder="Carry forward the operational context"
               />
@@ -928,7 +962,7 @@ export function WorkspaceConversationSurface() {
                 This creates one Idea task linked to {taskSource.kind === "message" ? "the source message" : "the selected AI extraction and channel"}. Ownership and dates remain unset unless recorded later.
               </p>
               <div className="mt-4 flex justify-end gap-2">
-                <Button type="button" size="sm" variant="ghost" onClick={() => setTaskSource(null)}>Cancel</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => { setTaskSource(null); setTaskMentions([]); }}>Cancel</Button>
                 <Button type="submit" size="sm" isLoading={creatingTask} disabled={!taskTitle.trim()} leftIcon={<ClipboardCheck className="h-3.5 w-3.5" />}>
                   Open task
                 </Button>
@@ -946,15 +980,18 @@ export function WorkspaceConversationSurface() {
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Discussion to decision</p>
                   <h2 className="mt-1 text-base font-semibold text-white">Record linked decision</h2>
                 </div>
-                <button type="button" onClick={() => setDecisionSource(null)} className="rounded-md p-1.5 text-white/45 hover:text-white" aria-label="Close decision conversion">
+                <button type="button" onClick={() => { setDecisionSource(null); setDecisionMentions([]); }} className="rounded-md p-1.5 text-white/45 hover:text-white" aria-label="Close decision conversion">
                   <X className="h-4 w-4" />
                 </button>
               </div>
               <Input value={decisionTitle} onChange={(event) => setDecisionTitle(event.target.value)} placeholder="Name the organizational choice" className="h-10 text-sm" autoFocus />
               <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
-                <textarea
+                <MentionTextarea
                   value={decisionReason}
-                  onChange={(event) => setDecisionReason(event.target.value)}
+                  onChange={setDecisionReason}
+                  members={activeMembers}
+                  mentions={decisionMentions}
+                  onMentionsChange={setDecisionMentions}
                   className="omnix-input min-h-[96px] w-full resize-none rounded-lg p-3 text-sm leading-6"
                   placeholder="Reason, if explicitly known"
                 />
@@ -971,9 +1008,12 @@ export function WorkspaceConversationSurface() {
                   </select>
                 </label>
               </div>
-              <textarea
+              <MentionTextarea
                 value={decisionDescription}
-                onChange={(event) => setDecisionDescription(event.target.value)}
+                onChange={setDecisionDescription}
+                members={activeMembers}
+                mentions={decisionMentions}
+                onMentionsChange={setDecisionMentions}
                 className="omnix-input mt-2 min-h-[92px] w-full resize-none rounded-lg p-3 text-sm leading-6"
                 placeholder="Source description"
               />
@@ -981,7 +1021,7 @@ export function WorkspaceConversationSurface() {
                 This creates one decision linked to the selected message, channel, and workspace. It does not infer agreement beyond what you record here.
               </p>
               <div className="mt-4 flex justify-end gap-2">
-                <Button type="button" size="sm" variant="ghost" onClick={() => setDecisionSource(null)}>Cancel</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => { setDecisionSource(null); setDecisionMentions([]); }}>Cancel</Button>
                 <Button type="submit" size="sm" isLoading={creatingDecision} disabled={!decisionTitle.trim()} leftIcon={<BadgeCheck className="h-3.5 w-3.5" />}>
                   Record decision
                 </Button>

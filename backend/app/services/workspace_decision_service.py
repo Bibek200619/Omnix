@@ -16,6 +16,11 @@ from .supabase_service import (
 )
 from .workspace_collaboration_service import log_workspace_activity
 from .workspace_conversation_service import MESSAGE_COLUMNS, _require_channel_access
+from .workspace_mention_service import (
+    mention_metadata_for_sources,
+    prepare_mentions_for_workspace,
+    sync_mentions_for_source,
+)
 from .workspace_service import get_profiles, require_workspace_access, utc_now_iso
 
 DECISION_COLUMNS = (
@@ -51,6 +56,17 @@ def _title_from_text(content: Any) -> str:
 
 
 async def _hydrate_decisions(rows: list[dict[str, Any]], expand_links: bool = False) -> list[dict[str, Any]]:
+    mentions_by_source: dict[str, list[dict[str, Any]]] = {}
+    workspace_ids = sorted({str(row.get("workspace_id")) for row in rows if row.get("workspace_id")})
+    for workspace_id in workspace_ids:
+        source_ids = [str(row.get("id")) for row in rows if str(row.get("workspace_id") or "") == workspace_id and row.get("id")]
+        mentions_by_source.update(
+            await mention_metadata_for_sources(
+                workspace_id=workspace_id,
+                source_type="decision",
+                source_ids=source_ids,
+            )
+        )
     creator_ids = sorted({str(row.get("created_by")) for row in rows if row.get("created_by")})
     profiles = await get_profiles(creator_ids)
     hydrated: list[dict[str, Any]] = []
@@ -61,6 +77,7 @@ async def _hydrate_decisions(rows: list[dict[str, Any]], expand_links: bool = Fa
             "creator_name": creator.get("full_name") or creator.get("handle") or creator.get("email"),
             "creator_email": creator.get("email"),
             "creator_avatar_label": creator.get("avatar_label"),
+            "mentions": mentions_by_source.get(str(row.get("id")), []),
             "linked_tasks": [],
             "initiative": None,
         }
@@ -274,10 +291,14 @@ async def create_decision(
     source_channel_id: str | None = None,
     source_message_id: str | None = None,
 ) -> dict[str, Any]:
-    await require_workspace_access(workspace_id, user_id)
+    access = await require_workspace_access(workspace_id, user_id)
     title = _clean_text(payload.get("title"))
     if not title:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Decision title cannot be empty.")
+    mentions = await prepare_mentions_for_workspace(
+        workspace=access.workspace,
+        mentions=payload.get("mentions"),
+    )
 
     timestamp = utc_now_iso()
     record = {
@@ -295,6 +316,13 @@ async def create_decision(
         created = await insert_one_trusted("workspace_decisions", record)
     except SupabaseServiceError as exc:
         raise _database_error() from exc
+    await sync_mentions_for_source(
+        workspace_id=workspace_id,
+        mentioned_by_user_id=user_id,
+        source_type="decision",
+        source_id=str(created["id"]),
+        mentions=mentions,
+    )
     await log_workspace_activity(
         workspace_id=workspace_id,
         actor_user_id=user_id,

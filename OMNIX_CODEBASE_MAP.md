@@ -93,6 +93,7 @@ frontend/
 │   │   ├── files/         # File management
 │   │   ├── history/       # Chat history
 │   │   ├── initiatives/   # Workspace initiatives
+│   │   ├── mentions/      # Lightweight workspace mentions inbox
 │   │   ├── settings/      # User/workspace settings
 │   │   ├── sources/       # Knowledge sources
 │   │   ├── tasks/         # Workspace tasks
@@ -136,6 +137,7 @@ frontend/
 │   ├── brand/                   # Logo/brand assets
 │   ├── conversations/           # Workspace channel/conversation components
 │   ├── decisions/               # Decision tracking components
+│   ├── mentions/                # Mention text rendering, @ member picker, inbox surface
 │   ├── initiatives/             # Initiative/project components
 │   ├── tasks/                   # Task management components
 │   ├── profile/                 # User profile components
@@ -175,6 +177,8 @@ frontend/
 | Sidebar nav | `components/layout/Sidebar.tsx` |
 | Command palette | `components/layout/CommandPalette.tsx` |
 | Workspace search UI | `components/layout/WorkspaceSearch.tsx` |
+| Mention picker/rendering | `components/mentions/MentionTextarea.tsx`, `components/mentions/MentionText.tsx` |
+| Mentions inbox | `components/mentions/MentionsInboxSurface.tsx`, `app/(dashboard)/mentions/page.tsx` |
 | Onboarding gate | `components/workspace/WorkspaceOnboardingGate.tsx` |
 
 ---
@@ -202,6 +206,7 @@ backend/
 │   │   ├── workspace_tasks.py         # Task CRUD
 │   │   ├── workspace_decisions.py     # Decision CRUD
 │   │   ├── workspace_search.py        # Workspace-scoped keyword search
+│   │   ├── workspace_mentions.py      # Workspace-scoped mentions inbox
 │   │   ├── files.py                   # File metadata
 │   │   ├── upload.py                  # File upload + RAG ingestion trigger
 │   │   ├── artifacts.py               # AI artifact storage
@@ -223,6 +228,7 @@ backend/
 │   │   ├── workspace_decision_service.py      # Decision logic (13KB)
 │   │   ├── workspace_initiative_service.py    # Initiative logic (20KB)
 │   │   ├── workspace_search_service.py        # ILIKE workspace search over conversations/tasks/initiatives/decisions
+│   │   ├── workspace_mention_service.py       # Structured mention validation, persistence, inbox hydration
 │   │   ├── workspace_intelligence_service.py  # AI workspace profile (14KB)
 │   │   ├── workspace_connector_service.py     # Source connectors (26KB)
 │   │   ├── workspace_schema_health_service.py # Schema validation (12KB)
@@ -281,7 +287,7 @@ backend/
 │   ├── observability/       # Metrics + tracing
 │   ├── jobs/                # Background jobs
 │   ├── runtime/             # RuntimeManager (system status)
-│   ├── schemas/             # Pydantic response schemas, including workspace_search.py
+│   ├── schemas/             # Pydantic response schemas, including workspace_search.py and workspace_mentions.py
 │   └── health/              # Health check endpoint
 ├── migrations/              # DB migration scripts
 ├── tests/                   # pytest test suite
@@ -343,6 +349,18 @@ Ctrl/Cmd+K or mobile command icon (components/layout/CommandPalette.tsx)
   → workspace_search_service.py calls require_workspace_access()
   → Supabase ILIKE queries stay scoped to workspace_id
   → Results return grouped as conversations/tasks/initiatives/decisions
+```
+
+### Workspace Mention Request
+
+```
+User types @ in conversation/task/decision text input
+  → MentionTextarea filters useWorkspace().activeMembers client-side
+  → Selected member inserts a visible @label and sends structured mentions: [{user_id}]
+  → Backend validates targets with list_workspace_members() for the active workspace
+  → Source record stores mention metadata in JSON where available
+  → workspace_mention_service.sync_mentions_for_source() replaces workspace_mentions rows for that source
+  → /mentions calls GET /workspaces/{workspace_id}/mentions for current user's awareness inbox
 ```
 
 ---
@@ -413,6 +431,7 @@ super_founder > founder > owner > co_owner > team_lead > sub_leader > member > s
 | Get intelligence | `GET /workspaces/{id}/intelligence` |
 | Update intelligence | `PATCH /workspaces/{id}/intelligence` |
 | Search workspace knowledge | `GET /workspaces/{id}/search?q=...` |
+| Mentions inbox | `GET /workspaces/{id}/mentions` |
 
 ### Workspace Search MVP
 - Backend router: `backend/app/routers/workspace_search.py`
@@ -435,6 +454,19 @@ super_founder > founder > owner > co_owner > team_lead > sub_leader > member > s
 - Existing create surfaces read those query params in task, decision, and initiative pages; no new entity creation logic exists in the palette
 - Recent destinations are stored locally per active workspace under `omnix.commandPalette.recent.{workspaceId}`
 - Keyboard support: arrow up/down, Enter, Escape, and Tab cycling inside the palette
+
+### Workspace Mentions MVP
+- Backend router: `backend/app/routers/workspace_mentions.py`
+- Backend service: `backend/app/services/workspace_mention_service.py`
+- Pydantic schema: `backend/app/schemas/workspace_mentions.py`
+- Migration: `backend/migrations/0037_workspace_mentions.sql`
+- Table: `workspace_mentions(id, workspace_id, mentioned_user_id, mentioned_by_user_id, source_type, source_id, created_at, read_at)`
+- Supported source types: `conversation_message`, `task`, `decision`
+- Frontend picker/rendering: `frontend/components/mentions/MentionTextarea.tsx` and `MentionText.tsx`
+- Frontend inbox: `frontend/app/(dashboard)/mentions/page.tsx` via `MentionsInboxSurface.tsx`
+- Scope: active workspace only; mention targets must be visible workspace members
+- Conversation privacy: inbox hydration only exposes private channel details to users who can read that channel
+- Excluded by design: full notifications, email, push, activity feeds, workflow automation, AI mentions, cross-workspace mentions
 
 ### Onboarding Gate
 - Component: `WorkspaceOnboardingGate.tsx`
@@ -541,6 +573,7 @@ Frontend channel management: `lib/realtime-registry.ts` → `RealtimeSubscriptio
 | `channel_messages` | `channel_messages:{workspaceId}:{conversationId}` | Live messages |
 | `tasks` | `tasks:{workspaceId}:none` | Task updates |
 | `initiatives` | `initiatives:{workspaceId}:none` | Initiative updates |
+| `workspace_mentions` | Supabase publication table only | Persisted awareness records for future notification integration |
 
 ### Collaboration Context
 - Provider: `WorkspaceCollaborationProvider` in `lib/workspace-collaboration-context.tsx`
@@ -573,6 +606,7 @@ Frontend channel management: `lib/realtime-registry.ts` → `RealtimeSubscriptio
 | `workspace_invites` | Email invitations |
 | `workspace_channels` | Team conversation channels |
 | `workspace_channel_messages` | Channel messages |
+| `workspace_mentions` | Structured @mention records for conversations, tasks, and decisions |
 | `workspace_tasks` | Tasks |
 | `workspace_decisions` | Decisions |
 | `workspace_initiatives` | Initiatives/projects |
@@ -714,6 +748,9 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
 **Workspace Search**
 - `GET /workspaces/{id}/search?q=...` — grouped workspace keyword results for conversations, tasks, initiatives, and decisions
 
+**Workspace Mentions**
+- `GET /workspaces/{id}/mentions` — current user's workspace-scoped mentions grouped client-side by source
+
 **Workspace Tasks**
 - `GET /workspaces/{id}/tasks`
 - `POST /workspaces/{id}/tasks`
@@ -796,6 +833,8 @@ WorkspaceChannel { id, name, channel_type, message_count, ... }
 WorkspaceChannelMessage { id, content, author_user_id, context_links[], ... }
 WorkspaceSearchResponse { conversations[], tasks[], initiatives[], decisions[] }
 WorkspaceSearchResult { id, workspace_id, type, title, preview, context, url, ... }
+WorkspaceMentionMetadata { user_id, label, display_name, avatar_label, operational_label, ... }
+WorkspaceMentionInboxItem { id, source_type, source_id, source_title, source_preview, source_url, ... }
 
 // Task/Decision status enums
 WorkspaceTaskStatus = "idea" | "planned" | "active" | "review" | "complete"
