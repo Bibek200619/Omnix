@@ -41,3 +41,17 @@ class WorkspaceMentionRead(BaseModel):
     source_title: str
     source_preview: str | None = None
     source_url: str
+
+
+class WorkspaceMentionUnreadCount(BaseModel):
+    unread_count: int = Field(..., ge=0)
+
+
+class WorkspaceMentionMarkReadResponse(BaseModel):
+    mention_id: str
+    read_at: datetime
+
+
+class WorkspaceMentionMarkAllReadResponse(BaseModel):
+    updated_count: int = Field(..., ge=0)
+    read_at: datetime
