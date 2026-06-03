@@ -181,7 +181,7 @@ frontend/
 | Command palette | `components/layout/CommandPalette.tsx` |
 | Workspace search UI | `components/layout/WorkspaceSearch.tsx` |
 | Mention picker/rendering | `components/mentions/MentionTextarea.tsx`, `components/mentions/MentionText.tsx` |
-| Notification bell/center | `components/notifications/NotificationBell.tsx`, `components/notifications/NotificationCenterSurface.tsx`, `app/(dashboard)/notifications/page.tsx` |
+| Notification bell/center | `components/notifications/NotificationBell.tsx`, `components/notifications/NotificationCenterSurface.tsx`, `app/(dashboard)/notifications/page.tsx`, `app/(dashboard)/settings/notifications/page.tsx` |
 | Mentions compatibility route | `app/(dashboard)/mentions/page.tsx` renders `NotificationCenterSurface` |
 | Mobile refinement surfaces | `components/settings/SettingsShell.tsx`, `components/layout/CommandPalette.tsx`, `components/layout/WorkspaceSearch.tsx`, `components/workspace/WorkspaceAccessPanel.tsx`, `app/(dashboard)/team/page.tsx`, `app/(dashboard)/files/page.tsx` |
 | Onboarding gate | `components/workspace/WorkspaceOnboardingGate.tsx` |
@@ -473,8 +473,9 @@ super_founder > founder > owner > co_owner > team_lead > sub_leader > member > s
 - Supported source types: `conversation_message`, `task`, `decision`
 - Frontend picker/rendering: `frontend/components/mentions/MentionTextarea.tsx` and `MentionText.tsx`
 - Frontend notification center: `frontend/app/(dashboard)/notifications/page.tsx` via `NotificationCenterSurface.tsx`
-- Backwards-compatible mentions route: `frontend/app/(dashboard)/mentions/page.tsx` also renders `NotificationCenterSurface.tsx`
+- Backwards-compatible mentions route/component: `frontend/app/(dashboard)/mentions/page.tsx` and `components/mentions/MentionsInboxSurface.tsx` render `NotificationCenterSurface.tsx`
 - Header unread bell: `frontend/components/notifications/NotificationBell.tsx`
+- Notification settings surface: `frontend/app/(dashboard)/settings/notifications/page.tsx` documents in-app mentions and workspace invitations only
 - Notification state/context: `frontend/lib/workspace-notifications-context.tsx`
 - Mobile UX: notification rows expose unread state, source context, and direct source navigation with touch-sized actions
 - Read state: unread when `read_at IS NULL`; read when `read_at IS NOT NULL`
