@@ -128,7 +128,7 @@ frontend/
 │   │   ├── AppShell.tsx         # Page shell wrapper
 │   │   ├── Header.tsx           # Top header bar
 │   │   ├── ProfileMenu.tsx      # User profile dropdown
-│   │   ├── MobileDock.tsx       # Mobile bottom navigation
+│   │   ├── MobileDock.tsx       # Mobile bottom navigation with "More" drawer trigger
 │   │   └── PageTransition.tsx   # Route transition animation
 │   ├── auth/                    # Auth forms
 │   ├── brand/                   # Logo/brand assets
