@@ -8,6 +8,7 @@ import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { apiClient } from "@/lib/api";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import type { ApiMessage } from "@/components/chat/types";
+import { logClientError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 
 type BusyAction = "rename" | "clear" | "delete" | "export" | null;
@@ -64,7 +65,8 @@ export function ActionsMenu({ className }: { className?: string }) {
       await task();
       setOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Action failed.");
+      logClientError("Conversation action failed", err);
+      setError("Unable to perform action.");
     } finally {
       setBusyAction(null);
     }

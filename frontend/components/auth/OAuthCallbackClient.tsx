@@ -11,6 +11,7 @@ import { OmnixMark } from "@/components/brand/OmnixMark";
 import { apiClient } from "@/lib/api";
 import { safeRedirectPath } from "@/lib/auth-redirects";
 import { useAuth } from "@/lib/auth-context";
+import { logClientError } from "@/lib/errors";
 import { supabase } from "@/lib/supabase";
 import type { UserProfile } from "@/lib/profile-context";
 
@@ -27,7 +28,7 @@ function friendlyCallbackError(message?: string | null) {
   if (/redirect/i.test(normalized)) {
     return "OAuth returned to an unexpected redirect URL. Check the Supabase redirect configuration.";
   }
-  return normalized;
+  return "Omnix could not complete this OAuth sign-in. Please try again.";
 }
 
 function oauthDisplayName(user: User) {
@@ -132,8 +133,9 @@ export function OAuthCallbackClient() {
           router.replace(next);
         }, 450);
       } catch (err) {
+        logClientError("OAuth callback failed", err);
         setState("error");
-        setError(friendlyCallbackError(err instanceof Error ? err.message : null));
+        setError(friendlyCallbackError(null));
       }
     }
 

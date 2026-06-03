@@ -15,8 +15,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { logClientError } from "@/lib/errors";
 import { realtimeRegistry } from "@/lib/realtime-registry";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -117,7 +119,7 @@ export function WorkspaceTasksSurface() {
       setError(null);
     } catch (err) {
       if (requestId === requestRef.current) {
-        console.error("Failed to load tasks", err);
+        logClientError("Failed to load tasks", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks` });
         setError("Unable to load tasks.");
       }
     } finally {
@@ -280,7 +282,7 @@ export function WorkspaceTasksSurface() {
       void loadExecution();
     } catch (err) {
       setTasks((current) => current.filter((task) => task.client_nonce !== nonce));
-      console.error("Failed to open task", err);
+      logClientError("Failed to open task", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks` });
       setError("Unable to open task.");
     } finally {
       setCreating(false);
@@ -298,7 +300,7 @@ export function WorkspaceTasksSurface() {
       void loadExecution();
     } catch (err) {
       setTasks((current) => current.map((item) => (item.id === task.id ? before : item)));
-      console.error("Failed to update task", err);
+      logClientError("Failed to update task", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks/${task.id}` });
       setError("Unable to update task.");
     } finally {
       setUpdatingId(null);
@@ -318,7 +320,7 @@ export function WorkspaceTasksSurface() {
       setAssisting(mode);
       setAssistance(await apiClient.post<WorkspaceTaskAssistance>(`/workspaces/${activeWorkspaceId}/tasks/assist`, { mode }));
     } catch (err) {
-      console.error("Failed to load task assistance", err);
+      logClientError("Failed to load task assistance", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks/assist` });
       setError("Execution assistance is unavailable.");
     } finally {
       setAssisting(null);
@@ -366,10 +368,15 @@ export function WorkspaceTasksSurface() {
       )}
 
       {error ? (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-rose-400/20 bg-rose-400/8 px-3 py-2 text-xs text-rose-100">
-          <span>{error}</span>
-          <button type="button" onClick={() => setError(null)} aria-label="Dismiss error"><X className="h-3.5 w-3.5" /></button>
-        </div>
+        <OmnixErrorState
+          compact
+          className="mb-4"
+          title={error === "Unable to load tasks." ? "Tasks are unavailable" : "Task action needs attention"}
+          message={error}
+          onRetry={error === "Unable to load tasks." ? () => void loadExecution(true) : undefined}
+          isRetrying={loading}
+          onDismiss={() => setError(null)}
+        />
       ) : null}
 
       <div className="omnix-scrollbar mb-4 flex shrink-0 gap-2 overflow-x-auto pb-1 xl:grid xl:grid-cols-5 xl:overflow-visible xl:pb-0">

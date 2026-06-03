@@ -27,9 +27,10 @@ import type {
   SearchMode,
 } from "@/components/chat/types";
 import { Alert } from "@/components/ui/Alert";
-import { apiClient } from "@/lib/api";
+import { ApiError, apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
+import { logClientError } from "@/lib/errors";
 import { useProfile } from "@/lib/profile-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -490,7 +491,8 @@ export function ChatInterface() {
           return true;
         } catch (err) {
           if (!options.silent && mountedRef.current) {
-            setError(err instanceof Error ? err.message : "Failed to sync conversation");
+            logClientError("Failed to sync conversation", err, { endpoint: `/conversations/${convId}/messages` });
+            setError("Unable to sync conversation.");
           }
           return false;
         } finally {
@@ -526,11 +528,12 @@ export function ChatInterface() {
         if (!mountedRef.current || loadRequestIdRef.current !== requestId) {
           return;
         }
-        const message =
-          err instanceof Error ? err.message : "Failed to load conversation";
-        setError(message);
+        logClientError("Failed to load conversation", err, { endpoint: `/conversations/${convId}/messages` });
+        const rawMessage = err instanceof ApiError ? err.rawMessage ?? "" : "";
+        const missingConversation = err instanceof ApiError && (err.status === 404 || /conversation not found/i.test(rawMessage));
+        setError("Unable to load conversation.");
 
-        if (message.toLowerCase().includes("conversation not found")) {
+        if (missingConversation) {
           setMessages([]);
           currentConversationRef.current = null;
           setCurrentConversation(null);
@@ -903,7 +906,10 @@ export function ChatInterface() {
             scheduleTokenFlush();
           } else if (t === "error") {
             flushPendingTokens();
-            const detail = obj.detail ?? "Unknown error";
+            logClientError("[chat] stream returned an error event", new Error(String(obj.detail ?? "Stream error")), {
+              responsePayload: obj,
+            });
+            const detail = "AI response is unavailable.";
             if (assistantId) {
               setMessages((current) =>
                 current.map((m) => (m.id === assistantId ? { ...m, status: "failed", isStreaming: false, error: detail } : m)),
@@ -968,8 +974,8 @@ export function ChatInterface() {
           return;
         }
 
-        const message =
-          err instanceof Error ? err.message : "Failed to send message";
+        logClientError("Failed to send message", err, { endpoint: "/chat/stream" });
+        const message = "Unable to send message.";
         const targetConversationId = streamConversationId || currentConversationRef.current;
         const recovered = targetConversationId
           ? await reconcileConversationMessages(targetConversationId, {
