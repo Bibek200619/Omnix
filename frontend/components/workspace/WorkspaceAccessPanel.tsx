@@ -21,6 +21,7 @@ import { ClientTime } from "@/components/ui/ClientTime";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { Portal } from "@/components/ui/Portal";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
 import {
   getWorkspaceInviteId,
@@ -251,7 +252,8 @@ export function WorkspaceAccessPanel() {
       await inviteToActiveWorkspace(target, role);
       setInviteOpen(false);
     } catch (err) {
-      setInviteError(err instanceof Error ? err.message : "Unable to invite teammate.");
+      logClientError("Failed to invite teammate", err);
+      setInviteError("Unable to invite teammate.");
     } finally {
       setInviteLoading(false);
     }
@@ -267,7 +269,8 @@ export function WorkspaceAccessPanel() {
       setActionError(null);
       await revokeInvite(inviteId);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Unable to revoke invite.");
+      logClientError("Failed to revoke invite", err);
+      setActionError("Unable to revoke invite.");
     } finally {
       setBusyKey(null);
     }
@@ -293,7 +296,8 @@ export function WorkspaceAccessPanel() {
       setConfirmAction(null);
       setOpenMemberMenu(null);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Unable to update team member.");
+      logClientError("Failed to update team member", err);
+      setActionError("Unable to update team member.");
     } finally {
       setBusyKey(null);
     }

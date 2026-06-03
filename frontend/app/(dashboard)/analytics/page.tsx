@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Database, LayoutDashboard, MessageSquare, RefreshCw, Sparkles, Users, Zap, Construction } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { logClientError } from "@/lib/errors";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspace } from "@/lib/workspace-context";
 
@@ -67,7 +68,8 @@ export default function AnalyticsPage() {
       setFiles(data);
     } catch (err) {
       setFiles([]);
-      setFilesError(err instanceof Error ? err.message : "Unable to load source metrics");
+      logClientError("Failed to load source metrics", err, { endpoint: "/files" });
+      setFilesError("Unable to load source metrics.");
     } finally {
       setFilesLoading(false);
     }

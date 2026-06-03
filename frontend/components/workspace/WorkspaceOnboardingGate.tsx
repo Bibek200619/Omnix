@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
 import type { Workspace, WorkspaceFocus, WorkspaceInvite } from "@/lib/workspace-types";
 import { Button } from "@/components/ui/Button";
@@ -178,7 +179,8 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       await refreshWorkspaces({ force: true, silent: true });
       goTo("team", { allowPendingWorkspace: true });
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Unable to create workspace.");
+      logClientError("Failed to create onboarding workspace", err, { endpoint: "/workspaces" });
+      setCreateError("Unable to create workspace.");
     } finally {
       setCreating(false);
     }
@@ -191,7 +193,8 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       setWorkspace(workspace);
       goTo("team", { allowPendingWorkspace: true });
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Unable to accept invite.");
+      logClientError("Failed to accept onboarding invite", err, { endpoint: `/workspace-invites/${inviteId}/accept` });
+      setCreateError("Unable to accept invite.");
     } finally {
       setAcceptingId(null);
     }
@@ -202,7 +205,8 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       setDecliningId(inviteId);
       await declineInvite(inviteId);
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Unable to decline invite.");
+      logClientError("Failed to decline onboarding invite", err, { endpoint: `/workspace-invites/${inviteId}/decline` });
+      setCreateError("Unable to decline invite.");
     } finally {
       setDecliningId(null);
     }
@@ -232,7 +236,8 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       setInviteEmail("");
       await refreshActiveWorkspaceData({ force: true, silent: true });
     } catch (err) {
-      setInviteError(err instanceof Error ? err.message : "Unable to send invite.");
+      logClientError("Failed to send onboarding invite", err, { endpoint: `/workspaces/${workspaceId}/invites` });
+      setInviteError("Unable to send invite.");
     } finally {
       setInviting(false);
     }

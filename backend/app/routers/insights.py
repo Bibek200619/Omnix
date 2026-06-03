@@ -44,7 +44,7 @@ async def generate_insights(request: Request, workspace_id: str, current_user: d
         conflicts = await conflict_detector.run(engine, user_id, workspace_id)
     except Exception as exc:
         logger.exception("Failed to generate insights")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to generate workspace insights.") from exc
 
     combined_markdown = "\n\n---\n\n".join([
         summary.get("markdown", ""),

@@ -937,7 +937,8 @@ async def generate_ai(
             max_tokens=payload.max_tokens,
         )
     except ModelServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+        logger.exception("Failed to generate AI response")
+        raise HTTPException(status_code=exc.status_code, detail="AI generation is unavailable.") from exc
 
     return AIGenerationResponse(
         response=generation.content,
@@ -1083,7 +1084,8 @@ async def chat(
                 "Failed to mark assistant message %s as failed.",
                 assistant_message["id"],
             )
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+        logger.exception("Failed to generate chat response")
+        raise HTTPException(status_code=exc.status_code, detail="AI response is unavailable.") from exc
 
     timestamp = utc_now_iso()
 
@@ -1295,7 +1297,8 @@ async def chat_stream(
                 payload_chunk = {"type": "token", "text": token}
                 yield f"data: {json.dumps(payload_chunk)}\n\n"
         except ModelServiceError as exc:
-            err = {"type": "error", "detail": str(exc)}
+            logger.exception("Failed to stream chat response")
+            err = {"type": "error", "detail": "AI response is unavailable."}
             yield f"data: {json.dumps(err)}\n\n"
             try:
                 await _update_assistant_message(

@@ -19,6 +19,7 @@ import { SettingsShell } from "@/components/settings/SettingsShell";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth-context";
+import { logClientError } from "@/lib/errors";
 import { useProfile } from "@/lib/profile-context";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -188,7 +189,8 @@ export default function AccountSettingsPage() {
     setError(null);
     const { error: signOutError } = await signOut();
     if (signOutError) {
-      setError(signOutError.message || "Unable to sign out.");
+      logClientError("Unable to sign out", signOutError);
+      setError("Unable to sign out.");
       setSigningOut(false);
       return;
     }
