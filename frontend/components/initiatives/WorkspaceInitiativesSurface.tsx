@@ -97,6 +97,7 @@ export function WorkspaceInitiativesSurface() {
   const { presence, realtimeStatus } = useWorkspaceCollaboration();
   const searchParams = useSearchParams();
   const routeInitiativeId = searchParams?.get("id") ?? null;
+  const routeCreateInitiative = searchParams?.get("create") === "initiative";
   const [initiatives, setInitiatives] = useState<WorkspaceInitiative[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<WorkspaceTask[]>([]);
@@ -201,6 +202,12 @@ export function WorkspaceInitiativesSurface() {
     setCreateOpen(false);
     void loadInitiatives(true);
   }, [activeWorkspaceId, loadInitiatives]);
+
+  useEffect(() => {
+    if (routeCreateInitiative) {
+      setCreateOpen(true);
+    }
+  }, [routeCreateInitiative]);
 
   useEffect(() => {
     if (!activeWorkspaceId || !session?.user.id) return;
