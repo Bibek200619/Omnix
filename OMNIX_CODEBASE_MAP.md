@@ -127,6 +127,7 @@ frontend/
 │   │   ├── Sidebar.tsx          # MAIN sidebar (68KB) — workspace switcher + nav
 │   │   ├── AppShell.tsx         # Page shell wrapper
 │   │   ├── Header.tsx           # Top header bar
+│   │   ├── WorkspaceSearch.tsx  # Header workspace-scoped search UI
 │   │   ├── ProfileMenu.tsx      # User profile dropdown
 │   │   ├── MobileDock.tsx       # Mobile bottom navigation with "More" drawer trigger
 │   │   └── PageTransition.tsx   # Route transition animation
@@ -171,6 +172,7 @@ frontend/
 | All TS types | `lib/workspace-types.ts` |
 | Main chat UI | `components/chat/ChatInterface.tsx` |
 | Sidebar nav | `components/layout/Sidebar.tsx` |
+| Workspace search UI | `components/layout/WorkspaceSearch.tsx` |
 | Onboarding gate | `components/workspace/WorkspaceOnboardingGate.tsx` |
 
 ---
@@ -197,6 +199,7 @@ backend/
 │   │   ├── workspace_conversations.py # Workspace channel messages
 │   │   ├── workspace_tasks.py         # Task CRUD
 │   │   ├── workspace_decisions.py     # Decision CRUD
+│   │   ├── workspace_search.py        # Workspace-scoped keyword search
 │   │   ├── files.py                   # File metadata
 │   │   ├── upload.py                  # File upload + RAG ingestion trigger
 │   │   ├── artifacts.py               # AI artifact storage
@@ -217,6 +220,7 @@ backend/
 │   │   ├── workspace_task_service.py          # Task business logic (18KB)
 │   │   ├── workspace_decision_service.py      # Decision logic (13KB)
 │   │   ├── workspace_initiative_service.py    # Initiative logic (20KB)
+│   │   ├── workspace_search_service.py        # ILIKE workspace search over conversations/tasks/initiatives/decisions
 │   │   ├── workspace_intelligence_service.py  # AI workspace profile (14KB)
 │   │   ├── workspace_connector_service.py     # Source connectors (26KB)
 │   │   ├── workspace_schema_health_service.py # Schema validation (12KB)
@@ -275,7 +279,7 @@ backend/
 │   ├── observability/       # Metrics + tracing
 │   ├── jobs/                # Background jobs
 │   ├── runtime/             # RuntimeManager (system status)
-│   ├── schemas/             # Pydantic response schemas
+│   ├── schemas/             # Pydantic response schemas, including workspace_search.py
 │   └── health/              # Health check endpoint
 ├── migrations/              # DB migration scripts
 ├── tests/                   # pytest test suite
@@ -325,6 +329,18 @@ User uploads file → upload.py router
   → Stores chunks in Supabase (document_chunks table)
   → Stores embeddings in pgvector (rag/pgvector_store.py)
   → File metadata saved to files table
+```
+
+### Workspace Search Request
+
+```
+Header search input (components/layout/WorkspaceSearch.tsx)
+  → apiClient.searchWorkspace(workspaceId, q)
+  → GET /workspaces/{workspace_id}/search?q=...
+  → workspace_search.py router authenticates user
+  → workspace_search_service.py calls require_workspace_access()
+  → Supabase ILIKE queries stay scoped to workspace_id
+  → Results return grouped as conversations/tasks/initiatives/decisions
 ```
 
 ---
@@ -394,6 +410,20 @@ super_founder > founder > owner > co_owner > team_lead > sub_leader > member > s
 | Revoke invite | `DELETE /workspaces/{id}/invites/{invite_id}` |
 | Get intelligence | `GET /workspaces/{id}/intelligence` |
 | Update intelligence | `PATCH /workspaces/{id}/intelligence` |
+| Search workspace knowledge | `GET /workspaces/{id}/search?q=...` |
+
+### Workspace Search MVP
+- Backend router: `backend/app/routers/workspace_search.py`
+- Backend service: `backend/app/services/workspace_search_service.py`
+- Response schema: `backend/app/schemas/workspace_search.py`
+- Frontend UI: `frontend/components/layout/WorkspaceSearch.tsx`
+- API helper/types: `frontend/lib/api.ts` (`apiClient.searchWorkspace`) and `frontend/lib/workspace-types.ts`
+- Scope: active workspace only; no global/cross-workspace search
+- Sources: workspace channels/messages, tasks, initiatives, decisions
+- Excluded by design: files, connectors, semantic/vector search, embeddings, AI search, RAG
+- Query method: bounded Supabase `ILIKE` field searches after `require_workspace_access`
+- Conversation privacy: private channel messages are searched only after visible channel filtering
+- Result navigation: `/tasks?id=...`, `/decisions?id=...`, `/initiatives?id=...`, `/conversations?channel=...`
 
 ### Onboarding Gate
 - Component: `WorkspaceOnboardingGate.tsx`
@@ -664,22 +694,25 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
 - `POST /workspace-invites/{id}/decline`
 
 **Workspace Conversations (channels)**
-- `GET /workspaces/{id}/conversations`
-- `POST /workspaces/{id}/conversations`
-- `GET /workspaces/{id}/conversations/{channel_id}/messages`
-- `POST /workspaces/{id}/conversations/{channel_id}/messages`
-- `POST /workspaces/{id}/conversations/{channel_id}/assist`
+- `GET /workspaces/{id}/channels`
+- `POST /workspaces/{id}/channels`
+- `GET /workspaces/{id}/channels/{channel_id}/messages`
+- `POST /workspaces/{id}/channels/{channel_id}/messages`
+- `POST /workspaces/{id}/channels/{channel_id}/assist`
+
+**Workspace Search**
+- `GET /workspaces/{id}/search?q=...` — grouped workspace keyword results for conversations, tasks, initiatives, and decisions
 
 **Workspace Tasks**
 - `GET /workspaces/{id}/tasks`
 - `POST /workspaces/{id}/tasks`
 - `PATCH /workspaces/{id}/tasks/{task_id}`
-- `DELETE /workspaces/{id}/tasks/{task_id}`
 
 **Workspace Decisions**
 - `GET /workspaces/{id}/decisions`
 - `POST /workspaces/{id}/decisions`
-- `PATCH /workspaces/{id}/decisions/{decision_id}`
+- `GET /workspaces/{id}/decisions/{decision_id}`
+- `PATCH /workspaces/{id}/decisions/{decision_id}/status`
 
 **Files & Upload**
 - `GET /files` — user's files
@@ -750,6 +783,8 @@ WorkspaceDecision { id, title, status, decision_reason, ... }
 WorkspaceInitiative { id, title, status, linked_tasks[], momentum, ... }
 WorkspaceChannel { id, name, channel_type, message_count, ... }
 WorkspaceChannelMessage { id, content, author_user_id, context_links[], ... }
+WorkspaceSearchResponse { conversations[], tasks[], initiatives[], decisions[] }
+WorkspaceSearchResult { id, workspace_id, type, title, preview, context, url, ... }
 
 // Task/Decision status enums
 WorkspaceTaskStatus = "idea" | "planned" | "active" | "review" | "complete"
