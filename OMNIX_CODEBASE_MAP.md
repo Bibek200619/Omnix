@@ -183,6 +183,7 @@ frontend/
 | Mention picker/rendering | `components/mentions/MentionTextarea.tsx`, `components/mentions/MentionText.tsx` |
 | Notification bell/center | `components/notifications/NotificationBell.tsx`, `components/notifications/NotificationCenterSurface.tsx`, `app/(dashboard)/notifications/page.tsx` |
 | Mentions compatibility route | `app/(dashboard)/mentions/page.tsx` renders `NotificationCenterSurface` |
+| Mobile refinement surfaces | `components/settings/SettingsShell.tsx`, `components/layout/CommandPalette.tsx`, `components/layout/WorkspaceSearch.tsx`, `components/workspace/WorkspaceAccessPanel.tsx`, `app/(dashboard)/team/page.tsx`, `app/(dashboard)/files/page.tsx` |
 | Onboarding gate | `components/workspace/WorkspaceOnboardingGate.tsx` |
 
 ---
@@ -444,6 +445,7 @@ super_founder > founder > owner > co_owner > team_lead > sub_leader > member > s
 - Backend service: `backend/app/services/workspace_search_service.py`
 - Response schema: `backend/app/schemas/workspace_search.py`
 - Frontend UI: `frontend/components/layout/CommandPalette.tsx` for active header use; `WorkspaceSearch.tsx` remains the standalone search surface
+- Mobile UX: `WorkspaceSearch.tsx` uses a bottom-sheet search surface, grouped result counts, and guided empty/no-result states
 - API helper/types: `frontend/lib/api.ts` (`apiClient.searchWorkspace`) and `frontend/lib/workspace-types.ts`
 - Scope: active workspace only; no global/cross-workspace search
 - Sources: workspace channels/messages, tasks, initiatives, decisions
@@ -456,6 +458,7 @@ super_founder > founder > owner > co_owner > team_lead > sub_leader > member > s
 - Component: `frontend/components/layout/CommandPalette.tsx`
 - Activation: desktop `Ctrl+K` / `Cmd+K`; mobile command icon in the authenticated header
 - Sections: quick actions, grouped workspace search, recent destinations
+- Mobile UX: bottom-sheet command surface with larger touch targets, focused search affordance, and denser scan-friendly result rows
 - Quick create actions route to existing flows with `?create=task`, `?create=decision`, or `?create=initiative`
 - Existing create surfaces read those query params in task, decision, and initiative pages; no new entity creation logic exists in the palette
 - Recent destinations are stored locally per active workspace under `omnix.commandPalette.recent.{workspaceId}`
@@ -473,6 +476,7 @@ super_founder > founder > owner > co_owner > team_lead > sub_leader > member > s
 - Backwards-compatible mentions route: `frontend/app/(dashboard)/mentions/page.tsx` also renders `NotificationCenterSurface.tsx`
 - Header unread bell: `frontend/components/notifications/NotificationBell.tsx`
 - Notification state/context: `frontend/lib/workspace-notifications-context.tsx`
+- Mobile UX: notification rows expose unread state, source context, and direct source navigation with touch-sized actions
 - Read state: unread when `read_at IS NULL`; read when `read_at IS NOT NULL`
 - Read actions: individual `PATCH /workspaces/{id}/mentions/{mention_id}/read`; bulk `PATCH /workspaces/{id}/mentions/read-all`
 - Unread count: `GET /workspaces/{id}/mentions/unread-count`

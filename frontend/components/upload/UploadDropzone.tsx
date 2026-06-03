@@ -182,7 +182,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
         className={cn(
           "relative overflow-hidden rounded-xl border border-dashed text-center transition-shadow hover:border-[var(--omnix-border-active)] hover:shadow-[var(--omnix-glow-xs)]",
-          compact ? "p-4" : "p-8",
+          compact ? "p-4" : "p-5 sm:p-8",
         )}
       >
         <div className="relative z-10 mx-auto max-w-lg">
@@ -206,7 +206,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
               >
                 {isDragActive ? "Drop files to upload" : "Upload documents"}
               </motion.p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs leading-5 text-slate-400">
                 {compact ? "PDF, DOCX, TXT, or Markdown." : "PDF, DOCX, TXT, Markdown supported. Drop files here or click to choose."}
               </p>
             </div>
@@ -218,7 +218,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
             className={cn("flex items-center justify-center", compact ? "mt-4" : "mt-6")}
           >
             <input ref={fileInputRef} type="file" multiple onChange={handleChoose} className="hidden" accept=".pdf,.docx,.txt,.md,text/*,application/pdf" />
-            <Button type="button" size={compact ? "sm" : "md"} onClick={triggerFilePicker} className="omnix-primary-action shadow-[var(--omnix-glow-sm)]">Choose files</Button>
+            <Button type="button" size={compact ? "sm" : "md"} onClick={triggerFilePicker} className="omnix-primary-action min-h-11 w-full shadow-[var(--omnix-glow-sm)] sm:w-auto">Choose files</Button>
           </motion.div>
         </div>
         
@@ -248,13 +248,13 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
                 compact ? "p-3" : "p-4",
               )}
             >
-              <div className="flex items-center gap-4 min-w-0 flex-1">
+              <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
                 <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--omnix-border)] transition-colors", it.status === "done" ? "bg-emerald-500/10 text-emerald-400" : it.status === "error" ? "bg-rose-500/10 text-rose-400" : "bg-cyan-300/10 text-cyan-100")}>
                   <FileText className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-slate-200 group-hover:text-white transition-colors">{it.file.name}</p>
-                  <div className="mt-1.5 flex items-center gap-3">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-3">
                     <p className="text-xs text-slate-500">{Math.round(it.file.size / 1024)} KB</p>
                     {it.status === "uploading" && (
                       <div className="flex-1 h-1.5 max-w-[120px] overflow-hidden rounded-full bg-[var(--omnix-surface-hover)]">
@@ -270,7 +270,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
                 </div>
               </div>
               
-              <div className="flex shrink-0 items-center justify-end gap-3 mt-2 sm:mt-0">
+              <div className="mt-2 flex shrink-0 items-center justify-end gap-3 sm:mt-0">
                 {it.status === "uploading" ? (
                   <span className="text-xs font-medium text-cyan-400 w-12 text-right">{it.progress}%</span>
                 ) : it.status === "done" ? (
@@ -278,10 +278,10 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
                 ) : it.status === "error" ? (
                   <span className="text-xs font-medium text-rose-400">Failed</span>
                 ) : (
-                  <Button type="button" size="sm" variant="ghost" onClick={() => upload(it)}>Upload</Button>
+                  <Button type="button" size="sm" variant="ghost" className="min-h-10" onClick={() => upload(it)}>Upload</Button>
                 )}
                 
-                <button type="button" onClick={() => setItems((s) => s.filter((_i) => _i.id !== it.id))} className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-cyan-300/10 hover:text-slate-100">
+                <button type="button" onClick={() => setItems((s) => s.filter((_i) => _i.id !== it.id))} className="flex min-h-10 min-w-10 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-cyan-300/10 hover:text-slate-100" aria-label={`Remove ${it.file.name}`}>
                   <X className="h-4 w-4" />
                 </button>
               </div>
