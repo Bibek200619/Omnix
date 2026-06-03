@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from fastapi import APIRouter, Request, HTTPException, status
 from pydantic import BaseModel
 from typing import Any
@@ -15,6 +16,7 @@ from ..actions import faq as faq_action
 from ..actions import notes as notes_action
 
 router = APIRouter(prefix="/actions", tags=["actions"])
+logger = logging.getLogger(__name__)
 
 
 class ActionRequest(BaseModel):
@@ -52,8 +54,11 @@ async def run_action(request: Request, body: ActionRequest) -> Any:
             result = await notes_action.run(engine, user_id, workspace_id)
         else:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown action: {action}")
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+        logger.exception("Failed to run action %s", action)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to perform action.") from exc
 
     # Persist action output as a workspace artifact
     try:

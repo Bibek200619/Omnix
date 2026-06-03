@@ -3,6 +3,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { logClientError } from "@/lib/errors";
 
 export type UserProfile = {
   user_id: string;
@@ -52,7 +53,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setProfile(data);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load profile.");
+      logClientError("Failed to load profile", err, { endpoint: "/profile" });
+      setError("Unable to load profile.");
     } finally {
       setLoading(false);
     }
