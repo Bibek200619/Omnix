@@ -64,7 +64,8 @@ WITH required(table_name) AS (
     ('workspace_initiative_channels'),
     ('workspace_connectors'),
     ('workspace_decisions'),
-    ('workspace_decision_tasks')
+    ('workspace_decision_tasks'),
+    ('workspace_mentions')
 ),
 table_meta AS (
   SELECT

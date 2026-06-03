@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { WorkspaceSearchResponse } from "@/lib/workspace-types";
+import type { WorkspaceMentionInboxItem, WorkspaceSearchResponse } from "@/lib/workspace-types";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://18.204.231.209";
@@ -296,6 +296,10 @@ class ApiClient {
     return this.get<WorkspaceSearchResponse>(
       `/workspaces/${workspaceId}/search?q=${encodeURIComponent(query)}`,
     );
+  }
+
+  async listWorkspaceMentions(workspaceId: string): Promise<WorkspaceMentionInboxItem[]> {
+    return this.get<WorkspaceMentionInboxItem[]>(`/workspaces/${workspaceId}/mentions`);
   }
 
   async delete<T = void>(endpoint: string): Promise<T> {

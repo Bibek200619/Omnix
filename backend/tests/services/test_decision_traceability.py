@@ -13,6 +13,16 @@ def mock_user_id():
 def mock_workspace_id():
     return "ws-456"
 
+
+@pytest.fixture(autouse=True)
+def stub_mention_hydration(monkeypatch: pytest.MonkeyPatch):
+    async def fake_mentions_by_source(**kwargs):
+        return {}
+
+    monkeypatch.setattr(service, "mention_metadata_for_sources", fake_mentions_by_source)
+    monkeypatch.setattr(task_service, "mention_metadata_for_sources", fake_mentions_by_source)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("from_status", "to_status"),
