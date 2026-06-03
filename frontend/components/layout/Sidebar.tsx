@@ -44,6 +44,7 @@ import { Input } from "@/components/ui/Input";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
+import { logClientError } from "@/lib/errors";
 import { useProfile } from "@/lib/profile-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -224,8 +225,8 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
       setOpen(false);
       onWorkspaceSelect?.();
     } catch (err) {
-      console.error("Failed to create workspace", err);
-      setCreateError(err instanceof Error ? err.message : "Unable to create workspace");
+      logClientError("Failed to create workspace", err, { endpoint: "/workspaces" });
+      setCreateError("Unable to create workspace.");
     } finally {
       setCreatingWorkspace(false);
     }
@@ -248,8 +249,8 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
       setOpen(false);
       onWorkspaceSelect?.();
     } catch (err) {
-      console.error("Failed to create subspace", err);
-      setCreateSubspaceError(err instanceof Error ? err.message : "Unable to create subspace");
+      logClientError("Failed to create subspace", err);
+      setCreateSubspaceError("Unable to create subspace.");
     } finally {
       setCreatingSubspace(false);
     }
@@ -276,7 +277,8 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
       setOpen(false);
       onWorkspaceSelect?.();
     } catch (err) {
-      setInviteError(err instanceof Error ? err.message : "Unable to invite teammate");
+      logClientError("Failed to invite teammate", err);
+      setInviteError("Unable to invite teammate.");
     } finally {
       setInviting(false);
     }
@@ -300,7 +302,8 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
       setOpen(false);
       onWorkspaceSelect?.();
     } catch (err) {
-      setRenameError(err instanceof Error ? err.message : "Unable to rename workspace");
+      logClientError("Failed to rename workspace", err, { endpoint: `/workspaces/${active.id}` });
+      setRenameError("Unable to rename workspace.");
     } finally {
       setRenaming(false);
     }
@@ -324,7 +327,8 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
       setOpen(false);
       onWorkspaceSelect?.();
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Unable to delete workspace");
+      logClientError("Failed to delete workspace", err, { endpoint: `/workspaces/${active.id}` });
+      setDeleteError("Unable to delete workspace.");
     } finally {
       setDeleting(false);
     }
@@ -1152,7 +1156,8 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
       setEditingId(null);
       setDraftTitle("");
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Unable to rename chat.");
+      logClientError("Failed to rename chat", err, { endpoint: `/conversations/${conversationId}` });
+      setActionError("Unable to rename chat.");
     } finally {
       setBusyId(null);
     }
@@ -1167,7 +1172,8 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
         router.push("/chat");
       }
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Unable to delete chat.");
+      logClientError("Failed to delete chat", err, { endpoint: `/conversations/${conversationId}` });
+      setActionError("Unable to delete chat.");
     } finally {
       setBusyId(null);
     }

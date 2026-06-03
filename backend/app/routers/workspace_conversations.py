@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -25,6 +26,7 @@ from ..services.workspace_conversation_service import (
 from ..services.workspace_service import require_workspace_access, utc_now_iso
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/channels", tags=["workspace-conversations"])
+logger = logging.getLogger(__name__)
 
 ASSISTANCE_INSTRUCTIONS = {
     "summary": "Summarize current operational state in concise prose. Separate confirmed outcomes from open discussion.",
@@ -138,7 +140,8 @@ async def assist_channel_discussion(
             max_tokens=420,
         )
     except ModelServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+        logger.exception("Failed to generate conversation assistance")
+        raise HTTPException(status_code=exc.status_code, detail="Conversation assistance is unavailable.") from exc
 
     return {
         "mode": request.mode,

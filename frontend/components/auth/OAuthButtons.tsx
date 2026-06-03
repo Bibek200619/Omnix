@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { AUTH_C } from "@/components/auth/OmnixAuthVisuals";
 import { oauthCallbackUrl, redirectFromWindow } from "@/lib/auth-redirects";
+import { logClientError } from "@/lib/errors";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
@@ -51,11 +52,8 @@ function providerIcon(provider: OAuthProvider, loading: boolean) {
   return <Github className="h-4 w-4" />;
 }
 
-function oauthErrorMessage(provider: OAuthProvider, error: unknown) {
+function oauthErrorMessage(provider: OAuthProvider) {
   const providerName = providerLabels[provider];
-  if (error instanceof Error && error.message) {
-    return `${providerName} sign-in could not start. ${error.message}`;
-  }
   return `${providerName} sign-in could not start. Please try again.`;
 }
 
@@ -79,13 +77,15 @@ export function OAuthButtons({ disabled = false, onError }: OAuthButtonsProps) {
       });
 
       if (error) {
-        const message = oauthErrorMessage(provider, error);
+        logClientError(`${providerLabels[provider]} OAuth sign-in failed`, error);
+        const message = oauthErrorMessage(provider);
         setLocalError(message);
         onError?.(message);
         setLoadingProvider(null);
       }
     } catch (err) {
-      const message = oauthErrorMessage(provider, err);
+      logClientError(`${providerLabels[provider]} OAuth sign-in failed`, err);
+      const message = oauthErrorMessage(provider);
       setLocalError(message);
       onError?.(message);
       setLoadingProvider(null);

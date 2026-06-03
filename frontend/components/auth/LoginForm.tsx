@@ -14,6 +14,7 @@ import {
 } from "@/components/auth/OmnixAuthVisuals";
 import { authLink, redirectFromWindow } from "@/lib/auth-redirects";
 import { useAuth } from "@/lib/auth-context";
+import { logClientError } from "@/lib/errors";
 import { supabase } from "@/lib/supabase";
 
 export function LoginForm() {
@@ -41,10 +42,8 @@ export function LoginForm() {
         await supabase.auth.signInWithPassword({ email, password });
 
       if (signInError) {
-        setError(
-          signInError.message ||
-            "Sign in failed. Check your email and password, then try again.",
-        );
+        logClientError("Sign in failed", signInError);
+        setError("Unable to sign in. Check your email and password, then try again.");
         setLoading(false);
         return;
       }
@@ -58,7 +57,8 @@ export function LoginForm() {
       await refreshSession();
       router.replace(redirectFromWindow());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred");
+      logClientError("Unexpected sign in failure", err);
+      setError("Unable to sign in.");
       setLoading(false);
     }
   }
