@@ -17,6 +17,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
@@ -94,6 +95,8 @@ export function WorkspaceInitiativesSurface() {
   const { session } = useAuth();
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const { presence, realtimeStatus } = useWorkspaceCollaboration();
+  const searchParams = useSearchParams();
+  const routeInitiativeId = searchParams?.get("id") ?? null;
   const [initiatives, setInitiatives] = useState<WorkspaceInitiative[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<WorkspaceTask[]>([]);
@@ -163,7 +166,12 @@ export function WorkspaceInitiativesSurface() {
       ]);
       if (requestId !== requestRef.current || workspaceRef.current !== activeWorkspaceId) return;
       setInitiatives(incoming);
-      setSelectedId((current) => (incoming.some((initiative) => initiative.id === current) ? current : incoming[0]?.id ?? null));
+      setSelectedId((current) => {
+        if (routeInitiativeId && incoming.some((initiative) => initiative.id === routeInitiativeId)) {
+          return routeInitiativeId;
+        }
+        return incoming.some((initiative) => initiative.id === current) ? current : incoming[0]?.id ?? null;
+      });
       if (taskOptions) setTasks(taskOptions);
       if (channelOptions) setChannels(channelOptions);
       if (memberOptions) setMembers(memberOptions);
@@ -176,7 +184,7 @@ export function WorkspaceInitiativesSurface() {
     } finally {
       if (requestId === requestRef.current) setLoading(false);
     }
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, routeInitiativeId]);
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimerRef.current !== null) return;

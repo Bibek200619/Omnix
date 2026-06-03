@@ -15,6 +15,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
@@ -103,6 +104,8 @@ export function WorkspaceConversationSurface() {
   const { session } = useAuth();
   const { activeMembers, activeWorkspace, activeWorkspaceId } = useWorkspace();
   const { activity, presence, realtimeStatus, sendTypingSignal, typingUsers } = useWorkspaceCollaboration();
+  const searchParams = useSearchParams();
+  const routeChannelId = searchParams?.get("channel") ?? null;
   const [channels, setChannels] = useState<WorkspaceChannel[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -170,9 +173,12 @@ export function WorkspaceConversationSurface() {
       const incoming = await apiClient.get<WorkspaceChannel[]>(`/workspaces/${activeWorkspaceId}/channels`);
       if (requestId !== channelRequestRef.current || workspaceRef.current !== activeWorkspaceId) return;
       setChannels(incoming);
-      setSelectedChannelId((existing) =>
-        incoming.some((channel) => channel.id === existing) ? existing : incoming[0]?.id ?? null,
-      );
+      setSelectedChannelId((existing) => {
+        if (routeChannelId && incoming.some((channel) => channel.id === routeChannelId)) {
+          return routeChannelId;
+        }
+        return incoming.some((channel) => channel.id === existing) ? existing : incoming[0]?.id ?? null;
+      });
       setError(null);
     } catch (err) {
       if (requestId === channelRequestRef.current) {
@@ -182,7 +188,7 @@ export function WorkspaceConversationSurface() {
     } finally {
       if (requestId === channelRequestRef.current) setChannelsLoading(false);
     }
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, routeChannelId]);
 
   const loadMessages = useCallback(async (channelId: string) => {
     if (!activeWorkspaceId) return;
