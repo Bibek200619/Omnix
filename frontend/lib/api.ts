@@ -1,5 +1,11 @@
 import { supabase } from "@/lib/supabase";
-import type { WorkspaceSearchResponse } from "@/lib/workspace-types";
+import type {
+  WorkspaceMentionInboxItem,
+  WorkspaceMentionMarkAllReadResponse,
+  WorkspaceMentionMarkReadResponse,
+  WorkspaceMentionUnreadCount,
+  WorkspaceSearchResponse,
+} from "@/lib/workspace-types";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://18.204.231.209";
@@ -296,6 +302,22 @@ class ApiClient {
     return this.get<WorkspaceSearchResponse>(
       `/workspaces/${workspaceId}/search?q=${encodeURIComponent(query)}`,
     );
+  }
+
+  async listWorkspaceMentions(workspaceId: string): Promise<WorkspaceMentionInboxItem[]> {
+    return this.get<WorkspaceMentionInboxItem[]>(`/workspaces/${workspaceId}/mentions`);
+  }
+
+  async getWorkspaceMentionsUnreadCount(workspaceId: string): Promise<WorkspaceMentionUnreadCount> {
+    return this.get<WorkspaceMentionUnreadCount>(`/workspaces/${workspaceId}/mentions/unread-count`);
+  }
+
+  async markWorkspaceMentionRead(workspaceId: string, mentionId: string): Promise<WorkspaceMentionMarkReadResponse> {
+    return this.patch<WorkspaceMentionMarkReadResponse>(`/workspaces/${workspaceId}/mentions/${mentionId}/read`);
+  }
+
+  async markAllWorkspaceMentionsRead(workspaceId: string): Promise<WorkspaceMentionMarkAllReadResponse> {
+    return this.patch<WorkspaceMentionMarkAllReadResponse>(`/workspaces/${workspaceId}/mentions/read-all`);
   }
 
   async delete<T = void>(endpoint: string): Promise<T> {

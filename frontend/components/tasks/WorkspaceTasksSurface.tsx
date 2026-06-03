@@ -17,6 +17,8 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
+import { MentionText } from "@/components/mentions/MentionText";
+import { MentionTextarea, mentionPayload } from "@/components/mentions/MentionTextarea";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
@@ -26,6 +28,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type {
   WorkspaceMember,
+  WorkspaceMentionMetadata,
   WorkspaceInitiative,
   WorkspaceTask,
   WorkspaceTaskAssistance,
@@ -71,6 +74,7 @@ export function WorkspaceTasksSurface() {
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [descriptionMentions, setDescriptionMentions] = useState<WorkspaceMentionMetadata[]>([]);
   const [status, setStatus] = useState<WorkspaceTaskStatus>("idea");
   const [ownerId, setOwnerId] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -281,8 +285,9 @@ export function WorkspaceTasksSurface() {
       due_date: dueDate || null,
       blockers: initialBlocker.trim() ? [initialBlocker.trim()] : [],
       linked_context: [],
-      activity_metadata: { origin: "manual" },
+      activity_metadata: descriptionMentions.length ? { origin: "manual", mentions: descriptionMentions } : { origin: "manual" },
       momentum_metadata: {},
+      mentions: descriptionMentions,
       initiative_id: initiativeId || null,
       client_nonce: nonce,
       linked_decisions: [],
@@ -301,10 +306,12 @@ export function WorkspaceTasksSurface() {
         linked_context: [],
         initiative_id: optimistic.initiative_id,
         client_nonce: nonce,
+        mentions: mentionPayload(descriptionMentions, description),
       });
       setTasks((current) => mergeTask(current, created));
       setTitle("");
       setDescription("");
+      setDescriptionMentions([]);
       setStatus("idea");
       setOwnerId("");
       setDueDate("");
@@ -443,7 +450,17 @@ export function WorkspaceTasksSurface() {
           {createOpen ? (
             <form onSubmit={createTask} className="mb-4 grid gap-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.035] p-3 sm:grid-cols-2">
               <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Operational next step" className="h-10 text-sm sm:col-span-2" autoFocus />
-              <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Context, expected outcome, or handoff" className="omnix-input min-h-[68px] w-full resize-none rounded-lg p-2.5 text-sm sm:col-span-2" />
+              <div className="sm:col-span-2">
+                <MentionTextarea
+                  value={description}
+                  onChange={setDescription}
+                  members={members}
+                  mentions={descriptionMentions}
+                  onMentionsChange={setDescriptionMentions}
+                  placeholder="Context, expected outcome, or handoff"
+                  className="omnix-input min-h-[68px] w-full resize-none rounded-lg p-2.5 text-sm"
+                />
+              </div>
               <select value={status} onChange={(event) => setStatus(event.target.value as WorkspaceTaskStatus)} className="omnix-input h-10 rounded-lg px-2 text-sm">
                 {flow.map((phase) => <option key={phase.value} value={phase.value}>{phase.label}</option>)}
               </select>
@@ -458,7 +475,7 @@ export function WorkspaceTasksSurface() {
                 {initiatives.map((initiative) => <option key={initiative.id} value={initiative.id}>{initiative.title}</option>)}
               </select>
               <div className="flex justify-end gap-2 sm:col-span-2">
-                <Button type="button" size="sm" variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => { setCreateOpen(false); setDescriptionMentions([]); }}>Cancel</Button>
                 <Button type="submit" size="sm" isLoading={creating} disabled={!title.trim()}>Create record</Button>
               </div>
             </form>
@@ -502,7 +519,11 @@ export function WorkspaceTasksSurface() {
                         {isActive && <div className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />}
                         <p className="truncate text-sm font-medium text-white">{task.title}</p>
                       </div>
-                      {task.description ? <p className="mt-1 line-clamp-1 text-xs text-[var(--omnix-text-2)] group-hover:line-clamp-none transition-all">{task.description}</p> : null}
+                      {task.description ? (
+                        <p className="mt-1 line-clamp-1 text-xs text-[var(--omnix-text-2)] transition-all group-hover:line-clamp-none">
+                          <MentionText content={task.description} mentions={task.mentions} />
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-2">
                       <select

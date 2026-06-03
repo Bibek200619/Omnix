@@ -5,12 +5,15 @@ import { X, BadgeCheck, Loader2, Target, ListTodo, Search, Link2, Unlink2 } from
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Portal } from "@/components/ui/Portal";
+import { MentionTextarea, mentionPayload } from "@/components/mentions/MentionTextarea";
 import { apiClient } from "@/lib/api";
+import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { 
   WorkspaceDecision, 
   WorkspaceDecisionStatus, 
   WorkspaceInitiative, 
+  WorkspaceMentionMetadata,
   WorkspaceTask 
 } from "@/lib/workspace-types";
 
@@ -26,9 +29,11 @@ const statusOptions: { value: WorkspaceDecisionStatus; label: string }[] = [
 ];
 
 export function CreateDecisionModal({ workspaceId, onClose, onSuccess }: CreateDecisionModalProps) {
+  const { activeMembers } = useWorkspace();
   const [title, setTitle] = useState("");
   const [reason, setReason] = useState("");
   const [description, setDescription] = useState("");
+  const [mentions, setMentions] = useState<WorkspaceMentionMetadata[]>([]);
   const [status, setStatus] = useState<WorkspaceDecisionStatus>("accepted");
   const [creating, setCreating] = useState(false);
 
@@ -79,6 +84,7 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess }: CreateD
           decision_reason: reason.trim(),
           description: description.trim() || null,
           status,
+          mentions: mentionPayload(mentions, `${reason}\n${description}`),
         }
       );
 
@@ -187,9 +193,12 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess }: CreateD
 
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--omnix-text-3)]">Reason *</label>
-                  <textarea
+                  <MentionTextarea
                     value={reason}
-                    onChange={(e) => setReason(e.target.value)}
+                    onChange={setReason}
+                    members={activeMembers}
+                    mentions={mentions}
+                    onMentionsChange={setMentions}
                     required
                     className="omnix-input min-h-[100px] w-full resize-none rounded-lg bg-white/5 border-white/10 p-3 text-sm leading-6 focus:border-cyan-400/40 outline-none transition-colors"
                     placeholder="Why was this choice made? (Required)"
@@ -198,9 +207,12 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess }: CreateD
 
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--omnix-text-3)]">Description</label>
-                  <textarea
+                  <MentionTextarea
                     value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    onChange={setDescription}
+                    members={activeMembers}
+                    mentions={mentions}
+                    onMentionsChange={setMentions}
                     className="omnix-input min-h-[80px] w-full resize-none rounded-lg bg-white/5 border-white/10 p-3 text-sm leading-6 focus:border-cyan-400/40 outline-none transition-colors"
                     placeholder="Additional context or impact analysis..."
                   />
