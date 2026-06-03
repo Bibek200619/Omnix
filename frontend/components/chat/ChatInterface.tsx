@@ -1073,7 +1073,12 @@ export function ChatInterface() {
       <div className="pointer-events-none absolute left-[18%] top-[-18%] h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle,rgba(0,255,255,0.075),transparent_68%)] blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-20%] right-[4%] h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,rgba(0,51,255,0.085),transparent_70%)] blur-3xl" />
       {historyOpen ? (
-        <aside className="relative z-10 hidden w-[264px] shrink-0 flex-col border-r border-[var(--omnix-border)] bg-[rgba(5,12,23,0.6)] shadow-[18px_0_70px_rgba(0,0,0,0.24)] backdrop-blur-2xl md:flex">
+        <>
+          <div
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity md:hidden"
+            onClick={() => setHistoryOpen(false)}
+          />
+          <aside className="fixed inset-y-0 left-0 z-50 flex w-[280px] shrink-0 flex-col border-r border-[var(--omnix-border)] bg-[rgba(5,12,23,0.98)] shadow-[18px_0_70px_rgba(0,0,0,0.24)] backdrop-blur-2xl md:relative md:z-10 md:w-[264px] md:flex md:bg-[rgba(5,12,23,0.6)]">
           <div className="flex items-center gap-2 border-b border-[var(--omnix-border)] px-3 py-2.5">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--omnix-text-3)]" />
@@ -1152,6 +1157,7 @@ export function ChatInterface() {
             </div>
           </div>
         </aside>
+      </>
       ) : null}
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -1161,7 +1167,7 @@ export function ChatInterface() {
               <button
                 type="button"
                 onClick={() => setHistoryOpen(true)}
-                className="omnix-ghost-action hidden h-7 w-7 items-center justify-center rounded-[7px] md:flex"
+                className="omnix-ghost-action flex h-7 w-7 items-center justify-center rounded-[7px]"
                 aria-label="Open history"
                 title="Open history"
               >

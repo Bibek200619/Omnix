@@ -116,12 +116,32 @@ export function WorkspaceInitiativesSurface() {
   const [resourceId, setResourceId] = useState("");
   const [assistance, setAssistance] = useState<WorkspaceInitiativeAssistance | null>(null);
   const [assisting, setAssisting] = useState<WorkspaceInitiativeAssistanceMode | null>(null);
+  const [mobileTab, setMobileTab] = useState<"brief" | "plan" | "assist">("brief");
   const workspaceRef = useRef(activeWorkspaceId);
   const requestRef = useRef(0);
   const refreshTimerRef = useRef<number | null>(null);
 
-  workspaceRef.current = activeWorkspaceId;
-  const selected = initiatives.find((initiative) => initiative.id === selectedId) ?? initiatives[0] ?? null;
+  const sortedInitiatives = useMemo(() => {
+    const statusOrder: Record<WorkspaceInitiativeStatus, number> = {
+      focused: 0,
+      active: 1,
+      at_risk: 2,
+      draft: 3,
+      complete: 4,
+    };
+
+    return [...initiatives].sort((a, b) => {
+      const orderA = statusOrder[a.status] ?? 99;
+      const orderB = statusOrder[b.status] ?? 99;
+      if (orderA !== orderB) return orderA - orderB;
+      
+      const timeA = new Date(a.updated_at || a.created_at || 0).getTime();
+      const timeB = new Date(b.updated_at || b.created_at || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [initiatives]);
+
+  const selected = sortedInitiatives.find((initiative) => initiative.id === selectedId) ?? sortedInitiatives[0] ?? null;
 
   const loadInitiatives = useCallback(async (includeOptions = false) => {
     if (!activeWorkspaceId) {
@@ -432,7 +452,10 @@ export function WorkspaceInitiativesSurface() {
       ) : null}
 
       <div className="grid shrink-0 gap-3 lg:grid-cols-[19rem_minmax(0,1fr)] xl:min-h-0 xl:flex-1 xl:grid-cols-[20rem_minmax(0,1fr)_19rem]">
-        <aside className="omnix-panel order-1 flex shrink-0 flex-col rounded-xl p-3 lg:order-none lg:min-h-[16rem]">
+        <aside className={cn(
+          "omnix-panel order-1 flex shrink-0 flex-col rounded-xl p-3 lg:order-none lg:min-h-[16rem]",
+          selectedId && "hidden lg:flex"
+        )}>
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Direction</p>
             <Button size="sm" variant="ghost" onClick={() => setCreateOpen((open) => !open)} leftIcon={<Plus className="h-3.5 w-3.5" />}>Open</Button>
@@ -459,7 +482,7 @@ export function WorkspaceInitiativesSurface() {
                 <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">Name the shared outcome that current execution serves.</p>
               </div>
             ) : null}
-            {initiatives.map((initiative) => (
+            {sortedInitiatives.map((initiative) => (
               <button key={initiative.id} type="button" onClick={() => { setSelectedId(initiative.id); setAssistance(null); }} className={cn("group w-[min(15rem,78vw)] shrink-0 rounded-xl border p-3.5 text-left transition lg:w-full", selected?.id === initiative.id ? "border-cyan-300/35 bg-cyan-300/[0.08] shadow-[var(--omnix-glow-xs)]" : "border-[var(--omnix-border)] bg-black/10 hover:bg-white/[0.025]")}>
                 <p className={cn("truncate text-sm font-medium transition", selected?.id === initiative.id ? "text-white" : "text-[var(--omnix-text-2)] group-hover:text-white")}>{initiative.title}</p>
                 <div className="mt-3 flex items-center justify-between gap-2 text-[10px]">
@@ -481,13 +504,49 @@ export function WorkspaceInitiativesSurface() {
           </div>
         </aside>
 
-        <main className="omnix-panel order-3 min-w-0 rounded-xl p-4 sm:p-6 lg:order-none xl:min-h-[30rem] xl:overflow-y-auto">
+        <main className={cn(
+          "omnix-panel order-3 min-w-0 rounded-xl p-4 sm:p-6 lg:order-none xl:min-h-[30rem] xl:overflow-y-auto",
+          !selectedId && "hidden lg:block"
+        )}>
           {!selected ? (
             <div className="flex h-full min-h-[24rem] items-center justify-center text-sm text-[var(--omnix-text-2)]">Select or open an initiative.</div>
           ) : (
             <>
+              {/* Mobile Header with Back and Tabs */}
+              <div className="mb-6 flex flex-col gap-4 lg:hidden">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(null)}
+                    className="flex h-8 items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 text-[10px] font-bold uppercase tracking-wider text-cyan-200"
+                  >
+                    ‹ Back
+                  </button>
+                  <h2 className="omnix-display truncate text-lg font-bold text-white">{selected.title}</h2>
+                </div>
+                <div className="flex gap-1 rounded-lg bg-black/20 p-1 border border-[var(--omnix-border)]">
+                  {(["brief", "plan", "assist"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setMobileTab(t)}
+                      className={cn(
+                        "flex-1 rounded-md py-2 text-[10px] font-bold uppercase tracking-wider transition-all",
+                        mobileTab === t 
+                          ? "bg-cyan-400/10 text-cyan-400 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]" 
+                          : "text-[var(--omnix-text-3)]"
+                      )}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Phase 2: Mission-First Overview */}
-              <div className="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-[var(--omnix-border)] pb-6">
+              <div className={cn(
+                "mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-[var(--omnix-border)] pb-6",
+                mobileTab !== "brief" && "hidden lg:flex"
+              )}>
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-300/60">Mission</p>
                   <h2 className="omnix-display mt-2 text-2xl font-bold text-white">{selected.title}</h2>
@@ -508,7 +567,10 @@ export function WorkspaceInitiativesSurface() {
               </div>
 
               {/* Phase 3 & 4: Momentum and Progress Clarity */}
-              <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className={cn(
+                "mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3",
+                mobileTab !== "brief" && "hidden lg:grid"
+              )}>
                 <div className="rounded-2xl border border-[var(--omnix-border)] bg-black/10 p-4">
                   <p className="mb-3 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--omnix-text-3)]">
                     <Target className="h-3.5 w-3.5" /> Momentum
@@ -545,20 +607,26 @@ export function WorkspaceInitiativesSurface() {
               </div>
 
               {selected.initiative_context ? (
-                <div className="mb-8 rounded-2xl border border-cyan-300/12 bg-cyan-300/[0.025] p-4">
+                <div className={cn(
+                  "mb-8 rounded-2xl border border-cyan-300/12 bg-cyan-300/[0.025] p-4",
+                  mobileTab !== "brief" && "hidden lg:block"
+                )}>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-300/50">Mission Context</p>
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--omnix-text)]">{selected.initiative_context}</p>
                 </div>
               ) : null}
 
               {/* Phase 3: Linked Decisions */}
-              <div className="mb-8">
+              <div className={cn("mb-8", mobileTab !== "brief" && "hidden lg:block")}>
                 <DecisionTraceabilityList decisions={selected.linked_decisions} title="Related Decisions" />
               </div>
 
               {/* Blockers Visibility */}
               {selected.momentum.blocked_task_count > 0 && (
-                <div className="mb-8 rounded-2xl border border-amber-400/20 bg-amber-400/[0.04] p-4">
+                <div className={cn(
+                  "mb-8 rounded-2xl border border-amber-400/20 bg-amber-400/[0.04] p-4",
+                  mobileTab !== "brief" && "hidden lg:block"
+                )}>
                   <div className="flex items-center gap-2 text-amber-300">
                     <AlertTriangle className="h-4 w-4" />
                     <p className="text-xs font-bold uppercase tracking-widest">Active Blockers</p>
@@ -568,8 +636,8 @@ export function WorkspaceInitiativesSurface() {
               )}
 
               {/* Phase 5: Progressive Disclosure for Linkage */}
-              <div className="space-y-4">
-                <details className="group/disclosure rounded-2xl border border-[var(--omnix-border)] bg-black/5 overflow-hidden transition-all">
+              <div className={cn("space-y-4", mobileTab !== "plan" && "hidden lg:block")}>
+                <details className="group/disclosure rounded-2xl border border-[var(--omnix-border)] bg-black/5 overflow-hidden transition-all" open={true}>
                   <summary className="flex cursor-pointer items-center justify-between p-4 hover:bg-white/[0.02]">
                     <div className="flex items-center gap-3">
                       <ClipboardCheck className="h-4 w-4 text-[var(--omnix-text-3)]" />
@@ -664,11 +732,35 @@ export function WorkspaceInitiativesSurface() {
                   </div>
                 </details>
               </div>
+
+              {/* Mobile Assist View */}
+              <div className={cn("space-y-4 lg:hidden", mobileTab !== "assist" && "hidden")}>
+                <section className="omnix-panel rounded-xl p-4">
+                  <p className="mb-4 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-purple-300/70"><Sparkles className="h-3.5 w-3.5" /> Mission Assist</p>
+                  <div className="grid gap-2">
+                    {Object.entries(assistanceLabels).map(([mode, label]) => (
+                      <button key={mode} type="button" disabled={Boolean(assisting)} onClick={() => void requestAssistance(mode as WorkspaceInitiativeAssistanceMode)} className="group flex items-center justify-between rounded-xl border border-purple-300/15 bg-purple-300/[0.03] px-4 py-3 text-left text-xs font-medium text-purple-100/90 transition hover:bg-purple-300/[0.08] disabled:opacity-40">
+                        {label}
+                        {assisting === mode ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5 opacity-40" />}
+                      </button>
+                    ))}
+                  </div>
+                  {assistance ? (
+                    <div className="mt-4 rounded-xl border border-purple-300/20 bg-purple-300/[0.04] p-4">
+                      <p className="whitespace-pre-wrap text-xs leading-6 text-[var(--omnix-text)]">{assistance.content}</p>
+                      <p className="mt-3 text-[10px] font-medium leading-relaxed text-[var(--omnix-text-3)]">Read from {assistance.source_task_count} tasks and {assistance.source_message_count} messages.</p>
+                    </div>
+                  ) : null}
+                </section>
+              </div>
             </>
           )}
         </main>
 
-        <aside className="order-2 space-y-3 lg:order-none lg:col-span-2 xl:col-span-1">
+        <aside className={cn(
+          "order-2 space-y-3 lg:order-none lg:col-span-2 xl:col-span-1",
+          selectedId && "hidden lg:block"
+        )}>
           <section className="omnix-panel rounded-xl p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Movement</p>
             <p className="mt-3 text-sm leading-6 text-white font-medium">{selected?.momentum.summary || "Select an initiative to see recorded movement."}</p>
