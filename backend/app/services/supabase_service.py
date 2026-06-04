@@ -921,6 +921,27 @@ async def update_one_trusted(
         _raise_supabase_error("Trusted update", table, exc)
 
 
+async def update_many_trusted(
+    table: str,
+    filters: Mapping[str, Any],
+    payload: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    if not payload:
+        logger.error("Trusted batch update for '%s' requires at least one field.", table)
+        raise SupabaseServiceError(INTERNAL_DB_ERROR)
+
+    try:
+        client = await _async_client()
+        query = client.table(table).update(dict(payload))
+        query = _apply_filters(query, filters)
+        response = await _execute_with_retry_async(query, operation=f"trusted batch update {table}")
+        return list(getattr(response, "data", None) or [])
+    except Exception as exc:
+        if isinstance(exc, SupabaseServiceError):
+            raise
+        _raise_supabase_error("Trusted batch update", table, exc)
+
+
 async def upsert_one(table: str, payload: Mapping[str, Any], on_conflict: str) -> dict[str, Any]:
     # WARNING: get_async_supabase() uses the SERVICE ROLE KEY.
     # This bypasses RLS completely. Enforcing user_id mapping prevents privilege escalation.
