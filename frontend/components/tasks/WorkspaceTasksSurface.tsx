@@ -487,7 +487,16 @@ export function WorkspaceTasksSurface() {
               <div className="mx-auto mt-14 max-w-sm text-center">
                 <ClipboardCheck className="mx-auto h-7 w-7 text-cyan-100/35" />
                 <p className="mt-3 text-sm text-[var(--omnix-text-2)]">No tasks recorded in this view.</p>
-                <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">Capture only the next steps that require shared visibility.</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">Capture only the next steps that require shared visibility, or change the phase filter above.</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-4 min-h-10"
+                  leftIcon={<Plus className="h-3.5 w-3.5" />}
+                  onClick={() => setCreateOpen(true)}
+                >
+                  Record task
+                </Button>
               </div>
             ) : null}
             {displayedTasks.map((task) => {

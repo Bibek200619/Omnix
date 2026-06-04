@@ -62,6 +62,7 @@ export function WorkspaceSearch() {
     [results],
   );
   const hasResults = flatResults.length > 0;
+  const totalResults = flatResults.length;
   const disabled = !activeWorkspaceId;
 
   useEffect(() => {
@@ -204,7 +205,7 @@ export function WorkspaceSearch() {
         type="button"
         disabled={disabled}
         onClick={openSearch}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] transition hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] disabled:opacity-40 md:hidden"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] transition hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] active:scale-[0.97] disabled:opacity-40 md:hidden"
         aria-label="Search Omnix"
         title="Search Omnix"
       >
@@ -233,8 +234,10 @@ export function WorkspaceSearch() {
       </div>
 
       {open ? (
-        <div className="fixed inset-x-2 top-[calc(env(safe-area-inset-top)+0.75rem)] z-50 max-h-[calc(100dvh-1.5rem)] overflow-hidden rounded-2xl border border-cyan-300/15 bg-[rgba(3,8,18,0.96)] shadow-[0_24px_80px_rgba(0,0,0,0.55),var(--omnix-glow-sm)] backdrop-blur-2xl md:absolute md:inset-x-auto md:right-0 md:top-[calc(100%+0.6rem)] md:w-[min(34rem,calc(100vw-2rem))] md:max-h-[min(34rem,calc(100dvh-8rem))]">
-          <div className="flex items-center gap-2 border-b border-white/5 p-2 md:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-50 max-h-[min(86dvh,42rem)] overflow-hidden rounded-t-2xl border border-cyan-300/15 bg-[rgba(3,8,18,0.96)] shadow-[0_-24px_80px_rgba(0,0,0,0.55),var(--omnix-glow-sm)] backdrop-blur-2xl md:absolute md:inset-x-auto md:bottom-auto md:right-0 md:top-[calc(100%+0.6rem)] md:w-[min(34rem,calc(100vw-2rem))] md:max-h-[min(34rem,calc(100dvh-8rem))] md:rounded-2xl">
+          <div className="border-b border-white/5 p-2 md:hidden">
+            <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/15" />
+            <div className="flex items-center gap-2">
             <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-100/35" />
               <input
@@ -263,15 +266,20 @@ export function WorkspaceSearch() {
             >
               <X className="h-4 w-4" />
             </button>
+            </div>
           </div>
 
           <div className="omnix-scrollbar max-h-[calc(100dvh-6.8rem)] overflow-y-auto p-2 md:max-h-[min(31rem,calc(100dvh-10rem))]">
             {!trimmedQuery ? (
               <div className="px-3 py-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100/45">Search tips</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100/45">Workspace search</p>
                 <div className="mt-3 grid gap-2 text-sm text-[var(--omnix-text-2)]">
-                  <p>Try a task title, decision reason, initiative description, or conversation message.</p>
-                  <p>Search stays inside the active workspace.</p>
+                  <div className="rounded-xl border border-[var(--omnix-border)] bg-white/[0.025] p-3">
+                    Search tasks, decisions, initiatives, and conversations inside the active workspace.
+                  </div>
+                  <div className="rounded-xl border border-[var(--omnix-border)] bg-black/10 p-3 text-xs leading-5 text-[var(--omnix-text-3)]">
+                    Start with a title, owner phrase, decision reason, or message keyword.
+                  </div>
                 </div>
               </div>
             ) : error ? (
@@ -282,11 +290,29 @@ export function WorkspaceSearch() {
                 Searching workspace
               </div>
             ) : !hasResults ? (
-              <div className="px-3 py-5 text-sm text-[var(--omnix-text-2)]">
-                No matching workspace information found.
+              <div className="rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 px-3 py-5 text-sm text-[var(--omnix-text-2)]">
+                <p className="font-medium text-white">No matching workspace information found.</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">
+                  Try a shorter phrase or search by source type, owner, status, or channel name.
+                </p>
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="mt-3 inline-flex min-h-9 items-center rounded-lg border border-cyan-300/14 bg-cyan-300/[0.055] px-3 text-xs font-medium text-cyan-100/85"
+                >
+                  Clear search
+                </button>
               </div>
             ) : (
               <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3 px-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100/45">
+                    Results
+                  </p>
+                  <span className="rounded-full border border-white/8 bg-white/[0.04] px-2 py-1 text-[10px] font-semibold text-white/45">
+                    {totalResults} found
+                  </span>
+                </div>
                 {groups.map((group) => {
                   const items = results[group.key];
                   if (!items.length) return null;
@@ -296,7 +322,7 @@ export function WorkspaceSearch() {
                       <div className="mb-1.5 flex items-center gap-2 px-2">
                         <Icon className="h-3.5 w-3.5 text-cyan-100/45" />
                         <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100/45">
-                          {group.label}
+                          {group.label} · {items.length}
                         </p>
                       </div>
                       <div className="space-y-1">
