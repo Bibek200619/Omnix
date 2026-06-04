@@ -10,6 +10,7 @@ import { ProfileProvider } from "@/lib/profile-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
 import { WorkspaceCollaborationProvider } from "@/lib/workspace-collaboration-context";
 import { WorkspaceContinuityProvider } from "@/lib/workspace-continuity-context";
+import { WorkspaceNotificationsProvider } from "@/lib/workspace-notifications-context";
 import { WorkspaceOnboardingGate } from "@/components/workspace/WorkspaceOnboardingGate";
 import { cn } from "@/lib/utils";
 
@@ -77,44 +78,46 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <WorkspaceProvider>
       <WorkspaceCollaborationProvider>
-        <WorkspaceContinuityProvider>
-          <ProfileProvider>
-            <ConversationHistoryProvider>
-              <WorkspaceOnboardingGate>
-                <div className="omnix-app-bg omnix-auth-shell relative h-[100dvh] overflow-hidden text-white sm:h-screen">
-                  <div className="omnix-ambient-layer" aria-hidden="true" />
-                  <div className="omnix-shell-scanline" aria-hidden="true" />
-                  <div
-                    className="pointer-events-none fixed inset-x-0 top-0 z-[2] h-px bg-[linear-gradient(90deg,transparent_0%,rgba(0,255,255,0.35)_30%,rgba(0,255,255,0.6)_50%,rgba(0,255,255,0.35)_70%,transparent_100%)]"
-                    aria-hidden="true"
-                  />
-                  <Sidebar
-                    isOpen={isSidebarOpen}
-                    collapsed={isSidebarCollapsed}
-                    onClose={() => setIsSidebarOpen(false)}
-                    onToggleCollapse={() => setIsSidebarCollapsed((value) => !value)}
-                  />
-                  <div
-                    className={cn(
-                      "relative z-[1] flex h-full min-h-0 flex-col transition-[padding] duration-200 ease-out",
-                      isSidebarCollapsed ? "lg:pl-0" : "lg:pl-[var(--omnix-sidebar-w)]",
-                    )}
-                  >
-                    <Header
-                      sidebarCollapsed={isSidebarCollapsed}
-                      onMenuClick={() => setIsSidebarOpen(true)}
-                      onExpandSidebar={() => setIsSidebarCollapsed(false)}
+        <WorkspaceNotificationsProvider>
+          <WorkspaceContinuityProvider>
+            <ProfileProvider>
+              <ConversationHistoryProvider>
+                <WorkspaceOnboardingGate>
+                  <div className="omnix-app-bg omnix-auth-shell relative h-[100dvh] overflow-hidden text-white sm:h-screen">
+                    <div className="omnix-ambient-layer" aria-hidden="true" />
+                    <div className="omnix-shell-scanline" aria-hidden="true" />
+                    <div
+                      className="pointer-events-none fixed inset-x-0 top-0 z-[2] h-px bg-[linear-gradient(90deg,transparent_0%,rgba(0,255,255,0.35)_30%,rgba(0,255,255,0.6)_50%,rgba(0,255,255,0.35)_70%,transparent_100%)]"
+                      aria-hidden="true"
                     />
-                    <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4.25rem_+_env(safe-area-inset-bottom))] lg:pb-0">
-                      <PageTransition className="flex min-h-0 flex-1 flex-col">{children}</PageTransition>
-                    </main>
-                    <MobileDock onMoreClick={() => setIsSidebarOpen(true)} />
+                    <Sidebar
+                      isOpen={isSidebarOpen}
+                      collapsed={isSidebarCollapsed}
+                      onClose={() => setIsSidebarOpen(false)}
+                      onToggleCollapse={() => setIsSidebarCollapsed((value) => !value)}
+                    />
+                    <div
+                      className={cn(
+                        "relative z-[1] flex h-full min-h-0 flex-col transition-[padding] duration-200 ease-out",
+                        isSidebarCollapsed ? "lg:pl-0" : "lg:pl-[var(--omnix-sidebar-w)]",
+                      )}
+                    >
+                      <Header
+                        sidebarCollapsed={isSidebarCollapsed}
+                        onMenuClick={() => setIsSidebarOpen(true)}
+                        onExpandSidebar={() => setIsSidebarCollapsed(false)}
+                      />
+                      <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4.25rem_+_env(safe-area-inset-bottom))] lg:pb-0">
+                        <PageTransition className="flex min-h-0 flex-1 flex-col">{children}</PageTransition>
+                      </main>
+                      <MobileDock onMoreClick={() => setIsSidebarOpen(true)} />
+                    </div>
                   </div>
-                </div>
-              </WorkspaceOnboardingGate>
-            </ConversationHistoryProvider>
-          </ProfileProvider>
-        </WorkspaceContinuityProvider>
+                </WorkspaceOnboardingGate>
+              </ConversationHistoryProvider>
+            </ProfileProvider>
+          </WorkspaceContinuityProvider>
+        </WorkspaceNotificationsProvider>
       </WorkspaceCollaborationProvider>
     </WorkspaceProvider>
   );

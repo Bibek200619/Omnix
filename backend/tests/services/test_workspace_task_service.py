@@ -8,6 +8,18 @@ import pytest
 from app.services import workspace_task_service as tasks
 
 
+@pytest.fixture(autouse=True)
+def stub_mentions(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_mentions_by_source(**kwargs):
+        return {}
+
+    async def fake_sync_mentions(**kwargs):
+        return []
+
+    monkeypatch.setattr(tasks, "mention_metadata_for_sources", fake_mentions_by_source)
+    monkeypatch.setattr(tasks, "sync_mentions_for_source", fake_sync_mentions)
+
+
 def _assert_no_raw_dates(value: object) -> None:
     if isinstance(value, date):
         raise AssertionError(f"raw date escaped serialization: {value!r}")
@@ -95,6 +107,56 @@ async def test_create_task_serializes_due_date_before_insert(monkeypatch: pytest
 
     assert captured["due_date"] == "2026-06-03"
     assert result["due_date"] == "2026-06-03"
+
+
+@pytest.mark.asyncio
+async def test_create_task_persists_structured_mentions(monkeypatch: pytest.MonkeyPatch) -> None:
+    mention_metadata = [{"user_id": "user-2", "label": "Bibek", "display_name": "Bibek", "avatar_label": "B"}]
+    captured_insert: dict[str, object] = {}
+    captured_sync: dict[str, object] = {}
+
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_prepare(**kwargs):
+        assert kwargs["mentions"] == [{"user_id": "user-2"}]
+        return mention_metadata
+
+    async def fake_insert(table: str, payload: dict[str, object]):
+        captured_insert.update(payload)
+        return {"id": "task-1", "workspace_id": "workspace-1", **payload}
+
+    async def fake_sync(**kwargs):
+        captured_sync.update(kwargs)
+        return []
+
+    async def fake_activity(**kwargs):
+        return None
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    async def fake_select_all(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(tasks, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(tasks, "prepare_mentions_for_workspace", fake_prepare)
+    monkeypatch.setattr(tasks, "insert_one_trusted", fake_insert)
+    monkeypatch.setattr(tasks, "sync_mentions_for_source", fake_sync)
+    monkeypatch.setattr(tasks, "log_workspace_activity", fake_activity)
+    monkeypatch.setattr(tasks, "get_profiles", fake_profiles)
+    monkeypatch.setattr(tasks, "select_all_trusted", fake_select_all)
+
+    result = await tasks.create_task(
+        workspace_id="workspace-1",
+        user_id="user-1",
+        payload={"title": "Check launch", "mentions": [{"user_id": "user-2"}]},
+    )
+
+    assert captured_insert["activity_metadata"] == {"origin": "manual", "mentions": mention_metadata}
+    assert captured_sync["source_type"] == "task"
+    assert captured_sync["source_id"] == "task-1"
+    assert result["mentions"] == mention_metadata
 
 
 @pytest.mark.asyncio

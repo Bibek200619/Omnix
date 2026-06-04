@@ -2,6 +2,7 @@
 
 import { BadgeCheck, CircleDot, User, Calendar, MessageSquare } from "lucide-react";
 import { WorkspaceDecision } from "@/lib/workspace-types";
+import { MentionText } from "@/components/mentions/MentionText";
 import { DecisionLifecycleControls } from "./DecisionLifecycleControls";
 import { DecisionTaskLinker } from "./DecisionTaskLinker";
 import { DecisionInitiativeLinker } from "./DecisionInitiativeLinker";
@@ -51,7 +52,10 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--omnix-text-3)]">Primary Rationale</p>
                     <p className="mt-3 whitespace-pre-wrap text-base leading-relaxed text-white/90 selection:bg-cyan-400/30">
-                      {decision.decision_reason || "No explicit reason recorded for this choice."}
+                      <MentionText
+                        content={decision.decision_reason || "No explicit reason recorded for this choice."}
+                        mentions={decision.mentions}
+                      />
                     </p>
                   </div>
                   
@@ -59,7 +63,7 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
                     <div className="border-t border-white/5 pt-6">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--omnix-text-3)]">Implementation Details</p>
                       <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-[var(--omnix-text-2)]">
-                        {decision.description}
+                        <MentionText content={decision.description} mentions={decision.mentions} />
                       </p>
                     </div>
                   )}
@@ -135,4 +139,3 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
     </div>
   );
 }
-

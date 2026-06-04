@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .workspace_mentions import WorkspaceMentionInput, WorkspaceMentionMetadata
+
 
 TaskStatus = Literal["idea", "planned", "active", "review", "complete"]
 TaskContextType = Literal[
@@ -36,6 +38,7 @@ class WorkspaceTaskCreate(BaseModel):
     linked_context: list[TaskContextLink] = Field(default_factory=list, max_length=12)
     initiative_id: str | None = None
     client_nonce: str | None = Field(default=None, max_length=100)
+    mentions: list[WorkspaceMentionInput] = Field(default_factory=list, max_length=50)
 
 
 class WorkspaceTaskUpdate(BaseModel):
@@ -47,6 +50,7 @@ class WorkspaceTaskUpdate(BaseModel):
     blockers: list[str] | None = Field(default=None, max_length=12)
     linked_context: list[TaskContextLink] | None = Field(default=None, max_length=12)
     initiative_id: str | None = None
+    mentions: list[WorkspaceMentionInput] | None = Field(default=None, max_length=50)
 
 
 class WorkspaceTaskFromMessageCreate(BaseModel):
@@ -56,6 +60,7 @@ class WorkspaceTaskFromMessageCreate(BaseModel):
     owner_user_id: str | None = None
     due_date: date | None = None
     client_nonce: str | None = Field(default=None, max_length=100)
+    mentions: list[WorkspaceMentionInput] = Field(default_factory=list, max_length=50)
 
 
 class WorkspaceTaskFromAssistanceCreate(BaseModel):
@@ -67,6 +72,7 @@ class WorkspaceTaskFromAssistanceCreate(BaseModel):
     owner_user_id: str | None = None
     due_date: date | None = None
     client_nonce: str | None = Field(default=None, max_length=100)
+    mentions: list[WorkspaceMentionInput] = Field(default_factory=list, max_length=50)
 
 
 class WorkspaceTaskRead(BaseModel):
@@ -84,6 +90,7 @@ class WorkspaceTaskRead(BaseModel):
     linked_context: list[TaskContextLink] = Field(default_factory=list)
     activity_metadata: dict[str, Any] = Field(default_factory=dict)
     momentum_metadata: dict[str, Any] = Field(default_factory=dict)
+    mentions: list[WorkspaceMentionMetadata] = Field(default_factory=list)
     initiative_id: str | None = None
     client_nonce: str | None = None
     completed_at: datetime | None = None
