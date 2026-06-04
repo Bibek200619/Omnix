@@ -696,19 +696,19 @@ export default function FilesPage() {
                         ) : null}
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center lg:justify-end">
                       {googleDriveNeedsAuth ? (
-                        <Button type="button" size="sm" variant="secondary" leftIcon={<ExternalLink className="h-3.5 w-3.5" />} isLoading={authConnectorId === connector.id} onClick={() => void handleDriveAuth(connector)}>
+                        <Button type="button" size="sm" variant="secondary" className="min-h-10" leftIcon={<ExternalLink className="h-3.5 w-3.5" />} isLoading={authConnectorId === connector.id} onClick={() => void handleDriveAuth(connector)}>
                           Authenticate
                         </Button>
                       ) : null}
-                      <Button type="button" size="sm" variant="ghost" leftIcon={<RefreshCw className="h-3.5 w-3.5" />} isLoading={busy} onClick={() => void handleRetryConnector(connector)}>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<RefreshCw className="h-3.5 w-3.5" />} isLoading={busy} onClick={() => void handleRetryConnector(connector)}>
                         Retry
                       </Button>
-                      <Button type="button" size="sm" variant="ghost" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => openSetup(connector.connector_type, connector)}>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => openSetup(connector.connector_type, connector)}>
                         Configure
                       </Button>
-                      <Button type="button" size="sm" variant="ghost" className="text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Unplug className="h-3.5 w-3.5" />} isLoading={busy} onClick={() => void handleRemoveConnector(connector)}>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-10 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Unplug className="h-3.5 w-3.5" />} isLoading={busy} onClick={() => void handleRemoveConnector(connector)}>
                         Remove
                       </Button>
                     </div>
@@ -726,16 +726,16 @@ export default function FilesPage() {
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Search knowledge sources..."
-              className="omnix-input h-9 w-full rounded-[var(--omnix-radius-sm)] py-2 pl-8 pr-3 text-xs"
+              className="omnix-input h-11 w-full rounded-[var(--omnix-radius-sm)] py-2 pl-8 pr-3 text-sm sm:h-9 sm:text-xs"
             />
           </div>
-          <div className="flex overflow-hidden rounded-[9px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.03)]">
+          <div className="flex min-h-11 overflow-hidden rounded-[9px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.03)] sm:min-h-9">
             {(["grid", "list"] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => setView(mode)}
-                className="flex h-9 w-10 items-center justify-center transition"
+                className="flex h-11 w-12 items-center justify-center transition active:scale-[0.97] sm:h-9 sm:w-10"
                 style={{
                   background: view === mode ? "rgba(0,255,255,0.1)" : "transparent",
                   color: view === mode ? "var(--omnix-cyan)" : "rgba(255,255,255,0.3)",
@@ -750,7 +750,7 @@ export default function FilesPage() {
           <button
             type="button"
             onClick={scrollToUpload}
-            className="inline-flex h-9 items-center gap-1.5 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-cyan)] bg-transparent px-4 text-xs font-bold text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] transition hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)]"
+            className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-cyan)] bg-transparent px-4 text-xs font-bold text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] transition hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] active:scale-[0.98] sm:h-9 sm:w-auto"
           >
             <Plus className="h-3.5 w-3.5" />
             Upload File
@@ -789,8 +789,17 @@ export default function FilesPage() {
               </div>
               <p className="mt-4 text-sm font-semibold text-white">No files uploaded yet.</p>
               <p className="mt-1 max-w-sm text-sm leading-6 text-[var(--omnix-text-2)]">
-                Drop a document above to make it available to Omnix retrieval.
+                Upload a PDF, DOCX, TXT, or Markdown file above to make it available to Omnix retrieval.
               </p>
+              <Button
+                type="button"
+                size="sm"
+                className="mt-4 min-h-10"
+                leftIcon={<Plus className="h-3.5 w-3.5" />}
+                onClick={scrollToUpload}
+              >
+                Upload first file
+              </Button>
             </div>
           ) : filteredFiles.length === 0 ? (
             <div className="relative z-10 mt-4 flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 p-6 text-center">
@@ -813,9 +822,9 @@ export default function FilesPage() {
                       <p className="mt-1 text-[11px] text-white/35">{f.file_type ?? f.content_type ?? "Document"} - {formatFileSize(f.size_bytes)}</p>
                     </div>
                   </div>
-                  <div className={view === "grid" ? "flex items-center gap-2 border-t border-white/5 pt-3" : "flex items-center gap-2"}>
-                    <Button type="button" size="sm" variant="ghost" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
-                    <Button type="button" size="sm" variant="ghost" className="text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
+                  <div className={view === "grid" ? "grid grid-cols-2 gap-2 border-t border-white/5 pt-3 sm:flex sm:items-center" : "grid grid-cols-2 gap-2 sm:flex sm:items-center"}>
+                    <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
+                    <Button type="button" size="sm" variant="ghost" className="min-h-10 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
                   </div>
                 </div>
               ))}
