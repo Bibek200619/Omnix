@@ -14,7 +14,7 @@ async def liveness_check():
 @router.get("/ready")
 async def readiness_check():
     checks = await run_all_checks()
-    if all(c.get("status") == "healthy" for c in checks.values()):
+    if all(c.get("status") in {"healthy", "degraded"} for c in checks.values()):
         return {"status": "ready", "checks": checks}
     return JSONResponse(status_code=503, content={"status": "not_ready", "checks": checks})
 
