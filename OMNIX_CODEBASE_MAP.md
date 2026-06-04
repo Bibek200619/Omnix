@@ -606,6 +606,7 @@ Frontend channel management: `lib/realtime-registry.ts` → `RealtimeSubscriptio
 - Provider: `WorkspaceNotificationsProvider` in `lib/workspace-notifications-context.tsx`
 - Hook: `useWorkspaceNotifications()`
 - Features: current workspace mention notifications, unread count, individual mark-read, mark-all-read
+- Error handling: classifies unreachable API, missing deployed endpoints, auth failures, and missing `workspace_mentions` storage for actionable UI messages
 - Realtime: subscribes through `realtimeRegistry` to `workspace_mentions` changes for the active workspace
 - Scope: in-app mentions only; no email, push, SMS, Slack/Discord, AI notifications, or workflow automation
 
