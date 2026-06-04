@@ -93,7 +93,8 @@ frontend/
 │   │   ├── files/         # File management
 │   │   ├── history/       # Chat history
 │   │   ├── initiatives/   # Workspace initiatives
-│   │   ├── mentions/      # Lightweight workspace mentions inbox
+│   │   ├── mentions/      # Backwards-compatible mentions route rendering notification center
+│   │   ├── notifications/ # In-app mention notification center
 │   │   ├── settings/      # User/workspace settings
 │   │   ├── sources/       # Knowledge sources
 │   │   ├── tasks/         # Workspace tasks
@@ -138,6 +139,7 @@ frontend/
 │   ├── conversations/           # Workspace channel/conversation components
 │   ├── decisions/               # Decision tracking components
 │   ├── mentions/                # Mention text rendering, @ member picker, inbox surface
+│   ├── notifications/           # Header notification bell + notification center
 │   ├── initiatives/             # Initiative/project components
 │   ├── tasks/                   # Task management components
 │   ├── profile/                 # User profile components
@@ -151,6 +153,7 @@ frontend/
 │   ├── auth-context.tsx         # AuthProvider + useAuth hook
 │   ├── workspace-context.tsx    # WorkspaceProvider + useWorkspace hook (45KB)
 │   ├── workspace-collaboration-context.tsx # Presence + realtime (17KB)
+│   ├── workspace-notifications-context.tsx # Mention notification state, unread count, read actions, realtime refresh
 │   ├── workspace-continuity-context.tsx    # Memory/continuity context
 │   ├── conversation-history-context.tsx    # Chat history context (9KB)
 │   ├── profile-context.tsx      # User profile context
@@ -178,7 +181,8 @@ frontend/
 | Command palette | `components/layout/CommandPalette.tsx` |
 | Workspace search UI | `components/layout/WorkspaceSearch.tsx` |
 | Mention picker/rendering | `components/mentions/MentionTextarea.tsx`, `components/mentions/MentionText.tsx` |
-| Mentions inbox | `components/mentions/MentionsInboxSurface.tsx`, `app/(dashboard)/mentions/page.tsx` |
+| Notification bell/center | `components/notifications/NotificationBell.tsx`, `components/notifications/NotificationCenterSurface.tsx`, `app/(dashboard)/notifications/page.tsx` |
+| Mentions compatibility route | `app/(dashboard)/mentions/page.tsx` renders `NotificationCenterSurface` |
 | Onboarding gate | `components/workspace/WorkspaceOnboardingGate.tsx` |
 
 ---
@@ -206,7 +210,7 @@ backend/
 │   │   ├── workspace_tasks.py         # Task CRUD
 │   │   ├── workspace_decisions.py     # Decision CRUD
 │   │   ├── workspace_search.py        # Workspace-scoped keyword search
-│   │   ├── workspace_mentions.py      # Workspace-scoped mentions inbox
+│   │   ├── workspace_mentions.py      # Workspace-scoped mention notifications + read state
 │   │   ├── files.py                   # File metadata
 │   │   ├── upload.py                  # File upload + RAG ingestion trigger
 │   │   ├── artifacts.py               # AI artifact storage
@@ -360,7 +364,9 @@ User types @ in conversation/task/decision text input
   → Backend validates targets with list_workspace_members() for the active workspace
   → Source record stores mention metadata in JSON where available
   → workspace_mention_service.sync_mentions_for_source() replaces workspace_mentions rows for that source
-  → /mentions calls GET /workspaces/{workspace_id}/mentions for current user's awareness inbox
+  → /notifications calls GET /workspaces/{workspace_id}/mentions for current user's mention notification list
+  → Header bell calls GET /workspaces/{workspace_id}/mentions/unread-count for workspace-scoped unread count
+  → Read actions call PATCH /workspaces/{workspace_id}/mentions/{mention_id}/read or PATCH /workspaces/{workspace_id}/mentions/read-all
 ```
 
 ---
@@ -431,7 +437,7 @@ super_founder > founder > owner > co_owner > team_lead > sub_leader > member > s
 | Get intelligence | `GET /workspaces/{id}/intelligence` |
 | Update intelligence | `PATCH /workspaces/{id}/intelligence` |
 | Search workspace knowledge | `GET /workspaces/{id}/search?q=...` |
-| Mentions inbox | `GET /workspaces/{id}/mentions` |
+| Mention notifications | `GET /workspaces/{id}/mentions`, `GET /workspaces/{id}/mentions/unread-count`, `PATCH /workspaces/{id}/mentions/{mention_id}/read`, `PATCH /workspaces/{id}/mentions/read-all` |
 
 ### Workspace Search MVP
 - Backend router: `backend/app/routers/workspace_search.py`
@@ -463,10 +469,17 @@ super_founder > founder > owner > co_owner > team_lead > sub_leader > member > s
 - Table: `workspace_mentions(id, workspace_id, mentioned_user_id, mentioned_by_user_id, source_type, source_id, created_at, read_at)`
 - Supported source types: `conversation_message`, `task`, `decision`
 - Frontend picker/rendering: `frontend/components/mentions/MentionTextarea.tsx` and `MentionText.tsx`
-- Frontend inbox: `frontend/app/(dashboard)/mentions/page.tsx` via `MentionsInboxSurface.tsx`
+- Frontend notification center: `frontend/app/(dashboard)/notifications/page.tsx` via `NotificationCenterSurface.tsx`
+- Backwards-compatible mentions route: `frontend/app/(dashboard)/mentions/page.tsx` also renders `NotificationCenterSurface.tsx`
+- Header unread bell: `frontend/components/notifications/NotificationBell.tsx`
+- Notification state/context: `frontend/lib/workspace-notifications-context.tsx`
+- Read state: unread when `read_at IS NULL`; read when `read_at IS NOT NULL`
+- Read actions: individual `PATCH /workspaces/{id}/mentions/{mention_id}/read`; bulk `PATCH /workspaces/{id}/mentions/read-all`
+- Unread count: `GET /workspaces/{id}/mentions/unread-count`
 - Scope: active workspace only; mention targets must be visible workspace members
 - Conversation privacy: inbox hydration only exposes private channel details to users who can read that channel
-- Excluded by design: full notifications, email, push, activity feeds, workflow automation, AI mentions, cross-workspace mentions
+- Realtime: `workspace_mentions` table changes refresh the active workspace notification context through `realtimeRegistry`
+- Excluded by design: email, push, SMS, Slack/Discord, activity-feed notifications, workflow automation, AI notifications/mentions, cross-workspace notifications
 
 ### Onboarding Gate
 - Component: `WorkspaceOnboardingGate.tsx`
@@ -573,7 +586,7 @@ Frontend channel management: `lib/realtime-registry.ts` → `RealtimeSubscriptio
 | `channel_messages` | `channel_messages:{workspaceId}:{conversationId}` | Live messages |
 | `tasks` | `tasks:{workspaceId}:none` | Task updates |
 | `initiatives` | `initiatives:{workspaceId}:none` | Initiative updates |
-| `workspace_mentions` | Supabase publication table only | Persisted awareness records for future notification integration |
+| `workspace_mentions` | `workspace_mentions:{workspaceId}:none` | Mention notification list/unread count refresh |
 
 ### Collaboration Context
 - Provider: `WorkspaceCollaborationProvider` in `lib/workspace-collaboration-context.tsx`
@@ -583,6 +596,13 @@ Frontend channel management: `lib/realtime-registry.ts` → `RealtimeSubscriptio
 - Status poll: every 90s
 - Typing throttle: 3s, timeout: 8s
 - Automatic reconnect: exponential backoff, max 15s delay
+
+### Notification Context
+- Provider: `WorkspaceNotificationsProvider` in `lib/workspace-notifications-context.tsx`
+- Hook: `useWorkspaceNotifications()`
+- Features: current workspace mention notifications, unread count, individual mark-read, mark-all-read
+- Realtime: subscribes through `realtimeRegistry` to `workspace_mentions` changes for the active workspace
+- Scope: in-app mentions only; no email, push, SMS, Slack/Discord, AI notifications, or workflow automation
 
 ### Backend Realtime Service
 - `backend/app/services/realtime_service.py`
@@ -749,7 +769,10 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
 - `GET /workspaces/{id}/search?q=...` — grouped workspace keyword results for conversations, tasks, initiatives, and decisions
 
 **Workspace Mentions**
-- `GET /workspaces/{id}/mentions` — current user's workspace-scoped mentions grouped client-side by source
+- `GET /workspaces/{id}/mentions` — current user's workspace-scoped mention notifications
+- `GET /workspaces/{id}/mentions/unread-count` — current user's workspace-scoped unread mention count
+- `PATCH /workspaces/{id}/mentions/{mention_id}/read` — mark one mention notification read
+- `PATCH /workspaces/{id}/mentions/read-all` — mark all current user's workspace mention notifications read
 
 **Workspace Tasks**
 - `GET /workspaces/{id}/tasks`
@@ -786,10 +809,11 @@ Provider tree order (root → leaf):
 AuthProvider (lib/auth-context.tsx)
   → WorkspaceProvider (lib/workspace-context.tsx)
     → WorkspaceCollaborationProvider (lib/workspace-collaboration-context.tsx)
-      → WorkspaceContinuityProvider (lib/workspace-continuity-context.tsx)
-        → ConversationHistoryProvider (lib/conversation-history-context.tsx)
+      → WorkspaceNotificationsProvider (lib/workspace-notifications-context.tsx)
+        → WorkspaceContinuityProvider (lib/workspace-continuity-context.tsx)
           → ProfileProvider (lib/profile-context.tsx)
-            → [App UI]
+            → ConversationHistoryProvider (lib/conversation-history-context.tsx)
+              → [App UI]
 ```
 
 ### Hooks Reference
@@ -798,6 +822,7 @@ AuthProvider (lib/auth-context.tsx)
 | `useAuth()` | `lib/auth-context` | `{ user, session, accessToken, loading, signOut }` |
 | `useWorkspace()` | `lib/workspace-context` | Full workspace state + actions |
 | `useCollaboration()` | `lib/workspace-collaboration-context` | Presence, activity, typing |
+| `useWorkspaceNotifications()` | `lib/workspace-notifications-context` | Mention notifications, unread count, read actions |
 | `useProfile()` | `lib/profile-context` | User profile data |
 | `useConversationHistory()` | `lib/conversation-history-context` | Chat conversation list |
 
@@ -835,6 +860,9 @@ WorkspaceSearchResponse { conversations[], tasks[], initiatives[], decisions[] }
 WorkspaceSearchResult { id, workspace_id, type, title, preview, context, url, ... }
 WorkspaceMentionMetadata { user_id, label, display_name, avatar_label, operational_label, ... }
 WorkspaceMentionInboxItem { id, source_type, source_id, source_title, source_preview, source_url, ... }
+WorkspaceMentionUnreadCount { unread_count }
+WorkspaceMentionMarkReadResponse { mention_id, read_at }
+WorkspaceMentionMarkAllReadResponse { updated_count, read_at }
 
 // Task/Decision status enums
 WorkspaceTaskStatus = "idea" | "planned" | "active" | "review" | "complete"

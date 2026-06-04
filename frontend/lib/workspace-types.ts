@@ -539,3 +539,17 @@ export type WorkspaceMentionInboxItem = {
   source_preview?: string | null;
   source_url: string;
 };
+
+export type WorkspaceMentionUnreadCount = {
+  unread_count: number;
+};
+
+export type WorkspaceMentionMarkReadResponse = {
+  mention_id: string;
+  read_at: string;
+};
+
+export type WorkspaceMentionMarkAllReadResponse = {
+  updated_count: number;
+  read_at: string;
+};
