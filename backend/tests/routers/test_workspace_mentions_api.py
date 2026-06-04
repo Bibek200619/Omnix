@@ -61,3 +61,54 @@ def test_workspace_mentions_route_returns_user_mentions(monkeypatch) -> None:
     assert response.status_code == 200
     assert captured == {"workspace_id": "workspace-1", "user_id": "user-2"}
     assert response.json()[0]["source_title"] == "Fix mobile navigation"
+
+
+def test_workspace_mentions_unread_count_returns_count(monkeypatch) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_count_unread_mentions_for_user(*, workspace_id: str, user_id: str):
+        captured.update({"workspace_id": workspace_id, "user_id": user_id})
+        return {"unread_count": 3}
+
+    monkeypatch.setattr(workspace_mentions, "count_unread_mentions_for_user", fake_count_unread_mentions_for_user)
+    client = _mentions_client()
+
+    response = client.get("/workspaces/workspace-1/mentions/unread-count")
+
+    assert response.status_code == 200
+    assert captured == {"workspace_id": "workspace-1", "user_id": "user-2"}
+    assert response.json() == {"unread_count": 3}
+
+
+def test_mark_workspace_mention_read_scopes_to_current_user(monkeypatch) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_mark_mention_read(*, workspace_id: str, user_id: str, mention_id: str):
+        captured.update({"workspace_id": workspace_id, "user_id": user_id, "mention_id": mention_id})
+        return {"mention_id": mention_id, "read_at": "2026-06-03T10:30:00+00:00"}
+
+    monkeypatch.setattr(workspace_mentions, "mark_mention_read", fake_mark_mention_read)
+    client = _mentions_client()
+
+    response = client.patch("/workspaces/workspace-1/mentions/mention-1/read")
+
+    assert response.status_code == 200
+    assert captured == {"workspace_id": "workspace-1", "user_id": "user-2", "mention_id": "mention-1"}
+    assert response.json()["mention_id"] == "mention-1"
+
+
+def test_mark_all_workspace_mentions_read_scopes_to_current_user(monkeypatch) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_mark_all_mentions_read(*, workspace_id: str, user_id: str):
+        captured.update({"workspace_id": workspace_id, "user_id": user_id})
+        return {"updated_count": 2, "read_at": "2026-06-03T10:30:00+00:00"}
+
+    monkeypatch.setattr(workspace_mentions, "mark_all_mentions_read", fake_mark_all_mentions_read)
+    client = _mentions_client()
+
+    response = client.patch("/workspaces/workspace-1/mentions/read-all")
+
+    assert response.status_code == 200
+    assert captured == {"workspace_id": "workspace-1", "user_id": "user-2"}
+    assert response.json()["updated_count"] == 2
