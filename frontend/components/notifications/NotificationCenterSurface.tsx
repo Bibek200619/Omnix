@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AtSign, BadgeCheck, Check, ClipboardCheck, Loader2, MessagesSquare } from "lucide-react";
+import { ArrowUpRight, AtSign, BadgeCheck, Check, ClipboardCheck, Loader2, MessagesSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
@@ -167,7 +167,19 @@ export function NotificationCenterSurface() {
             <AtSign className="h-5 w-5" />
           </div>
           <p className="mt-4 text-sm font-medium text-white">You&apos;re all caught up.</p>
-          <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">No unread mentions right now.</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">
+            New @mentions from conversations, tasks, and decisions will appear here with a direct path back to the source.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => router.push("/conversations")}
+            className="mt-4 min-h-10"
+            rightIcon={<ArrowUpRight className="h-3.5 w-3.5" />}
+          >
+            Review conversations
+          </Button>
         </div>
       ) : null}
 
@@ -183,16 +195,17 @@ export function NotificationCenterSurface() {
               <article
                 key={item.id}
                 className={cn(
-                  "flex flex-col gap-3 rounded-xl border px-3 py-3 transition sm:flex-row sm:items-start sm:px-4",
+                  "relative flex flex-col gap-3 overflow-hidden rounded-xl border px-3 py-3 transition active:scale-[0.995] sm:flex-row sm:items-start sm:px-4",
                   unread
                     ? "border-cyan-300/18 bg-cyan-300/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]"
                     : "border-[var(--omnix-border)] bg-black/[0.12]",
                 )}
               >
+                {unread ? <span className="absolute inset-y-3 left-0 w-0.5 rounded-r-full bg-cyan-300/80 shadow-[var(--omnix-glow-xs)]" /> : null}
                 <button
                   type="button"
                   onClick={() => void openNotification(item)}
-                  className="flex min-h-[4.25rem] min-w-0 flex-1 items-start gap-3 rounded-lg text-left transition hover:bg-white/[0.025] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/45"
+                  className="flex min-h-[4.75rem] min-w-0 flex-1 items-start gap-3 rounded-lg text-left transition hover:bg-white/[0.025] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/45"
                 >
                   <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-300/15 bg-cyan-300/[0.07] text-xs font-semibold text-cyan-100">
                     {avatarLabel(item).slice(0, 2)}
@@ -206,6 +219,10 @@ export function NotificationCenterSurface() {
                       <span className="text-[11px] text-[var(--omnix-text-3)]">{readableTime(item.created_at)}</span>
                     </span>
                     <span className="mt-1 block text-sm font-medium leading-5 text-white">{mentionSentence(item)}</span>
+                    <span className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/8 bg-white/[0.025] px-2 py-1 text-[11px] text-[var(--omnix-text-3)]">
+                      <ArrowUpRight className="h-3 w-3 shrink-0 text-cyan-100/45" />
+                      <span className="truncate">{item.source_title}</span>
+                    </span>
                     {item.source_preview ? (
                       <span className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--omnix-text-2)]">
                         {item.source_preview}
@@ -214,7 +231,7 @@ export function NotificationCenterSurface() {
                   </span>
                 </button>
 
-                <div className="flex shrink-0 items-center justify-between gap-2 pl-[3.25rem] sm:w-32 sm:flex-col sm:items-end sm:justify-start sm:pl-0">
+                <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 pl-[3.25rem] sm:w-32 sm:flex-col sm:items-end sm:justify-start sm:pl-0">
                   <span
                     className={cn(
                       "inline-flex min-h-7 items-center rounded-full border px-2 text-[11px] font-medium",
@@ -225,12 +242,20 @@ export function NotificationCenterSurface() {
                   >
                     {unread ? "Unread" : "Read"}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => void openNotification(item)}
+                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-cyan-300/14 bg-cyan-300/[0.04] px-3 text-xs font-medium text-cyan-100/80 transition hover:border-cyan-300/25 hover:bg-cyan-300/[0.08] sm:w-full"
+                  >
+                    Open
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </button>
                   {unread ? (
                     <button
                       type="button"
                       onClick={() => void handleMarkRead(item)}
                       disabled={busy}
-                      className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-cyan-300/14 bg-cyan-300/[0.055] px-3 text-xs font-medium text-cyan-100/85 transition hover:border-cyan-300/25 hover:bg-cyan-300/[0.09] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-cyan-300/14 bg-cyan-300/[0.055] px-3 text-xs font-medium text-cyan-100/85 transition hover:border-cyan-300/25 hover:bg-cyan-300/[0.09] disabled:cursor-not-allowed disabled:opacity-60 sm:w-full"
                     >
                       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                       Mark read

@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import {
   Bell,
   BrainCircuit,
+  ChevronRight,
   FileText,
   Monitor,
   Settings,
@@ -35,6 +36,11 @@ type SettingsShellProps = {
 
 export function SettingsShell({ title, description, children }: SettingsShellProps) {
   const pathname = usePathname();
+  const activeIndex = Math.max(
+    0,
+    settingsNav.findIndex((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)),
+  );
+  const activeSection = settingsNav[activeIndex];
 
   return (
     <div className="relative flex h-full w-full overflow-hidden text-[var(--omnix-text)]">
@@ -89,31 +95,54 @@ export function SettingsShell({ title, description, children }: SettingsShellPro
         <div className="relative z-10 max-w-[88rem] pb-12">
           <div className="sticky top-0 z-20 -mx-4 mb-5 border-b border-[rgba(0,255,255,0.08)] bg-[rgba(5,12,23,0.92)] px-4 pb-3 pt-1 backdrop-blur-xl md:hidden">
             <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Settings</p>
-              <span className="h-px min-w-10 flex-1 bg-[linear-gradient(90deg,rgba(0,255,255,0.16),transparent)]" />
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Settings</p>
+                <p className="mt-0.5 truncate text-xs text-cyan-100/65">
+                  {activeSection?.label ?? "Section"} · {activeIndex + 1} of {settingsNav.length}
+                </p>
+              </div>
+              <span className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border border-cyan-300/14 bg-cyan-300/[0.055] px-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-cyan-100/70">
+                Swipe
+                <ChevronRight className="h-3 w-3" />
+              </span>
             </div>
-            <nav className="omnix-scrollbar flex snap-x gap-2 overflow-x-auto pb-1" aria-label="Settings sections">
-              {settingsNav.map((item) => {
-                const Icon = item.icon;
-                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-[linear-gradient(90deg,rgba(5,12,23,0.96),transparent)]" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-[linear-gradient(270deg,rgba(5,12,23,0.96),transparent)]" />
+              <nav className="omnix-scrollbar flex snap-x gap-2 overflow-x-auto pb-1 pl-1 pr-8" aria-label="Settings sections">
+                {settingsNav.map((item) => {
+                  const Icon = item.icon;
+                  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "inline-flex h-11 min-w-[8.75rem] snap-start items-center gap-2 rounded-lg border px-3 text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
-                      active
-                        ? "border-cyan-300/25 bg-cyan-300/10 text-white shadow-[var(--omnix-glow-xs)]"
-                        : "border-[var(--omnix-border)] bg-[rgba(0,255,255,0.03)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white",
-                    )}
-                  >
-                    <Icon className={cn("h-4 w-4 shrink-0", active ? "text-cyan-100" : "text-[var(--omnix-text-3)]")} />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </nav>
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "inline-flex h-12 min-w-[9.25rem] snap-start items-center gap-2 rounded-lg border px-3 text-sm transition active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
+                        active
+                          ? "border-cyan-300/30 bg-cyan-300/10 text-white shadow-[var(--omnix-glow-xs)]"
+                          : "border-[var(--omnix-border)] bg-[rgba(0,255,255,0.03)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white",
+                      )}
+                    >
+                      <Icon className={cn("h-4 w-4 shrink-0", active ? "text-cyan-100" : "text-[var(--omnix-text-3)]")} />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+            <div className="mt-2 flex justify-center gap-1">
+              {settingsNav.map((item, index) => (
+                <span
+                  key={item.href}
+                  className={cn(
+                    "h-1 rounded-full transition-all",
+                    index === activeIndex ? "w-5 bg-cyan-300/80 shadow-[var(--omnix-glow-xs)]" : "w-1.5 bg-white/15",
+                  )}
+                />
+              ))}
+            </div>
           </div>
           <div className="mb-5 max-w-[640px]">
             <h2 className="omnix-display text-[22px] font-bold leading-tight text-white">{title}</h2>
