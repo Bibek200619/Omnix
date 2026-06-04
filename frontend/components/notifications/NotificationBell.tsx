@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Loader2 } from "lucide-react";
+import { AtSign, Bell, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { useWorkspaceNotifications } from "@/lib/workspace-notifications-context";
@@ -23,17 +23,24 @@ export function NotificationBell() {
       size="icon"
       aria-label={
         unreadCount === 1
-          ? "Notifications, 1 unread mention"
-          : `Notifications, ${unreadCount} unread mentions`
+          ? "Mention notifications, 1 unread"
+          : `Mention notifications, ${unreadCount} unread`
       }
-      title="Notifications"
+      title="Mention notifications"
       onClick={() => {
         void refreshNotifications();
         router.push("/notifications");
       }}
       className="relative h-10 w-10 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] sm:h-9 sm:w-9"
     >
-      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
+      {loading ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <span className="relative inline-flex">
+          <Bell className="h-4 w-4" />
+          <AtSign className="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full bg-[var(--omnix-surface)] text-cyan-100/70" />
+        </span>
+      )}
       <span
         className={cn(
           "absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border px-1 text-[10px] font-semibold leading-none",

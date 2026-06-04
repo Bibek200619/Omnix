@@ -752,8 +752,8 @@ function AppScreenshots() {
           </div>
         </div>
         <div className="p-4 rounded-2xl" style={{background:C.card,border:`1px solid ${C.border}`}}>
-          <div className="font-bold text-sm mb-3" style={{color:C.white}}>Workspace Alerts</div>
-          {["Invite notifications","Workspace emails","Security alerts"].map(item=>(
+          <div className="font-bold text-sm mb-3" style={{color:C.white}}>In-App Notifications</div>
+          {["Mention alerts","Workspace invitations","Security notices"].map(item=>(
             <div key={item} className="flex items-center justify-between py-2.5">
               <span className="text-sm" style={{color:C.muted}}>{item}</span>
               <div className="w-10 h-5 rounded-full flex items-center px-0.5" style={{background:C.cyan,justifyContent:"flex-end"}}>
