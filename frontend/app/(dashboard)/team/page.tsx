@@ -454,17 +454,17 @@ export default function TeamPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search members or labels..."
-              className="omnix-input h-10 w-full rounded-[var(--omnix-radius-sm)] py-2 pl-8 pr-3 text-sm"
+              className="omnix-input h-11 w-full rounded-[var(--omnix-radius-sm)] py-2 pl-8 pr-3 text-sm sm:h-10"
             />
           </div>
-          <div className="flex flex-wrap gap-1">
+          <div className="omnix-scrollbar -mx-1 flex w-[calc(100%+0.5rem)] gap-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:w-auto sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
             {filters.map((item) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => setFilter(item)}
                 className={cn(
-                  "rounded-full border px-3 py-1.5 text-[11px] font-semibold transition",
+                  "min-h-10 shrink-0 rounded-full border px-3.5 py-2 text-[11px] font-semibold transition active:scale-[0.98]",
                   filter === item
                     ? "border-cyan-300/35 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]"
                     : "border-[var(--omnix-border)] bg-black/10 text-[var(--omnix-text-3)] hover:text-white",
@@ -557,7 +557,7 @@ export default function TeamPage() {
                             key={preset}
                             type="button"
                             onClick={() => commitLabel(member, preset)}
-                            className="rounded-full border border-[var(--omnix-border)] bg-black/15 px-2 py-1 text-[10px] text-[var(--omnix-text-3)] transition hover:text-white"
+                            className="min-h-8 rounded-full border border-[var(--omnix-border)] bg-black/15 px-2.5 py-1 text-[10px] text-[var(--omnix-text-3)] transition hover:text-white active:scale-[0.98]"
                           >
                             {preset}
                           </button>
@@ -568,7 +568,7 @@ export default function TeamPage() {
                   <button
                     type="button"
                     onClick={() => startEdit(member)}
-                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--omnix-border)] bg-black/15 px-3 text-xs font-semibold text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-border-active)] hover:text-white"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[var(--omnix-border)] bg-black/15 px-3 text-xs font-semibold text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-border-active)] hover:text-white active:scale-[0.98] sm:h-9 sm:min-h-0"
                   >
                     <Edit3 className="h-3.5 w-3.5" />
                     Label
@@ -591,14 +591,28 @@ export default function TeamPage() {
               </article>
             );
           }) : (
-            <div className="p-10 text-center">
+            <div className="p-6 text-center sm:p-10">
               <Users className="mx-auto h-9 w-9 text-cyan-200/35" />
               <p className="mt-3 font-semibold text-white">{members.length === 0 ? "No team members loaded yet" : "No members match this filter"}</p>
               <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-[var(--omnix-text-3)]">
                 {members.length === 0
-                  ? "Workspace membership will appear here after the backend returns members for this workspace."
+                  ? "Invite a teammate to make workspace roles, labels, and access actions visible here."
                   : "Try another search term, role filter, or secondary label."}
               </p>
+              {members.length === 0 && canInvite ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-4 min-h-10"
+                  leftIcon={<Plus className="h-3.5 w-3.5" />}
+                  onClick={() => {
+                    setInviteError(null);
+                    setInviteOpen(true);
+                  }}
+                >
+                  Invite first teammate
+                </Button>
+              ) : null}
             </div>
           )}
         </div>
