@@ -495,6 +495,15 @@ export function WorkspaceInitiativesSurface() {
                 <Compass className="mx-auto h-7 w-7 text-cyan-100/30" />
                 <p className="mt-3 text-sm text-[var(--omnix-text-2)]">No initiatives open.</p>
                 <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">Name the shared outcome that current execution serves.</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-4 min-h-10"
+                  leftIcon={<Plus className="h-3.5 w-3.5" />}
+                  onClick={() => setCreateOpen(true)}
+                >
+                  Create initiative
+                </Button>
               </div>
             ) : null}
             {sortedInitiatives.map((initiative) => (
