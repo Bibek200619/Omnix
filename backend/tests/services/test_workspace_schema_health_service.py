@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import pytest
+
 from app.services.workspace_schema_health_service import (
     EXPECTED_WORKSPACE_SCHEMA,
+    SchemaHealthError,
+    check_workspace_schema_health,
     evaluate_workspace_schema_health,
 )
 
@@ -53,3 +57,19 @@ def test_schema_health_reports_schema_drift_diagnostics() -> None:
     assert "workspace_tasks" in result["diagnostics"]["missing_foreign_keys"]
     assert "workspace_connectors" in result["diagnostics"]["rls_disabled_tables"]
     assert "workspace_connectors" in result["diagnostics"]["missing_select_policies"]
+
+
+@pytest.mark.asyncio
+async def test_schema_health_reports_degraded_when_metadata_rpc_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def broken_metadata() -> dict[str, object]:
+        raise SchemaHealthError("metadata RPC is unavailable")
+
+    monkeypatch.setattr(
+        "app.services.workspace_schema_health_service.fetch_workspace_schema_metadata",
+        broken_metadata,
+    )
+
+    result = await check_workspace_schema_health()
+
+    assert result["status"] == "degraded"
+    assert result["diagnostics"]["required_rpc"] == "omnix_workspace_schema_health"
