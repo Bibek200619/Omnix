@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, Check, ChevronDown, Loader2, UserPlus, X } from "lucide-react";
+import { Check, ChevronDown, Loader2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { logClientError } from "@/lib/errors";
@@ -135,7 +135,7 @@ export function InviteNotificationBar() {
           <div className="flex w-full flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex min-w-0 items-start gap-3">
               <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]">
-                {pendingInvitesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
+                {pendingInvitesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium leading-6 text-white">
@@ -204,17 +204,21 @@ export function InviteNotificationBell() {
         type="button"
         variant="ghost"
         size="icon"
-        aria-label="Workspace invite notifications"
-        title="Invite notifications"
+        aria-label={
+          pendingInvites.length === 1
+            ? "Workspace invitations, 1 pending"
+            : `Workspace invitations, ${pendingInvites.length} pending`
+        }
+        title="Workspace invitations"
         onClick={() => {
           setOpen((current) => !current);
           void refreshPendingInvites();
         }}
-        className="relative h-9 w-9 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)]"
+        className="relative h-10 w-10 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] sm:h-9 sm:w-9"
       >
-        {pendingInvitesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
+        {pendingInvitesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
         {pendingInvites.length > 0 ? (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-[#071017] bg-cyan-300 px-1 text-[11px] font-bold text-slate-950">
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-cyan-300/25 bg-cyan-300/15 px-1 text-[10px] font-semibold leading-none text-cyan-50 shadow-[0_0_14px_rgba(0,255,255,0.16)]">
             {pendingInvites.length > 9 ? "9+" : pendingInvites.length}
           </span>
         ) : null}
