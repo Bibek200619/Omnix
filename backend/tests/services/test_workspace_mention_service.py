@@ -134,3 +134,112 @@ async def test_mentions_inbox_hides_private_conversation_without_channel_access(
     result = await mentions.list_mentions_for_user(workspace_id="workspace-1", user_id="user-2")
 
     assert result == []
+
+
+@pytest.mark.asyncio
+async def test_count_unread_mentions_uses_visible_unread_mentions(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_list_mentions_for_user(**kwargs):
+        captured.update(kwargs)
+        return [{"id": "mention-1"}, {"id": "mention-2"}]
+
+    monkeypatch.setattr(mentions, "list_mentions_for_user", fake_list_mentions_for_user)
+
+    result = await mentions.count_unread_mentions_for_user(workspace_id="workspace-1", user_id="user-2")
+
+    assert captured == {
+        "workspace_id": "workspace-1",
+        "user_id": "user-2",
+        "only_unread": True,
+        "limit": None,
+    }
+    assert result == {"unread_count": 2}
+
+
+@pytest.mark.asyncio
+async def test_mark_mention_read_scopes_update_to_mentioned_user(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured_update: dict[str, object] = {}
+
+    async def fake_access(workspace_id: str, user_id: str):
+        return SimpleNamespace(workspace={"id": workspace_id})
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
+        assert table == "workspace_mentions"
+        assert filters == {"id": "mention-1", "workspace_id": "workspace-1", "mentioned_user_id": "user-2"}
+        return {
+            "id": "mention-1",
+            "workspace_id": "workspace-1",
+            "mentioned_user_id": "user-2",
+            "read_at": None,
+        }
+
+    async def fake_update(table: str, filters: dict[str, object], payload: dict[str, object]):
+        captured_update.update({"table": table, "filters": filters, "payload": payload})
+        return {"id": "mention-1", "read_at": payload["read_at"]}
+
+    monkeypatch.setattr(mentions, "require_workspace_access", fake_access)
+    monkeypatch.setattr(mentions, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(mentions, "update_one_trusted", fake_update)
+
+    result = await mentions.mark_mention_read(
+        workspace_id="workspace-1",
+        user_id="user-2",
+        mention_id="mention-1",
+    )
+
+    assert captured_update["table"] == "workspace_mentions"
+    assert captured_update["filters"] == {"id": "mention-1", "workspace_id": "workspace-1", "mentioned_user_id": "user-2"}
+    assert "read_at" in captured_update["payload"]
+    assert result["mention_id"] == "mention-1"
+    assert result["read_at"] == captured_update["payload"]["read_at"]
+
+
+@pytest.mark.asyncio
+async def test_mark_mention_read_preserves_existing_read_timestamp(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_access(workspace_id: str, user_id: str):
+        return SimpleNamespace(workspace={"id": workspace_id})
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
+        return {"id": "mention-1", "read_at": "2026-06-03T10:00:00+00:00"}
+
+    async def fail_update(*args, **kwargs):
+        raise AssertionError("Already-read mentions should not be updated.")
+
+    monkeypatch.setattr(mentions, "require_workspace_access", fake_access)
+    monkeypatch.setattr(mentions, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(mentions, "update_one_trusted", fail_update)
+
+    result = await mentions.mark_mention_read(
+        workspace_id="workspace-1",
+        user_id="user-2",
+        mention_id="mention-1",
+    )
+
+    assert result == {"mention_id": "mention-1", "read_at": "2026-06-03T10:00:00+00:00"}
+
+
+@pytest.mark.asyncio
+async def test_mark_all_mentions_read_updates_unread_rows_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured_update: dict[str, object] = {}
+
+    async def fake_access(workspace_id: str, user_id: str):
+        return SimpleNamespace(workspace={"id": workspace_id})
+
+    async def fake_update_many(table: str, filters: dict[str, object], payload: dict[str, object]):
+        captured_update.update({"table": table, "filters": filters, "payload": payload})
+        return [{"id": "mention-1"}, {"id": "mention-2"}]
+
+    monkeypatch.setattr(mentions, "require_workspace_access", fake_access)
+    monkeypatch.setattr(mentions, "update_many_trusted", fake_update_many)
+
+    result = await mentions.mark_all_mentions_read(workspace_id="workspace-1", user_id="user-2")
+
+    assert captured_update["table"] == "workspace_mentions"
+    assert captured_update["filters"] == {
+        "workspace_id": "workspace-1",
+        "mentioned_user_id": "user-2",
+        "read_at": {"is": None},
+    }
+    assert "read_at" in captured_update["payload"]
+    assert result["updated_count"] == 2

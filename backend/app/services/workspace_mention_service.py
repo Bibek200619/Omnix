@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import datetime, timezone
 import logging
 from typing import Any
 
@@ -13,6 +14,8 @@ from .supabase_service import (
     insert_many_trusted,
     select_all_trusted,
     select_one_trusted,
+    update_many_trusted,
+    update_one_trusted,
 )
 from .workspace_service import WORKSPACE_COLUMNS, get_profiles, list_workspace_members, require_workspace_access
 
@@ -25,6 +28,10 @@ logger = logging.getLogger(__name__)
 
 def _database_error() -> HTTPException:
     return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _clean_text(value: Any) -> str | None:
@@ -320,16 +327,22 @@ async def list_mentions_for_user(
     *,
     workspace_id: str,
     user_id: str,
+    only_unread: bool = False,
+    limit: int | None = 100,
 ) -> list[dict[str, Any]]:
     await require_workspace_access(workspace_id, user_id)
+    filters: dict[str, Any] = {"workspace_id": workspace_id, "mentioned_user_id": user_id}
+    if only_unread:
+        filters["read_at"] = {"is": None}
+
     try:
         rows = await select_all_trusted(
             "workspace_mentions",
             MENTION_COLUMNS,
-            filters={"workspace_id": workspace_id, "mentioned_user_id": user_id},
+            filters=filters,
             order_by="created_at",
             desc=True,
-            limit=100,
+            limit=limit,
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
@@ -376,3 +389,76 @@ async def list_mentions_for_user(
             }
         )
     return hydrated
+
+
+async def count_unread_mentions_for_user(
+    *,
+    workspace_id: str,
+    user_id: str,
+) -> dict[str, int]:
+    rows = await list_mentions_for_user(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        only_unread=True,
+        limit=None,
+    )
+    return {"unread_count": len(rows)}
+
+
+async def mark_mention_read(
+    *,
+    workspace_id: str,
+    user_id: str,
+    mention_id: str,
+) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, user_id)
+
+    try:
+        existing = await select_one_trusted(
+            "workspace_mentions",
+            MENTION_COLUMNS,
+            {"id": mention_id, "workspace_id": workspace_id, "mentioned_user_id": user_id},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mention not found.")
+
+    if existing.get("read_at"):
+        return {"mention_id": str(existing.get("id") or mention_id), "read_at": existing["read_at"]}
+
+    read_at = _utc_now()
+    try:
+        updated = await update_one_trusted(
+            "workspace_mentions",
+            {"id": mention_id, "workspace_id": workspace_id, "mentioned_user_id": user_id},
+            {"read_at": read_at.isoformat()},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mention not found.")
+
+    return {"mention_id": str(updated.get("id") or mention_id), "read_at": updated.get("read_at") or read_at}
+
+
+async def mark_all_mentions_read(
+    *,
+    workspace_id: str,
+    user_id: str,
+) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, user_id)
+    read_at = _utc_now()
+
+    try:
+        updated = await update_many_trusted(
+            "workspace_mentions",
+            {"workspace_id": workspace_id, "mentioned_user_id": user_id, "read_at": {"is": None}},
+            {"read_at": read_at.isoformat()},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    return {"updated_count": len(updated), "read_at": read_at}

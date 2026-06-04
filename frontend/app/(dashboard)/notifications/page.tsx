@@ -1,5 +1,5 @@
 import { NotificationCenterSurface } from "@/components/notifications/NotificationCenterSurface";
 
-export default function MentionsPage() {
+export default function NotificationsPage() {
   return <NotificationCenterSurface />;
 }
