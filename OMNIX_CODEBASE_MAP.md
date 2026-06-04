@@ -664,7 +664,7 @@ Frontend channel management: `lib/realtime-registry.ts` → `RealtimeSubscriptio
 
 ### Frontend (`frontend/.env`)
 ```bash
-NEXT_PUBLIC_API_BASE_URL=http://18.204.231.209   # Backend API URL
+NEXT_PUBLIC_API_BASE_URL=https://api.omni-x.co.in # Backend API URL
 NEXT_PUBLIC_SUPABASE_URL=https://...              # Supabase project URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...             # Supabase anon key
 ```
@@ -719,7 +719,7 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
 ## 13. API Endpoint Reference
 
 ### Base URL
-`http://18.204.231.209` (production) | `http://localhost:8000` (local dev)
+`https://api.omni-x.co.in` (production) | `http://localhost:8000` (local dev)
 
 ### Auth Header
 `Authorization: Bearer {supabase_access_token}`
@@ -731,6 +731,7 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
 
 **Health**
 - `GET /health`
+- `GET /health/ready` treats unverifiable optional workspace schema diagnostics as `degraded`, not API-down, while real unhealthy checks still return 503.
 
 **Conversations (personal AI chat)**
 - `GET /conversations` — list user's conversations
