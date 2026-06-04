@@ -10,6 +10,7 @@ from typing import Any
 from ..rag.chunking import chunk_text
 from ..retrieval.context_builder import BuiltContext, ContextBuilder, ContextSupplement
 from ..retrieval.scoring import RetrievalResult
+from ..services.document_intelligence_service import diagnostics_from_file
 from ..services.supabase_service import (
     SupabaseServiceError,
     delete_many_trusted,
@@ -22,7 +23,11 @@ from ..services.workspace_service import utc_now_iso
 logger = logging.getLogger(__name__)
 
 DOCUMENT_COLUMNS = "id,content,file_id,created_at,workspace_id,user_id,chunk_index"
-FILE_COLUMNS = "id,user_id,workspace_id,conversation_id,file_name,file_type,metadata,created_at"
+FILE_COLUMNS = (
+    "id,user_id,workspace_id,conversation_id,file_name,file_type,metadata,"
+    "page_count,extractor_used,extracted_character_count,image_page_count,text_page_count,"
+    "extraction_status,extraction_failure_reason,ocr_used,ocr_character_count,created_at"
+)
 MAX_IMMEDIATE_CHUNKS = 250
 _TERM_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:/#-]*")
 _GENERIC_DOCUMENT_RE = re.compile(
@@ -242,6 +247,38 @@ async def build_uploaded_document_context(
         str(first_preview).replace("\n", " ")[:240],
     )
     return built
+
+
+async def find_unavailable_uploaded_documents(
+    *,
+    user_id: str,
+    conversation_id: str | None,
+    workspace_id: str | None,
+    scope_workspace_ids: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    files = await _load_candidate_files(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        workspace_id=workspace_id,
+        scope_workspace_ids=scope_workspace_ids,
+    )
+    unavailable: list[dict[str, Any]] = []
+    for file_row in files:
+        diagnostics = diagnostics_from_file(file_row)
+        if diagnostics.extraction_status == "searchable":
+            continue
+        unavailable.append(
+            {
+                "id": file_row.get("id"),
+                "file_name": file_row.get("file_name") or "Uploaded document",
+                "extraction_status": diagnostics.extraction_status,
+                "extraction_failure_reason": diagnostics.extraction_failure_reason,
+                "extracted_character_count": diagnostics.extracted_character_count,
+                "ocr_used": diagnostics.ocr_used,
+                "ocr_character_count": diagnostics.ocr_character_count,
+            }
+        )
+    return unavailable
 
 
 async def _load_candidate_files(

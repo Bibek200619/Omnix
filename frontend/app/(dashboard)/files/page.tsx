@@ -61,6 +61,15 @@ interface FileData {
   size_bytes?: number;
   storage_path?: string;
   metadata?: Record<string, unknown> | null;
+  page_count?: number | null;
+  extractor_used?: string | null;
+  extracted_character_count?: number | null;
+  image_page_count?: number | null;
+  text_page_count?: number | null;
+  extraction_status?: "processing" | "searchable" | "ocr_required" | "extraction_failed" | null;
+  extraction_failure_reason?: string | null;
+  ocr_used?: boolean | null;
+  ocr_character_count?: number | null;
 }
 
 type ConnectorType = "knowledge_link" | "file_repository" | "company_drive" | "external_database";
@@ -159,6 +168,24 @@ const statusStyle: Record<ConnectorStatus | "not_configured", string> = {
   not_configured: "border-white/10 bg-white/[0.04] text-white/45",
 };
 
+type FileIngestionStatus = "searchable" | "processing" | "ocr_required" | "ocr_complete" | "extraction_failed";
+
+const fileStatusStyle: Record<FileIngestionStatus, string> = {
+  searchable: "border-emerald-300/25 bg-emerald-300/10 text-emerald-200",
+  processing: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
+  ocr_required: "border-amber-300/25 bg-amber-300/10 text-amber-100",
+  ocr_complete: "border-emerald-300/25 bg-emerald-300/10 text-emerald-200",
+  extraction_failed: "border-rose-300/30 bg-rose-300/10 text-rose-100",
+};
+
+const fileStatusLabel: Record<FileIngestionStatus, string> = {
+  searchable: "Searchable",
+  processing: "Processing",
+  ocr_required: "OCR Required",
+  ocr_complete: "OCR Complete",
+  extraction_failed: "Extraction Failed",
+};
+
 function formatFileSize(size?: number) {
   if (!size) return "Unknown size";
   if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
@@ -170,6 +197,54 @@ function formatDate(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Not synced yet";
   return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function metadataValue(file: FileData, key: string) {
+  return file.metadata && typeof file.metadata === "object" ? file.metadata[key] : undefined;
+}
+
+function numberDiagnostic(file: FileData, key: keyof FileData) {
+  const direct = file[key];
+  if (typeof direct === "number") return direct;
+  const fromMetadata = metadataValue(file, String(key));
+  return typeof fromMetadata === "number" ? fromMetadata : undefined;
+}
+
+function stringDiagnostic(file: FileData, key: keyof FileData | string) {
+  const direct = key in file ? file[key as keyof FileData] : undefined;
+  if (typeof direct === "string") return direct;
+  const fromMetadata = metadataValue(file, String(key));
+  return typeof fromMetadata === "string" ? fromMetadata : undefined;
+}
+
+function booleanDiagnostic(file: FileData, key: keyof FileData) {
+  const direct = file[key];
+  if (typeof direct === "boolean") return direct;
+  const fromMetadata = metadataValue(file, String(key));
+  return typeof fromMetadata === "boolean" ? fromMetadata : false;
+}
+
+function fileIngestionStatus(file: FileData): FileIngestionStatus {
+  const status = stringDiagnostic(file, "extraction_status");
+  const ocrUsed = booleanDiagnostic(file, "ocr_used");
+  const ocrChars = numberDiagnostic(file, "ocr_character_count") ?? 0;
+  if (status === "searchable" && ocrUsed && ocrChars > 0) return "ocr_complete";
+  if (status === "processing" || status === "ocr_required" || status === "extraction_failed" || status === "searchable") return status;
+  return (numberDiagnostic(file, "extracted_character_count") ?? 0) > 0 ? "searchable" : "processing";
+}
+
+function fileStatusDetail(file: FileData) {
+  const status = fileIngestionStatus(file);
+  const reason = stringDiagnostic(file, "extraction_failure_reason") || stringDiagnostic(file, "extraction_error");
+  if (reason && status !== "searchable" && status !== "ocr_complete") return reason;
+  const extractedChars = numberDiagnostic(file, "extracted_character_count") ?? 0;
+  const ocrChars = numberDiagnostic(file, "ocr_character_count") ?? 0;
+  const pages = numberDiagnostic(file, "page_count");
+  if (status === "processing") return "Text extraction is still running.";
+  if (status === "ocr_required") return "This PDF contains no readable text layer. OCR is required before it becomes searchable.";
+  if (status === "extraction_failed") return "Text extraction failed for this document.";
+  if (status === "ocr_complete") return `OCR extracted ${ocrChars.toLocaleString()} characters${pages ? ` across ${pages} pages` : ""}.`;
+  return `Extracted ${extractedChars.toLocaleString()} characters${pages ? ` across ${pages} pages` : ""}.`;
 }
 
 function connectorIcon(type: ConnectorType) {
@@ -811,23 +886,32 @@ export default function FilesPage() {
             </div>
           ) : (
             <div className={view === "grid" ? "relative z-10 mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3" : "relative z-10 mt-3 grid gap-2"}>
-              {filteredFiles.map((f) => (
-                <div key={f.id} className={view === "grid" ? "omnix-source-card flex min-h-[154px] flex-col justify-between gap-3 p-[18px]" : "omnix-source-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"}>
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_0_14px_rgba(0,255,255,0.12)]">
-                      <FileText className="h-[19px] w-[19px]" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="omnix-display truncate text-[13px] font-bold text-white">{f.file_name ?? f.filename}</p>
-                      <p className="mt-1 text-[11px] text-white/35">{f.file_type ?? f.content_type ?? "Document"} - {formatFileSize(f.size_bytes)}</p>
+              {filteredFiles.map((f) => {
+                const ingestionStatus = fileIngestionStatus(f);
+                return (
+                  <div key={f.id} className={view === "grid" ? "omnix-source-card flex min-h-[174px] flex-col justify-between gap-3 p-[18px]" : "omnix-source-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"}>
+                    <div className="flex min-w-0 items-start gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_0_14px_rgba(0,255,255,0.12)]">
+                        <FileText className="h-[19px] w-[19px]" />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="omnix-display max-w-full truncate text-[13px] font-bold text-white">{f.file_name ?? f.filename}</p>
+                          <span className={cn("rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-wider", fileStatusStyle[ingestionStatus])}>
+                            {fileStatusLabel[ingestionStatus]}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-white/35">{f.file_type ?? f.content_type ?? "Document"} - {formatFileSize(f.size_bytes)}</p>
+                        <p className="mt-2 max-w-3xl text-[11px] leading-5 text-white/50">{fileStatusDetail(f)}</p>
+                      </div>
+                    </div>
+                    <div className={view === "grid" ? "grid grid-cols-2 gap-2 border-t border-white/5 pt-3 sm:flex sm:items-center" : "grid grid-cols-2 gap-2 sm:flex sm:items-center"}>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-10 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
                     </div>
                   </div>
-                  <div className={view === "grid" ? "grid grid-cols-2 gap-2 border-t border-white/5 pt-3 sm:flex sm:items-center" : "grid grid-cols-2 gap-2 sm:flex sm:items-center"}>
-                    <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
-                    <Button type="button" size="sm" variant="ghost" className="min-h-10 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

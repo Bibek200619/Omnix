@@ -7,11 +7,15 @@ from datetime import datetime, timezone
 
 from ..services.supabase_service import (
     select_one_trusted,
+    update_one_trusted,
 )
-from ..routers.upload import _extract_text_from_bytes
+from ..services.document_intelligence_service import (
+    diagnostics_from_file,
+    extract_document_with_diagnostics,
+    extraction_columns_payload,
+)
 from ..rag.startup import get_vector_store
 from ..rag.ingestion import RAGIngestionPipeline
-from ..rag.ingestion_service import DocumentIngestionService
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +38,11 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("Invalid ingest job payload")
 
         # Fetch file metadata
-        FILE_COLUMNS = "id,user_id,workspace_id,file_name,file_type,size_bytes,storage_path,metadata,created_at"
+        FILE_COLUMNS = (
+            "id,user_id,workspace_id,file_name,file_type,size_bytes,storage_path,metadata,"
+            "page_count,extractor_used,extracted_character_count,image_page_count,text_page_count,"
+            "extraction_status,extraction_failure_reason,ocr_used,ocr_character_count,created_at"
+        )
         file_row = await select_one_trusted("files", FILE_COLUMNS, {"id": file_id})
         if file_row is None:
             raise RuntimeError("File not found for ingestion")
@@ -50,16 +58,32 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
         with open(storage_path, "rb") as fh:
             data = fh.read()
 
-        # Extract text
+        extraction_result = extract_document_with_diagnostics(filename, file_type, data)
+        normalized = extraction_result.text
+        diagnostics = extraction_result.diagnostics
+        metadata = dict(file_row.get("metadata") or {})
+        metadata.update({"extracted_text_preview": normalized[:2000], **diagnostics.to_metadata()})
+        if diagnostics.extraction_failure_reason:
+            metadata["extraction_error"] = diagnostics.extraction_failure_reason
         try:
-            text = _extract_text_from_bytes(filename, file_type, data)
-            normalized = "\n\n".join([line.strip() for line in text.splitlines() if line.strip()])
+            file_row = await update_one_trusted(
+                "files",
+                {"id": file_id},
+                {"metadata": metadata, **extraction_columns_payload(diagnostics)},
+            ) or file_row
         except Exception:
-            logger.exception("Text extraction failed; using raw decode fallback")
-            try:
-                normalized = data.decode("utf-8", errors="ignore")
-            except Exception:
-                normalized = ""
+            logger.warning("Unable to persist physical extraction diagnostics in ingestion worker; retrying metadata only.")
+            await update_one_trusted("files", {"id": file_id}, {"metadata": metadata})
+            file_row["metadata"] = metadata
+
+        diagnostics = diagnostics_from_file(file_row)
+        if diagnostics.extraction_status != "searchable" or not normalized:
+            return {
+                "status": "failed" if diagnostics.extraction_status == "extraction_failed" else "completed",
+                "file_status": diagnostics.extraction_status,
+                "error": diagnostics.extraction_failure_reason,
+                "chunks": [],
+            }
 
         # Run ingestion pipeline (chunks, embeddings, DB insert)
         try:
@@ -83,29 +107,21 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
                 ) from e
 
             pipeline = RAGIngestionPipeline(vector_store)
-            if "word" in (file_type or "").lower() or str(filename).lower().endswith(".docx"):
-                num, chunk_ids = await pipeline.ingest_text(
-                    normalized,
-                    user_id,
-                    document_id=file_id,
-                    workspace_id=workspace_id,
-                    metadata={"filename": filename, "content_type": file_type},
-                    source_type="docx",
-                    replace_existing=True,
-                )
+            if str(filename).lower().endswith(".pdf") or "pdf" in (file_type or "").lower():
+                source_type = "pdf"
+            elif "word" in (file_type or "").lower() or str(filename).lower().endswith(".docx"):
+                source_type = "docx"
             else:
-                ingestion_service = DocumentIngestionService(pipeline)
-                result = await ingestion_service.ingest_bytes(
-                    data,
-                    user_id=user_id,
-                    file_id=file_id,
-                    workspace_id=workspace_id,
-                    filename=filename,
-                    content_type=file_type,
-                    metadata={"file_id": file_id},
-                    replace_existing=True,
-                )
-                num, chunk_ids = result.chunk_count, result.chunk_ids
+                source_type = "text"
+            num, chunk_ids = await pipeline.ingest_text(
+                normalized,
+                user_id,
+                document_id=file_id,
+                workspace_id=workspace_id,
+                metadata={"filename": filename, "content_type": file_type, **diagnostics.to_metadata()},
+                source_type=source_type,
+                replace_existing=True,
+            )
             logger.info("Ingestion produced %d chunks for file %s", num, file_id)
         except Exception:
             logger.exception("Ingestion pipeline failed for file %s", file_id)

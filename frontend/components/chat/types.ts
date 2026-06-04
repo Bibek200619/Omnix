@@ -55,6 +55,15 @@ export type MessageAttachment = {
   workspace_id?: string | null;
   created_at?: string;
   metadata?: Record<string, unknown> | null;
+  page_count?: number | null;
+  extractor_used?: string | null;
+  extracted_character_count?: number | null;
+  image_page_count?: number | null;
+  text_page_count?: number | null;
+  extraction_status?: "processing" | "searchable" | "ocr_required" | "extraction_failed" | null;
+  extraction_failure_reason?: string | null;
+  ocr_used?: boolean | null;
+  ocr_character_count?: number | null;
 };
 
 export type ApiMessage = {

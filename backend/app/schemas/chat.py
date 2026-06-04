@@ -136,6 +136,15 @@ class FileRead(BaseModel):
     size_bytes: int | None = None
     storage_path: str | None = None
     metadata: dict[str, Any] | None = None
+    page_count: int | None = None
+    extractor_used: str | None = None
+    extracted_character_count: int = 0
+    image_page_count: int = 0
+    text_page_count: int = 0
+    extraction_status: Literal["processing", "searchable", "ocr_required", "extraction_failed"] | None = None
+    extraction_failure_reason: str | None = None
+    ocr_used: bool = False
+    ocr_character_count: int = 0
     created_at: datetime | None = None
 
 
