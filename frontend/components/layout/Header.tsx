@@ -15,6 +15,7 @@ import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import { InviteNotificationBar, InviteNotificationBell } from "@/components/workspace/InviteNotifications";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ProfileMenu } from "@/components/layout/ProfileMenu";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 
@@ -25,6 +26,8 @@ const routeTitles = [
   { match: "/decisions", title: "Decisions", subtitle: "Organizational memory" },
   { match: "/tasks", title: "Tasks", subtitle: "Shared execution" },
   { match: "/initiatives", title: "Initiatives", subtitle: "Shared operational direction" },
+  { match: "/notifications", title: "Notifications", subtitle: "Mention notifications" },
+  { match: "/mentions", title: "Mentions", subtitle: "Workspace awareness" },
   { match: "/workspace", title: "Workspaces", subtitle: "Manage your super workspaces and sub-spaces" },
   { match: "/team", title: "Team", subtitle: "Manage workspace members" },
   { match: "/sources", title: "Sources", subtitle: "Manage your connected data" },
@@ -138,6 +141,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <CommandPalette />
+          <NotificationBell />
           <InviteNotificationBell />
           <div className="hidden h-[22px] w-px bg-[rgba(0,255,255,0.1)] sm:block" />
           <Button

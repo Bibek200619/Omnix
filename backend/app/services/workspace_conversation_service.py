@@ -13,6 +13,11 @@ from .supabase_service import (
     select_all_trusted,
     select_one_trusted,
 )
+from .workspace_mention_service import (
+    mention_metadata_for_sources,
+    prepare_mentions_for_workspace,
+    sync_mentions_for_source,
+)
 from .workspace_service import (
     get_profiles,
     list_workspace_members,
@@ -253,6 +258,12 @@ async def _hydrate_messages(
     workspace: dict[str, Any],
     reply_rows: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
+    message_ids = [str(row.get("id")) for row in rows if row.get("id")]
+    mentions_by_source = await mention_metadata_for_sources(
+        workspace_id=str(workspace.get("id") or ""),
+        source_type="conversation_message",
+        source_ids=message_ids,
+    )
     members = await list_workspace_members(workspace)
     members_by_user_id = {
         str(member.get("user_id")): member for member in members if member.get("user_id")
@@ -271,11 +282,15 @@ async def _hydrate_messages(
         user_id = str(row.get("author_user_id") or "")
         member = members_by_user_id.get(user_id)
         profile = member or profiles.get(user_id, {})
+        metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+        metadata_mentions = metadata.get("mentions") if isinstance(metadata.get("mentions"), list) else []
+        mentions = mentions_by_source.get(str(row.get("id"))) or metadata_mentions
         hydrated.append(
             {
                 **row,
                 "context_links": row.get("context_links") if isinstance(row.get("context_links"), list) else [],
-                "metadata": row.get("metadata") if isinstance(row.get("metadata"), dict) else {},
+                "metadata": metadata,
+                "mentions": mentions,
                 "author_name": profile.get("full_name") or profile.get("handle"),
                 "author_email": profile.get("email"),
                 "author_avatar_url": profile.get("avatar_url"),
@@ -285,6 +300,33 @@ async def _hydrate_messages(
             }
         )
     return hydrated
+
+
+async def _ensure_mentions_can_read_channel(
+    *,
+    channel: Mapping[str, Any],
+    mention_user_ids: list[str],
+) -> None:
+    if not mention_user_ids or channel.get("visibility") == "workspace":
+        return
+
+    channel_id = str(channel.get("id") or "")
+    try:
+        members = await select_all_trusted(
+            "workspace_channel_members",
+            "channel_id,user_id",
+            filters={"channel_id": channel_id},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+    allowed_user_ids = {str(channel.get("created_by") or "")}
+    allowed_user_ids.update(str(member.get("user_id")) for member in members if member.get("user_id"))
+    blocked = [user_id for user_id in mention_user_ids if user_id not in allowed_user_ids]
+    if blocked:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mentions in private conversations must target channel members.",
+        )
 
 
 async def list_messages(
@@ -385,6 +427,14 @@ async def create_message(
         if existing is not None:
             return (await _hydrate_messages([existing], access.workspace))[0]
 
+    mentions = await prepare_mentions_for_workspace(
+        workspace=access.workspace,
+        mentions=payload.get("mentions"),
+    )
+    await _ensure_mentions_can_read_channel(
+        channel=channel,
+        mention_user_ids=[str(mention["user_id"]) for mention in mentions],
+    )
     timestamp = utc_now_iso()
     try:
         created = await insert_one_trusted(
@@ -396,7 +446,7 @@ async def create_message(
                 "parent_message_id": parent_message_id,
                 "content": str(payload["content"]).strip(),
                 "context_links": list(payload.get("context_links") or []),
-                "metadata": {},
+                "metadata": {"mentions": mentions} if mentions else {},
                 "client_nonce": client_nonce,
                 "created_at": timestamp,
                 "updated_at": timestamp,
@@ -404,6 +454,13 @@ async def create_message(
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
+    await sync_mentions_for_source(
+        workspace_id=workspace_id,
+        mentioned_by_user_id=user_id,
+        source_type="conversation_message",
+        source_id=str(created["id"]),
+        mentions=mentions,
+    )
     return (await _hydrate_messages([created], access.workspace))[0]
 
 

@@ -10,6 +10,7 @@ import {
 import {
   ArrowUpRight,
   BadgeCheck,
+  Bell,
   ClipboardCheck,
   Command,
   Compass,
@@ -127,6 +128,14 @@ const quickActions: PaletteItem[] = [
     icon: Compass,
   },
   {
+    id: "action:open-notifications",
+    kind: "action",
+    label: "Open Notifications",
+    description: "Go to mention notifications.",
+    href: "/notifications",
+    icon: Bell,
+  },
+  {
     id: "action:open-team",
     kind: "action",
     label: "Open Team",
@@ -158,6 +167,7 @@ const destinations: Record<string, Omit<RecentDestination, "visitedAt">> = {
   "/tasks": { href: "/tasks", label: "Tasks", description: "Shared execution" },
   "/decisions": { href: "/decisions", label: "Decisions", description: "Decision memory" },
   "/initiatives": { href: "/initiatives", label: "Initiatives", description: "Operational direction" },
+  "/notifications": { href: "/notifications", label: "Notifications", description: "Mention notifications" },
   "/team": { href: "/team", label: "Team", description: "Workspace members" },
   "/files": { href: "/files", label: "Files", description: "Workspace files" },
   "/sources": { href: "/sources", label: "Sources", description: "Knowledge sources" },

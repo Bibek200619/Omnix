@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .workspace_mentions import WorkspaceMentionInput, WorkspaceMentionMetadata
+
 
 DecisionStatus = Literal["proposed", "accepted", "rejected", "superseded"]
 
@@ -14,6 +16,7 @@ class WorkspaceDecisionCreate(BaseModel):
     description: str | None = Field(default=None, max_length=4000)
     decision_reason: str | None = Field(default=None, max_length=6000)
     status: DecisionStatus = "accepted"
+    mentions: list[WorkspaceMentionInput] = Field(default_factory=list, max_length=50)
 
 
 class WorkspaceDecisionFromMessageCreate(BaseModel):
@@ -21,6 +24,7 @@ class WorkspaceDecisionFromMessageCreate(BaseModel):
     description: str | None = Field(default=None, max_length=4000)
     decision_reason: str | None = Field(default=None, max_length=6000)
     status: DecisionStatus = "accepted"
+    mentions: list[WorkspaceMentionInput] = Field(default_factory=list, max_length=50)
 
 
 class WorkspaceDecisionRead(BaseModel):
@@ -41,6 +45,7 @@ class WorkspaceDecisionRead(BaseModel):
     creator_name: str | None = None
     creator_email: str | None = None
     creator_avatar_label: str | None = None
+    mentions: list[WorkspaceMentionMetadata] = Field(default_factory=list)
 
     # Linkage expansion
     linked_tasks: list[dict[str, Any]] = Field(default_factory=list)
