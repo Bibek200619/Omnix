@@ -110,7 +110,7 @@ export function NotificationCenterSurface() {
         <div className="min-w-0">
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
             <AtSign className="h-3.5 w-3.5" />
-            Mention notifications
+            In-app mentions
           </p>
           <h1 className="omnix-display text-xl font-semibold text-white">Notifications</h1>
           <p className="mt-1 text-sm text-[var(--omnix-text-2)]">

@@ -21,7 +21,7 @@ const settingsNav = [
   { href: "/settings/account", label: "Account", description: "Session and identity controls", icon: ShieldCheck },
   { href: "/settings/workspace", label: "Workspace", description: "Name and workspace details", icon: Settings },
   { href: "/settings/appearance", label: "Appearance", description: "Local interface preferences", icon: Monitor },
-  { href: "/settings/notifications", label: "Notifications", description: "Invite and email preferences", icon: Bell },
+  { href: "/settings/notifications", label: "Notifications", description: "Mentions and invitations", icon: Bell },
   { href: "/settings/team", label: "Team Management", description: "Roles, members, invites", icon: Users },
   { href: "/settings/ai", label: "AI Settings", description: "Model behavior and context", icon: BrainCircuit },
   { href: "/settings/about", label: "About", description: "Product notes and policies", icon: FileText },
