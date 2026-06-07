@@ -9,6 +9,9 @@ from .workspace_mentions import WorkspaceMentionInput, WorkspaceMentionMetadata
 
 
 DecisionStatus = Literal["proposed", "accepted", "rejected", "superseded"]
+DecisionCandidateSourceType = Literal["conversation", "document"]
+DecisionCandidateConfidence = Literal["low", "medium", "high"]
+DecisionCandidateMetricAction = Literal["accept", "dismiss"]
 
 
 class WorkspaceDecisionCreate(BaseModel):
@@ -25,6 +28,31 @@ class WorkspaceDecisionFromMessageCreate(BaseModel):
     decision_reason: str | None = Field(default=None, max_length=6000)
     status: DecisionStatus = "accepted"
     mentions: list[WorkspaceMentionInput] = Field(default_factory=list, max_length=50)
+
+
+class DecisionCandidate(BaseModel):
+    id: str
+    title: str = Field(..., min_length=1, max_length=180)
+    reason: str = Field(..., min_length=1, max_length=1000)
+    confidence: DecisionCandidateConfidence
+    source_type: DecisionCandidateSourceType
+    source_id: str
+    supporting_evidence: list[str] = Field(..., min_length=1, max_length=5)
+
+
+class DecisionCandidateListRead(BaseModel):
+    candidates: list[DecisionCandidate] = Field(default_factory=list)
+    candidate_count: int
+    source_type: DecisionCandidateSourceType
+    source_id: str
+    generated_at: str
+
+
+class DecisionCandidateMetricCreate(BaseModel):
+    action: DecisionCandidateMetricAction
+    candidate_id: str = Field(..., min_length=1, max_length=160)
+    source_type: DecisionCandidateSourceType
+    source_id: str = Field(..., min_length=1, max_length=160)
 
 
 class WorkspaceDecisionRead(BaseModel):

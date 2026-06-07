@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Portal } from "@/components/ui/Portal";
+import { DecisionCandidatePanel } from "@/components/decisions/DecisionCandidatePanel";
 import { MentionText } from "@/components/mentions/MentionText";
 import { MentionTextarea, mentionPayload } from "@/components/mentions/MentionTextarea";
 import { apiClient } from "@/lib/api";
@@ -36,6 +37,8 @@ import type {
   WorkspaceChannelMessage,
   WorkspaceConversationAssistance,
   WorkspaceConversationAssistanceMode,
+  DecisionCandidate,
+  DecisionCandidateList,
   WorkspaceDecision,
   WorkspaceDecisionStatus,
   WorkspaceMentionMetadata,
@@ -50,9 +53,9 @@ type TaskSource =
   | { kind: "message"; message: WorkspaceChannelMessage }
   | { kind: "assistance"; assistance: WorkspaceConversationAssistance };
 
-type DecisionSource = {
-  message: WorkspaceChannelMessage;
-};
+type DecisionSource =
+  | { kind: "message"; message: WorkspaceChannelMessage }
+  | { kind: "candidate"; candidate: DecisionCandidate };
 
 const assistanceLabels: Record<WorkspaceConversationAssistanceMode, string> = {
   summary: "Summarize",
@@ -130,6 +133,10 @@ export function WorkspaceConversationSurface() {
   const [creatingChannel, setCreatingChannel] = useState(false);
   const [assistance, setAssistance] = useState<WorkspaceConversationAssistance | null>(null);
   const [assistanceLoading, setAssistanceLoading] = useState<WorkspaceConversationAssistanceMode | null>(null);
+  const [decisionCandidatesCollapsed, setDecisionCandidatesCollapsed] = useState(true);
+  const [decisionCandidates, setDecisionCandidates] = useState<DecisionCandidate[]>([]);
+  const [decisionCandidatesLoading, setDecisionCandidatesLoading] = useState(false);
+  const [decisionCandidatesError, setDecisionCandidatesError] = useState<string | null>(null);
   const [taskSource, setTaskSource] = useState<TaskSource | null>(null);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
@@ -506,6 +513,25 @@ export function WorkspaceConversationSurface() {
     }
   }
 
+  async function scanDecisionCandidates() {
+    if (!activeWorkspaceId || !selectedChannelId) return;
+    setDecisionCandidatesCollapsed(false);
+    setDecisionCandidatesLoading(true);
+    setDecisionCandidatesError(null);
+    try {
+      const result = await apiClient.post<DecisionCandidateList>(
+        `/workspaces/${activeWorkspaceId}/decisions/candidates/conversation/${selectedChannelId}`,
+        {},
+      );
+      setDecisionCandidates(result.candidates);
+    } catch (err) {
+      logClientError("Failed to extract decision candidates", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/conversation/${selectedChannelId}` });
+      setDecisionCandidatesError("Unable to scan this conversation for decision candidates.");
+    } finally {
+      setDecisionCandidatesLoading(false);
+    }
+  }
+
   function openThread(message: WorkspaceChannelMessage) {
     if (!selectedChannelId) return;
     setThreadRoot(message);
@@ -524,12 +550,47 @@ export function WorkspaceConversationSurface() {
 
   function openMessageDecision(message: WorkspaceChannelMessage) {
     const title = message.content.replace(/\s+/g, " ").trim();
-    setDecisionSource({ message });
+    setDecisionSource({ kind: "message", message });
     setDecisionTitle(title.length > 110 ? `${title.slice(0, 107).trim()}...` : title);
     setDecisionDescription(message.content);
     setDecisionReason("");
     setDecisionMentions(message.mentions || []);
     setDecisionStatus("accepted");
+  }
+
+  async function openCandidateDecision(candidate: DecisionCandidate) {
+    if (!activeWorkspaceId) return;
+    setDecisionSource({ kind: "candidate", candidate });
+    setDecisionTitle(candidate.title);
+    setDecisionReason(candidate.reason);
+    setDecisionDescription(`Supporting evidence:\n${candidate.supporting_evidence.join("\n")}`);
+    setDecisionMentions([]);
+    setDecisionStatus("proposed");
+    try {
+      await apiClient.post(`/workspaces/${activeWorkspaceId}/decisions/candidates/metrics`, {
+        action: "accept",
+        candidate_id: candidate.id,
+        source_type: candidate.source_type,
+        source_id: candidate.source_id,
+      });
+    } catch (err) {
+      logClientError("Failed to log decision candidate acceptance", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/metrics` });
+    }
+  }
+
+  async function dismissDecisionCandidate(candidate: DecisionCandidate) {
+    setDecisionCandidates((current) => current.filter((item) => item.id !== candidate.id));
+    if (!activeWorkspaceId) return;
+    try {
+      await apiClient.post(`/workspaces/${activeWorkspaceId}/decisions/candidates/metrics`, {
+        action: "dismiss",
+        candidate_id: candidate.id,
+        source_type: candidate.source_type,
+        source_id: candidate.source_id,
+      });
+    } catch (err) {
+      logClientError("Failed to log decision candidate dismissal", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/metrics` });
+    }
   }
 
   function openAssistanceTask(result: WorkspaceConversationAssistance) {
@@ -589,16 +650,22 @@ export function WorkspaceConversationSurface() {
     if (!activeWorkspaceId || !selectedChannelId || !decisionSource || !decisionTitle.trim()) return;
     try {
       setCreatingDecision(true);
-      const created = await apiClient.post<WorkspaceDecision>(
-        `/workspaces/${activeWorkspaceId}/decisions/from-message/${selectedChannelId}/${decisionSource.message.id}`,
-        {
-          title: decisionTitle.trim(),
-          description: decisionDescription.trim() || null,
-          decision_reason: decisionReason.trim() || null,
-          status: decisionStatus,
-          mentions: mentionPayload(decisionMentions, `${decisionReason}\n${decisionDescription}`),
-        },
-      );
+      const payload = {
+        title: decisionTitle.trim(),
+        description: decisionDescription.trim() || null,
+        decision_reason: decisionReason.trim() || null,
+        status: decisionStatus,
+        mentions: mentionPayload(decisionMentions, `${decisionReason}\n${decisionDescription}`),
+      };
+      const created = decisionSource.kind === "message"
+        ? await apiClient.post<WorkspaceDecision>(
+            `/workspaces/${activeWorkspaceId}/decisions/from-message/${selectedChannelId}/${decisionSource.message.id}`,
+            payload,
+          )
+        : await apiClient.post<WorkspaceDecision>(
+            `/workspaces/${activeWorkspaceId}/decisions`,
+            payload,
+          );
       setDecisionConfirmation(`Decision recorded: ${created.title}`);
       setDecisionSource(null);
       setDecisionTitle("");
@@ -813,6 +880,23 @@ export function WorkspaceConversationSurface() {
               </div>
             ) : null}
           </div>
+          <div className="mx-4 mt-3">
+            <DecisionCandidatePanel
+              candidates={decisionCandidates}
+              collapsed={decisionCandidatesCollapsed}
+              loading={decisionCandidatesLoading}
+              error={decisionCandidatesError}
+              onToggle={() => {
+                setDecisionCandidatesCollapsed((collapsed) => !collapsed);
+                if (decisionCandidatesCollapsed && decisionCandidates.length === 0 && !decisionCandidatesLoading) {
+                  void scanDecisionCandidates();
+                }
+              }}
+              onRefresh={() => void scanDecisionCandidates()}
+              onCreate={(candidate) => void openCandidateDecision(candidate)}
+              onDismiss={(candidate) => void dismissDecisionCandidate(candidate)}
+            />
+          </div>
           {assistance ? (
             <div className="mx-4 mt-3 rounded-xl border border-purple-300/15 bg-purple-300/[0.045] px-4 py-3">
               <div className="flex items-center justify-between gap-2">
@@ -1018,7 +1102,9 @@ export function WorkspaceConversationSurface() {
                 placeholder="Source description"
               />
               <p className="mt-2 text-[11px] leading-5 text-[var(--omnix-text-3)]">
-                This creates one decision linked to the selected message, channel, and workspace. It does not infer agreement beyond what you record here.
+                {decisionSource.kind === "message"
+                  ? "This creates one decision linked to the selected message, channel, and workspace. It does not infer agreement beyond what you record here."
+                  : "This suggestion is not a decision yet. Review the evidence and submit only if the workspace should record it."}
               </p>
               <div className="mt-4 flex justify-end gap-2">
                 <Button type="button" size="sm" variant="ghost" onClick={() => { setDecisionSource(null); setDecisionMentions([]); }}>Cancel</Button>
