@@ -52,7 +52,17 @@ def get_redis() -> Any:
 
 
 async def enqueue_job(payload: Dict[str, Any], queue: str | None = None) -> str:
-    """Create a jobs table row (trusted) and push job id to Redis queue."""
+    """
+    Create a jobs table row (trusted) and push job id to Redis queue.
+
+    Safety contract:
+    - DB row is always written first. If Redis push fails, the job row remains
+      in the DB with status='queued' and can be recovered by a future scan.
+    - If the DB write fails, we log and continue without Redis push, so we do
+      not push an orphan job_id that has no corresponding DB row.
+    - Redis unavailability does NOT silently swallow the job — the DB row
+      persists and is detectable via stuck-job detection.
+    """
     queue_name = queue or _QUEUE_KEY
     job_id = str(uuid.uuid4())
     record = {
@@ -63,20 +73,36 @@ async def enqueue_job(payload: Dict[str, Any], queue: str | None = None) -> str:
         "progress": 0,
         "attempts": 0,
     }
+
+    # Step 1: Persist to DB first. If this fails, skip Redis push.
+    db_ok = False
     try:
         from ..services.supabase_service import insert_one_trusted
 
-        # Persist job record to DB (trusted insert)
         await insert_one_trusted("jobs", record)
+        db_ok = True
     except Exception:
-        logger.exception("Failed to insert job row into DB; continuing and still enqueueing.")
+        logger.exception(
+            "Failed to insert job row into DB; job %s NOT pushed to Redis to avoid orphan queue entry.",
+            job_id,
+        )
 
+    if not db_ok:
+        raise RuntimeError(f"Job {job_id} could not be persisted to DB; enqueue aborted.")
+
+    # Step 2: Push to Redis. If Redis is down, the DB row is the recovery source.
     try:
         redis = get_redis()
         await redis.lpush(queue_name, job_id)
         logger.info("Enqueued job %s to %s", job_id, queue_name)
     except Exception:
-        logger.exception("Failed to push job to Redis queue")
+        logger.exception(
+            "Failed to push job %s to Redis queue %s. "
+            "Job row exists in DB with status='queued' and will be detectable as stuck.",
+            job_id,
+            queue_name,
+        )
+        # Re-raise so the caller knows Redis is unavailable.
         raise
 
     return job_id

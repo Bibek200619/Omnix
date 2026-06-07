@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import logging
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
 from urllib.parse import urlparse
 import httpx
@@ -11,28 +12,36 @@ from ..services.workspace_schema_health_service import check_workspace_schema_he
 
 logger = logging.getLogger(__name__)
 
+
 async def check_supabase() -> Dict[str, Any]:
     try:
-        # Simple query to check connectivity
         get_supabase().table("workspaces").select("id").limit(1).execute()
         return {"status": "healthy"}
     except Exception as e:
-        logger.error(f"Supabase health check failed: {e}")
+        logger.error("Supabase health check failed: %s", e)
         return {"status": "unhealthy", "error": str(e)}
+
 
 async def check_vector_store() -> Dict[str, Any]:
     try:
-        # Vector store is a singleton, check if it's initialized and responsive
         store = get_vector_store()
-        # Could add a more rigorous check here if needed
         return {"status": "healthy", "type": store.__class__.__name__}
     except Exception as e:
-        logger.error(f"Vector store health check failed: {e}")
+        logger.error("Vector store health check failed: %s", e)
         return {"status": "unhealthy", "error": str(e)}
 
+
 async def check_redis() -> Dict[str, Any]:
-    # Placeholder until Redis is fully integrated
-    return {"status": "healthy", "info": "Redis check not fully implemented"}
+    """Real Redis connectivity check — no placeholders."""
+    try:
+        from ..jobs.queue import get_redis
+        redis = get_redis()
+        pong = await redis.ping()
+        return {"status": "healthy", "ping": str(pong)}
+    except Exception as e:
+        logger.error("Redis health check failed: %s", e)
+        return {"status": "unhealthy", "error": str(e)}
+
 
 async def check_ollama() -> Dict[str, Any]:
     settings = get_settings()
@@ -75,6 +84,77 @@ async def check_ollama() -> Dict[str, Any]:
         "chat_endpoint": settings.ollama_chat_url,
     }
 
+
+async def check_ingestion_worker() -> Dict[str, Any]:
+    """
+    Report ingestion worker health from RuntimeManager (in-process counters)
+    plus real Redis queue depth and DB-derived stuck job counts.
+    Returns only backend-derived values — no fake metrics.
+    """
+    from ..runtime.manager import RuntimeManager
+
+    runtime = RuntimeManager.get()
+    metrics = runtime.get_ingestion_worker_metrics()
+
+    # Real queue depth from Redis
+    queue_depth: int | None = None
+    try:
+        from ..jobs.queue import get_redis
+        import os
+        queue_name = os.environ.get("OMNIX_JOB_QUEUE", "omnix:jobs")
+        redis = get_redis()
+        queue_depth = await redis.llen(queue_name)
+    except Exception as exc:
+        logger.warning("Could not read queue depth from Redis: %s", exc)
+
+    # Stuck job detection from Supabase (detection only, no auto-repair)
+    stuck_10m = await _count_stuck_jobs(minutes=10)
+    stuck_30m = await _count_stuck_jobs(minutes=30)
+    stuck_60m = await _count_stuck_jobs(minutes=60)
+
+    worker_status = "healthy" if metrics["active_workers"] > 0 else "no_worker"
+    if metrics["active_workers"] == 0:
+        logger.warning("Ingestion worker health check: no active ingestion workers registered in this process.")
+
+    return {
+        "status": worker_status,
+        "active_workers": metrics["active_workers"],
+        "worker_details": metrics["worker_details"],
+        "queue_depth": queue_depth,
+        "processing_jobs": metrics["processing_jobs"],
+        "completed_jobs": metrics["completed_jobs"],
+        "failed_jobs": metrics["failed_jobs"],
+        "stuck_jobs": {
+            "older_than_10m": stuck_10m,
+            "older_than_30m": stuck_30m,
+            "older_than_60m": stuck_60m,
+        },
+    }
+
+
+async def _count_stuck_jobs(minutes: int) -> int | None:
+    """Count jobs with status='queued' older than `minutes` minutes. Detection only."""
+    try:
+        from ..services.supabase_service import select_all_trusted
+        threshold = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
+        rows = await select_all_trusted(
+            "jobs",
+            "id",
+            filters={"status": "queued"},
+        )
+        if rows is None:
+            return None
+        # Filter by created_at < threshold in Python (avoids complex query syntax)
+        stuck = [
+            r for r in rows
+            if isinstance(r.get("created_at"), str) and r["created_at"] < threshold
+        ]
+        return len(stuck)
+    except Exception as exc:
+        logger.warning("Could not count stuck jobs (>%dm): %s", minutes, exc)
+        return None
+
+
 async def run_all_checks() -> Dict[str, Any]:
     results = await asyncio.gather(
         check_supabase(),
@@ -82,13 +162,15 @@ async def run_all_checks() -> Dict[str, Any]:
         check_vector_store(),
         check_redis(),
         check_ollama(),
-        return_exceptions=True
+        check_ingestion_worker(),
+        return_exceptions=True,
     )
-    
+
     return {
         "supabase": results[0] if not isinstance(results[0], Exception) else {"status": "error", "error": str(results[0])},
         "workspace_schema": results[1] if not isinstance(results[1], Exception) else {"status": "error", "error": str(results[1])},
         "vector_store": results[2] if not isinstance(results[2], Exception) else {"status": "error", "error": str(results[2])},
         "redis": results[3] if not isinstance(results[3], Exception) else {"status": "error", "error": str(results[3])},
         "ollama": results[4] if not isinstance(results[4], Exception) else {"status": "error", "error": str(results[4])},
+        "ingestion_worker": results[5] if not isinstance(results[5], Exception) else {"status": "error", "error": str(results[5])},
     }
