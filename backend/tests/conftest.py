@@ -9,6 +9,7 @@ the real packages.
 from __future__ import annotations
 
 import sys
+import importlib
 from unittest.mock import AsyncMock, MagicMock
 
 
@@ -23,19 +24,22 @@ def _pkg(name: str) -> MagicMock:
 
 
 # ---------------------------------------------------------------------------
-# httpx  (used in supabase_client.py and checks.py at module level)
+# httpx  (used in supabase_client.py/checks.py and by Starlette TestClient)
 # ---------------------------------------------------------------------------
 if "httpx" not in sys.modules:
-    _httpx = _pkg("httpx")
-    _httpx.Client = MagicMock
-    # AsyncClient must be an AsyncMock so .aclose() is awaitable (used by close_async_supabase)
-    _async_client_instance = AsyncMock()
-    _httpx.AsyncClient = MagicMock(return_value=_async_client_instance)
-    _httpx.Timeout = MagicMock(return_value=MagicMock())
-    _httpx.Limits = MagicMock(return_value=MagicMock())
-    _httpx.TransportError = Exception
-    _httpx.TimeoutException = Exception
-    sys.modules["httpx"] = _httpx
+    try:
+        importlib.import_module("httpx")
+    except ImportError:
+        _httpx = _pkg("httpx")
+        _httpx.Client = MagicMock
+        # AsyncClient must be an AsyncMock so .aclose() is awaitable (used by close_async_supabase)
+        _async_client_instance = AsyncMock()
+        _httpx.AsyncClient = MagicMock(return_value=_async_client_instance)
+        _httpx.Timeout = MagicMock(return_value=MagicMock())
+        _httpx.Limits = MagicMock(return_value=MagicMock())
+        _httpx.TransportError = Exception
+        _httpx.TimeoutException = Exception
+        sys.modules["httpx"] = _httpx
 
 # ---------------------------------------------------------------------------
 # supabase and its sub-modules
