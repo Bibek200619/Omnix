@@ -21,6 +21,12 @@ interface CreateDecisionModalProps {
   workspaceId: string;
   onClose: () => void;
   onSuccess: (decision: WorkspaceDecision) => void;
+  initialValues?: {
+    title?: string;
+    reason?: string;
+    description?: string;
+    status?: WorkspaceDecisionStatus;
+  };
 }
 
 const statusOptions: { value: WorkspaceDecisionStatus; label: string }[] = [
@@ -28,13 +34,13 @@ const statusOptions: { value: WorkspaceDecisionStatus; label: string }[] = [
   { value: "accepted", label: "Accepted" },
 ];
 
-export function CreateDecisionModal({ workspaceId, onClose, onSuccess }: CreateDecisionModalProps) {
+export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialValues }: CreateDecisionModalProps) {
   const { activeMembers } = useWorkspace();
-  const [title, setTitle] = useState("");
-  const [reason, setReason] = useState("");
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState(initialValues?.title ?? "");
+  const [reason, setReason] = useState(initialValues?.reason ?? "");
+  const [description, setDescription] = useState(initialValues?.description ?? "");
   const [mentions, setMentions] = useState<WorkspaceMentionMetadata[]>([]);
-  const [status, setStatus] = useState<WorkspaceDecisionStatus>("accepted");
+  const [status, setStatus] = useState<WorkspaceDecisionStatus>(initialValues?.status ?? "accepted");
   const [creating, setCreating] = useState(false);
 
   // Linkages

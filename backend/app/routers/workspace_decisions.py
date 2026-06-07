@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, status
 
 from ..core.security import get_current_user
 from ..schemas.workspace_decisions import (
+    DecisionCandidateListRead,
+    DecisionCandidateMetricCreate,
     WorkspaceDecisionCreate,
     WorkspaceDecisionFromMessageCreate,
     WorkspaceDecisionLinkInitiative,
@@ -22,6 +24,11 @@ from ..services.workspace_decision_service import (
     list_decisions,
     unlink_task_from_decision,
     update_decision_status,
+)
+from ..services.decision_candidate_service import (
+    conversation_decision_candidates,
+    document_decision_candidates,
+    log_candidate_metrics,
 )
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/decisions", tags=["workspace-decisions"])
@@ -70,6 +77,48 @@ async def post_workspace_decision_from_message(
         message_id=message_id,
         user_id=_user_id(current_user),
         payload=payload.model_dump(),
+    )
+
+
+@router.post("/candidates/conversation/{channel_id}", response_model=DecisionCandidateListRead)
+async def post_conversation_decision_candidates(
+    workspace_id: str,
+    channel_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    return await conversation_decision_candidates(
+        workspace_id=workspace_id,
+        channel_id=channel_id,
+        user_id=_user_id(current_user),
+    )
+
+
+@router.post("/candidates/document/{file_id}", response_model=DecisionCandidateListRead)
+async def post_document_decision_candidates(
+    workspace_id: str,
+    file_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    return await document_decision_candidates(
+        workspace_id=workspace_id,
+        file_id=file_id,
+        user_id=_user_id(current_user),
+    )
+
+
+@router.post("/candidates/metrics", status_code=status.HTTP_204_NO_CONTENT)
+async def post_decision_candidate_metric(
+    workspace_id: str,
+    payload: DecisionCandidateMetricCreate,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> None:
+    await log_candidate_metrics(
+        workspace_id=workspace_id,
+        user_id=_user_id(current_user),
+        source_type=payload.source_type,
+        source_id=payload.source_id,
+        action=payload.action,
+        candidate_id=payload.candidate_id,
     )
 
 
