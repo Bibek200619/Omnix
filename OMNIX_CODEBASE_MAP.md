@@ -138,8 +138,8 @@ frontend/
 │   │   └── PageTransition.tsx   # Route transition animation
 │   ├── auth/                    # Auth forms
 │   ├── brand/                   # Logo/brand assets
-│   ├── conversations/           # Workspace channel/conversation components
-│   ├── decisions/               # Decision tracking components
+│   ├── conversations/           # Workspace channel/conversation components + potential decision panel
+│   ├── decisions/               # Decision tracking components + temporary candidate review panel
 │   ├── mentions/                # Mention text rendering, @ member picker, inbox surface
 │   ├── notifications/           # Header notification bell + notification center
 │   ├── initiatives/             # Initiative/project components
@@ -183,6 +183,7 @@ frontend/
 | Command palette | `components/layout/CommandPalette.tsx` |
 | Workspace search UI | `components/layout/WorkspaceSearch.tsx` |
 | Mention picker/rendering | `components/mentions/MentionTextarea.tsx`, `components/mentions/MentionText.tsx` |
+| Decision candidate review | `components/decisions/DecisionCandidatePanel.tsx`, used by workspace conversations and files |
 | Notification bell/center | `components/notifications/NotificationBell.tsx`, `components/notifications/NotificationCenterSurface.tsx`, `app/(dashboard)/notifications/page.tsx`, `app/(dashboard)/settings/notifications/page.tsx` |
 | Mentions compatibility route | `app/(dashboard)/mentions/page.tsx` renders `NotificationCenterSurface` |
 | Mobile refinement surfaces | `components/settings/SettingsShell.tsx`, `components/layout/CommandPalette.tsx`, `components/layout/WorkspaceSearch.tsx`, `components/workspace/WorkspaceAccessPanel.tsx`, `app/(dashboard)/team/page.tsx`, `app/(dashboard)/files/page.tsx` |
@@ -211,7 +212,7 @@ backend/
 │   │   ├── conversations.py # Personal AI conversation CRUD
 │   │   ├── workspace_conversations.py # Workspace channel messages
 │   │   ├── workspace_tasks.py         # Task CRUD
-│   │   ├── workspace_decisions.py     # Decision CRUD
+│   │   ├── workspace_decisions.py     # Decision CRUD + temporary AI decision candidate endpoints
 │   │   ├── workspace_search.py        # Workspace-scoped keyword search
 │   │   ├── workspace_mentions.py      # Workspace-scoped mention notifications + read state
 │   │   ├── files.py                   # File metadata
@@ -233,6 +234,7 @@ backend/
 │   │   ├── workspace_conversation_service.py  # Channel conversations (16KB)
 │   │   ├── workspace_task_service.py          # Task business logic (18KB)
 │   │   ├── workspace_decision_service.py      # Decision logic (13KB)
+│   │   ├── decision_candidate_service.py      # Temporary AI decision suggestions from conversations/documents; no persistence as decisions
 │   │   ├── workspace_initiative_service.py    # Initiative logic (20KB)
 │   │   ├── workspace_search_service.py        # ILIKE workspace search over conversations/tasks/initiatives/decisions
 │   │   ├── workspace_mention_service.py       # Structured mention validation, persistence, inbox hydration
@@ -384,6 +386,25 @@ User types @ in conversation/task/decision text input
   → Header bell calls GET /workspaces/{workspace_id}/mentions/unread-count for workspace-scoped unread count
   → Read actions call PATCH /workspaces/{workspace_id}/mentions/{mention_id}/read or PATCH /workspaces/{workspace_id}/mentions/read-all
 ```
+
+### AI Decision Candidate Extraction
+
+```
+User expands Potential Decisions in a conversation or scans a document source
+  → Frontend calls POST /workspaces/{workspace_id}/decisions/candidates/conversation/{channel_id}
+    or POST /workspaces/{workspace_id}/decisions/candidates/document/{file_id}
+  → decision_candidate_service.py reuses channel transcript access or stored document chunks
+  → Existing chat_service.generate_ai_response() returns structured candidate JSON
+  → Service drops candidates without supporting_evidence and returns temporary DecisionCandidate objects only
+  → Frontend shows DecisionCandidatePanel with evidence, confidence, Dismiss, and Create Decision
+  → Dismiss/accept clicks log operational metrics through POST /workspaces/{workspace_id}/decisions/candidates/metrics
+  → Create Decision only opens an existing human-confirmed decision form; actual persistence still goes through /workspaces/{workspace_id}/decisions
+```
+
+Candidate fields: `id`, `title`, `reason`, `confidence`, `source_type`, `source_id`, `supporting_evidence`.
+Supported source types: `conversation`, `document`.
+Confidence values: `low`, `medium`, `high`.
+Important boundary: candidates are not persisted decisions, never auto-accepted, and never create tasks or workflow automation.
 
 ---
 
