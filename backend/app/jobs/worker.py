@@ -10,20 +10,30 @@ from .automation_jobs import handle_run_automation
 from ..services.supabase_service import update_one_trusted, select_one_trusted
 from ..rag.startup import initialize_vector_store, shutdown_vector_store
 from ..embeddings.provider import warm_up_default_provider
+from ..runtime.manager import RuntimeManager
 
 logger = logging.getLogger(__name__)
+
+_WORKER_ID = "ingestion_worker_main"
 
 
 async def _process_job(job_id: str):
     """Fetch job row, mark processing, run handler, update result."""
+    runtime = RuntimeManager.get()
+    runtime.record_job_started(_WORKER_ID)
+    success = False
     try:
         job_row = await select_one_trusted("jobs", "*", {"id": job_id})
         if not job_row:
             logger.warning("Job %s missing in DB; skipping", job_id)
             return
 
-        # Update status to processing
-        await update_one_trusted("jobs", {"id": job_id}, {"status": "processing", "attempts": job_row.get("attempts", 0) + 1})
+        # Update status to processing and increment attempt counter
+        await update_one_trusted(
+            "jobs",
+            {"id": job_id},
+            {"status": "processing", "attempts": job_row.get("attempts", 0) + 1},
+        )
 
         job_type = job_row.get("type")
         if job_type == "ingest_file":
@@ -39,7 +49,12 @@ async def _process_job(job_id: str):
             result = {"status": "failed", "error": "unknown job type"}
 
         status = result.get("status", "failed")
-        await update_one_trusted("jobs", {"id": job_id}, {"status": status, "progress": 100, "result": result})
+        await update_one_trusted(
+            "jobs",
+            {"id": job_id},
+            {"status": status, "progress": 100, "result": result},
+        )
+        success = status == "completed"
         logger.info("Job %s finished with status %s", job_id, status)
     except Exception as exc:
         logger.exception("Processing job %s failed: %s", job_id, exc)
@@ -47,10 +62,14 @@ async def _process_job(job_id: str):
             await update_one_trusted("jobs", {"id": job_id}, {"status": "failed", "error": str(exc)})
         except Exception:
             logger.exception("Failed to update job row for job %s after exception", job_id)
+    finally:
+        runtime.record_job_completed(_WORKER_ID, success=success)
 
 
 async def _worker_loop(shutdown_event: asyncio.Event):
     """Main worker lifecycle: initialize infra, then poll Redis and process jobs."""
+    runtime = RuntimeManager.get()
+
     # Initialize retrieval/vector store
     try:
         logger.info("Worker startup: initializing vector store...")
@@ -76,6 +95,10 @@ async def _worker_loop(shutdown_event: asyncio.Event):
     except Exception as exc:
         logger.exception("Failed to connect to Redis during worker startup: %s", exc)
         return
+
+    # Register with RuntimeManager
+    runtime.register_worker(_WORKER_ID, capabilities=["ingest_file", "reembed_batch"], worker_type="ingestion")
+    runtime.set_status("running")
 
     # Poll loop
     while not shutdown_event.is_set():
@@ -125,4 +148,3 @@ def run_worker():
 
 if __name__ == "__main__":
     run_worker()
-
