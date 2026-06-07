@@ -18,6 +18,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile.backend
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--proxy-headers"]
+    environment:
+      OMNIX_ROLE: api
     env_file:
       - .env.production
     expose:
@@ -30,16 +32,38 @@ services:
       timeout: 5s
       retries: 5
 
-  worker:
+  # Ingestion worker: consumes ingest_file jobs from Redis queue.
+  # MUST run separately from the API and automation-scheduler.
+  ingestion-worker:
     build:
       context: ./backend
       dockerfile: Dockerfile.backend
-    command: ["python", "-m", "app.automation.scheduler"]
+    command: ["python", "-m", "app.jobs.worker"]
+    environment:
+      OMNIX_ROLE: ingestion_worker
     env_file:
       - .env.production
     depends_on:
       backend:
         condition: service_healthy
+    restart: on-failure
+    networks:
+      - omnix-network
+
+  # Automation scheduler: runs periodic workspace automations (presence cleanup, etc.)
+  automation-scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    command: ["python", "-m", "app.automation.scheduler"]
+    environment:
+      OMNIX_ROLE: automation_scheduler
+    env_file:
+      - .env.production
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: on-failure
     networks:
       - omnix-network
 
