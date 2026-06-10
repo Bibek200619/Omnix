@@ -19,7 +19,7 @@ from ..services.chat_service import (
     call_llm_stream,
     generate_ai_response,
 )
-from ..services.document_context_service import build_uploaded_document_context
+from ..services.document_context_service import build_uploaded_document_context, find_unavailable_uploaded_documents
 from ..services.query_classifier import SearchDecision, SearchMode, classify_search_need
 from ..services.supabase_service import (
     SupabaseServiceError,
@@ -54,7 +54,11 @@ DEFAULT_MESSAGE_LIMIT = 50
 MAX_MESSAGE_LIMIT = 100
 MESSAGE_COLUMNS = "id,conversation_id,user_id,role,content,status,created_at,metadata,payload"
 MESSAGE_CONTEXT_COLUMNS = "role,content,status,created_at"
-FILE_COLUMNS = "id,user_id,workspace_id,conversation_id,file_name,file_type,metadata,created_at"
+FILE_COLUMNS = (
+    "id,user_id,workspace_id,conversation_id,file_name,file_type,metadata,"
+    "page_count,extractor_used,extracted_character_count,image_page_count,text_page_count,"
+    "extraction_status,extraction_failure_reason,ocr_used,ocr_character_count,created_at"
+)
 
 RATE_LIMIT_REQUESTS = 5
 RATE_LIMIT_WINDOW = 60.0
@@ -220,6 +224,21 @@ def _empty_retrieval_debug(strategy: str = "none") -> dict[str, Any]:
         "first_chunk_preview": "",
         "diagnostics": {},
     }
+
+
+def _document_unavailable_answer(files: list[dict[str, Any]]) -> str:
+    first = files[0] if files else {}
+    name = str(first.get("file_name") or "this file")
+    status_value = str(first.get("extraction_status") or "processing")
+    reason = str(first.get("extraction_failure_reason") or "").strip()
+
+    if status_value == "processing":
+        return f"I cannot summarize {name} yet because text extraction has not completed."
+    if status_value == "ocr_required":
+        return reason or f"I cannot summarize {name} yet because it needs OCR before text can be searched."
+    if status_value == "extraction_failed":
+        return reason or f"I cannot summarize {name} because text extraction failed."
+    return f"I cannot summarize {name} yet because it is not searchable."
 
 
 def _compact_text(value: Any, limit: int) -> str | None:
@@ -719,6 +738,21 @@ async def _retrieve_prompt_context(
     except Exception as exc:
         logger.exception("Uploaded document context retrieval failed for conversation %s: %s", conversation_id, exc)
 
+    if DOCUMENT_INTENT_RE.search(message_text):
+        unavailable_files = await find_unavailable_uploaded_documents(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            workspace_id=workspace_id,
+            scope_workspace_ids=scope_workspace_ids,
+        )
+        if unavailable_files:
+            debug = _empty_retrieval_debug("document_unavailable")
+            debug["diagnostics"]["web_search"] = web_diagnostics
+            debug["diagnostics"]["unavailable_documents"] = unavailable_files
+            if intelligence_profile:
+                debug["workspace_intelligence"] = _compact_intelligence_debug(intelligence_profile)
+            return _document_unavailable_answer(unavailable_files), [], debug
+
     if not await _has_retrievable_documents(
         user_id=user_id,
         workspace_id=workspace_id,
@@ -1054,38 +1088,41 @@ async def chat(
         retrieval_debug=retrieval_debug,
     )
 
-    try:
-        assistant_response = await call_llm(
-            prompt_message,
-            context=_build_context(recent_messages),
-            system_prompt=workspace_system_prompt or None,
-            temperature=payload.temperature,
-            model=payload.model,
-            max_tokens=payload.max_tokens,
-        )
-    except ModelServiceError as exc:
-        failed_at = utc_now_iso()
+    if retrieval_debug.get("strategy") == "document_unavailable":
+        assistant_response = prompt_message
+    else:
         try:
-            await asyncio.gather(
-                update_one(
-                    "messages",
-                    {"id": assistant_message["id"], "user_id": user_id},
-                    {"status": "failed"},
-                ),
-                _touch_conversation(
-                    conversation_id,
-                    user_id,
-                    workspace_id,
-                    {"last_message_at": failed_at, "updated_at": failed_at},
-                ),
+            assistant_response = await call_llm(
+                prompt_message,
+                context=_build_context(recent_messages),
+                system_prompt=workspace_system_prompt or None,
+                temperature=payload.temperature,
+                model=payload.model,
+                max_tokens=payload.max_tokens,
             )
-        except Exception:
-            logger.exception(
-                "Failed to mark assistant message %s as failed.",
-                assistant_message["id"],
-            )
-        logger.exception("Failed to generate chat response")
-        raise HTTPException(status_code=exc.status_code, detail="AI response is unavailable.") from exc
+        except ModelServiceError as exc:
+            failed_at = utc_now_iso()
+            try:
+                await asyncio.gather(
+                    update_one(
+                        "messages",
+                        {"id": assistant_message["id"], "user_id": user_id},
+                        {"status": "failed"},
+                    ),
+                    _touch_conversation(
+                        conversation_id,
+                        user_id,
+                        workspace_id,
+                        {"last_message_at": failed_at, "updated_at": failed_at},
+                    ),
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to mark assistant message %s as failed.",
+                    assistant_message["id"],
+                )
+            logger.exception("Failed to generate chat response")
+            raise HTTPException(status_code=exc.status_code, detail="AI response is unavailable.") from exc
 
     timestamp = utc_now_iso()
 
@@ -1280,22 +1317,26 @@ async def chat_stream(
                 prompt=prompt_message,
                 retrieval_debug=retrieval_debug,
             )
-            async for token in call_llm_stream(
-                prompt_message,
-                context=_build_context(recent_messages),
-                system_prompt=workspace_system_prompt or None,
-                temperature=payload.temperature,
-                model=payload.model,
-                max_tokens=payload.max_tokens,
-            ):
-                if await request.is_disconnected():
-                    logger.info("Client disconnected during streaming.")
-                    client_disconnected = True
-                    break
+            if retrieval_debug.get("strategy") == "document_unavailable":
+                assistant_parts.append(prompt_message)
+                yield f"data: {json.dumps({'type': 'token', 'text': prompt_message})}\n\n"
+            else:
+                async for token in call_llm_stream(
+                    prompt_message,
+                    context=_build_context(recent_messages),
+                    system_prompt=workspace_system_prompt or None,
+                    temperature=payload.temperature,
+                    model=payload.model,
+                    max_tokens=payload.max_tokens,
+                ):
+                    if await request.is_disconnected():
+                        logger.info("Client disconnected during streaming.")
+                        client_disconnected = True
+                        break
 
-                assistant_parts.append(token)
-                payload_chunk = {"type": "token", "text": token}
-                yield f"data: {json.dumps(payload_chunk)}\n\n"
+                    assistant_parts.append(token)
+                    payload_chunk = {"type": "token", "text": token}
+                    yield f"data: {json.dumps(payload_chunk)}\n\n"
         except ModelServiceError as exc:
             logger.exception("Failed to stream chat response")
             err = {"type": "error", "detail": "AI response is unavailable."}

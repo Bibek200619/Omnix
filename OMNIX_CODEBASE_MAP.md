@@ -234,6 +234,7 @@ backend/
 │   │   ├── workspace_initiative_service.py    # Initiative logic (20KB)
 │   │   ├── workspace_search_service.py        # ILIKE workspace search over conversations/tasks/initiatives/decisions
 │   │   ├── workspace_mention_service.py       # Structured mention validation, persistence, inbox hydration
+│   │   ├── document_intelligence_service.py   # Upload extraction diagnostics, image-only PDF detection, optional OCR fallback
 │   │   ├── workspace_intelligence_service.py  # AI workspace profile (14KB)
 │   │   ├── workspace_connector_service.py     # Source connectors (26KB)
 │   │   ├── workspace_schema_health_service.py # Schema validation (12KB)
@@ -336,13 +337,21 @@ User types message → ChatInterface.tsx
 
 ```
 User uploads file → upload.py router
-  → Parses file (PDF/DOCX/TXT via rag/parsers/)
-  → Chunks text (rag/chunking.py)
+  → Saves original file to disk
+  → Inserts files row with extraction_status='processing'
+  → Extracts text with document_intelligence_service.py diagnostics
+  → Detects image-only PDFs through empty text layer + image XObjects
+  → Runs OCR fallback when low text + image-based pages are detected and OCR is available
+  → Updates files diagnostics and final extraction_status
+  → Chunks text only when final state is searchable (rag/chunking.py)
   → Generates embeddings (rag/embedding.py → sentence-transformers)
-  → Stores chunks in Supabase (document_chunks table)
+  → Stores chunks in Supabase documents table
   → Stores embeddings in pgvector (rag/pgvector_store.py)
-  → File metadata saved to files table
+  → File metadata and extraction diagnostics remain saved to files table
 ```
+
+Allowed document extraction states: `processing`, `searchable`, `ocr_required`, `extraction_failed`.
+Documents with zero extracted characters are not treated as fully available unless OCR produced searchable text.
 
 ### Command Palette & Workspace Search Request
 
@@ -539,11 +548,13 @@ Defined in `settings/providers.py` → `AI_SYSTEM_PROMPT`:
 ### Flow
 ```
 Document Upload
-  → File parsed (rag/parsers/ — PDF, DOCX, TXT, etc.)
-  → Text chunked (rag/chunking.py — overlap-aware splitter)
+  → Original file preserved on disk
+  → Extraction diagnostics persisted on files row
+  → Image-only PDFs route to OCR fallback or ocr_required/extraction_failed state
+  → Searchable text chunked (rag/chunking.py — overlap-aware splitter)
   → Embeddings generated (rag/embedding.py → sentence-transformers)
   → Chunks + embeddings stored in Supabase
-     - document_chunks table (text + metadata)
+     - documents table (text + metadata)
      - pgvector column on chunks (embeddings)
   → On query: PgVectorStore.search() calls `search_documents_vector` RPC
 ```
@@ -555,6 +566,9 @@ Document Upload
 | `HYBRID_POOL_SIZE` | 6 | Candidate pool size |
 | `HYBRID_CONTEXT_TOKEN_BUDGET` | 2200 | Max tokens in context |
 | `HYBRID_MAX_CHUNK_TOKENS` | 520 | Max tokens per chunk |
+| `OMNIX_MIN_EXTRACTED_CHARACTERS` | 20 | Minimum extracted/OCR chars before a document is searchable |
+| `OMNIX_OCR_ENABLED` | true | Enables OCR fallback for image-based PDFs |
+| `OMNIX_MAX_OCR_PAGES` | 25 | Max PDF pages rendered for OCR |
 
 ### Embedding Model
 - Library: `sentence-transformers`
@@ -571,6 +585,16 @@ Document Upload
 | `rag/keyword_retrieval.py` | BM25/keyword search |
 | `rag/token_utils.py` | Tiktoken-based token counting |
 | `retrieval/` | Hybrid retrieval orchestration |
+
+### Document Intelligence
+| File | Purpose |
+|------|---------|
+| `services/document_intelligence_service.py` | Extraction diagnostics, image-only PDF detection, OCR fallback, status classification |
+| `routers/upload.py` | Persists original upload, diagnostics, and immediate searchable chunks only when extraction/OCR succeeds |
+| `jobs/ingestion_jobs.py` | Reuses diagnostics extraction and ingests normalized OCR/text output for embedded chunks |
+| `services/document_context_service.py` | Excludes non-searchable files from context and exposes unavailable document diagnostics |
+| `routers/messages.py` | Blocks document-grounded answers when files are `processing`, `ocr_required`, or `extraction_failed` |
+| `app/(dashboard)/files/page.tsx` | Shows file ingestion state and meaningful extraction/OCR failure reasons |
 
 ---
 
@@ -647,6 +671,24 @@ Frontend channel management: `lib/realtime-registry.ts` → `RealtimeSubscriptio
 | `workspace_artifacts` | AI-generated artifacts |
 | `workspace_insights` | AI insights |
 
+### File Extraction Diagnostics
+Migration: `backend/migrations/0038_document_extraction_diagnostics.sql`
+
+`files` diagnostics columns:
+- `page_count`
+- `extractor_used`
+- `extracted_character_count`
+- `image_page_count`
+- `text_page_count`
+- `extraction_status` (`processing`, `searchable`, `ocr_required`, `extraction_failed`)
+- `extraction_failure_reason`
+- `ocr_used`
+- `ocr_character_count`
+
+Diagnostics are mirrored into `files.metadata` for compatibility with schemas that have not applied the migration yet.
+Image-only PDFs are classified when `pypdf` extracts no usable text and page resources include image XObjects.
+OCR uses optional `pypdfium2` rendering plus `pytesseract`; if OCR is unavailable or fails, the file remains non-searchable with a user-facing reason.
+
 ### Supabase RPCs
 | RPC | Purpose |
 |-----|---------|
@@ -693,6 +735,9 @@ HYBRID_TOP_K=3
 HYBRID_POOL_SIZE=6
 HYBRID_CONTEXT_TOKEN_BUDGET=2200
 HYBRID_MAX_CHUNK_TOKENS=520
+OMNIX_MIN_EXTRACTED_CHARACTERS=20
+OMNIX_OCR_ENABLED=true
+OMNIX_MAX_OCR_PAGES=25
 
 # Web Search (optional)
 WEB_SEARCH_ENABLED=false
@@ -796,6 +841,7 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
 - `GET /files` — user's files
 - `POST /upload` — upload file (multipart)
 - `DELETE /files/{id}`
+- File responses include extraction diagnostics: `page_count`, `extractor_used`, `extracted_character_count`, `image_page_count`, `text_page_count`, `extraction_status`, `extraction_failure_reason`, `ocr_used`, `ocr_character_count`
 
 **Actions, Artifacts, Insights, Automations**
 - Standard CRUD under `/workspaces/{id}/actions`, `/artifacts`, `/insights`, `/automations`
@@ -937,4 +983,4 @@ pytest tests/                          # Specific test directory
 
 ---
 
-*Last updated: 2026-06-03. Update this file when adding new routers, services, major components, or env variables.*
+*Last updated: 2026-06-10. Update this file when adding new routers, services, major components, or env variables.*

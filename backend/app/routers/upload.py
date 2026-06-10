@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import io
 import logging
 import os
 import uuid
@@ -11,8 +10,12 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 
 from ..core.security import get_current_user
-from ..rag.ingestion_service import parse_document_bytes
-from ..services.supabase_service import SupabaseServiceError, insert_one
+from ..services.document_intelligence_service import (
+    ExtractionDiagnostics,
+    extract_document_with_diagnostics,
+    extraction_columns_payload,
+)
+from ..services.supabase_service import SupabaseServiceError, insert_one, update_one
 from ..services.document_context_service import store_extracted_text_chunks
 from ..services.workspace_service import active_workspace_id_from_request, require_workspace_access
 from ..services.workspace_collaboration_service import log_workspace_activity
@@ -50,26 +53,34 @@ async def _save_bytes_to_path(user_id: str, filename: str, data: bytes) -> str:
 
 
 def _extract_text_from_bytes(filename: str, file_type: str | None, data: bytes) -> str:
-    lowered = (file_type or "").lower()
-    name_l = filename.lower()
+    return extract_document_with_diagnostics(filename, file_type, data).text
 
-    # DOCX
-    if "word" in lowered or name_l.endswith(".docx"):
-        try:
-            import docx
 
-            doc = docx.Document(io.BytesIO(data))
-            paragraphs = [p.text for p in doc.paragraphs if p.text]
-            return "\n\n".join(paragraphs)
-        except ImportError as exc:
-            logger.exception("Missing python-docx dependency: %s", exc)
+def _metadata_with_diagnostics(
+    *,
+    preview: str = "",
+    diagnostics: ExtractionDiagnostics,
+) -> dict[str, Any]:
+    metadata = {
+        "extracted_text_preview": preview[:2000],
+        **diagnostics.to_metadata(),
+    }
+    if diagnostics.extraction_failure_reason:
+        metadata["extraction_error"] = diagnostics.extraction_failure_reason
+    return metadata
+
+
+async def _insert_file_row(payload: dict[str, Any], user_id: str) -> dict[str, Any]:
+    try:
+        return await insert_one("files", {"user_id": user_id, **payload})
+    except SupabaseServiceError as exc:
+        message = str(exc.__cause__ or exc).lower()
+        diagnostic_columns = set(ExtractionDiagnostics().__dataclass_fields__)
+        if not any(column in message for column in diagnostic_columns):
             raise
-        except Exception as exc:
-            logger.exception("DOCX extraction failed: %s", exc)
-            raise
-
-    parsed = parse_document_bytes(data, filename=filename, content_type=file_type)
-    return parsed.text
+        logger.warning("File diagnostics columns are unavailable; inserting file metadata without physical diagnostics columns.")
+        fallback_payload = {key: value for key, value in payload.items() if key not in diagnostic_columns}
+        return await insert_one("files", {"user_id": user_id, **fallback_payload})
 
 
 @router.post("/upload")
@@ -124,21 +135,7 @@ async def upload_file(
         logger.exception("Failed to persist uploaded file to disk: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to store file")
 
-    # Extract text (best-effort). Do not fail the upload on extraction errors.
-    extracted = ""
-    normalized = ""
-    extraction_error: str | None = None
-    try:
-        extracted = (await asyncio.to_thread(_extract_text_from_bytes, filename, file_type, contents)) or ""
-        normalized = "\n\n".join([line.strip() for line in extracted.splitlines() if line.strip()])
-    except ImportError as exc:
-        logger.exception("Missing dependency for text extraction: %s", exc)
-        extraction_error = f"Missing dependency: {exc}"
-        normalized = ""
-    except Exception as exc:
-        logger.exception("Text extraction failed for file '%s': %s", filename, exc)
-        extraction_error = str(exc)
-        normalized = ""
+    processing_diagnostics = ExtractionDiagnostics(extraction_status="processing")
 
     # Persist file metadata to files table
     payload = {
@@ -146,17 +143,44 @@ async def upload_file(
         "file_type": file_type or None,
         "size_bytes": size,
         "storage_path": storage_path,
-        "metadata": {"extracted_text_preview": normalized[:2000], "extraction_error": extraction_error},
+        "metadata": _metadata_with_diagnostics(diagnostics=processing_diagnostics),
         "conversation_id": conversation_id,
+        **extraction_columns_payload(processing_diagnostics),
     }
     if workspace_id:
         payload["workspace_id"] = workspace_id
 
     try:
-        file_row = await insert_one("files", {"user_id": user_id, **payload})
+        file_row = await _insert_file_row(payload, user_id)
     except SupabaseServiceError as exc:
         logger.exception("Failed to insert file metadata: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to register file")
+
+    extraction_result = await asyncio.to_thread(extract_document_with_diagnostics, filename, file_type, contents)
+    normalized = extraction_result.text
+    diagnostics = extraction_result.diagnostics
+    metadata = _metadata_with_diagnostics(preview=normalized, diagnostics=diagnostics)
+    update_payload = {
+        "metadata": metadata,
+        **extraction_columns_payload(diagnostics),
+    }
+    try:
+        updated_file = await update_one("files", {"id": str(file_row["id"]), "user_id": user_id}, update_payload)
+        if updated_file:
+            file_row = updated_file
+        else:
+            file_row.update(update_payload)
+    except SupabaseServiceError:
+        logger.warning("File diagnostics columns may be unavailable; retrying metadata-only diagnostics update.")
+        try:
+            updated_file = await update_one("files", {"id": str(file_row["id"]), "user_id": user_id}, {"metadata": metadata})
+            if updated_file:
+                file_row = updated_file
+            else:
+                file_row["metadata"] = metadata
+        except SupabaseServiceError as exc:
+            logger.exception("Failed to persist extraction diagnostics: %s", exc)
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to persist extraction diagnostics")
 
     if workspace_id:
         await log_workspace_activity(
@@ -169,12 +193,15 @@ async def upload_file(
                 "file_type": file_type or None,
                 "size_bytes": size,
                 "conversation_id": conversation_id,
+                "extraction_status": diagnostics.extraction_status,
+                "extracted_character_count": diagnostics.extracted_character_count,
+                "ocr_used": diagnostics.ocr_used,
             },
         )
 
     # Persist lightweight chunks immediately so chat can use the upload even if
     # Redis, the worker, or embedding generation is delayed on the EC2 host.
-    if normalized:
+    if diagnostics.extraction_status == "searchable" and normalized:
         try:
             stored_chunks = await store_extracted_text_chunks(
                 file_id=str(file_row.get("id")),
@@ -191,6 +218,10 @@ async def upload_file(
                 }
             )
             file_row["metadata"] = metadata
+            try:
+                await update_one("files", {"id": str(file_row["id"]), "user_id": user_id}, {"metadata": metadata})
+            except SupabaseServiceError:
+                logger.warning("Unable to persist immediate chunk diagnostics for file %s.", file_row.get("id"))
             logger.info("Chunks created")
         except Exception:
             logger.exception("Failed to persist immediate text chunks for file %s.", file_row.get("id"))
