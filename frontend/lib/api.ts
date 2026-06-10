@@ -8,7 +8,7 @@ import type {
 } from "@/lib/workspace-types";
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://18.204.231.209";
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.omni-x.co.in";
 
 export type ApiStatus = "idle" | "loading" | "success" | "error";
 
