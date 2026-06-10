@@ -52,12 +52,14 @@ Omnix/
 ├── frontend/              # Next.js 15 app
 ├── backend/               # FastAPI Python app
 ├── scripts/               # Utility scripts
+│   ├── omnix-ingestion-worker.service   # Systemd unit for ingestion worker
+│   └── omnix-automation-scheduler.service # Systemd unit for automation scheduler
 ├── docs/                  # Project documentation
 ├── uploads/               # Local file upload staging
 ├── docker-compose.yml     # Local dev compose
-├── docker-compose.prod.yml
+├── docker-compose.prod.yml# 3-service prod compose: backend + ingestion-worker + automation-scheduler
 ├── nginx.conf             # Production reverse proxy config
-├── Makefile               # Dev task shortcuts
+├── Makefile               # Dev task shortcuts (worker → ingestion-worker, new automation-scheduler)
 ├── AGENTS.md              # Core architecture rules (Omnix-specific)
 ├── GEMINI.md              # Full project mandate for AI assistants
 ├── CODEX.md               # Coding behavior guidelines
@@ -292,9 +294,13 @@ backend/
 │   ├── integrations/        # External integrations
 │   ├── observability/       # Metrics + tracing
 │   ├── jobs/                # Background jobs
-│   ├── runtime/             # RuntimeManager (system status)
+│   ├── runtime/             # RuntimeManager (system status + ingestion worker counters)
+│   │   └── manager.py      # RuntimeManager: register_worker, record_job_started/completed,
+│   │                       # get_ingestion_worker_metrics() — tracks processing/completed/failed counts
 │   ├── schemas/             # Pydantic response schemas, including workspace_search.py and workspace_mentions.py
 │   └── health/              # Health check endpoint
+│       ├── router.py        # Adds GET /health/ingestion-worker endpoint
+│       └── checks.py        # Real Redis ping, check_ingestion_worker(), _count_stuck_jobs()
 ├── migrations/              # DB migration scripts
 ├── tests/                   # pytest test suite
 └── requirements.txt         # Python dependencies
@@ -775,8 +781,20 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
 ### Endpoints by Router
 
 **Health**
-- `GET /health`
-- `GET /health/ready` treats unverifiable optional workspace schema diagnostics as `degraded`, not API-down, while real unhealthy checks still return 503.
+- `GET /health/live` — liveness probe
+- `GET /health/ready` — readiness probe; treats `no_worker` as non-blocking for API startup
+- `GET /health/runtime` — RuntimeManager uptime and worker counts
+- `GET /health/workers` — raw active_workers dict from RuntimeManager
+- `GET /health/ingestion-worker` — **Full ingestion worker health report:**
+  - `active_workers`: number of registered ingestion workers in this process
+  - `worker_details`: per-worker type, status, registered_at
+  - `queue_depth`: live Redis `LLEN` of `omnix:jobs` queue
+  - `processing_jobs`: jobs currently being processed (in-process counter)
+  - `completed_jobs`: completed since worker start
+  - `failed_jobs`: failed since worker start
+  - `stuck_jobs.older_than_10m/30m/60m`: DB-derived counts of queued jobs older than threshold
+- `GET /health/schema` — workspace schema health
+- `GET /health/providers` — active AI providers
 
 **Conversations (personal AI chat)**
 - `GET /conversations` — list user's conversations
@@ -955,18 +973,33 @@ Files that, if broken, will take down core functionality:
 # Frontend
 cd frontend && npm run dev              # Next.js on port 3000
 
-# Backend
+# Backend API
 cd backend && uvicorn app.main:app --reload --port 8000
 
+# Ingestion worker (REQUIRED for document processing)
+make ingestion-worker                   # python -m app.jobs.worker
+
+# Automation scheduler (presence cleanup, workspace automations)
+make automation-scheduler              # python -m app.automation.scheduler
+
 # Full stack
-docker-compose up                       # Uses docker-compose.yml
+docker-compose up                      # Uses docker-compose.yml
 ```
 
-### Production
+### Production Service Architecture
+
+| Service | Command | Systemd Unit | OMNIX_ROLE |
+|---------|---------|--------------|------------|
+| API | `uvicorn app.main:app` | `omnix` | `api` |
+| Ingestion Worker | `python -m app.jobs.worker` | `omnix-ingestion-worker` | `ingestion_worker` |
+| Automation Scheduler | `python -m app.automation.scheduler` | `omnix-automation-scheduler` | `automation_scheduler` |
+
 - Backend: EC2 instance at `18.204.231.209`
 - Frontend: Vercel (configured in `frontend/vercel.json`)
 - Reverse proxy: nginx (`nginx.conf`)
 - Backend Dockerfile: `backend/Dockerfile.backend`
+- Systemd units: `scripts/omnix-ingestion-worker.service`, `scripts/omnix-automation-scheduler.service`
+- GitHub Actions deploy: `.github/workflows/deploy.yml` — restarts all 3 services on push to main
 
 ### Key Dev Notes
 - Backend loads `.env` from both repo root AND `backend/` directory
@@ -974,13 +1007,27 @@ docker-compose up                       # Uses docker-compose.yml
 - Redis is required for production — initialized in `bootstrap/redis.py`
 - pgvector extension must be enabled in Supabase project
 - Supabase project ID: `qsaaipuaxcreiljnwcgs`
+- `OMNIX_ROLE` env var controls which process a container/systemd unit runs as
+- Ingestion worker registers itself with RuntimeManager on startup — visible at `GET /health/ingestion-worker`
+
+### Ingestion Worker Queue Contract
+- Job row inserted to `jobs` DB table FIRST (DB-first enqueue)
+- Job ID then pushed to Redis `omnix:jobs` queue (controlled by `OMNIX_JOB_QUEUE` env)
+- If DB insert fails → Redis push is skipped entirely (no orphan entries)
+- If Redis push fails after DB write → job row persists as stuck and is detectable via `/health/ingestion-worker`
+- Stuck job detection thresholds: 10m, 30m, 60m (detection only — no auto-repair)
 
 ### Running Tests
 ```bash
-cd backend && pytest                    # All backend tests
-pytest tests/                          # Specific test directory
+pytest backend/tests/test_ingestion_worker_recovery.py   # Worker recovery sprint tests (24 tests)
+pytest backend/tests/db/                                  # DB client tests
+pytest backend/tests/                                     # All available tests
 ```
+
+> [!NOTE]
+> Tests in `backend/tests/routers/` and `backend/tests/services/` require `fastapi` and other
+> production packages installed. Run them inside the backend virtualenv: `cd backend && venv/bin/pytest`
 
 ---
 
-*Last updated: 2026-06-10. Update this file when adding new routers, services, major components, or env variables.*
+*Last updated: 2026-06-10 — Ingestion Worker Recovery Sprint (fix/ingestion-worker-recovery). Update this file when adding new routers, services, major components, or env variables.*
