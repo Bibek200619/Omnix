@@ -6,7 +6,12 @@ dev:
 backend:
 	cd backend && venv/bin/uvicorn app.main:app
 
-worker:
+worker: ingestion-worker
+
+ingestion-worker:
+	cd backend && venv/bin/python -m app.jobs.worker
+
+automation-scheduler:
 	cd backend && venv/bin/python -m app.automation.scheduler
 
 docker-up:
