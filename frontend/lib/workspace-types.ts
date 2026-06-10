@@ -496,6 +496,27 @@ export type WorkspaceDecision = {
   } | null;
 };
 
+export type DecisionCandidateSourceType = "conversation" | "document";
+export type DecisionCandidateConfidence = "low" | "medium" | "high";
+
+export type DecisionCandidate = {
+  id: string;
+  title: string;
+  reason: string;
+  confidence: DecisionCandidateConfidence;
+  source_type: DecisionCandidateSourceType;
+  source_id: string;
+  supporting_evidence: string[];
+};
+
+export type DecisionCandidateList = {
+  candidates: DecisionCandidate[];
+  candidate_count: number;
+  source_type: DecisionCandidateSourceType;
+  source_id: string;
+  generated_at: string;
+};
+
 export type WorkspaceSearchResultType = "conversation" | "task" | "initiative" | "decision";
 
 export type WorkspaceSearchResult = {

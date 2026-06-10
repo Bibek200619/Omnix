@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertCircle,
+  BadgeCheck,
   CheckCircle2,
   Clock3,
   Database,
@@ -30,6 +31,8 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { CreateDecisionModal } from "@/components/decisions/CreateDecisionModal";
+import { DecisionCandidatePanel } from "@/components/decisions/DecisionCandidatePanel";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -37,6 +40,7 @@ import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStac
 import { workspaceRoleLabel } from "@/lib/workspace-roles";
 import { cn } from "@/lib/utils";
 import type { MessageAttachment } from "@/components/chat/types";
+import type { DecisionCandidate, DecisionCandidateList, WorkspaceDecisionStatus } from "@/lib/workspace-types";
 
 const UploadDropzone = dynamic(() => import("@/components/upload/UploadDropzone").then((m) => m.UploadDropzone), { ssr: false });
 
@@ -339,6 +343,16 @@ export default function FilesPage() {
   const [savingConnector, setSavingConnector] = useState(false);
   const [actionConnectorId, setActionConnectorId] = useState<string | null>(null);
   const [authConnectorId, setAuthConnectorId] = useState<string | null>(null);
+  const [candidateFile, setCandidateFile] = useState<FileData | null>(null);
+  const [decisionCandidates, setDecisionCandidates] = useState<DecisionCandidate[]>([]);
+  const [decisionCandidatesLoading, setDecisionCandidatesLoading] = useState(false);
+  const [decisionCandidatesError, setDecisionCandidatesError] = useState<string | null>(null);
+  const [decisionCandidateDraft, setDecisionCandidateDraft] = useState<{
+    title: string;
+    reason: string;
+    description: string;
+    status: WorkspaceDecisionStatus;
+  } | null>(null);
   const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
 
   const filteredFiles = files.filter((file) => {
@@ -445,6 +459,64 @@ export default function FilesPage() {
     } catch (err) {
       logClientError("Failed to download file", err, { endpoint: `/files/${id}/download` });
       setError("Unable to download file.");
+    }
+  }
+
+  async function scanDocumentDecisionCandidates(file: FileData) {
+    if (!activeWorkspaceId) {
+      setError("Select a workspace before scanning document decisions.");
+      return;
+    }
+    setCandidateFile(file);
+    setDecisionCandidates([]);
+    setDecisionCandidatesLoading(true);
+    setDecisionCandidatesError(null);
+    try {
+      const result = await apiClient.post<DecisionCandidateList>(
+        `/workspaces/${activeWorkspaceId}/decisions/candidates/document/${file.id}`,
+        {},
+      );
+      setDecisionCandidates(result.candidates);
+    } catch (err) {
+      logClientError("Failed to extract document decision candidates", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/document/${file.id}` });
+      setDecisionCandidatesError("Unable to scan this document for decision candidates.");
+    } finally {
+      setDecisionCandidatesLoading(false);
+    }
+  }
+
+  async function openCandidateDecision(candidate: DecisionCandidate) {
+    if (!activeWorkspaceId) return;
+    setDecisionCandidateDraft({
+      title: candidate.title,
+      reason: candidate.reason,
+      description: `Supporting evidence:\n${candidate.supporting_evidence.join("\n")}`,
+      status: "proposed",
+    });
+    try {
+      await apiClient.post(`/workspaces/${activeWorkspaceId}/decisions/candidates/metrics`, {
+        action: "accept",
+        candidate_id: candidate.id,
+        source_type: candidate.source_type,
+        source_id: candidate.source_id,
+      });
+    } catch (err) {
+      logClientError("Failed to log document decision candidate acceptance", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/metrics` });
+    }
+  }
+
+  async function dismissDecisionCandidate(candidate: DecisionCandidate) {
+    setDecisionCandidates((current) => current.filter((item) => item.id !== candidate.id));
+    if (!activeWorkspaceId) return;
+    try {
+      await apiClient.post(`/workspaces/${activeWorkspaceId}/decisions/candidates/metrics`, {
+        action: "dismiss",
+        candidate_id: candidate.id,
+        source_type: candidate.source_type,
+        source_id: candidate.source_id,
+      });
+    } catch (err) {
+      logClientError("Failed to log document decision candidate dismissal", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/metrics` });
     }
   }
 
@@ -906,6 +978,7 @@ export default function FilesPage() {
                       </div>
                     </div>
                     <div className={view === "grid" ? "grid grid-cols-2 gap-2 border-t border-white/5 pt-3 sm:flex sm:items-center" : "grid grid-cols-2 gap-2 sm:flex sm:items-center"}>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<BadgeCheck className="h-3.5 w-3.5" />} onClick={() => void scanDocumentDecisionCandidates(f)}>Decisions</Button>
                       <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
                       <Button type="button" size="sm" variant="ghost" className="min-h-10 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
                     </div>
@@ -916,6 +989,58 @@ export default function FilesPage() {
           )}
         </div>
       </div>
+
+      {candidateFile ? (
+        <DocumentPortal>
+          <div className="fixed inset-0 z-[155] flex items-end justify-center bg-black/70 px-3 py-4 backdrop-blur-md sm:items-center">
+            <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(12,18,28,0.98),rgba(3,6,12,0.98))] p-4 shadow-2xl sm:rounded-2xl sm:p-5">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Document suggestions</p>
+                  <h3 className="mt-1 truncate text-base font-semibold text-white">{candidateFile.file_name ?? candidateFile.filename ?? "Document"}</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCandidateFile(null);
+                    setDecisionCandidates([]);
+                    setDecisionCandidatesError(null);
+                  }}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
+                  aria-label="Close document decision suggestions"
+                  title="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <DecisionCandidatePanel
+                collapsed={false}
+                candidates={decisionCandidates}
+                loading={decisionCandidatesLoading}
+                error={decisionCandidatesError}
+                emptyText="No evidence-backed document decisions found."
+                onToggle={() => undefined}
+                onRefresh={() => void scanDocumentDecisionCandidates(candidateFile)}
+                onCreate={(candidate) => void openCandidateDecision(candidate)}
+                onDismiss={(candidate) => void dismissDecisionCandidate(candidate)}
+              />
+            </div>
+          </div>
+        </DocumentPortal>
+      ) : null}
+
+      {activeWorkspaceId && decisionCandidateDraft ? (
+        <CreateDecisionModal
+          workspaceId={activeWorkspaceId}
+          initialValues={decisionCandidateDraft}
+          onClose={() => setDecisionCandidateDraft(null)}
+          onSuccess={() => {
+            setDecisionCandidateDraft(null);
+            setCandidateFile(null);
+            setDecisionCandidates([]);
+          }}
+        />
+      ) : null}
 
       {setupType && setupMeta ? (
         <DocumentPortal>
