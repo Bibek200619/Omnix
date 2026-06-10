@@ -332,7 +332,7 @@ async def check_workspace_schema_health() -> dict[str, Any]:
         return evaluate_workspace_schema_health(metadata)
     except SchemaHealthError as exc:
         return {
-            "status": "unhealthy",
+            "status": "degraded",
             "summary": "Workspace schema health could not be verified.",
             "diagnostics": {"metadata_error": str(exc), "required_rpc": SCHEMA_HEALTH_RPC},
             "tables": {},
