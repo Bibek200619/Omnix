@@ -10,6 +10,10 @@ from app.services.supabase_service import SupabaseServiceError
 from app.services.workspace_service import WorkspaceAccess
 
 
+def _resolved(address: str):
+    return [(connectors.socket.AF_INET, connectors.socket.SOCK_STREAM, 0, "", (address, 443))]
+
+
 def _access(workspace_id: str = "workspace-1") -> WorkspaceAccess:
     return WorkspaceAccess(
         workspace={
@@ -128,6 +132,7 @@ async def test_knowledge_link_success_creates_retrievable_file(monkeypatch: pyte
         return None
 
     monkeypatch.setattr(connectors, "require_workspace_access", fake_access)
+    monkeypatch.setattr(connectors.socket, "getaddrinfo", lambda *args, **kwargs: _resolved("93.184.216.34"))
     monkeypatch.setattr(connectors, "fetch_knowledge_link", fake_fetch)
     monkeypatch.setattr(connectors, "insert_one", fake_insert_one)
     monkeypatch.setattr(connectors, "store_extracted_text_chunks", fake_store_chunks)
@@ -175,10 +180,21 @@ async def test_database_connector_requires_connection_scope(monkeypatch: pytest.
     assert exc_info.value.status_code == 400
 
 
-def test_private_knowledge_urls_are_not_fetchable() -> None:
+def test_private_knowledge_urls_are_not_fetchable(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_getaddrinfo(host: str, *args, **kwargs):
+        if host == "example.com":
+            return _resolved("93.184.216.34")
+        if host == "internal.example":
+            return _resolved("10.0.0.4")
+        raise OSError("DNS failure")
+
+    monkeypatch.setattr(connectors.socket, "getaddrinfo", fake_getaddrinfo)
+
     assert connectors._is_safe_http_url("https://example.com/docs") is True
     assert connectors._is_safe_http_url("http://localhost:8080/docs") is False
     assert connectors._is_safe_http_url("http://127.0.0.1/docs") is False
+    assert connectors._is_safe_http_url("https://internal.example/docs") is False
+    assert connectors._is_safe_http_url("https://missing.example/docs") is False
 
 
 def test_html_link_parser_falls_back_when_bs4_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:

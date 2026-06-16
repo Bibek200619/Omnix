@@ -205,7 +205,7 @@ backend/
 │   │   ├── redis.py         # Redis connection init
 │   │   ├── vector_store.py  # pgvector init
 │   │   ├── workers.py       # Background worker init
-│   │   └── shutdown.py      # Graceful shutdown handler
+│   │   └── shutdown.py      # Graceful shutdown handler with bounded worker drain
 │   ├── routers/             # FastAPI route handlers (API surface)
 │   │   ├── messages.py      # AI chat + streaming (50KB — CRITICAL)
 │   │   ├── workspaces.py    # Workspace CRUD + members (53KB — CRITICAL)
@@ -221,7 +221,7 @@ backend/
 │   │   ├── actions.py                 # AI action extraction
 │   │   ├── automations.py             # Automation rules
 │   │   ├── insights.py                # AI-generated insights
-│   │   ├── connectors.py              # External data connectors
+│   │   ├── connectors.py              # External data connectors with public URL/DNS safety checks
 │   │   ├── google_drive.py            # Google Drive integration
 │   │   ├── continuity.py              # Workspace continuity/memory
 │   │   ├── profile.py                 # User profile
@@ -545,7 +545,7 @@ ProviderManager (backend/app/services/llm/manager.py)
 │   ├── "openai"       → OpenAIProvider (if OPENAI_API_KEY set)
 │   ├── "local"        → LocalModelProvider (if LOCAL_MODEL_PATH set)
 │   └── "placeholder"  → PlaceholderProvider (always registered, fallback)
-└── Default: env DEFAULT_PROVIDER (default: "placeholder" in llm/config.py)
+└── Default: env DEFAULT_PROVIDER (default: "ollama" in llm/config.py)
     Fallback: env FALLBACK_PROVIDER (default: "placeholder")
 ```
 
@@ -777,6 +777,7 @@ OMNIX_JOB_QUEUE=omnix:jobs
 OMNIX_JOB_MAX_ATTEMPTS=3
 OMNIX_JOB_LEASE_TIMEOUT_SECONDS=900
 OMNIX_DB_JOB_RECOVERY_BATCH_SIZE=25
+OMNIX_SHUTDOWN_DRAIN_TIMEOUT_SECONDS=5
 
 # Deployment / Security
 OMNIX_PUBLIC_API_DOCS=false
@@ -1051,6 +1052,7 @@ docker-compose up                      # Uses docker-compose.yml
 - Reverse proxy: nginx (`nginx.conf`)
 - Backend Dockerfile: `backend/Dockerfile.backend`
 - Production compose: `docker-compose.prod.yml` mounts shared `omnix_uploads:/app/uploads` into API and ingestion-worker
+- Worker script: `scripts/start_workers.sh` scales the `ingestion-worker` compose service
 - Systemd units: `scripts/omnix-ingestion-worker.service`, `scripts/omnix-automation-scheduler.service`
 - GitHub Actions deploy: `.github/workflows/deploy.yml` — restarts all 3 services on push to main
 
@@ -1058,6 +1060,8 @@ docker-compose up                      # Uses docker-compose.yml
 - Backend loads `.env` from both repo root AND `backend/` directory
 - `DEV_MODE=true` enables relaxed settings (e.g., CORS `*`)
 - Redis is required for production — initialized in `bootstrap/redis.py`
+- Graceful shutdown waits up to `OMNIX_SHUTDOWN_DRAIN_TIMEOUT_SECONDS` for in-process ingestion jobs to drain before closing shared clients
+- `OpenTelemetryExporter` emits sanitized span attributes when an OpenTelemetry tracer is available; otherwise it returns disabled without exporting content
 - pgvector extension must be enabled in Supabase project
 - Supabase project ID: `qsaaipuaxcreiljnwcgs`
 - `OMNIX_ROLE` env var controls which process a container/systemd unit runs as
@@ -1071,6 +1075,10 @@ docker-compose up                      # Uses docker-compose.yml
 - Redis delivery and DB recovery both lease jobs by transitioning `queued` → `processing` with incremented `attempts`
 - Stale `processing` jobs older than `OMNIX_JOB_LEASE_TIMEOUT_SECONDS` requeue automatically until `OMNIX_JOB_MAX_ATTEMPTS`; exhausted jobs move to `dead_letter`
 - Stuck job detection thresholds: 10m, 30m, 60m count queued jobs by `created_at` and remain visible at `/health/ingestion-worker`
+
+### Connector & Cleanup Safety
+- Knowledge-link and drive-link connector URLs must resolve only to public IP addresses; DNS results resolving to private/local/reserved ranges are rejected.
+- `cleanup_old_artifacts()` selects workspace artifacts by `created_at` and deletes only artifacts older than the configured cutoff, scoped by both `workspace_id` and artifact `id`.
 
 ### Running Tests
 ```bash

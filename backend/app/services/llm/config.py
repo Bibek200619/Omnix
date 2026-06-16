@@ -3,7 +3,7 @@ from typing import Optional
 
 class LLMSettings(BaseSettings):
     # Provider Selection
-    DEFAULT_PROVIDER: str = "placeholder" # Options: placeholder, openai, ollama, local
+    DEFAULT_PROVIDER: str = "ollama" # Options: placeholder, openai, ollama, local
     FALLBACK_PROVIDER: str = "placeholder"
 
     # OpenAI Settings
