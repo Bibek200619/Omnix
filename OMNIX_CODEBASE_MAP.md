@@ -783,6 +783,7 @@ OMNIX_SHUTDOWN_DRAIN_TIMEOUT_SECONDS=5
 OMNIX_PUBLIC_API_DOCS=false
 OMNIX_CORS_ALLOWED_ORIGINS=https://app.omni-x.co.in
 OMNIX_ADMIN_USER_IDS=
+OMNIX_TOKEN_ENCRYPTION_KEY=  # Optional; defaults to deriving from SUPABASE_SERVICE_ROLE_KEY for Google Drive token encryption
 
 # Web Search (optional)
 WEB_SEARCH_ENABLED=false
@@ -913,7 +914,7 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
 
 **Google Drive Integration**
 - `GET /integrations/google_drive/connect?workspace_id=...` — requires workspace access when binding a workspace and returns an authorize URL with signed OAuth state
-- `GET /integrations/google_drive/callback` — auth-exempt OAuth redirect; validates signed state TTL and rechecks workspace access before token storage
+- `GET /integrations/google_drive/callback` — auth-exempt OAuth redirect; validates signed state TTL, rechecks workspace access, and stores encrypted access/refresh tokens
 - `GET /integrations/google_drive/files?workspace_id=...` — requires workspace access before workspace token lookup
 - `POST /integrations/google_drive/import?workspace_id=...&file_id=...` — requires workspace access before token lookup, file storage, and RAG ingestion
 
