@@ -5,6 +5,13 @@ from typing import Any
 
 
 DEV_ENVIRONMENTS = {"dev", "development", "local", "test"}
+DEFAULT_PRODUCTION_CORS_ORIGINS = [
+    "https://omni-x.co.in",
+    "https://www.omni-x.co.in",
+    "https://app.omni-x.co.in",
+    "https://omnix.ai",
+    "https://www.omnix.ai",
+]
 
 
 def _split_csv(value: Any) -> list[str]:
@@ -59,12 +66,12 @@ def cors_allowed_origins(settings: Any | None = None) -> list[str]:
     fallback_origins = _split_csv(frontend_url)
     if fallback_origins:
         if not is_development_mode(settings) and any(_is_local_origin(origin) for origin in fallback_origins):
-            return []
+            return DEFAULT_PRODUCTION_CORS_ORIGINS
         return fallback_origins
 
     if is_development_mode(settings):
         return ["*"]
-    return []
+    return DEFAULT_PRODUCTION_CORS_ORIGINS
 
 
 def cors_allow_credentials(origins: list[str]) -> bool:

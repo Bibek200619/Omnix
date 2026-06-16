@@ -29,6 +29,14 @@ async def test_audit_stabilization_contracts_work_together(monkeypatch: pytest.M
     assert deployment.public_api_docs_enabled(prod_settings) is False
     assert deployment.cors_allowed_origins(prod_settings) == ["https://app.omni-x.co.in"]
     assert deployment.cors_allow_credentials(["https://app.omni-x.co.in"]) is True
+    incomplete_prod_settings = SimpleNamespace(
+        **{
+            **prod_settings.__dict__,
+            "OMNIX_CORS_ALLOWED_ORIGINS": "",
+            "OMNIX_APP_URL": "http://localhost:3000",
+        }
+    )
+    assert deployment.cors_allowed_origins(incomplete_prod_settings) == deployment.DEFAULT_PRODUCTION_CORS_ORIGINS
 
     monkeypatch.setattr(security, "public_api_docs_enabled", lambda: False)
     assert security._is_exempt_path("/docs") is False

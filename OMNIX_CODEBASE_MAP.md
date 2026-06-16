@@ -1063,6 +1063,7 @@ docker-compose up                      # Uses docker-compose.yml
 - Redis is required for production — initialized in `bootstrap/redis.py`
 - Graceful shutdown waits up to `OMNIX_SHUTDOWN_DRAIN_TIMEOUT_SECONDS` for in-process ingestion jobs to drain before closing shared clients
 - `OpenTelemetryExporter` emits sanitized span attributes when an OpenTelemetry tracer is available; otherwise it returns disabled without exporting content
+- Production CORS never uses wildcard credentials; if deployment origin env is incomplete, backend falls back to known Omnix app origins in `core/deployment.py`
 - pgvector extension must be enabled in Supabase project
 - Supabase project ID: `qsaaipuaxcreiljnwcgs`
 - `OMNIX_ROLE` env var controls which process a container/systemd unit runs as
