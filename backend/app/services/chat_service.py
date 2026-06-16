@@ -136,7 +136,6 @@ class OllamaChatService:
                 "chars": len(message.get("content") or ""),
                 "has_web_search_results": "WEB SEARCH RESULTS:" in (message.get("content") or ""),
                 "has_document_context": "DOCUMENT CONTEXT:" in (message.get("content") or ""),
-                "preview": (message.get("content") or "").replace("\n", " ")[:360],
             }
             for index, message in enumerate(payload["messages"])
         ]
@@ -153,9 +152,13 @@ class OllamaChatService:
             "DOCUMENT CONTEXT:" in (prompt or ""),
             messages_summary,
         )
-        logger.debug("Ollama final user prompt preview: %r", (prompt or "")[:500])
         if self.settings.DEV_MODE:
-            logger.debug("Ollama final payload debug: %s", json.dumps(payload, ensure_ascii=False))
+            logger.debug(
+                "Ollama final payload debug: model=%s stream=%s messages_summary=%s",
+                payload["model"],
+                stream,
+                messages_summary,
+            )
         return payload
 
     @staticmethod

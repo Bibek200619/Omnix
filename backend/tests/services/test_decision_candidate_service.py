@@ -99,10 +99,16 @@ async def test_document_candidates_load_existing_document_chunks(monkeypatch: py
 @pytest.mark.asyncio
 async def test_candidate_metrics_log_accept_and_dismiss_counts(monkeypatch: pytest.MonkeyPatch) -> None:
     events: list[dict[str, object]] = []
+    access_checks: list[tuple[str, str]] = []
+
+    async def fake_require_workspace_access(workspace_id: str, user_id: str):
+        access_checks.append((workspace_id, user_id))
+        return SimpleNamespace(workspace={"id": workspace_id})
 
     async def fake_activity(**kwargs):
         events.append(kwargs)
 
+    monkeypatch.setattr(candidates, "require_workspace_access", fake_require_workspace_access)
     monkeypatch.setattr(candidates, "log_workspace_activity", fake_activity)
 
     await candidates.log_candidate_metrics(
@@ -126,3 +132,4 @@ async def test_candidate_metrics_log_accept_and_dismiss_counts(monkeypatch: pyte
     assert events[0]["metadata"]["accept_count"] == 1
     assert events[1]["event_type"] == "decision_candidate.dismissed"
     assert events[1]["metadata"]["dismiss_count"] == 1
+    assert access_checks == [("workspace-1", "user-1"), ("workspace-1", "user-1")]

@@ -8,6 +8,7 @@ from typing import Any
 from ..rag.startup import get_vector_store
 
 from ..context.engine import ContextEngine
+from ..services.workspace_service import require_workspace_access
 
 from ..actions import summarize as summarize_action
 from ..actions import tasks as tasks_action
@@ -32,6 +33,8 @@ async def run_action(request: Request, body: ActionRequest) -> Any:
 
     user_id = user.get("sub")
     workspace_id = request.headers.get("X-Omnix-Workspace") or None
+    if workspace_id:
+        await require_workspace_access(workspace_id, str(user_id))
 
     # Build unified context engine
     vector_store = get_vector_store()

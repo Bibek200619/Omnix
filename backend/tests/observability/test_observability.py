@@ -7,6 +7,7 @@ from app.observability.runtime import ExecutionRuntime
 from app.observability.event_bus import EventBus
 from app.observability.schemas import ObservabilityEvent
 from app.observability.serializers import sanitize_dict
+from app.observability.exporters.opentelemetry import OpenTelemetryExporter
 
 @pytest.mark.asyncio
 async def test_retrieval_tracing():
@@ -149,3 +150,60 @@ async def test_event_bus_reliability():
     
     assert len(received_events) == 1
     assert received_events[0].payload["msg"] == "hello"
+
+
+@pytest.mark.asyncio
+async def test_opentelemetry_exporter_disabled_without_tracer():
+    exporter = OpenTelemetryExporter(tracer=None)
+    exporter.tracer = None
+    exporter.is_configured = False
+    event = ObservabilityEvent(
+        event_type="test_event",
+        trace_context=ContextTrace(workspace_id="workspace-1").context,
+        payload={"count": 1},
+    )
+
+    assert await exporter.export(event) is False
+
+
+@pytest.mark.asyncio
+async def test_opentelemetry_exporter_sets_span_attributes():
+    class FakeSpan:
+        def __init__(self):
+            self.attributes = {}
+
+        def set_attribute(self, key, value):
+            self.attributes[key] = value
+
+    class FakeSpanContext:
+        def __init__(self, span):
+            self.span = span
+
+        def __enter__(self):
+            return self.span
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+    class FakeTracer:
+        def __init__(self):
+            self.span = FakeSpan()
+
+        def start_as_current_span(self, name):
+            self.name = name
+            return FakeSpanContext(self.span)
+
+    tracer = FakeTracer()
+    exporter = OpenTelemetryExporter(tracer=tracer)
+    event = ObservabilityEvent(
+        event_type="test_event",
+        trace_context=ContextTrace(workspace_id="workspace-1").context,
+        payload={"count": 1, "secret": "Bearer token-value"},
+    )
+
+    assert await exporter.export(event) is True
+    assert tracer.name == "test_event"
+    assert tracer.span.attributes["omnix.event_type"] == "test_event"
+    assert tracer.span.attributes["omnix.workspace_id"] == "workspace-1"
+    assert tracer.span.attributes["omnix.payload.count"] == 1
+    assert tracer.span.attributes["omnix.payload.secret"] == "***REDACTED***"

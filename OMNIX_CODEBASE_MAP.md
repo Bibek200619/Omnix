@@ -205,7 +205,7 @@ backend/
 │   │   ├── redis.py         # Redis connection init
 │   │   ├── vector_store.py  # pgvector init
 │   │   ├── workers.py       # Background worker init
-│   │   └── shutdown.py      # Graceful shutdown handler
+│   │   └── shutdown.py      # Graceful shutdown handler with bounded worker drain
 │   ├── routers/             # FastAPI route handlers (API surface)
 │   │   ├── messages.py      # AI chat + streaming (50KB — CRITICAL)
 │   │   ├── workspaces.py    # Workspace CRUD + members (53KB — CRITICAL)
@@ -221,7 +221,7 @@ backend/
 │   │   ├── actions.py                 # AI action extraction
 │   │   ├── automations.py             # Automation rules
 │   │   ├── insights.py                # AI-generated insights
-│   │   ├── connectors.py              # External data connectors
+│   │   ├── connectors.py              # External data connectors with public URL/DNS safety checks
 │   │   ├── google_drive.py            # Google Drive integration
 │   │   ├── continuity.py              # Workspace continuity/memory
 │   │   ├── profile.py                 # User profile
@@ -265,6 +265,7 @@ backend/
 │   │           └── placeholder.py             # Fallback placeholder provider
 │   ├── core/
 │   │   ├── security.py      # JWT auth middleware + get_current_user (9KB)
+│   │   ├── deployment.py    # Environment policy for public docs, CORS origins, admin user ids
 │   │   ├── rbac.py          # Role-based access control
 │   │   └── config.py        # get_settings() factory
 │   ├── db/
@@ -345,7 +346,7 @@ User types message → ChatInterface.tsx
 
 ```
 User uploads file → upload.py router
-  → Saves original file to disk
+  → Saves original file to disk under `OMNIX_UPLOAD_DIR`
   → Inserts files row with extraction_status='processing'
   → Extracts text with document_intelligence_service.py diagnostics
   → Detects image-only PDFs through empty text layer + image XObjects
@@ -360,6 +361,7 @@ User uploads file → upload.py router
 
 Allowed document extraction states: `processing`, `searchable`, `ocr_required`, `extraction_failed`.
 Documents with zero extracted characters are not treated as fully available unless OCR produced searchable text.
+Production compose mounts named volume `omnix_uploads` at `/app/uploads` for both the API and ingestion worker; `OMNIX_UPLOAD_DIR=/app/uploads` must stay identical in both services because worker jobs read the stored `files.storage_path`.
 
 ### Command Palette & Workspace Search Request
 
@@ -419,11 +421,13 @@ Important boundary: candidates are not persisted decisions, never auto-accepted,
 6. On 401: frontend auto-calls `supabase.auth.signOut()`
 
 ### Exempt Auth Paths (no JWT required)
-- `/health`, `/docs`, `/openapi.json`, `/redoc`
-- `/integrations/google_drive/callback`
+- `/health`
+- `/docs`, `/docs/oauth2-redirect`, `/openapi.json`, `/redoc` only when `OMNIX_PUBLIC_API_DOCS=true` or dev/local/test mode enables public docs
+- `/integrations/google_drive/callback` — Google cannot send Omnix JWTs; callback must validate signed, time-limited OAuth state before storing tokens
 
 ### Backend Auth Helpers
 - `get_current_user(request)` — dependency injection for authenticated routes
+- `require_workspace_access(workspace_id, user_id)` — canonical workspace route/service authorization check
 - `check_workspace_access(user_id, workspace_id)` — workspace permission check
 - `get_supabase_auth_client()` — auth admin client (service role)
 
@@ -541,7 +545,7 @@ ProviderManager (backend/app/services/llm/manager.py)
 │   ├── "openai"       → OpenAIProvider (if OPENAI_API_KEY set)
 │   ├── "local"        → LocalModelProvider (if LOCAL_MODEL_PATH set)
 │   └── "placeholder"  → PlaceholderProvider (always registered, fallback)
-└── Default: env DEFAULT_PROVIDER (default: "placeholder" in llm/config.py)
+└── Default: env DEFAULT_PROVIDER (default: "ollama" in llm/config.py)
     Fallback: env FALLBACK_PROVIDER (default: "placeholder")
 ```
 
@@ -551,6 +555,7 @@ ProviderManager (backend/app/services/llm/manager.py)
 - Default model: `phi3:mini`
 - Streaming: yes (async generator)
 - Config: `AI_REQUEST_TIMEOUT_SECONDS`, `AI_STREAM_TIMEOUT_SECONDS`, `AI_MAX_RETRIES`
+- Logging rule: prompt text, document chunk previews, and full provider payloads are not logged; AI request logs use lengths, counts, and context flags only
 
 ### AI System Prompt
 Defined in `settings/providers.py` → `AI_SYSTEM_PROMPT`:
@@ -766,6 +771,20 @@ OMNIX_MIN_EXTRACTED_CHARACTERS=20
 OMNIX_OCR_ENABLED=true
 OMNIX_MAX_OCR_PAGES=25
 
+# Jobs / Workers
+REDIS_URL=redis://localhost:6379/0
+OMNIX_JOB_QUEUE=omnix:jobs
+OMNIX_JOB_MAX_ATTEMPTS=3
+OMNIX_JOB_LEASE_TIMEOUT_SECONDS=900
+OMNIX_DB_JOB_RECOVERY_BATCH_SIZE=25
+OMNIX_SHUTDOWN_DRAIN_TIMEOUT_SECONDS=5
+
+# Deployment / Security
+OMNIX_PUBLIC_API_DOCS=false
+OMNIX_CORS_ALLOWED_ORIGINS=https://app.omni-x.co.in
+OMNIX_ADMIN_USER_IDS=
+OMNIX_TOKEN_ENCRYPTION_KEY=  # Optional; defaults to deriving from SUPABASE_SERVICE_ROLE_KEY for Google Drive token encryption
+
 # Web Search (optional)
 WEB_SEARCH_ENABLED=false
 TAVILY_API_KEY=
@@ -816,6 +835,12 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
   - `stuck_jobs.older_than_10m/30m/60m`: DB-derived counts of queued jobs older than threshold
 - `GET /health/schema` — workspace schema health
 - `GET /health/providers` — active AI providers
+
+**Admin Runtime**
+- `GET /admin/runtime/` — requires admin claim or `OMNIX_ADMIN_USER_IDS`
+- `GET /admin/runtime/workers` — requires admin claim or `OMNIX_ADMIN_USER_IDS`
+- `GET /admin/runtime/providers` — requires admin claim or `OMNIX_ADMIN_USER_IDS`
+- `GET /admin/runtime/settings` — requires admin claim or `OMNIX_ADMIN_USER_IDS`; returns non-sensitive settings only
 
 **Conversations (personal AI chat)**
 - `GET /conversations` — list user's conversations
@@ -883,7 +908,15 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
 - File responses include extraction diagnostics: `page_count`, `extractor_used`, `extracted_character_count`, `image_page_count`, `text_page_count`, `extraction_status`, `extraction_failure_reason`, `ocr_used`, `ocr_character_count`
 
 **Actions, Artifacts, Insights, Automations**
+- `POST /actions/run` — requires `X-Omnix-Workspace` access when the workspace header is present before retrieval/artifact persistence
 - Standard CRUD under `/workspaces/{id}/actions`, `/artifacts`, `/insights`, `/automations`
+- Automations routes require workspace access; automation updates are filtered by both `id` and `workspace_id`
+
+**Google Drive Integration**
+- `GET /integrations/google_drive/connect?workspace_id=...` — requires workspace access when binding a workspace and returns an authorize URL with signed OAuth state
+- `GET /integrations/google_drive/callback` — auth-exempt OAuth redirect; validates signed state TTL, rechecks workspace access, and stores encrypted access/refresh tokens
+- `GET /integrations/google_drive/files?workspace_id=...` — requires workspace access before workspace token lookup
+- `POST /integrations/google_drive/import?workspace_id=...&file_id=...` — requires workspace access before token lookup, file storage, and RAG ingestion
 
 **Profile**
 - `GET /profile`
@@ -1019,6 +1052,8 @@ docker-compose up                      # Uses docker-compose.yml
 - Frontend: Vercel (configured in `frontend/vercel.json`)
 - Reverse proxy: nginx (`nginx.conf`)
 - Backend Dockerfile: `backend/Dockerfile.backend`
+- Production compose: `docker-compose.prod.yml` mounts shared `omnix_uploads:/app/uploads` into API and ingestion-worker
+- Worker script: `scripts/start_workers.sh` scales the `ingestion-worker` compose service
 - Systemd units: `scripts/omnix-ingestion-worker.service`, `scripts/omnix-automation-scheduler.service`
 - GitHub Actions deploy: `.github/workflows/deploy.yml` — restarts all 3 services on push to main
 
@@ -1026,6 +1061,8 @@ docker-compose up                      # Uses docker-compose.yml
 - Backend loads `.env` from both repo root AND `backend/` directory
 - `DEV_MODE=true` enables relaxed settings (e.g., CORS `*`)
 - Redis is required for production — initialized in `bootstrap/redis.py`
+- Graceful shutdown waits up to `OMNIX_SHUTDOWN_DRAIN_TIMEOUT_SECONDS` for in-process ingestion jobs to drain before closing shared clients
+- `OpenTelemetryExporter` emits sanitized span attributes when an OpenTelemetry tracer is available; otherwise it returns disabled without exporting content
 - pgvector extension must be enabled in Supabase project
 - Supabase project ID: `qsaaipuaxcreiljnwcgs`
 - `OMNIX_ROLE` env var controls which process a container/systemd unit runs as
@@ -1035,12 +1072,18 @@ docker-compose up                      # Uses docker-compose.yml
 - Job row inserted to `jobs` DB table FIRST (DB-first enqueue)
 - Job ID then pushed to Redis `omnix:jobs` queue (controlled by `OMNIX_JOB_QUEUE` env)
 - If DB insert fails → Redis push is skipped entirely (no orphan entries)
-- If Redis push fails after DB write → job row persists as stuck and is detectable via `/health/ingestion-worker`
-- Stuck job detection thresholds: 10m, 30m, 60m (detection only — no auto-repair)
+- If Redis push fails after DB write → job row persists as `queued`; ingestion worker recovers it from DB when Redis is idle
+- Redis delivery and DB recovery both lease jobs by transitioning `queued` → `processing` with incremented `attempts`
+- Stale `processing` jobs older than `OMNIX_JOB_LEASE_TIMEOUT_SECONDS` requeue automatically until `OMNIX_JOB_MAX_ATTEMPTS`; exhausted jobs move to `dead_letter`
+- Stuck job detection thresholds: 10m, 30m, 60m count queued jobs by `created_at` and remain visible at `/health/ingestion-worker`
+
+### Connector & Cleanup Safety
+- Knowledge-link and drive-link connector URLs must resolve only to public IP addresses; DNS results resolving to private/local/reserved ranges are rejected.
+- `cleanup_old_artifacts()` selects workspace artifacts by `created_at` and deletes only artifacts older than the configured cutoff, scoped by both `workspace_id` and artifact `id`.
 
 ### Running Tests
 ```bash
-pytest backend/tests/test_ingestion_worker_recovery.py   # Worker recovery sprint tests (24 tests)
+pytest backend/tests/test_ingestion_worker_recovery.py   # Worker recovery tests (29 tests)
 pytest backend/tests/db/                                  # DB client tests
 pytest backend/tests/                                     # All available tests
 ```
@@ -1051,4 +1094,4 @@ pytest backend/tests/                                     # All available tests
 
 ---
 
-*Last updated: 2026-06-10 — Ingestion Worker Recovery Sprint (fix/ingestion-worker-recovery). Update this file when adding new routers, services, major components, or env variables.*
+*Last updated: 2026-06-16 — Audit stabilization auth hardening. Update this file when adding new routers, services, major components, or env variables.*

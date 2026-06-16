@@ -13,6 +13,7 @@ os.environ["AI_MAX_CONTEXT_MESSAGES"] = "4"
 
 from app.services import chat_service
 from app.services.chat_service import AIMessage, AIGeneration, OllamaChatService
+from app.services.llm.config import LLMSettings
 
 
 def test_build_payload_uses_phi3_and_preserves_context():
@@ -36,6 +37,15 @@ def test_build_payload_uses_phi3_and_preserves_context():
         "content": "The workspace was updated.",
     }
     assert payload["messages"][-1] == {"role": "user", "content": "What changed?"}
+
+
+def test_provider_framework_defaults_to_ollama(monkeypatch):
+    monkeypatch.delenv("DEFAULT_PROVIDER", raising=False)
+
+    settings = LLMSettings(_env_file=None)
+
+    assert settings.DEFAULT_PROVIDER == "ollama"
+    assert settings.FALLBACK_PROVIDER == "placeholder"
 
 
 def test_build_payload_limits_history_to_recent_messages():

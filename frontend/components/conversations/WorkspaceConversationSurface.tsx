@@ -558,24 +558,13 @@ export function WorkspaceConversationSurface() {
     setDecisionStatus("accepted");
   }
 
-  async function openCandidateDecision(candidate: DecisionCandidate) {
-    if (!activeWorkspaceId) return;
+  function openCandidateDecision(candidate: DecisionCandidate) {
     setDecisionSource({ kind: "candidate", candidate });
     setDecisionTitle(candidate.title);
     setDecisionReason(candidate.reason);
     setDecisionDescription(`Supporting evidence:\n${candidate.supporting_evidence.join("\n")}`);
     setDecisionMentions([]);
     setDecisionStatus("proposed");
-    try {
-      await apiClient.post(`/workspaces/${activeWorkspaceId}/decisions/candidates/metrics`, {
-        action: "accept",
-        candidate_id: candidate.id,
-        source_type: candidate.source_type,
-        source_id: candidate.source_id,
-      });
-    } catch (err) {
-      logClientError("Failed to log decision candidate acceptance", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/metrics` });
-    }
   }
 
   async function dismissDecisionCandidate(candidate: DecisionCandidate) {
@@ -648,6 +637,7 @@ export function WorkspaceConversationSurface() {
   async function createDecisionFromContext(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!activeWorkspaceId || !selectedChannelId || !decisionSource || !decisionTitle.trim()) return;
+    const source = decisionSource;
     try {
       setCreatingDecision(true);
       const payload = {
@@ -657,16 +647,33 @@ export function WorkspaceConversationSurface() {
         status: decisionStatus,
         mentions: mentionPayload(decisionMentions, `${decisionReason}\n${decisionDescription}`),
       };
-      const created = decisionSource.kind === "message"
+      const created = source.kind === "message"
         ? await apiClient.post<WorkspaceDecision>(
-            `/workspaces/${activeWorkspaceId}/decisions/from-message/${selectedChannelId}/${decisionSource.message.id}`,
+            `/workspaces/${activeWorkspaceId}/decisions/from-message/${selectedChannelId}/${source.message.id}`,
             payload,
           )
         : await apiClient.post<WorkspaceDecision>(
             `/workspaces/${activeWorkspaceId}/decisions`,
             payload,
           );
-      setDecisionConfirmation(`Decision recorded: ${created.title}`);
+      if (source.kind === "candidate") {
+        try {
+          await apiClient.post(`/workspaces/${activeWorkspaceId}/decisions/candidates/metrics`, {
+            action: "accept",
+            candidate_id: source.candidate.id,
+            source_type: source.candidate.source_type,
+            source_id: source.candidate.source_id,
+          });
+          setDecisionCandidates((current) => current.filter((item) => item.id !== source.candidate.id));
+        } catch (err) {
+          logClientError("Failed to log decision candidate acceptance", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/metrics` });
+        }
+      }
+      setDecisionConfirmation(
+        source.kind === "message"
+          ? `Decision recorded: ${created.title}. Source message and channel are preserved.`
+          : `Decision recorded: ${created.title}. Supporting evidence was copied into the description.`,
+      );
       setDecisionSource(null);
       setDecisionTitle("");
       setDecisionDescription("");
@@ -803,7 +810,7 @@ export function WorkspaceConversationSurface() {
       ) : null}
       {decisionConfirmation ? (
         <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-cyan-300/18 bg-cyan-300/[0.06] px-3 py-2 text-xs text-cyan-100">
-          <span>{decisionConfirmation}. Source message and channel are preserved.</span>
+          <span>{decisionConfirmation}</span>
           <button type="button" onClick={() => setDecisionConfirmation(null)} aria-label="Dismiss decision confirmation"><X className="h-3.5 w-3.5" /></button>
         </div>
       ) : null}

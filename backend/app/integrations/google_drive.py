@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 import os
 import logging
 import time
 from typing import Any
 
 import httpx
+from cryptography.fernet import Fernet, InvalidToken
 
+from ..core.config import get_settings
 from ..services.supabase_service import (
     insert_one_trusted,
     select_one_trusted,
@@ -25,6 +29,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly",
     "https://www.googleapis.com/auth/userinfo.email",
 ]
+ENCRYPTED_TOKEN_PREFIX = "fernet:"
 
 
 def _client_credentials() -> tuple[str, str]:
@@ -33,6 +38,43 @@ def _client_credentials() -> tuple[str, str]:
     if not client_id or not client_secret:
         raise RuntimeError("Google OAuth client_id/secret not configured in environment")
     return client_id, client_secret
+
+
+def _token_cipher() -> Fernet:
+    secret = os.environ.get("OMNIX_TOKEN_ENCRYPTION_KEY") or os.environ.get("GOOGLE_TOKEN_ENCRYPTION_KEY")
+    if not secret:
+        settings = get_settings()
+        secret = settings.SUPABASE_SERVICE_ROLE_KEY
+    if not secret:
+        raise RuntimeError("Google Drive token encryption secret is not configured")
+    key = base64.urlsafe_b64encode(hashlib.sha256(secret.encode("utf-8")).digest())
+    return Fernet(key)
+
+
+def _encrypt_token_value(value: Any) -> Any:
+    if not isinstance(value, str) or not value:
+        return value
+    if value.startswith(ENCRYPTED_TOKEN_PREFIX):
+        return value
+    encrypted = _token_cipher().encrypt(value.encode("utf-8")).decode("ascii")
+    return f"{ENCRYPTED_TOKEN_PREFIX}{encrypted}"
+
+
+def _decrypt_token_value(value: Any) -> Any:
+    if not isinstance(value, str) or not value.startswith(ENCRYPTED_TOKEN_PREFIX):
+        return value
+    encrypted = value[len(ENCRYPTED_TOKEN_PREFIX):]
+    try:
+        return _token_cipher().decrypt(encrypted.encode("ascii")).decode("utf-8")
+    except InvalidToken as exc:
+        raise RuntimeError("Stored Google Drive token cannot be decrypted") from exc
+
+
+def _decrypt_token_row(row: dict[str, Any]) -> dict[str, Any]:
+    decrypted = dict(row)
+    decrypted["access_token"] = _decrypt_token_value(decrypted.get("access_token"))
+    decrypted["refresh_token"] = _decrypt_token_value(decrypted.get("refresh_token"))
+    return decrypted
 
 
 def build_oauth_authorize_url(redirect_uri: str, state: str | None = None) -> str:
@@ -91,6 +133,7 @@ async def ensure_valid_token(row: dict[str, Any]) -> dict[str, Any]:
     """Ensure access_token is valid; refresh if expired."""
     if not row:
         raise RuntimeError("No token row provided")
+    row = _decrypt_token_row(row)
     expires_at = row.get("expires_at")
     if expires_at and int(time.time()) < int(expires_at) - 30:
         return row
@@ -105,7 +148,15 @@ async def ensure_valid_token(row: dict[str, Any]) -> dict[str, Any]:
         raise
     # Persist new tokens
     try:
-        await update_one_trusted("google_drive_tokens", {"id": row.get("id")}, {"access_token": new.get("access_token"), "expires_at": new.get("expires_at"), "updated_at": None})
+        await update_one_trusted(
+            "google_drive_tokens",
+            {"id": row.get("id")},
+            {
+                "access_token": _encrypt_token_value(new.get("access_token")),
+                "expires_at": new.get("expires_at"),
+                "updated_at": None,
+            },
+        )
     except Exception:
         logger.exception("Failed to persist refreshed token")
     row["access_token"] = new.get("access_token")
@@ -155,8 +206,8 @@ async def store_token_for_user(user_id: str, workspace_id: str | None, token_res
         "user_id": user_id,
         "workspace_id": workspace_id,
         "provider": "google_drive",
-        "access_token": token_response.get("access_token"),
-        "refresh_token": token_response.get("refresh_token"),
+        "access_token": _encrypt_token_value(token_response.get("access_token")),
+        "refresh_token": _encrypt_token_value(token_response.get("refresh_token")),
         "scope": token_response.get("scope"),
         "expires_at": token_response.get("expires_at"),
     }

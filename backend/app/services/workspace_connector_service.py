@@ -7,6 +7,7 @@ from html.parser import HTMLParser
 import ipaddress
 import logging
 import re
+import socket
 import uuid
 from typing import Any
 from urllib.parse import urljoin, urlparse
@@ -154,8 +155,23 @@ def _is_safe_http_url(url: str) -> bool:
     try:
         ip = ipaddress.ip_address(host)
     except ValueError:
-        return True
+        try:
+            resolved = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+        except OSError:
+            return False
+        addresses = {item[4][0] for item in resolved if item and item[4]}
+        if not addresses:
+            return False
+        return all(_is_public_ip_address(address) for address in addresses)
 
+    return _is_public_ip_address(str(ip))
+
+
+def _is_public_ip_address(value: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(value)
+    except ValueError:
+        return False
     return not (
         ip.is_private
         or ip.is_loopback
