@@ -24,6 +24,7 @@ INITIATIVE_COLUMNS = (
     "id,workspace_id,title,description,status,owner_user_id,created_by,target_date,"
     "initiative_context,linked_resources,activity_metadata,completed_at,client_nonce,created_at,updated_at"
 )
+INITIATIVE_STATUSES = {"draft", "active", "focused", "at_risk", "complete"}
 CHANNEL_LINK_COLUMNS = "initiative_id,workspace_id,channel_id,attached_by,created_at"
 DECISION_PREVIEW_COLUMNS = "id,title,status,decision_reason,created_at"
 logger = logging.getLogger(__name__)
@@ -52,6 +53,27 @@ def _normalize_resources(resources: Any) -> list[dict[str, Any]]:
         if isinstance(resource, Mapping):
             normalized.append(dict(resource))
     return normalized[:24]
+
+
+def _normalize_initiative_status(value: Any) -> str:
+    status_value = str(value or "").strip()
+    if status_value == "completed":
+        return "complete"
+    if status_value == "paused":
+        return "draft"
+    return status_value if status_value in INITIATIVE_STATUSES else "draft"
+
+
+def _normalize_initiative_row(row: Mapping[str, Any], workspace_id: str) -> dict[str, Any]:
+    normalized = dict(row)
+    normalized["workspace_id"] = str(normalized.get("workspace_id") or workspace_id)
+    normalized["title"] = _clean_text(normalized.get("title") or normalized.get("name")) or "Untitled initiative"
+    normalized["status"] = _normalize_initiative_status(normalized.get("status"))
+    normalized["linked_resources"] = _normalize_resources(normalized.get("linked_resources"))
+    normalized["activity_metadata"] = (
+        normalized.get("activity_metadata") if isinstance(normalized.get("activity_metadata"), dict) else {}
+    )
+    return normalized
 
 
 def _as_datetime(value: Any) -> datetime | None:
@@ -190,6 +212,7 @@ async def _hydrate_initiatives(
     workspace_id: str,
     user_id: str,
 ) -> list[dict[str, Any]]:
+    rows = [_normalize_initiative_row(row, workspace_id) for row in rows]
     tasks, visible_channels, channel_links = await _base_records(workspace_id, user_id)
     channels_by_id = {str(channel["id"]): channel for channel in visible_channels}
     profiles = await get_profiles(
@@ -229,8 +252,6 @@ async def _hydrate_initiatives(
         hydrated.append(
             {
                 **row,
-                "linked_resources": _normalize_resources(row.get("linked_resources")),
-                "activity_metadata": row.get("activity_metadata") if isinstance(row.get("activity_metadata"), dict) else {},
                 "owner_name": owner.get("full_name") or owner.get("handle"),
                 "owner_email": owner.get("email"),
                 "owner_avatar_label": owner.get("avatar_label"),
@@ -272,7 +293,7 @@ async def require_initiative(*, workspace_id: str, initiative_id: str, user_id: 
         raise _database_error() from exc
     if row is None:
         raise _not_found()
-    return row
+    return _normalize_initiative_row(row, workspace_id)
 
 
 async def get_initiative(*, workspace_id: str, initiative_id: str, user_id: str) -> dict[str, Any]:

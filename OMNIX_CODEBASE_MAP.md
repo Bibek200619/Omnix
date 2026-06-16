@@ -897,6 +897,15 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
 - `GET /workspaces/{id}/tasks`
 - `POST /workspaces/{id}/tasks`
 - `PATCH /workspaces/{id}/tasks/{task_id}`
+- `GET /workspaces/{id}/tasks/momentum`
+- Task read guardrails: list responses normalize invalid/legacy statuses to `idea`, filter legacy/invalid context links, and fall back to stored activity metadata mentions if mention hydration has a backend/schema failure.
+
+**Workspace Initiatives**
+- `GET /workspaces/{id}/initiatives`
+- `POST /workspaces/{id}/initiatives`
+- `GET /workspaces/{id}/initiatives/{initiative_id}`
+- `PATCH /workspaces/{id}/initiatives/{initiative_id}`
+- Initiative read guardrails: list/detail responses normalize legacy `name` to `title`, legacy `completed` to `complete`, legacy `paused` to `draft`, and coerce missing list/metadata fields to response-safe defaults.
 
 **Workspace Decisions**
 - `GET /workspaces/{id}/decisions`
