@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from .queue import get_redis
 from .ingestion_jobs import handle_ingest_file
 from .automation_jobs import handle_run_automation
-from ..services.supabase_service import update_one_trusted, select_one_trusted
+from ..services.supabase_service import select_all_trusted, select_one_trusted, update_one_trusted
 from ..rag.startup import initialize_vector_store, shutdown_vector_store
 from ..embeddings.provider import warm_up_default_provider
 from ..runtime.manager import RuntimeManager
@@ -15,25 +17,183 @@ from ..runtime.manager import RuntimeManager
 logger = logging.getLogger(__name__)
 
 _WORKER_ID = "ingestion_worker_main"
+MAX_JOB_ATTEMPTS = int(os.environ.get("OMNIX_JOB_MAX_ATTEMPTS", "3"))
+DB_RECOVERY_BATCH_SIZE = int(os.environ.get("OMNIX_DB_JOB_RECOVERY_BATCH_SIZE", "25"))
+PROCESSING_LEASE_TIMEOUT_SECONDS = int(os.environ.get("OMNIX_JOB_LEASE_TIMEOUT_SECONDS", "900"))
 
 
-async def _process_job(job_id: str):
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _parse_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _coerce_attempts(job_row: dict[str, Any]) -> int:
+    try:
+        return int(job_row.get("attempts") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+async def _dead_letter_job(
+    job_row: dict[str, Any],
+    reason: str,
+    *,
+    expected_status: str | None = None,
+) -> dict[str, Any] | None:
+    job_id = str(job_row.get("id") or "")
+    if not job_id:
+        return None
+    filters = {"id": job_id}
+    if expected_status:
+        filters["status"] = expected_status
+    logger.error("Dead-lettering job %s: %s", job_id, reason)
+    return await update_one_trusted(
+        "jobs",
+        filters,
+        {
+            "status": "dead_letter",
+            "error": reason,
+            "completed_at": _utc_now_iso(),
+        },
+    )
+
+
+async def _lease_queued_job(job_row: dict[str, Any]) -> dict[str, Any] | None:
+    job_id = str(job_row.get("id") or "")
+    if not job_id:
+        return None
+
+    attempts = _coerce_attempts(job_row)
+    if attempts >= MAX_JOB_ATTEMPTS:
+        await _dead_letter_job(
+            job_row,
+            f"Job exceeded max attempts ({MAX_JOB_ATTEMPTS}).",
+            expected_status="queued",
+        )
+        return None
+
+    return await update_one_trusted(
+        "jobs",
+        {"id": job_id, "status": "queued"},
+        {
+            "status": "processing",
+            "attempts": attempts + 1,
+            "started_at": _utc_now_iso(),
+            "error": None,
+        },
+    )
+
+
+async def _load_and_lease_job(job_id: str) -> dict[str, Any] | None:
+    job_row = await select_one_trusted("jobs", "*", {"id": job_id})
+    if not job_row:
+        logger.warning("Job %s missing in DB; skipping", job_id)
+        return None
+
+    status = str(job_row.get("status") or "")
+    if status != "queued":
+        logger.info("Job %s has status %s; skipping duplicate queue delivery", job_id, status)
+        return None
+
+    leased = await _lease_queued_job(job_row)
+    if leased is None:
+        logger.info("Job %s was not leased; another worker may have claimed it.", job_id)
+    return leased
+
+
+async def _requeue_stale_processing_jobs() -> int:
+    threshold = datetime.now(timezone.utc) - timedelta(seconds=PROCESSING_LEASE_TIMEOUT_SECONDS)
+    rows = await select_all_trusted(
+        "jobs",
+        "*",
+        filters={"status": "processing"},
+        order_by="started_at",
+        desc=False,
+        limit=DB_RECOVERY_BATCH_SIZE,
+    )
+    requeued = 0
+    for row in rows:
+        started_at = _parse_timestamp(row.get("started_at")) or _parse_timestamp(row.get("created_at"))
+        if started_at is None or started_at > threshold:
+            continue
+
+        if _coerce_attempts(row) >= MAX_JOB_ATTEMPTS:
+            await _dead_letter_job(
+                row,
+                f"Processing lease expired after max attempts ({MAX_JOB_ATTEMPTS}).",
+                expected_status="processing",
+            )
+            continue
+
+        updated = await update_one_trusted(
+            "jobs",
+            {"id": row.get("id"), "status": "processing"},
+            {
+                "status": "queued",
+                "error": "Processing lease expired; requeued for recovery.",
+            },
+        )
+        if updated:
+            requeued += 1
+    if requeued:
+        logger.warning("Requeued %d stale processing ingestion jobs.", requeued)
+    return requeued
+
+
+async def _lease_next_queued_db_job() -> dict[str, Any] | None:
+    rows = await select_all_trusted(
+        "jobs",
+        "*",
+        filters={"status": "queued"},
+        order_by="created_at",
+        desc=False,
+        limit=DB_RECOVERY_BATCH_SIZE,
+    )
+    for row in rows:
+        leased = await _lease_queued_job(row)
+        if leased:
+            logger.info("Recovered queued DB job %s without Redis delivery.", leased.get("id"))
+            return leased
+    return None
+
+
+async def _recover_db_job() -> dict[str, Any] | None:
+    await _requeue_stale_processing_jobs()
+    return await _lease_next_queued_db_job()
+
+
+async def _next_job(redis: Any, queue_name: str) -> tuple[str | None, dict[str, Any] | None]:
+    item = await redis.brpop(queue_name, timeout=5)
+    if item:
+        _, job_id = item
+        return str(job_id), None
+
+    recovered = await _recover_db_job()
+    if recovered:
+        return str(recovered.get("id")), recovered
+    return None, None
+
+
+async def _process_job(job_id: str, leased_job_row: dict[str, Any] | None = None):
     """Fetch job row, mark processing, run handler, update result."""
     runtime = RuntimeManager.get()
     runtime.record_job_started(_WORKER_ID)
     success = False
     try:
-        job_row = await select_one_trusted("jobs", "*", {"id": job_id})
+        job_row = leased_job_row or await _load_and_lease_job(job_id)
         if not job_row:
-            logger.warning("Job %s missing in DB; skipping", job_id)
             return
-
-        # Update status to processing and increment attempt counter
-        await update_one_trusted(
-            "jobs",
-            {"id": job_id},
-            {"status": "processing", "attempts": job_row.get("attempts", 0) + 1},
-        )
 
         job_type = job_row.get("type")
         if job_type == "ingest_file":
@@ -52,14 +212,23 @@ async def _process_job(job_id: str):
         await update_one_trusted(
             "jobs",
             {"id": job_id},
-            {"status": status, "progress": 100, "result": result},
+            {
+                "status": status,
+                "progress": 100,
+                "result": result,
+                "completed_at": _utc_now_iso(),
+            },
         )
         success = status == "completed"
         logger.info("Job %s finished with status %s", job_id, status)
     except Exception as exc:
         logger.exception("Processing job %s failed: %s", job_id, exc)
         try:
-            await update_one_trusted("jobs", {"id": job_id}, {"status": "failed", "error": str(exc)})
+            await update_one_trusted(
+                "jobs",
+                {"id": job_id},
+                {"status": "failed", "error": str(exc), "completed_at": _utc_now_iso()},
+            )
         except Exception:
             logger.exception("Failed to update job row for job %s after exception", job_id)
     finally:
@@ -103,13 +272,12 @@ async def _worker_loop(shutdown_event: asyncio.Event):
     # Poll loop
     while not shutdown_event.is_set():
         try:
-            item = await redis.brpop(queue_name, timeout=5)
-            if not item:
+            job_id, leased_job_row = await _next_job(redis, queue_name)
+            if not job_id:
                 await asyncio.sleep(0.1)
                 continue
-            _, job_id = item
             logger.info("Dequeued job %s", job_id)
-            await _process_job(job_id)
+            await _process_job(job_id, leased_job_row=leased_job_row)
         except Exception as exc:
             logger.exception("Worker loop error: %s", exc)
             await asyncio.sleep(1)

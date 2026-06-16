@@ -768,6 +768,13 @@ OMNIX_MIN_EXTRACTED_CHARACTERS=20
 OMNIX_OCR_ENABLED=true
 OMNIX_MAX_OCR_PAGES=25
 
+# Jobs / Workers
+REDIS_URL=redis://localhost:6379/0
+OMNIX_JOB_QUEUE=omnix:jobs
+OMNIX_JOB_MAX_ATTEMPTS=3
+OMNIX_JOB_LEASE_TIMEOUT_SECONDS=900
+OMNIX_DB_JOB_RECOVERY_BATCH_SIZE=25
+
 # Web Search (optional)
 WEB_SEARCH_ENABLED=false
 TAVILY_API_KEY=
@@ -1046,12 +1053,14 @@ docker-compose up                      # Uses docker-compose.yml
 - Job row inserted to `jobs` DB table FIRST (DB-first enqueue)
 - Job ID then pushed to Redis `omnix:jobs` queue (controlled by `OMNIX_JOB_QUEUE` env)
 - If DB insert fails → Redis push is skipped entirely (no orphan entries)
-- If Redis push fails after DB write → job row persists as stuck and is detectable via `/health/ingestion-worker`
-- Stuck job detection thresholds: 10m, 30m, 60m (detection only — no auto-repair)
+- If Redis push fails after DB write → job row persists as `queued`; ingestion worker recovers it from DB when Redis is idle
+- Redis delivery and DB recovery both lease jobs by transitioning `queued` → `processing` with incremented `attempts`
+- Stale `processing` jobs older than `OMNIX_JOB_LEASE_TIMEOUT_SECONDS` requeue automatically until `OMNIX_JOB_MAX_ATTEMPTS`; exhausted jobs move to `dead_letter`
+- Stuck job detection thresholds: 10m, 30m, 60m remain visible at `/health/ingestion-worker`
 
 ### Running Tests
 ```bash
-pytest backend/tests/test_ingestion_worker_recovery.py   # Worker recovery sprint tests (24 tests)
+pytest backend/tests/test_ingestion_worker_recovery.py   # Worker recovery tests (29 tests)
 pytest backend/tests/db/                                  # DB client tests
 pytest backend/tests/                                     # All available tests
 ```

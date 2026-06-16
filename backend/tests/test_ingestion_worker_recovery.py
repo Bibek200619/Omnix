@@ -30,6 +30,7 @@ def _make_job_row(
     status: str = "queued",
     attempts: int = 0,
     created_at: str | None = None,
+    started_at: str | None = None,
     payload: dict | None = None,
 ) -> dict:
     if created_at is None:
@@ -41,6 +42,7 @@ def _make_job_row(
         "attempts": attempts,
         "payload": payload or {"type": job_type, "file_id": "file-1", "user_id": "user-1"},
         "created_at": created_at,
+        "started_at": started_at,
     }
 
 
@@ -336,6 +338,155 @@ class TestProcessJob:
 
         final_update = update_calls[-1]
         assert final_update["status"] == "failed"
+
+    @pytest.mark.asyncio
+    async def test_process_job_uses_preleased_row_without_second_claim(self):
+        """DB-recovered jobs are already leased and must not be claimed twice."""
+        import app.jobs.worker as w
+
+        self.rm.register_worker(w._WORKER_ID, [], worker_type="ingestion")
+
+        leased_row = _make_job_row(status="processing", attempts=1)
+        update_calls: list[dict] = []
+
+        async def fail_select_one(table, cols, filters):
+            pytest.fail("preleased job should not be selected again")
+
+        async def fake_update_one(table, filters, data):
+            update_calls.append(dict(data))
+            return {**leased_row, **data}
+
+        async def fake_handle_ingest(row):
+            return {"status": "completed"}
+
+        with (
+            patch("app.jobs.worker.select_one_trusted", fail_select_one),
+            patch("app.jobs.worker.update_one_trusted", fake_update_one),
+            patch("app.jobs.worker.handle_ingest_file", fake_handle_ingest),
+        ):
+            await w._process_job("job-1", leased_job_row=leased_row)
+
+        assert update_calls[0]["status"] == "completed"
+        assert all(call.get("status") != "processing" for call in update_calls)
+
+
+# ===========================================================================
+# Section 3b: Worker DB recovery
+# ===========================================================================
+
+class TestWorkerDbRecovery:
+    @pytest.mark.asyncio
+    async def test_lease_next_queued_db_job_claims_oldest_job(self):
+        import app.jobs.worker as w
+
+        job_row = _make_job_row(attempts=0)
+        captured: dict = {}
+
+        async def fake_select_all(table, columns, filters=None, order_by=None, desc=False, limit=None, offset=None):
+            captured["select"] = {
+                "table": table,
+                "filters": filters,
+                "order_by": order_by,
+                "desc": desc,
+                "limit": limit,
+            }
+            return [job_row]
+
+        async def fake_update_one(table, filters, data):
+            captured["update"] = {"table": table, "filters": filters, "data": dict(data)}
+            return {**job_row, **data}
+
+        with (
+            patch("app.jobs.worker.select_all_trusted", fake_select_all),
+            patch("app.jobs.worker.update_one_trusted", fake_update_one),
+        ):
+            leased = await w._lease_next_queued_db_job()
+
+        assert leased is not None
+        assert captured["select"]["filters"] == {"status": "queued"}
+        assert captured["select"]["order_by"] == "created_at"
+        assert captured["update"]["filters"] == {"id": "job-1", "status": "queued"}
+        assert captured["update"]["data"]["status"] == "processing"
+        assert captured["update"]["data"]["attempts"] == 1
+        assert leased["status"] == "processing"
+
+    @pytest.mark.asyncio
+    async def test_lease_next_queued_db_job_dead_letters_exhausted_job(self):
+        import app.jobs.worker as w
+
+        job_row = _make_job_row(attempts=w.MAX_JOB_ATTEMPTS)
+        update_calls: list[dict] = []
+
+        async def fake_select_all(*args, **kwargs):
+            return [job_row]
+
+        async def fake_update_one(table, filters, data):
+            update_calls.append({"table": table, "filters": filters, "data": dict(data)})
+            return {**job_row, **data}
+
+        with (
+            patch("app.jobs.worker.select_all_trusted", fake_select_all),
+            patch("app.jobs.worker.update_one_trusted", fake_update_one),
+        ):
+            leased = await w._lease_next_queued_db_job()
+
+        assert leased is None
+        assert update_calls[-1]["filters"] == {"id": "job-1", "status": "queued"}
+        assert update_calls[-1]["data"]["status"] == "dead_letter"
+
+    @pytest.mark.asyncio
+    async def test_requeue_stale_processing_jobs_returns_expired_leases_to_queue(self):
+        import app.jobs.worker as w
+
+        old_started_at = (datetime.now(timezone.utc) - timedelta(seconds=w.PROCESSING_LEASE_TIMEOUT_SECONDS + 60)).isoformat()
+        fresh_started_at = datetime.now(timezone.utc).isoformat()
+        rows = [
+            _make_job_row(job_id="old", status="processing", started_at=old_started_at),
+            _make_job_row(job_id="fresh", status="processing", started_at=fresh_started_at),
+        ]
+        update_calls: list[dict] = []
+
+        async def fake_select_all(*args, **kwargs):
+            return rows
+
+        async def fake_update_one(table, filters, data):
+            update_calls.append({"table": table, "filters": filters, "data": dict(data)})
+            return {**data, **filters}
+
+        with (
+            patch("app.jobs.worker.select_all_trusted", fake_select_all),
+            patch("app.jobs.worker.update_one_trusted", fake_update_one),
+        ):
+            count = await w._requeue_stale_processing_jobs()
+
+        assert count == 1
+        assert update_calls == [
+            {
+                "table": "jobs",
+                "filters": {"id": "old", "status": "processing"},
+                "data": {
+                    "status": "queued",
+                    "error": "Processing lease expired; requeued for recovery.",
+                },
+            }
+        ]
+
+    @pytest.mark.asyncio
+    async def test_next_job_recovers_db_job_when_redis_is_empty(self):
+        import app.jobs.worker as w
+
+        recovered = _make_job_row(status="processing", attempts=1)
+        fake_redis = AsyncMock()
+        fake_redis.brpop = AsyncMock(return_value=None)
+
+        async def fake_recover_db_job():
+            return recovered
+
+        with patch("app.jobs.worker._recover_db_job", fake_recover_db_job):
+            job_id, leased_job = await w._next_job(fake_redis, "omnix:jobs")
+
+        assert job_id == "job-1"
+        assert leased_job == recovered
 
 
 # ===========================================================================
