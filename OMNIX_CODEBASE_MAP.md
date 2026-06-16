@@ -385,7 +385,9 @@ User types @ in conversation/task/decision text input
   → Source record stores mention metadata in JSON where available
   → workspace_mention_service.sync_mentions_for_source() replaces workspace_mentions rows for that source
   → /notifications calls GET /workspaces/{workspace_id}/mentions for current user's mention notification list
+  → Inbox source hydration is best-effort for backend/schema failures and falls back to generic source labels
   → Header bell calls GET /workspaces/{workspace_id}/mentions/unread-count for workspace-scoped unread count
+  → Unread count queries unread workspace_mentions rows directly; it does not hydrate source records
   → Read actions call PATCH /workspaces/{workspace_id}/mentions/{mention_id}/read or PATCH /workspaces/{workspace_id}/mentions/read-all
 ```
 

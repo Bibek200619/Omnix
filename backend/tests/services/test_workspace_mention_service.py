@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from fastapi import HTTPException
 import pytest
 
 from app.services import workspace_mention_service as mentions
@@ -140,21 +141,78 @@ async def test_mentions_inbox_hides_private_conversation_without_channel_access(
 async def test_count_unread_mentions_uses_visible_unread_mentions(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
 
-    async def fake_list_mentions_for_user(**kwargs):
-        captured.update(kwargs)
+    async def fake_access(workspace_id: str, user_id: str):
+        captured["access"] = {"workspace_id": workspace_id, "user_id": user_id}
+        return SimpleNamespace(workspace={"id": workspace_id})
+
+    async def fake_select_all(table: str, columns: str, filters: dict[str, object], **kwargs):
+        captured.update({"table": table, "columns": columns, "filters": filters, "kwargs": kwargs})
         return [{"id": "mention-1"}, {"id": "mention-2"}]
 
-    monkeypatch.setattr(mentions, "list_mentions_for_user", fake_list_mentions_for_user)
+    async def fail_source_hydration(*args, **kwargs):
+        raise AssertionError("Unread counts should not hydrate mention sources.")
+
+    monkeypatch.setattr(mentions, "require_workspace_access", fake_access)
+    monkeypatch.setattr(mentions, "select_all_trusted", fake_select_all)
+    monkeypatch.setattr(mentions, "_task_source_details", fail_source_hydration)
 
     result = await mentions.count_unread_mentions_for_user(workspace_id="workspace-1", user_id="user-2")
 
-    assert captured == {
+    assert captured["access"] == {"workspace_id": "workspace-1", "user_id": "user-2"}
+    assert captured["table"] == "workspace_mentions"
+    assert captured["columns"] == "id"
+    assert captured["filters"] == {
         "workspace_id": "workspace-1",
-        "user_id": "user-2",
-        "only_unread": True,
-        "limit": None,
+        "mentioned_user_id": "user-2",
+        "read_at": {"is": None},
     }
+    assert captured["kwargs"] == {"limit": None}
     assert result == {"unread_count": 2}
+
+
+@pytest.mark.asyncio
+async def test_mentions_inbox_uses_generic_source_when_task_hydration_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_access(workspace_id: str, user_id: str):
+        return SimpleNamespace(workspace={"id": workspace_id})
+
+    async def fake_select_all(table: str, columns: str, filters: dict[str, object], **kwargs):
+        assert table == "workspace_mentions"
+        return [
+            {
+                "id": "mention-1",
+                "workspace_id": "workspace-1",
+                "mentioned_user_id": "user-2",
+                "mentioned_by_user_id": "user-1",
+                "source_type": "task",
+                "source_id": "task-1",
+                "created_at": "2026-06-03T10:00:00+00:00",
+                "read_at": None,
+            }
+        ]
+
+    async def fake_profiles(user_ids: list[str]):
+        assert user_ids == ["user-1", "user-2"]
+        return {
+            "user-1": {"full_name": "Alex", "email": "alex@example.com", "avatar_label": "A"},
+            "user-2": {"full_name": "Bibek", "email": "bibek@example.com", "avatar_label": "B"},
+        }
+
+    async def fail_task_source_details(workspace_id: str, source_ids: list[str]):
+        assert workspace_id == "workspace-1"
+        assert source_ids == ["task-1"]
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    monkeypatch.setattr(mentions, "require_workspace_access", fake_access)
+    monkeypatch.setattr(mentions, "select_all_trusted", fake_select_all)
+    monkeypatch.setattr(mentions, "get_profiles", fake_profiles)
+    monkeypatch.setattr(mentions, "_task_source_details", fail_task_source_details)
+
+    result = await mentions.list_mentions_for_user(workspace_id="workspace-1", user_id="user-2")
+
+    assert len(result) == 1
+    assert result[0]["source_title"] == "Workspace task"
+    assert result[0]["source_preview"] is None
+    assert result[0]["source_url"] == "/tasks?id=task-1"
 
 
 @pytest.mark.asyncio
