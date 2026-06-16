@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
 import logging
 import os
+import time
 from typing import Any
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse, JSONResponse
 
+from ..core.config import get_settings
 from ..core.security import get_current_user
 from ..integrations.google_drive import (
     build_oauth_authorize_url,
@@ -18,12 +24,82 @@ from ..integrations.google_drive import (
     download_drive_file_bytes,
 )
 from ..services.supabase_service import SupabaseServiceError, insert_one
+from ..services.workspace_service import require_workspace_access
 from ..routers.upload import _save_bytes_to_path, _extract_text_from_bytes
 from ..rag.ingestion import RAGIngestionPipeline
 from ..rag.startup import get_vector_store
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/integrations/google_drive", tags=["integrations"])
+OAUTH_STATE_TTL_SECONDS = 10 * 60
+
+
+def _base64url_encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _base64url_decode(value: str) -> bytes:
+    padding = "=" * (-len(value) % 4)
+    return base64.urlsafe_b64decode(f"{value}{padding}".encode("ascii"))
+
+
+def _oauth_state_secret() -> str:
+    secret = os.environ.get("GOOGLE_OAUTH_STATE_SECRET") or os.environ.get("OMNIX_OAUTH_STATE_SECRET")
+    if secret:
+        return secret
+
+    settings = get_settings()
+    secret = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_ANON_KEY
+    if not secret:
+        raise RuntimeError("OAuth state signing secret is not configured")
+    return secret
+
+
+def _sign_oauth_state(user_id: str, workspace_id: str | None) -> str:
+    payload = {
+        "user_id": user_id,
+        "workspace_id": workspace_id,
+        "iat": int(time.time()),
+    }
+    body = _base64url_encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+    signature = hmac.new(_oauth_state_secret().encode("utf-8"), body.encode("ascii"), hashlib.sha256).digest()
+    return f"{body}.{_base64url_encode(signature)}"
+
+
+def _verify_oauth_state(state: str | None) -> tuple[str, str | None]:
+    if not state:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing OAuth state")
+
+    body, separator, signature = state.partition(".")
+    if not body or separator != "." or not signature:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state")
+
+    expected = hmac.new(_oauth_state_secret().encode("utf-8"), body.encode("ascii"), hashlib.sha256).digest()
+    try:
+        received = _base64url_decode(signature)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state") from exc
+    if not hmac.compare_digest(expected, received):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state")
+
+    try:
+        payload = json.loads(_base64url_decode(body).decode("utf-8"))
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state") from exc
+
+    user_id = payload.get("user_id")
+    if not isinstance(user_id, str) or not user_id.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state")
+
+    issued_at = payload.get("iat")
+    if not isinstance(issued_at, int) or int(time.time()) - issued_at > OAUTH_STATE_TTL_SECONDS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Expired OAuth state")
+
+    workspace_id = payload.get("workspace_id")
+    if workspace_id is not None and not isinstance(workspace_id, str):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state")
+
+    return user_id, workspace_id or None
 
 
 @router.get("/connect")
@@ -31,10 +107,11 @@ async def connect_google_drive(request: Request, workspace_id: str | None = None
     """Return the Google OAuth authorize URL for the client to redirect the user to."""
     user = current_user
     user_id = str(user.get("sub"))
+    if workspace_id:
+        await require_workspace_access(workspace_id, user_id)
     base = os.environ.get("OMNIX_BASE_URL") or "http://localhost:8000"
     redirect_uri = f"{base.rstrip('/')}/integrations/google_drive/callback"
-    # encode state as user_id|workspace_id
-    state = f"{user_id}|{workspace_id or ''}"
+    state = _sign_oauth_state(user_id, workspace_id)
     url = build_oauth_authorize_url(redirect_uri, state=state)
     return JSONResponse({"authorize_url": url})
 
@@ -44,13 +121,9 @@ async def connect_google_drive(request: Request, workspace_id: str | None = None
 async def oauth_callback(code: str | None = None, state: str | None = None) -> Any:
     if not code:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing code in callback")
-    # parse state
-    user_id = None
-    workspace_id = None
-    if state:
-        parts = state.split("|", 1)
-        user_id = parts[0] if parts and parts[0] else None
-        workspace_id = parts[1] if len(parts) > 1 and parts[1] else None
+    user_id, workspace_id = _verify_oauth_state(state)
+    if workspace_id:
+        await require_workspace_access(workspace_id, user_id)
 
     base = os.environ.get("OMNIX_BASE_URL") or "http://localhost:8000"
     redirect_uri = f"{base.rstrip('/')}/integrations/google_drive/callback"
@@ -60,10 +133,6 @@ async def oauth_callback(code: str | None = None, state: str | None = None) -> A
     except Exception as exc:
         logger.exception("Failed to exchange code for tokens: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Token exchange failed")
-
-    if not user_id:
-        # No user bound; return a simple success page
-        return JSONResponse({"status": "connected", "detail": "No user state provided; tokens not stored."})
 
     try:
         await store_token_for_user(user_id, workspace_id, tokens)
@@ -81,6 +150,8 @@ async def oauth_callback(code: str | None = None, state: str | None = None) -> A
 @router.get("/files")
 async def list_files(workspace_id: str | None = None, q: str | None = None, current_user: dict[str, Any] = Depends(get_current_user)) -> Any:
     user_id = str(current_user.get("sub"))
+    if workspace_id:
+        await require_workspace_access(workspace_id, user_id)
     token_row = await get_token_for_user(user_id, workspace_id)
     if not token_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Google Drive not connected for this user/workspace")
@@ -95,6 +166,7 @@ async def list_files(workspace_id: str | None = None, q: str | None = None, curr
 @router.post("/import")
 async def import_file(workspace_id: str, file_id: str, current_user: dict[str, Any] = Depends(get_current_user)) -> Any:
     user_id = str(current_user.get("sub"))
+    await require_workspace_access(workspace_id, user_id)
     token_row = await get_token_for_user(user_id, workspace_id)
     if not token_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Google Drive not connected for this user/workspace")

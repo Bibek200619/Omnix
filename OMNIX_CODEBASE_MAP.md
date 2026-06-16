@@ -420,10 +420,11 @@ Important boundary: candidates are not persisted decisions, never auto-accepted,
 
 ### Exempt Auth Paths (no JWT required)
 - `/health`, `/docs`, `/openapi.json`, `/redoc`
-- `/integrations/google_drive/callback`
+- `/integrations/google_drive/callback` — Google cannot send Omnix JWTs; callback must validate signed, time-limited OAuth state before storing tokens
 
 ### Backend Auth Helpers
 - `get_current_user(request)` — dependency injection for authenticated routes
+- `require_workspace_access(workspace_id, user_id)` — canonical workspace route/service authorization check
 - `check_workspace_access(user_id, workspace_id)` — workspace permission check
 - `get_supabase_auth_client()` — auth admin client (service role)
 
@@ -883,7 +884,15 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
 - File responses include extraction diagnostics: `page_count`, `extractor_used`, `extracted_character_count`, `image_page_count`, `text_page_count`, `extraction_status`, `extraction_failure_reason`, `ocr_used`, `ocr_character_count`
 
 **Actions, Artifacts, Insights, Automations**
+- `POST /actions/run` — requires `X-Omnix-Workspace` access when the workspace header is present before retrieval/artifact persistence
 - Standard CRUD under `/workspaces/{id}/actions`, `/artifacts`, `/insights`, `/automations`
+- Automations routes require workspace access; automation updates are filtered by both `id` and `workspace_id`
+
+**Google Drive Integration**
+- `GET /integrations/google_drive/connect?workspace_id=...` — requires workspace access when binding a workspace and returns an authorize URL with signed OAuth state
+- `GET /integrations/google_drive/callback` — auth-exempt OAuth redirect; validates signed state TTL and rechecks workspace access before token storage
+- `GET /integrations/google_drive/files?workspace_id=...` — requires workspace access before workspace token lookup
+- `POST /integrations/google_drive/import?workspace_id=...&file_id=...` — requires workspace access before token lookup, file storage, and RAG ingestion
 
 **Profile**
 - `GET /profile`
@@ -1051,4 +1060,4 @@ pytest backend/tests/                                     # All available tests
 
 ---
 
-*Last updated: 2026-06-10 — Ingestion Worker Recovery Sprint (fix/ingestion-worker-recovery). Update this file when adding new routers, services, major components, or env variables.*
+*Last updated: 2026-06-16 — Audit stabilization auth hardening. Update this file when adding new routers, services, major components, or env variables.*
