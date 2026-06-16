@@ -345,7 +345,7 @@ User types message → ChatInterface.tsx
 
 ```
 User uploads file → upload.py router
-  → Saves original file to disk
+  → Saves original file to disk under `OMNIX_UPLOAD_DIR`
   → Inserts files row with extraction_status='processing'
   → Extracts text with document_intelligence_service.py diagnostics
   → Detects image-only PDFs through empty text layer + image XObjects
@@ -360,6 +360,7 @@ User uploads file → upload.py router
 
 Allowed document extraction states: `processing`, `searchable`, `ocr_required`, `extraction_failed`.
 Documents with zero extracted characters are not treated as fully available unless OCR produced searchable text.
+Production compose mounts named volume `omnix_uploads` at `/app/uploads` for both the API and ingestion worker; `OMNIX_UPLOAD_DIR=/app/uploads` must stay identical in both services because worker jobs read the stored `files.storage_path`.
 
 ### Command Palette & Workspace Search Request
 
@@ -1028,6 +1029,7 @@ docker-compose up                      # Uses docker-compose.yml
 - Frontend: Vercel (configured in `frontend/vercel.json`)
 - Reverse proxy: nginx (`nginx.conf`)
 - Backend Dockerfile: `backend/Dockerfile.backend`
+- Production compose: `docker-compose.prod.yml` mounts shared `omnix_uploads:/app/uploads` into API and ingestion-worker
 - Systemd units: `scripts/omnix-ingestion-worker.service`, `scripts/omnix-automation-scheduler.service`
 - GitHub Actions deploy: `.github/workflows/deploy.yml` — restarts all 3 services on push to main
 
