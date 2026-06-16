@@ -265,6 +265,7 @@ backend/
 │   │           └── placeholder.py             # Fallback placeholder provider
 │   ├── core/
 │   │   ├── security.py      # JWT auth middleware + get_current_user (9KB)
+│   │   ├── deployment.py    # Environment policy for public docs, CORS origins, admin user ids
 │   │   ├── rbac.py          # Role-based access control
 │   │   └── config.py        # get_settings() factory
 │   ├── db/
@@ -420,7 +421,8 @@ Important boundary: candidates are not persisted decisions, never auto-accepted,
 6. On 401: frontend auto-calls `supabase.auth.signOut()`
 
 ### Exempt Auth Paths (no JWT required)
-- `/health`, `/docs`, `/openapi.json`, `/redoc`
+- `/health`
+- `/docs`, `/docs/oauth2-redirect`, `/openapi.json`, `/redoc` only when `OMNIX_PUBLIC_API_DOCS=true` or dev/local/test mode enables public docs
 - `/integrations/google_drive/callback` — Google cannot send Omnix JWTs; callback must validate signed, time-limited OAuth state before storing tokens
 
 ### Backend Auth Helpers
@@ -775,6 +777,11 @@ OMNIX_JOB_MAX_ATTEMPTS=3
 OMNIX_JOB_LEASE_TIMEOUT_SECONDS=900
 OMNIX_DB_JOB_RECOVERY_BATCH_SIZE=25
 
+# Deployment / Security
+OMNIX_PUBLIC_API_DOCS=false
+OMNIX_CORS_ALLOWED_ORIGINS=https://app.omni-x.co.in
+OMNIX_ADMIN_USER_IDS=
+
 # Web Search (optional)
 WEB_SEARCH_ENABLED=false
 TAVILY_API_KEY=
@@ -825,6 +832,12 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
   - `stuck_jobs.older_than_10m/30m/60m`: DB-derived counts of queued jobs older than threshold
 - `GET /health/schema` — workspace schema health
 - `GET /health/providers` — active AI providers
+
+**Admin Runtime**
+- `GET /admin/runtime/` — requires admin claim or `OMNIX_ADMIN_USER_IDS`
+- `GET /admin/runtime/workers` — requires admin claim or `OMNIX_ADMIN_USER_IDS`
+- `GET /admin/runtime/providers` — requires admin claim or `OMNIX_ADMIN_USER_IDS`
+- `GET /admin/runtime/settings` — requires admin claim or `OMNIX_ADMIN_USER_IDS`; returns non-sensitive settings only
 
 **Conversations (personal AI chat)**
 - `GET /conversations` — list user's conversations

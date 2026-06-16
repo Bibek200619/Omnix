@@ -6,20 +6,31 @@ from . import vector_store, observability, workers, redis, shutdown, middleware
 from ..runtime.manager import RuntimeManager
 from ..health.router import router as health_router
 from ..routers import conversations, files, cache, messages, upload, workspaces, workspace_conversations, workspace_tasks, workspace_decisions, workspace_search, workspace_mentions, actions, artifacts, insights, automations, google_drive, admin, profile, continuity, connectors
+from ..core.config import get_settings
+from ..core.deployment import cors_allow_credentials, cors_allowed_origins, public_api_docs_enabled
 from ..core.security import auth_context_middleware
 
 logger = logging.getLogger(__name__)
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Omnix AI Platform", version="1.0.0")
+    settings = get_settings()
+    docs_enabled = public_api_docs_enabled(settings)
+    app = FastAPI(
+        title="Omnix AI Platform",
+        version="1.0.0",
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
+    )
+    allowed_origins = cors_allowed_origins(settings)
     
     # Register Middlewares
     app.middleware("http")(auth_context_middleware)
     app.middleware("http")(middleware.api_logging_middleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"], # Should be restricted in prod via settings
-        allow_credentials=True,
+        allow_origins=allowed_origins,
+        allow_credentials=cors_allow_credentials(allowed_origins),
         allow_methods=["*"],
         allow_headers=["*"],
     )
