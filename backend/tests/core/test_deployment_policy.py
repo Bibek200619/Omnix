@@ -46,11 +46,12 @@ def test_cors_rejects_production_wildcard_and_falls_back_to_app_url(monkeypatch)
     assert deployment.cors_allow_credentials(origins) is True
 
 
-def test_cors_does_not_use_localhost_fallback_in_production(monkeypatch) -> None:
+def test_cors_uses_known_omnix_origins_when_production_env_is_incomplete(monkeypatch) -> None:
     monkeypatch.delenv("OMNIX_CORS_ALLOWED_ORIGINS", raising=False)
     origins = deployment.cors_allowed_origins(_settings(OMNIX_APP_URL="http://localhost:3000"))
 
-    assert origins == []
+    assert origins == deployment.DEFAULT_PRODUCTION_CORS_ORIGINS
+    assert "http://localhost:3000" not in origins
 
 
 def test_configured_admin_user_ids_are_csv_normalized(monkeypatch) -> None:
