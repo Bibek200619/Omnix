@@ -55,6 +55,7 @@ DEFAULT_CHANNELS = (
 )
 LEADER_ROLES = {"founder", "owner", "co_owner", "team_lead", "sub_leader", "super_founder"}
 MESSAGE_LIST_LIMIT = 100
+CONTEXT_ENTITY_TYPES = {"file", "ai_session", "decision", "task", "initiative", "memory"}
 
 
 def _ambient_role_label(role: Any) -> str | None:
@@ -110,6 +111,28 @@ def _preview(content: Any) -> str | None:
     return normalized if len(normalized) <= 110 else f"{normalized[:107].rstrip()}..."
 
 
+def _normalize_context_links(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+
+    normalized: list[dict[str, Any]] = []
+    for link in value:
+        if not isinstance(link, Mapping):
+            continue
+        entity_type = str(link.get("entity_type") or link.get("context_type") or "").strip()
+        entity_id = str(link.get("entity_id") or link.get("context_id") or "").strip()
+        if entity_type not in CONTEXT_ENTITY_TYPES or not entity_id:
+            continue
+        normalized.append(
+            {
+                "entity_type": entity_type,
+                "entity_id": entity_id[:120],
+                "label": str(link.get("label")).strip()[:160] if link.get("label") else None,
+            }
+        )
+    return normalized[:12]
+
+
 async def ensure_default_channels(workspace_id: str, user_id: str) -> None:
     try:
         existing = await select_all_trusted(
@@ -145,7 +168,13 @@ async def ensure_default_channels(workspace_id: str, user_id: str) -> None:
             except SupabaseServiceError:
                 concurrently_created = None
             if concurrently_created is None:
-                raise _database_error() from exc
+                logger.warning(
+                    "Default channel seed failed; continuing with existing channels | workspace_id=%s | slug=%s",
+                    workspace_id,
+                    channel["slug"],
+                    exc_info=True,
+                )
+                continue
             # Multiple first loads may seed concurrently; the unique slug constraint is authoritative.
             logger.info("Default channel already seeded concurrently | workspace_id=%s | slug=%s", workspace_id, channel["slug"])
 
@@ -259,11 +288,21 @@ async def _hydrate_messages(
     reply_rows: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     message_ids = [str(row.get("id")) for row in rows if row.get("id")]
-    mentions_by_source = await mention_metadata_for_sources(
-        workspace_id=str(workspace.get("id") or ""),
-        source_type="conversation_message",
-        source_ids=message_ids,
-    )
+    try:
+        mentions_by_source = await mention_metadata_for_sources(
+            workspace_id=str(workspace.get("id") or ""),
+            source_type="conversation_message",
+            source_ids=message_ids,
+        )
+    except HTTPException as exc:
+        if exc.status_code < 500:
+            raise
+        logger.warning(
+            "Conversation mention hydration failed; using message metadata mentions | workspace_id=%s",
+            workspace.get("id"),
+            exc_info=True,
+        )
+        mentions_by_source = {}
     members = await list_workspace_members(workspace)
     members_by_user_id = {
         str(member.get("user_id")): member for member in members if member.get("user_id")
@@ -288,7 +327,7 @@ async def _hydrate_messages(
         hydrated.append(
             {
                 **row,
-                "context_links": row.get("context_links") if isinstance(row.get("context_links"), list) else [],
+                "context_links": _normalize_context_links(row.get("context_links")),
                 "metadata": metadata,
                 "mentions": mentions,
                 "author_name": profile.get("full_name") or profile.get("handle"),

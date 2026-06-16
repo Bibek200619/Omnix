@@ -882,6 +882,7 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
 - `GET /workspaces/{id}/channels/{channel_id}/messages`
 - `POST /workspaces/{id}/channels/{channel_id}/messages`
 - `POST /workspaces/{id}/channels/{channel_id}/assist`
+- Read-path guardrails: channel listing continues if default-channel seed inserts fail, message reads fall back to stored metadata mentions if mention hydration has a backend/schema failure, and legacy `context_type/context_id` links are normalized to response-safe `entity_type/entity_id`.
 
 **Workspace Search**
 - `GET /workspaces/{id}/search?q=...` — grouped workspace keyword results for conversations, tasks, initiatives, and decisions
