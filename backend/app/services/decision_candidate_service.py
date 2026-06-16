@@ -204,6 +204,7 @@ async def log_candidate_metrics(
     action: Literal["accept", "dismiss"] | None = None,
     candidate_id: str | None = None,
 ) -> None:
+    await require_workspace_access(workspace_id, user_id)
     if action:
         event_type = f"decision_candidate.{action}ed"
         summary = f"Decision candidate {action}ed."

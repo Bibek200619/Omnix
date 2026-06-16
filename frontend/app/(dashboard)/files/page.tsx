@@ -352,6 +352,7 @@ export default function FilesPage() {
     reason: string;
     description: string;
     status: WorkspaceDecisionStatus;
+    candidate: DecisionCandidate;
   } | null>(null);
   const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
 
@@ -485,14 +486,18 @@ export default function FilesPage() {
     }
   }
 
-  async function openCandidateDecision(candidate: DecisionCandidate) {
-    if (!activeWorkspaceId) return;
+  function openCandidateDecision(candidate: DecisionCandidate) {
     setDecisionCandidateDraft({
       title: candidate.title,
       reason: candidate.reason,
       description: `Supporting evidence:\n${candidate.supporting_evidence.join("\n")}`,
       status: "proposed",
+      candidate,
     });
+  }
+
+  async function logAcceptedDecisionCandidate(candidate: DecisionCandidate) {
+    if (!activeWorkspaceId) return;
     try {
       await apiClient.post(`/workspaces/${activeWorkspaceId}/decisions/candidates/metrics`, {
         action: "accept",
@@ -1035,6 +1040,7 @@ export default function FilesPage() {
           initialValues={decisionCandidateDraft}
           onClose={() => setDecisionCandidateDraft(null)}
           onSuccess={() => {
+            void logAcceptedDecisionCandidate(decisionCandidateDraft.candidate);
             setDecisionCandidateDraft(null);
             setCandidateFile(null);
             setDecisionCandidates([]);
