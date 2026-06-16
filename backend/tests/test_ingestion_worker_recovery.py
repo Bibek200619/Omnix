@@ -617,13 +617,26 @@ class TestStuckJobDetection:
             {"id": "old-2", "created_at": old_ts},
             {"id": "fresh", "created_at": recent_ts},
         ]
+        captured: dict = {}
 
         fake_svc = MagicMock()
-        fake_svc.select_all_trusted = AsyncMock(return_value=fake_rows)
+
+        async def fake_select_all_trusted(table, columns, filters=None, **kwargs):
+            captured["table"] = table
+            captured["columns"] = columns
+            captured["filters"] = filters
+            return fake_rows
+
+        fake_svc.select_all_trusted = fake_select_all_trusted
 
         with patch.dict(sys.modules, {"app.services.supabase_service": fake_svc}):
             count = await checks._count_stuck_jobs(minutes=30)
 
+        assert captured == {
+            "table": "jobs",
+            "columns": "id,created_at",
+            "filters": {"status": "queued"},
+        }
         assert count == 2  # only the two old ones
 
     @pytest.mark.asyncio

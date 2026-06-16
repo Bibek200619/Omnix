@@ -1056,7 +1056,7 @@ docker-compose up                      # Uses docker-compose.yml
 - If Redis push fails after DB write → job row persists as `queued`; ingestion worker recovers it from DB when Redis is idle
 - Redis delivery and DB recovery both lease jobs by transitioning `queued` → `processing` with incremented `attempts`
 - Stale `processing` jobs older than `OMNIX_JOB_LEASE_TIMEOUT_SECONDS` requeue automatically until `OMNIX_JOB_MAX_ATTEMPTS`; exhausted jobs move to `dead_letter`
-- Stuck job detection thresholds: 10m, 30m, 60m remain visible at `/health/ingestion-worker`
+- Stuck job detection thresholds: 10m, 30m, 60m count queued jobs by `created_at` and remain visible at `/health/ingestion-worker`
 
 ### Running Tests
 ```bash

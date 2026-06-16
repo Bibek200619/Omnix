@@ -139,7 +139,7 @@ async def _count_stuck_jobs(minutes: int) -> int | None:
         threshold = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
         rows = await select_all_trusted(
             "jobs",
-            "id",
+            "id,created_at",
             filters={"status": "queued"},
         )
         if rows is None:
