@@ -29,6 +29,15 @@ TASK_COLUMNS = (
     "completed_at,created_at,updated_at"
 )
 TASK_STATUSES = ("idea", "planned", "active", "review", "complete")
+TASK_CONTEXT_TYPES = {
+    "conversation_message",
+    "channel",
+    "ai_session",
+    "file",
+    "decision",
+    "initiative",
+    "ai_action_extraction",
+}
 DECISION_PREVIEW_COLUMNS = "id,title,status,decision_reason,created_at"
 logger = logging.getLogger(__name__)
 
@@ -72,8 +81,40 @@ def _normalize_links(links: Any) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     for link in links:
         if isinstance(link, Mapping):
-            normalized.append(dict(link))
+            context_type = str(link.get("context_type") or link.get("entity_type") or "").strip()
+            context_id = str(link.get("context_id") or link.get("entity_id") or "").strip()
+            if context_type not in TASK_CONTEXT_TYPES or not context_id:
+                continue
+            normalized.append(
+                {
+                    "context_type": context_type,
+                    "context_id": context_id[:120],
+                    "label": str(link.get("label")).strip()[:160] if link.get("label") else None,
+                    "metadata": link.get("metadata") if isinstance(link.get("metadata"), dict) else {},
+                }
+            )
     return normalized[:12]
+
+
+def _normalize_task_status(value: Any) -> str:
+    status_value = str(value or "").strip()
+    return status_value if status_value in TASK_STATUSES else "idea"
+
+
+def _normalize_task_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    normalized = dict(row)
+    normalized["title"] = _clean_text(normalized.get("title")) or "Untitled task"
+    normalized["status"] = _normalize_task_status(normalized.get("status"))
+    normalized["blockers"] = _normalize_blockers(normalized.get("blockers"))
+    normalized["linked_context"] = _normalize_links(normalized.get("linked_context"))
+    normalized["activity_metadata"] = (
+        normalized.get("activity_metadata") if isinstance(normalized.get("activity_metadata"), dict) else {}
+    )
+    normalized["momentum_metadata"] = (
+        normalized.get("momentum_metadata") if isinstance(normalized.get("momentum_metadata"), dict) else {}
+    )
+    normalized["created_by"] = _clean_text(normalized.get("created_by")) or ""
+    return normalized
 
 
 def _serialize_supabase_value(value: Any) -> Any:
@@ -99,13 +140,22 @@ async def _hydrate_tasks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     workspace_ids = sorted({str(row.get("workspace_id")) for row in rows if row.get("workspace_id")})
     for workspace_id in workspace_ids:
         source_ids = [str(row.get("id")) for row in rows if str(row.get("workspace_id") or "") == workspace_id and row.get("id")]
-        mentions_by_source.update(
-            await mention_metadata_for_sources(
-                workspace_id=workspace_id,
-                source_type="task",
-                source_ids=source_ids,
+        try:
+            mentions_by_source.update(
+                await mention_metadata_for_sources(
+                    workspace_id=workspace_id,
+                    source_type="task",
+                    source_ids=source_ids,
+                )
             )
-        )
+        except HTTPException as exc:
+            if exc.status_code < 500:
+                raise
+            logger.warning(
+                "Task mention hydration failed; using activity metadata mentions | workspace_id=%s",
+                workspace_id,
+                exc_info=True,
+            )
     ids = sorted(
         {
             str(user_id)
@@ -116,10 +166,11 @@ async def _hydrate_tasks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     )
     profiles = await get_profiles(ids)
     hydrated: list[dict[str, Any]] = []
-    for row in rows:
+    for raw_row in rows:
+        row = _normalize_task_row(raw_row)
         owner = profiles.get(str(row.get("owner_user_id") or ""), {})
         creator = profiles.get(str(row.get("created_by") or ""), {})
-        activity_metadata = row.get("activity_metadata") if isinstance(row.get("activity_metadata"), dict) else {}
+        activity_metadata = row["activity_metadata"]
         metadata_mentions = activity_metadata.get("mentions") if isinstance(activity_metadata.get("mentions"), list) else []
         mentions = mentions_by_source.get(str(row.get("id"))) or metadata_mentions
 
@@ -145,10 +196,7 @@ async def _hydrate_tasks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         hydrated.append(
             {
                 **row,
-                "blockers": _normalize_blockers(row.get("blockers")),
-                "linked_context": _normalize_links(row.get("linked_context")),
                 "activity_metadata": activity_metadata,
-                "momentum_metadata": row.get("momentum_metadata") if isinstance(row.get("momentum_metadata"), dict) else {},
                 "mentions": mentions,
                 "owner_name": owner.get("full_name") or owner.get("handle"),
                 "owner_email": owner.get("email"),

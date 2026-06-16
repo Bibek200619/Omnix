@@ -3,8 +3,10 @@ from __future__ import annotations
 from datetime import date, timedelta
 from types import SimpleNamespace
 
+from fastapi import HTTPException
 import pytest
 
+from app.schemas.workspace_tasks import WorkspaceTaskRead
 from app.services import workspace_task_service as tasks
 
 
@@ -157,6 +159,59 @@ async def test_create_task_persists_structured_mentions(monkeypatch: pytest.Monk
     assert captured_sync["source_type"] == "task"
     assert captured_sync["source_id"] == "task-1"
     assert result["mentions"] == mention_metadata
+
+
+@pytest.mark.asyncio
+async def test_list_tasks_returns_response_safe_rows_when_optional_hydration_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_select_all(table: str, columns: str, filters: dict[str, object], **kwargs):
+        if table == "workspace_tasks":
+            return [
+                {
+                    "id": "task-1",
+                    "workspace_id": "workspace-1",
+                    "title": "  ",
+                    "status": "archived",
+                    "created_by": "user-1",
+                    "blockers": "not-a-list",
+                    "linked_context": [
+                        {"context_type": "channel", "context_id": "channel-1", "label": "Launch"},
+                        {"context_type": "unknown", "context_id": "bad"},
+                    ],
+                    "activity_metadata": {
+                        "mentions": [{"user_id": "user-2", "label": "Bibek", "avatar_label": "B"}]
+                    },
+                    "momentum_metadata": None,
+                }
+            ]
+        return []
+
+    async def fake_mentions_by_source(**kwargs):
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    monkeypatch.setattr(tasks, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(tasks, "select_all_trusted", fake_select_all)
+    monkeypatch.setattr(tasks, "mention_metadata_for_sources", fake_mentions_by_source)
+    monkeypatch.setattr(tasks, "get_profiles", fake_profiles)
+
+    result = await tasks.list_tasks(workspace_id="workspace-1", user_id="user-1")
+
+    WorkspaceTaskRead.model_validate(result[0])
+    assert result[0]["title"] == "Untitled task"
+    assert result[0]["status"] == "idea"
+    assert result[0]["blockers"] == []
+    assert result[0]["linked_context"] == [
+        {"context_type": "channel", "context_id": "channel-1", "label": "Launch", "metadata": {}}
+    ]
+    assert result[0]["mentions"] == [{"user_id": "user-2", "label": "Bibek", "avatar_label": "B"}]
+    assert result[0]["momentum_metadata"] == {}
 
 
 @pytest.mark.asyncio

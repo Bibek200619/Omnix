@@ -230,6 +230,32 @@ def _profile_label(user_id: str, profiles: Mapping[str, Mapping[str, Any]]) -> t
     return name, email, avatar_label
 
 
+def _generic_source_details(source_type: str, source_id: str) -> dict[str, str | None]:
+    if source_type == "conversation_message":
+        return {
+            "title": "Workspace conversation",
+            "preview": None,
+            "url": "/conversations",
+        }
+    if source_type == "task":
+        return {
+            "title": "Workspace task",
+            "preview": None,
+            "url": f"/tasks?id={source_id}",
+        }
+    if source_type == "decision":
+        return {
+            "title": "Workspace decision",
+            "preview": None,
+            "url": f"/decisions?id={source_id}",
+        }
+    return {
+        "title": "Workspace mention",
+        "preview": None,
+        "url": "/notifications",
+    }
+
+
 async def _conversation_source_details(
     *,
     workspace_id: str,
@@ -357,14 +383,39 @@ async def list_mentions_for_user(
     decision_ids = [str(row["source_id"]) for row in rows if row.get("source_type") == "decision"]
 
     source_details: dict[str, dict[str, dict[str, str | None]]] = {
-        "conversation_message": await _conversation_source_details(
-            workspace_id=workspace_id,
-            user_id=user_id,
-            source_ids=conversation_ids,
-        ) if conversation_ids else {},
-        "task": await _task_source_details(workspace_id, task_ids) if task_ids else {},
-        "decision": await _decision_source_details(workspace_id, decision_ids) if decision_ids else {},
+        "conversation_message": {},
+        "task": {},
+        "decision": {},
     }
+    failed_source_types: set[str] = set()
+    source_loaders = (
+        (
+            "conversation_message",
+            conversation_ids,
+            lambda ids: _conversation_source_details(
+                workspace_id=workspace_id,
+                user_id=user_id,
+                source_ids=ids,
+            ),
+        ),
+        ("task", task_ids, lambda ids: _task_source_details(workspace_id, ids)),
+        ("decision", decision_ids, lambda ids: _decision_source_details(workspace_id, ids)),
+    )
+    for source_type, source_ids, loader in source_loaders:
+        if not source_ids:
+            continue
+        try:
+            source_details[source_type] = await loader(source_ids)
+        except HTTPException as exc:
+            if exc.status_code < 500:
+                raise
+            failed_source_types.add(source_type)
+            logger.warning(
+                "Mention source hydration failed | workspace_id=%s | source_type=%s",
+                workspace_id,
+                source_type,
+                exc_info=True,
+            )
     mentioned_user_name, _, _ = _profile_label(user_id, profiles)
 
     hydrated: list[dict[str, Any]] = []
@@ -373,7 +424,9 @@ async def list_mentions_for_user(
         source_id = str(row.get("source_id") or "")
         details = source_details.get(source_type, {}).get(source_id)
         if not details:
-            continue
+            if source_type not in failed_source_types:
+                continue
+            details = _generic_source_details(source_type, source_id)
         actor_id = str(row.get("mentioned_by_user_id") or "")
         actor_name, actor_email, actor_avatar_label = _profile_label(actor_id, profiles)
         hydrated.append(
@@ -396,12 +449,16 @@ async def count_unread_mentions_for_user(
     workspace_id: str,
     user_id: str,
 ) -> dict[str, int]:
-    rows = await list_mentions_for_user(
-        workspace_id=workspace_id,
-        user_id=user_id,
-        only_unread=True,
-        limit=None,
-    )
+    await require_workspace_access(workspace_id, user_id)
+    try:
+        rows = await select_all_trusted(
+            "workspace_mentions",
+            "id",
+            filters={"workspace_id": workspace_id, "mentioned_user_id": user_id, "read_at": {"is": None}},
+            limit=None,
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
     return {"unread_count": len(rows)}
 
 

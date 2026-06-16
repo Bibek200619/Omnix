@@ -385,7 +385,9 @@ User types @ in conversation/task/decision text input
   → Source record stores mention metadata in JSON where available
   → workspace_mention_service.sync_mentions_for_source() replaces workspace_mentions rows for that source
   → /notifications calls GET /workspaces/{workspace_id}/mentions for current user's mention notification list
+  → Inbox source hydration is best-effort for backend/schema failures and falls back to generic source labels
   → Header bell calls GET /workspaces/{workspace_id}/mentions/unread-count for workspace-scoped unread count
+  → Unread count queries unread workspace_mentions rows directly; it does not hydrate source records
   → Read actions call PATCH /workspaces/{workspace_id}/mentions/{mention_id}/read or PATCH /workspaces/{workspace_id}/mentions/read-all
 ```
 
@@ -880,6 +882,7 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
 - `GET /workspaces/{id}/channels/{channel_id}/messages`
 - `POST /workspaces/{id}/channels/{channel_id}/messages`
 - `POST /workspaces/{id}/channels/{channel_id}/assist`
+- Read-path guardrails: channel listing continues if default-channel seed inserts fail, message reads fall back to stored metadata mentions if mention hydration has a backend/schema failure, and legacy `context_type/context_id` links are normalized to response-safe `entity_type/entity_id`.
 
 **Workspace Search**
 - `GET /workspaces/{id}/search?q=...` — grouped workspace keyword results for conversations, tasks, initiatives, and decisions
@@ -894,6 +897,15 @@ Backend loads from: `repo_root/.env` → `backend/.env` → `backend/.env.local`
 - `GET /workspaces/{id}/tasks`
 - `POST /workspaces/{id}/tasks`
 - `PATCH /workspaces/{id}/tasks/{task_id}`
+- `GET /workspaces/{id}/tasks/momentum`
+- Task read guardrails: list responses normalize invalid/legacy statuses to `idea`, filter legacy/invalid context links, and fall back to stored activity metadata mentions if mention hydration has a backend/schema failure.
+
+**Workspace Initiatives**
+- `GET /workspaces/{id}/initiatives`
+- `POST /workspaces/{id}/initiatives`
+- `GET /workspaces/{id}/initiatives/{initiative_id}`
+- `PATCH /workspaces/{id}/initiatives/{initiative_id}`
+- Initiative read guardrails: list/detail responses normalize legacy `name` to `title`, legacy `completed` to `complete`, legacy `paused` to `draft`, and coerce missing list/metadata fields to response-safe defaults.
 
 **Workspace Decisions**
 - `GET /workspaces/{id}/decisions`

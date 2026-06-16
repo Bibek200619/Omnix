@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from fastapi import HTTPException
 import pytest
 
 from app.services import workspace_conversation_service as conversations
+from app.services.supabase_service import SupabaseServiceError
 
 
 @pytest.fixture(autouse=True)
@@ -22,6 +24,40 @@ def stub_mentions(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_channel_slug_is_operational_and_stable() -> None:
     assert conversations.channel_slug(" Backend / API Readiness ") == "backend-api-readiness"
     assert conversations.channel_slug("!!!") == "discussion"
+
+
+@pytest.mark.asyncio
+async def test_list_channels_continues_when_default_seed_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, str]] = []
+
+    async def fake_access(workspace_id: str, user_id: str):
+        return SimpleNamespace(workspace={"id": workspace_id})
+
+    async def fake_select_all(table: str, columns: str, filters: dict[str, object], **kwargs):
+        calls.append((table, columns))
+        assert table == "workspace_channels"
+        return []
+
+    async def fake_insert(table: str, payload: dict[str, object]):
+        assert table == "workspace_channels"
+        raise SupabaseServiceError("relation workspace_channels does not exist")
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
+        assert table == "workspace_channels"
+        return None
+
+    monkeypatch.setattr(conversations, "require_workspace_access", fake_access)
+    monkeypatch.setattr(conversations, "select_all_trusted", fake_select_all)
+    monkeypatch.setattr(conversations, "insert_one_trusted", fake_insert)
+    monkeypatch.setattr(conversations, "select_one_trusted", fake_select_one)
+
+    result = await conversations.list_channels(workspace_id="workspace-1", user_id="user-1")
+
+    assert result == []
+    assert calls == [
+        ("workspace_channels", "slug"),
+        ("workspace_channels", conversations.CHANNEL_COLUMNS),
+    ]
 
 
 @pytest.mark.asyncio
@@ -90,6 +126,70 @@ async def test_list_messages_loads_latest_roots_and_reply_counts(monkeypatch: py
     assert result[0]["thread_reply_count"] == 1
     assert result[0]["author_name"] == "Rhea"
     assert result[0]["author_identity"]["display_label"] == "Team Lead \u2022 Backend"
+
+
+@pytest.mark.asyncio
+async def test_list_messages_survives_failed_mention_hydration_and_legacy_context_links(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_require_channel_access(**kwargs):
+        return {"id": kwargs["channel_id"], "visibility": "workspace"}, SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_select_all(table: str, columns: str, filters: dict[str, object], **kwargs):
+        assert table == "workspace_channel_messages"
+        if filters.get("parent_message_id") == {"is": None}:
+            return [
+                {
+                    "id": "root-1",
+                    "workspace_id": "workspace-1",
+                    "channel_id": "channel-1",
+                    "author_user_id": "user-1",
+                    "parent_message_id": None,
+                    "content": "Check the source link.",
+                    "context_links": [
+                        {"context_type": "task", "context_id": "task-1", "label": "Launch task"},
+                        {"context_type": "unknown", "context_id": "ignored"},
+                    ],
+                    "metadata": {
+                        "mentions": [
+                            {
+                                "user_id": "user-2",
+                                "label": "Bibek",
+                                "avatar_label": "B",
+                            }
+                        ]
+                    },
+                }
+            ]
+        return []
+
+    async def fake_mentions_by_source(**kwargs):
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    async def fake_list_workspace_members(workspace: dict[str, object]):
+        return [{"user_id": "user-1", "role": "member", "full_name": "Alex", "avatar_label": "A"}]
+
+    async def fake_get_profiles(user_ids: list[str]):
+        return {}
+
+    monkeypatch.setattr(conversations, "_require_channel_access", fake_require_channel_access)
+    monkeypatch.setattr(conversations, "select_all_trusted", fake_select_all)
+    monkeypatch.setattr(conversations, "mention_metadata_for_sources", fake_mentions_by_source)
+    monkeypatch.setattr(conversations, "list_workspace_members", fake_list_workspace_members)
+    monkeypatch.setattr(conversations, "get_profiles", fake_get_profiles)
+
+    result = await conversations.list_messages(
+        workspace_id="workspace-1",
+        channel_id="channel-1",
+        user_id="user-1",
+        limit=20,
+        offset=0,
+    )
+
+    assert result[0]["mentions"] == [{"user_id": "user-2", "label": "Bibek", "avatar_label": "B"}]
+    assert result[0]["context_links"] == [
+        {"entity_type": "task", "entity_id": "task-1", "label": "Launch task"}
+    ]
 
 
 @pytest.mark.asyncio
