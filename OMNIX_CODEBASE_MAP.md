@@ -555,6 +555,7 @@ ProviderManager (backend/app/services/llm/manager.py)
 - Default model: `phi3:mini`
 - Streaming: yes (async generator)
 - Config: `AI_REQUEST_TIMEOUT_SECONDS`, `AI_STREAM_TIMEOUT_SECONDS`, `AI_MAX_RETRIES`
+- Logging rule: prompt text, document chunk previews, and full provider payloads are not logged; AI request logs use lengths, counts, and context flags only
 
 ### AI System Prompt
 Defined in `settings/providers.py` → `AI_SYSTEM_PROMPT`:

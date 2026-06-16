@@ -488,7 +488,7 @@ def _log_ollama_prompt_debug(
     logger.info(
         "Ollama prompt debug: conversation_id=%s retrieval_strategy=%s retrieved_chunks_count=%d "
         "prompt_length=%d has_web_results=%s has_document_context=%s web_search=%s context_counts=%s "
-        "first_retrieved_chunk_preview=%r prompt_preview=%r",
+        "has_first_retrieved_chunk=%s",
         conversation_id,
         retrieval_debug.get("strategy", "unknown"),
         int(retrieval_debug.get("retrieved_chunks_count") or 0),
@@ -501,8 +501,7 @@ def _log_ollama_prompt_debug(
             "document_context_count": context_diag.get("document_context_count"),
             "estimated_context_tokens": context_diag.get("estimated_context_tokens"),
         },
-        retrieval_debug.get("first_chunk_preview") or "",
-        (prompt or "").replace("\n", " ")[:1000],
+        bool(retrieval_debug.get("first_chunk_preview")),
     )
 
 
