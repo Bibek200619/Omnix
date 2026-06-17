@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
@@ -58,6 +59,14 @@ function mergeTask(current: WorkspaceTask[], incoming: WorkspaceTask) {
 }
 
 export function WorkspaceTasksSurface() {
+  return (
+    <SurfaceErrorBoundary surfaceName="Execution">
+      <WorkspaceTasksSurfaceContent />
+    </SurfaceErrorBoundary>
+  );
+}
+
+function WorkspaceTasksSurfaceContent() {
   const { session } = useAuth();
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const { presence, realtimeStatus } = useWorkspaceCollaboration();

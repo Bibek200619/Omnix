@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowUpRight, AtSign, BadgeCheck, Check, ClipboardCheck, Loader2, MessagesSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -45,6 +46,14 @@ function mentionSentence(item: WorkspaceMentionInboxItem) {
 }
 
 export function NotificationCenterSurface() {
+  return (
+    <SurfaceErrorBoundary surfaceName="Notifications">
+      <NotificationCenterSurfaceContent />
+    </SurfaceErrorBoundary>
+  );
+}
+
+function NotificationCenterSurfaceContent() {
   const router = useRouter();
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const {

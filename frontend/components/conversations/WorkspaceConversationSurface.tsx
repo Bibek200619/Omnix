@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
@@ -107,6 +108,14 @@ function canCreateOperationalChannel(role?: string | null) {
 }
 
 export function WorkspaceConversationSurface() {
+  return (
+    <SurfaceErrorBoundary surfaceName="Workspace conversations">
+      <WorkspaceConversationSurfaceContent />
+    </SurfaceErrorBoundary>
+  );
+}
+
+function WorkspaceConversationSurfaceContent() {
   const { session } = useAuth();
   const { activeMembers, activeWorkspace, activeWorkspaceId } = useWorkspace();
   const { activity, presence, realtimeStatus, sendTypingSignal, typingUsers } = useWorkspaceCollaboration();

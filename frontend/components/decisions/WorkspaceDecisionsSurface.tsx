@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BadgeCheck, Loader2, Plus, RefreshCw, Target, ListTodo } from "lucide-react";
+import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { apiClient } from "@/lib/api";
@@ -28,6 +29,14 @@ function statusClass(status: WorkspaceDecisionStatus) {
 }
 
 export function WorkspaceDecisionsSurface() {
+  return (
+    <SurfaceErrorBoundary surfaceName="Workspace decisions">
+      <WorkspaceDecisionsSurfaceContent />
+    </SurfaceErrorBoundary>
+  );
+}
+
+function WorkspaceDecisionsSurfaceContent() {
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const searchParams = useSearchParams();
   const routeCreateDecision = searchParams?.get("create") === "decision";

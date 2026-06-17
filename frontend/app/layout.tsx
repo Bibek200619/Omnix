@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "../styles/globals.css";
+import { AppErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
@@ -40,7 +41,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AppErrorBoundary>
+          <AuthProvider>{children}</AuthProvider>
+        </AppErrorBoundary>
       </body>
     </html>
   );

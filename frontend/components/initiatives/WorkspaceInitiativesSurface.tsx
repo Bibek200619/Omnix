@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
@@ -92,6 +93,14 @@ function quietMomentum() {
 }
 
 export function WorkspaceInitiativesSurface() {
+  return (
+    <SurfaceErrorBoundary surfaceName="Initiatives">
+      <WorkspaceInitiativesSurfaceContent />
+    </SurfaceErrorBoundary>
+  );
+}
+
+function WorkspaceInitiativesSurfaceContent() {
   const { session } = useAuth();
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const { presence, realtimeStatus } = useWorkspaceCollaboration();
