@@ -94,6 +94,12 @@ class WorkspaceInitiativeRead(BaseModel):
     momentum: InitiativeMomentumRead
 
 
+class WorkspaceInitiativePageRead(BaseModel):
+    items: list[WorkspaceInitiativeRead] = Field(default_factory=list)
+    next_cursor: str | None = None
+    has_more: bool
+
+
 class WorkspaceInitiativeAssistanceRequest(BaseModel):
     mode: InitiativeAssistanceMode
 

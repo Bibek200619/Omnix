@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 from datetime import datetime, timezone
 
@@ -14,6 +13,7 @@ from ..services.document_intelligence_service import (
     extract_document_with_diagnostics,
     extraction_columns_payload,
 )
+from ..services.document_context_service import load_stored_file_bytes
 from ..rag.startup import get_vector_store
 from ..rag.ingestion import RAGIngestionPipeline
 
@@ -39,7 +39,7 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
 
         # Fetch file metadata
         FILE_COLUMNS = (
-            "id,user_id,workspace_id,file_name,file_type,size_bytes,storage_path,metadata,"
+            "id,user_id,workspace_id,file_name,file_type,size_bytes,storage_path,storage_backend,metadata,"
             "page_count,extractor_used,extracted_character_count,image_page_count,text_page_count,"
             "extraction_status,extraction_failure_reason,ocr_used,ocr_character_count,created_at"
         )
@@ -47,16 +47,13 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
         if file_row is None:
             raise RuntimeError("File not found for ingestion")
 
-        storage_path = file_row.get("storage_path")
         filename = file_row.get("file_name") or "imported"
         file_type = file_row.get("file_type")
 
-        if not storage_path or not os.path.exists(storage_path):
-            raise RuntimeError("Stored file not found on disk")
-
-        # Read bytes
-        with open(storage_path, "rb") as fh:
-            data = fh.read()
+        try:
+            data = await load_stored_file_bytes(file_row)
+        except Exception as exc:
+            raise RuntimeError("Stored file bytes could not be loaded") from exc
 
         extraction_result = extract_document_with_diagnostics(filename, file_type, data)
         normalized = extraction_result.text

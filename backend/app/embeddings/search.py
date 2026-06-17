@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any, List
 
 from ..db.supabase_client import get_supabase
@@ -37,18 +38,27 @@ async def semantic_search(query: str, user_id: str, workspace_id: str | None = N
 
     supabase = get_supabase()
     try:
+        workspace_ids = [workspace_id] if workspace_id else None
         params = {
-            "q": embedding,
-            "p_top_k": top_k,
-            "p_user": user_id,
-            "p_workspace": workspace_id,
+            "query_embedding": embedding,
+            "match_threshold": -1.0,
+            "match_count": top_k,
+            "filter_user_id": user_id,
+            "filter_workspace_ids": workspace_ids,
         }
         logger.info("Starting semantic_search RPC (top_k=%d, dimension=%d).", top_k, len(embedding))
         resp = execute_query_sync(
-            supabase.rpc("search_documents_vector", params),
+            supabase.rpc("match_documents", params),
             operation="semantic search rpc",
         )
         rows = getattr(resp, "data", None) or []
+        for row in rows:
+            if "distance" not in row and row.get("similarity") is not None:
+                try:
+                    similarity = float(row["similarity"])
+                    row["distance"] = max(0.0, 1.0 - similarity) if math.isfinite(similarity) else 0.0
+                except Exception:
+                    row["distance"] = 0.0
         logger.info("semantic_search RPC returned %d row(s).", len(rows))
         return rows
     except Exception:

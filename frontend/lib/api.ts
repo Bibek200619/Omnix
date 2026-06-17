@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type {
+  PaginatedResponse,
   WorkspaceMentionInboxItem,
   WorkspaceMentionMarkAllReadResponse,
   WorkspaceMentionMarkReadResponse,
@@ -296,6 +297,36 @@ class ApiClient {
 
     this.inFlightGets.set(key, request);
     return request;
+  }
+
+  async getPaginatedItems<T>(endpoint: string, pageLimit = 200): Promise<T[]> {
+    const items: T[] = [];
+    let cursor: string | null | undefined = null;
+    const seenCursors = new Set<string>();
+
+    do {
+      const separator = endpoint.includes("?") ? "&" : "?";
+      const params = new URLSearchParams({ limit: String(pageLimit) });
+      if (cursor) {
+        params.set("cursor", cursor);
+      }
+      const page = await this.get<PaginatedResponse<T>>(`${endpoint}${separator}${params.toString()}`);
+      items.push(...page.items);
+      cursor = page.has_more ? page.next_cursor : null;
+      if (cursor) {
+        if (seenCursors.has(cursor)) {
+          throw new ApiError("Omnix API returned a repeated pagination cursor.", {
+            endpoint,
+            url: `${API_BASE_URL}${endpoint}`,
+            method: "GET",
+            rawMessage: "Repeated pagination cursor.",
+          });
+        }
+        seenCursors.add(cursor);
+      }
+    } while (cursor);
+
+    return items;
   }
 
   async searchWorkspace(workspaceId: string, query: string): Promise<WorkspaceSearchResponse> {

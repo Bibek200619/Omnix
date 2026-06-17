@@ -12,6 +12,7 @@ from ..schemas.workspace_initiatives import (
     WorkspaceInitiativeAssistanceRequest,
     WorkspaceInitiativeChannelAttach,
     WorkspaceInitiativeCreate,
+    WorkspaceInitiativePageRead,
     WorkspaceInitiativeRead,
     WorkspaceInitiativeUpdate,
 )
@@ -60,12 +61,14 @@ async def create_workspace_initiative(
     )
 
 
-@router.get("/{workspace_id}/initiatives", response_model=list[WorkspaceInitiativeRead])
+@router.get("/{workspace_id}/initiatives", response_model=WorkspaceInitiativePageRead)
 async def get_workspace_initiatives(
     workspace_id: str,
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
     user: dict[str, Any] = Depends(get_current_user),
-) -> list[dict[str, Any]]:
-    return await list_initiatives(user_id=_user_id(user), workspace_id=workspace_id)
+) -> dict[str, Any]:
+    return await list_initiatives(user_id=_user_id(user), workspace_id=workspace_id, cursor=cursor, limit=limit)
 
 
 @router.get("/{workspace_id}/initiatives/{initiative_id}", response_model=WorkspaceInitiativeRead)

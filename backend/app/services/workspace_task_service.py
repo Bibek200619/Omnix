@@ -21,6 +21,7 @@ from .workspace_mention_service import (
     prepare_mentions_for_workspace,
     sync_mentions_for_source,
 )
+from .workspace_pagination import DEFAULT_PAGE_LIMIT, cursor_filters, cursor_page, normalize_page_limit
 from .workspace_service import get_profiles, list_workspace_members, require_workspace_access, utc_now_iso
 
 TASK_COLUMNS = (
@@ -40,6 +41,10 @@ TASK_CONTEXT_TYPES = {
 }
 DECISION_PREVIEW_COLUMNS = "id,title,status,decision_reason,created_at"
 logger = logging.getLogger(__name__)
+
+
+def _one_or_many(values: list[str]) -> str | list[str]:
+    return values[0] if len(values) == 1 else values
 
 
 def _database_error() -> HTTPException:
@@ -165,6 +170,7 @@ async def _hydrate_tasks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         }
     )
     profiles = await get_profiles(ids)
+    linked_decisions_by_task = await _linked_decisions_for_tasks(rows)
     hydrated: list[dict[str, Any]] = []
     for raw_row in rows:
         row = _normalize_task_row(raw_row)
@@ -173,25 +179,6 @@ async def _hydrate_tasks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         activity_metadata = row["activity_metadata"]
         metadata_mentions = activity_metadata.get("mentions") if isinstance(activity_metadata.get("mentions"), list) else []
         mentions = mentions_by_source.get(str(row.get("id"))) or metadata_mentions
-
-        # Fetch linked decisions
-        linked_decisions = []
-        try:
-            decision_links = await select_all_trusted(
-                "workspace_decision_tasks",
-                "decision_id",
-                {"task_id": row["id"], "workspace_id": row["workspace_id"]},
-            )
-            if decision_links:
-                decision_ids = [str(dl["decision_id"]) for dl in decision_links]
-                decisions = await select_all_trusted(
-                    "workspace_decisions",
-                    DECISION_PREVIEW_COLUMNS,
-                    {"id": decision_ids, "workspace_id": row["workspace_id"]},
-                )
-                linked_decisions = decisions
-        except SupabaseServiceError:
-            logger.warning("Task linked decision hydration failed | task_id=%s", row.get("id"), exc_info=True)
 
         hydrated.append(
             {
@@ -202,10 +189,50 @@ async def _hydrate_tasks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "owner_email": owner.get("email"),
                 "owner_avatar_label": owner.get("avatar_label"),
                 "creator_name": creator.get("full_name") or creator.get("handle") or creator.get("email"),
-                "linked_decisions": linked_decisions,
+                "linked_decisions": linked_decisions_by_task.get(str(row.get("id")), []),
             }
         )
     return hydrated
+
+
+async def _linked_decisions_for_tasks(rows: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    task_ids_by_workspace: dict[str, list[str]] = {}
+    for row in rows:
+        task_id = str(row.get("id") or "")
+        workspace_id = str(row.get("workspace_id") or "")
+        if task_id and workspace_id:
+            task_ids_by_workspace.setdefault(workspace_id, []).append(task_id)
+
+    linked_by_task: dict[str, list[dict[str, Any]]] = {}
+    for workspace_id, task_ids in task_ids_by_workspace.items():
+        try:
+            decision_links = await select_all_trusted(
+                "workspace_decision_tasks",
+                "task_id,decision_id",
+                {"task_id": _one_or_many(task_ids), "workspace_id": workspace_id},
+            )
+            decision_ids = sorted({str(link.get("decision_id")) for link in decision_links if link.get("decision_id")})
+            if not decision_ids:
+                continue
+            decisions = await select_all_trusted(
+                "workspace_decisions",
+                DECISION_PREVIEW_COLUMNS,
+                {"id": decision_ids, "workspace_id": workspace_id},
+            )
+            decision_by_id = {str(decision.get("id")): decision for decision in decisions if decision.get("id")}
+            for link in decision_links:
+                task_id = str(link.get("task_id") or (task_ids[0] if len(task_ids) == 1 else ""))
+                decision = decision_by_id.get(str(link.get("decision_id") or ""))
+                if task_id and decision:
+                    linked_by_task.setdefault(task_id, []).append(decision)
+        except SupabaseServiceError:
+            logger.warning(
+                "Task linked decision hydration failed | workspace_id=%s task_count=%d",
+                workspace_id,
+                len(task_ids),
+                exc_info=True,
+            )
+    return linked_by_task
 
 
 async def _validate_owner(access: Any, owner_user_id: str | None) -> None:
@@ -237,20 +264,27 @@ async def _validate_initiative(workspace_id: str, initiative_id: str | None) -> 
         )
 
 
-async def list_tasks(*, workspace_id: str, user_id: str) -> list[dict[str, Any]]:
+async def list_tasks(
+    *,
+    workspace_id: str,
+    user_id: str,
+    cursor: str | None = None,
+    limit: int = DEFAULT_PAGE_LIMIT,
+) -> dict[str, Any]:
     await require_workspace_access(workspace_id, user_id)
+    page_limit = normalize_page_limit(limit)
     try:
         rows = await select_all_trusted(
             "workspace_tasks",
             TASK_COLUMNS,
-            filters={"workspace_id": workspace_id},
+            filters=cursor_filters({"workspace_id": workspace_id}, cursor),
             order_by="updated_at",
             desc=True,
-            limit=300,
+            limit=page_limit + 1,
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
-    return await _hydrate_tasks(rows)
+    return cursor_page(await _hydrate_tasks(rows[:page_limit]), has_more=len(rows) > page_limit)
 
 
 async def require_task(*, workspace_id: str, task_id: str, user_id: str) -> dict[str, Any]:
@@ -517,7 +551,8 @@ async def create_task_from_assistance(
 
 
 async def task_momentum(*, workspace_id: str, user_id: str) -> dict[str, Any]:
-    tasks = await list_tasks(workspace_id=workspace_id, user_id=user_id)
+    tasks_page = await list_tasks(workspace_id=workspace_id, user_id=user_id, limit=200)
+    tasks = tasks_page["items"]
     flow_counts = {task_status: 0 for task_status in TASK_STATUSES}
     today = date.today()
     due_threshold = today + timedelta(days=7)
@@ -573,4 +608,5 @@ async def task_momentum(*, workspace_id: str, user_id: str) -> dict[str, Any]:
 
 
 async def task_transcript_for_assistance(*, workspace_id: str, user_id: str) -> list[dict[str, Any]]:
-    return (await list_tasks(workspace_id=workspace_id, user_id=user_id))[:80]
+    tasks_page = await list_tasks(workspace_id=workspace_id, user_id=user_id, limit=80)
+    return tasks_page["items"]

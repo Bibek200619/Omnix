@@ -103,6 +103,12 @@ class WorkspaceTaskRead(BaseModel):
     linked_decisions: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class WorkspaceTaskPageRead(BaseModel):
+    items: list[WorkspaceTaskRead] = Field(default_factory=list)
+    next_cursor: str | None = None
+    has_more: bool
+
+
 class WorkspaceTaskMomentumRead(BaseModel):
     workspace_id: str
     total_count: int

@@ -118,7 +118,66 @@ def _extract_docx(data: bytes) -> str:
         raise RuntimeError("DOCX extraction requires the python-docx package.") from exc
 
     doc = docx.Document(io.BytesIO(data))
-    return "\n\n".join(p.text for p in doc.paragraphs if p.text)
+    text_parts: list[str] = []
+
+    for paragraph in doc.paragraphs:
+        paragraph_text = _format_docx_paragraph(paragraph)
+        if paragraph_text:
+            text_parts.append(paragraph_text)
+
+    for table in doc.tables:
+        for row in table.rows:
+            row_text = " | ".join(_normalize_docx_cell_text(cell.text) for cell in row.cells)
+            if row_text.strip(" |"):
+                text_parts.append(row_text)
+
+    text_parts.extend(_extract_docx_text_boxes(doc))
+    return "\n\n".join(text_parts)
+
+
+def _format_docx_paragraph(paragraph: Any) -> str | None:
+    text = " ".join(str(getattr(paragraph, "text", "") or "").split())
+    if not text:
+        return None
+
+    style = getattr(paragraph, "style", None)
+    style_name = str(getattr(style, "name", "") or "")
+    heading_level = _docx_heading_level(style_name)
+    if heading_level is not None:
+        return f"{'#' * heading_level} {text}"
+    return text
+
+
+def _docx_heading_level(style_name: str) -> int | None:
+    normalized = " ".join(style_name.split()).lower()
+    if not normalized.startswith("heading "):
+        return None
+    try:
+        level = int(normalized.rsplit(" ", 1)[-1])
+    except ValueError:
+        return None
+    return level if 1 <= level <= 6 else None
+
+
+def _normalize_docx_cell_text(text: str) -> str:
+    return " ".join(str(text or "").split())
+
+
+def _extract_docx_text_boxes(doc: Any) -> list[str]:
+    body = getattr(getattr(doc, "element", None), "body", None)
+    if body is None or not hasattr(body, "xpath"):
+        return []
+    try:
+        nodes = body.xpath(".//*[local-name()='txbxContent']//*[local-name()='t']")
+    except Exception:
+        return []
+
+    text = " ".join(
+        str(getattr(node, "text", "") or "").strip()
+        for node in nodes
+        if str(getattr(node, "text", "") or "").strip()
+    )
+    return [text] if text else []
 
 
 def _decode_text(data: bytes) -> str:

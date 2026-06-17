@@ -4,7 +4,7 @@ import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 
 from ..core.security import get_current_user
 from ..schemas.chat import FileCreate, FileRead
@@ -22,11 +22,16 @@ from ..services.workspace_service import (
     require_workspace_access,
 )
 from ..services.workspace_collaboration_service import log_workspace_activity
+from ..services.document_context_service import (
+    LOCAL_STORAGE_BACKEND,
+    SUPABASE_STORAGE_BACKEND,
+    create_supabase_signed_url,
+)
 from .conversations import require_conversation_access
 
 router = APIRouter(prefix="/files", tags=["files"])
 FILE_COLUMNS = (
-    "id,user_id,workspace_id,conversation_id,file_name,file_type,size_bytes,storage_path,metadata,"
+    "id,user_id,workspace_id,conversation_id,file_name,file_type,size_bytes,storage_path,storage_backend,metadata,"
     "page_count,extractor_used,extracted_character_count,image_page_count,text_page_count,"
     "extraction_status,extraction_failure_reason,ocr_used,ocr_character_count,created_at"
 )
@@ -183,12 +188,23 @@ async def get_files(
 async def download_file(
     file_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
-) -> FileResponse:
+) -> Response:
     user_id = _user_id_from_claims(current_user)
     file_row, _ = await _require_file_access(file_id, user_id)
 
     storage_path = file_row.get("storage_path")
-    if not storage_path or not os.path.exists(storage_path):
+    if not storage_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File content not found on server.")
+
+    storage_backend = str(file_row.get("storage_backend") or LOCAL_STORAGE_BACKEND).lower()
+    if storage_backend == SUPABASE_STORAGE_BACKEND:
+        try:
+            signed_url = await create_supabase_signed_url(str(storage_path))
+        except Exception as exc:
+            raise _database_error() from exc
+        return RedirectResponse(signed_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
+    if not os.path.exists(storage_path):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File content not found on server.")
 
     filename = file_row.get("file_name") or "download"
@@ -229,7 +245,8 @@ async def delete_file(
         )
 
     storage_path = file_row.get("storage_path")
-    if storage_path:
+    storage_backend = str(file_row.get("storage_backend") or LOCAL_STORAGE_BACKEND).lower()
+    if storage_path and storage_backend != SUPABASE_STORAGE_BACKEND:
         try:
             os.remove(storage_path)
         except FileNotFoundError:

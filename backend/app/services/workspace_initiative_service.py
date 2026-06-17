@@ -17,6 +17,7 @@ from .supabase_service import (
 )
 from .workspace_collaboration_service import log_workspace_activity
 from .workspace_conversation_service import _require_channel_access, channel_transcript_for_assistance, list_channels
+from .workspace_pagination import DEFAULT_PAGE_LIMIT, cursor_filters, cursor_page, normalize_page_limit
 from .workspace_service import get_profiles, list_workspace_members, require_workspace_access, utc_now_iso
 from .workspace_task_service import list_tasks, update_task
 
@@ -179,7 +180,8 @@ async def _validate_owner(workspace: dict[str, Any], owner_user_id: str | None) 
 
 async def _base_records(workspace_id: str, user_id: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     try:
-        tasks = await list_tasks(workspace_id=workspace_id, user_id=user_id)
+        tasks_page = await list_tasks(workspace_id=workspace_id, user_id=user_id, limit=200)
+        tasks = tasks_page["items"]
     except HTTPException as exc:
         if exc.status_code < 500:
             raise
@@ -265,20 +267,30 @@ async def _hydrate_initiatives(
     return hydrated
 
 
-async def list_initiatives(*, workspace_id: str, user_id: str) -> list[dict[str, Any]]:
+async def list_initiatives(
+    *,
+    workspace_id: str,
+    user_id: str,
+    cursor: str | None = None,
+    limit: int = DEFAULT_PAGE_LIMIT,
+) -> dict[str, Any]:
     await require_workspace_access(workspace_id, user_id)
+    page_limit = normalize_page_limit(limit)
     try:
         rows = await select_all_trusted(
             "workspace_initiatives",
             INITIATIVE_COLUMNS,
-            filters={"workspace_id": workspace_id},
+            filters=cursor_filters({"workspace_id": workspace_id}, cursor),
             order_by="updated_at",
             desc=True,
-            limit=200,
+            limit=page_limit + 1,
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
-    return await _hydrate_initiatives(rows, workspace_id=workspace_id, user_id=user_id)
+    return cursor_page(
+        await _hydrate_initiatives(rows[:page_limit], workspace_id=workspace_id, user_id=user_id),
+        has_more=len(rows) > page_limit,
+    )
 
 
 async def require_initiative(*, workspace_id: str, initiative_id: str, user_id: str) -> dict[str, Any]:

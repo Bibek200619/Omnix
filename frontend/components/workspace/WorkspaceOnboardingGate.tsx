@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import {
   AlertCircle,
   ArrowLeft,
@@ -80,6 +81,7 @@ function inviteLabel(invite: WorkspaceInvite) {
 }
 
 export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGateProps) {
+  const pathname = usePathname();
   const {
     workspaces,
     loading,
@@ -140,6 +142,10 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
   }, [error, hasWorkspaces, loading, workspaceLoadFailed]);
 
   const isBlocked = !loading && (workspaceLoadFailed || !hasWorkspaces || (onboardingStarted && !onboardingComplete));
+
+  if (pathname === "/onboarding") {
+    return <>{children}</>;
+  }
 
   if (!isBlocked) {
     return <>{children}</>;

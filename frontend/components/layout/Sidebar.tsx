@@ -1120,6 +1120,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
   const displayName = profileDisplayName(user?.email, user?.user_metadata, profile?.display_name);
   const displayEmail = profile?.email || user?.email || "";
   const displayHandle = profile?.username || profile?.handle || null;
+  const previousPathnameRef = useRef(pathname);
 
   const filteredConversations = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -1181,20 +1182,31 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
     }
   }
 
+  useEffect(() => {
+    if (previousPathnameRef.current === pathname) {
+      return;
+    }
+
+    previousPathnameRef.current = pathname;
+    if (isOpen) {
+      onClose();
+    }
+  }, [isOpen, onClose, pathname]);
+
   return (
     <>
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity lg:hidden",
+          "fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity md:hidden",
           isOpen ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={onClose}
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[min(21rem,calc(100vw_-_2.75rem))] flex-col overflow-hidden border-r border-[var(--omnix-border)] bg-[linear-gradient(180deg,rgba(5,12,23,0.98),rgba(4,10,20,0.985))] shadow-[24px_0_120px_rgba(0,0,0,0.6),4px_0_40px_rgba(0,255,255,0.05)] backdrop-blur-[28px] transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] lg:w-[var(--omnix-sidebar-w)]",
+          "fixed inset-y-0 left-0 z-50 flex w-[min(21rem,calc(100vw_-_2.75rem))] flex-col overflow-hidden border-r border-[var(--omnix-border)] bg-[linear-gradient(180deg,rgba(5,12,23,0.98),rgba(4,10,20,0.985))] shadow-[24px_0_120px_rgba(0,0,0,0.6),4px_0_40px_rgba(0,255,255,0.05)] backdrop-blur-[28px] transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] md:w-[var(--omnix-sidebar-w)]",
           isOpen ? "translate-x-0" : "-translate-x-full",
-          collapsed ? "lg:-translate-x-full" : "lg:translate-x-0",
+          collapsed ? "md:-translate-x-full" : "md:translate-x-0",
         )}
       >
         {/* Top ambient glow */}
@@ -1215,7 +1227,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                   <OmnixMark size={34} />
                 </div>
                 <div>
-                  <span className="omnix-display block text-lg font-semibold leading-tight tracking-[-0.045em] text-white">Omnix</span>
+                  <span className="omnix-display block text-base font-bold uppercase leading-tight tracking-[0.06em] text-white drop-shadow-[0_0_12px_rgba(0,255,255,0.45)]">OMNIX</span>
                   <span className="text-[10px] leading-tight tracking-[0.05em] text-[var(--omnix-cyan)] opacity-60">AI Workspace</span>
                 </div>
               </Link>
@@ -1224,7 +1236,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="hidden h-[26px] w-[26px] rounded-[7px] border border-[var(--omnix-border)] bg-transparent text-[var(--omnix-text-3)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white lg:inline-flex"
+                  className="hidden h-[26px] w-[26px] rounded-[7px] border border-[var(--omnix-border)] bg-transparent text-[var(--omnix-text-3)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white md:inline-flex"
                   aria-label="Collapse workspace sidebar"
                   title="Collapse workspace sidebar"
                   onClick={onToggleCollapse}
@@ -1235,7 +1247,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 rounded-[10px] border border-[var(--omnix-border)] bg-transparent text-[var(--omnix-text-3)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white lg:hidden"
+                  className="h-10 w-10 rounded-[10px] border border-[var(--omnix-border)] bg-transparent text-[var(--omnix-text-3)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white md:hidden"
                   aria-label="Close navigation"
                   title="Close navigation"
                   onClick={onClose}
@@ -1279,7 +1291,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                 href={item.href}
                 onClick={onClose}
                 className={cn(
-                  "omnix-sidebar-link group/nav relative mb-px flex min-h-11 items-center gap-2.5 rounded-[var(--omnix-radius-sm)] border px-2.5 py-[9px] text-[13px] transition duration-150 lg:min-h-0",
+                  "omnix-sidebar-link group/nav relative mb-px flex min-h-11 items-center gap-2.5 rounded-[var(--omnix-radius-sm)] border px-2.5 py-[9px] text-[13px] transition duration-150 md:min-h-0",
                   isActive
                     ? "border-cyan-300/20 bg-[radial-gradient(ellipse_at_0%_50%,rgba(0,255,255,0.1),transparent_60%),rgba(0,255,255,0.06)] font-semibold text-white shadow-[var(--omnix-glow-xs),inset_0_1px_0_rgba(255,255,255,0.04)]"
                     : "border-transparent font-normal text-[var(--omnix-text-2)] hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface)] hover:text-white hover:shadow-[var(--omnix-glow-xs)]",

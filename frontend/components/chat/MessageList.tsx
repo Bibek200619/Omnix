@@ -15,6 +15,7 @@ type MessageListProps = {
   loadingConversation?: boolean;
   onRetry?: (message: Message) => void;
   onRegenerate?: (assistantMessageId: string) => void;
+  onFeedback?: (message: Message, rating: "good" | "bad") => void | Promise<void>;
   typingMembers?: WorkspacePresenceMember[];
 };
 
@@ -43,6 +44,7 @@ export function MessageList({
   loadingConversation = false,
   onRetry,
   onRegenerate,
+  onFeedback,
   typingMembers = [],
 }: MessageListProps) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -151,7 +153,13 @@ export function MessageList({
       >
         <AnimatePresence initial={false}>
           {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} onRetry={onRetry} onRegenerate={onRegenerate} />
+            <MessageBubble
+              key={message.id}
+              message={message}
+              onRetry={onRetry}
+              onRegenerate={onRegenerate}
+              onFeedback={onFeedback}
+            />
           ))}
           {typingMembers.length ? (
             <motion.div
@@ -227,4 +235,3 @@ export function MessageList({
     </div>
   );
 }
-

@@ -140,8 +140,8 @@ async def test_workspace_operational_reads_survive_schema_drift_together(monkeyp
     monkeypatch.setattr(tasks, "select_all_trusted", task_select_all)
     monkeypatch.setattr(tasks, "mention_metadata_for_sources", fail_task_mentions)
 
-    task_rows = await tasks.list_tasks(workspace_id="workspace-1", user_id="user-1")
-    WorkspaceTaskRead.model_validate(task_rows[0])
+    task_page = await tasks.list_tasks(workspace_id="workspace-1", user_id="user-1")
+    WorkspaceTaskRead.model_validate(task_page["items"][0])
 
     monkeypatch.setattr(initiatives, "require_workspace_access", fake_access)
     monkeypatch.setattr(initiatives, "get_profiles", fake_profiles)
@@ -166,5 +166,5 @@ async def test_workspace_operational_reads_survive_schema_drift_together(monkeyp
     monkeypatch.setattr(initiatives, "select_all_trusted", initiative_select_all)
     monkeypatch.setattr(initiatives, "_base_records", no_base_records)
 
-    initiative_rows = await initiatives.list_initiatives(workspace_id="workspace-1", user_id="user-1")
-    WorkspaceInitiativeRead.model_validate(initiative_rows[0])
+    initiative_page = await initiatives.list_initiatives(workspace_id="workspace-1", user_id="user-1")
+    WorkspaceInitiativeRead.model_validate(initiative_page["items"][0])

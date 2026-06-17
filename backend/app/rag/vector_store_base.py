@@ -39,7 +39,7 @@ class VectorStore(ABC):
         self,
         query_embedding: list[float],
         user_id: str,
-        workspace_id: str | None = None,
+        workspace_id: str | list[str] | None = None,
         top_k: int = 3,
     ) -> list[tuple[str, float]]:
         """

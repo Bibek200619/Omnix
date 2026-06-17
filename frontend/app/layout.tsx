@@ -18,11 +18,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/omnix-icon.svg", type: "image/svg+xml", sizes: "any" },
+      { url: "/favicon.ico", sizes: "any" },
       { url: "/icon.png", type: "image/png", sizes: "512x512" },
       { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
     ],
-    shortcut: [{ url: "/omnix-icon.svg", type: "image/svg+xml", sizes: "any" }],
+    shortcut: [{ url: "/favicon.ico" }],
     apple: [{ url: "/apple-icon.png", type: "image/png", sizes: "180x180" }],
   },
 };

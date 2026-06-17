@@ -14,6 +14,8 @@ in conftest.py before any test module is collected.
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import sys
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -193,6 +195,83 @@ class TestEnqueueJob:
 # ===========================================================================
 # Section 3: Worker _process_job
 # ===========================================================================
+
+
+class TestWorkerScalability:
+    def test_worker_id_is_unique_process_identifier(self):
+        import app.jobs.worker as w
+
+        assert w._WORKER_ID.startswith("ingestion_worker_")
+        assert w._WORKER_ID != "ingestion_worker_main"
+
+    def test_worker_concurrency_reads_environment(self, monkeypatch: pytest.MonkeyPatch):
+        import app.jobs.worker as w
+
+        monkeypatch.setenv("OMNIX_WORKER_CONCURRENCY", "3")
+        assert w._worker_concurrency() == 3
+
+    @pytest.mark.asyncio
+    async def test_competing_workers_claim_queued_job_once(self):
+        import app.jobs.worker as w
+
+        job_row = _make_job_row(job_id="job-race")
+        claimed = False
+        filters_seen: list[dict] = []
+
+        async def fake_update_one(table, filters, data):
+            nonlocal claimed
+            filters_seen.append(filters)
+            if claimed:
+                return None
+            claimed = True
+            return {**job_row, **data}
+
+        with patch("app.jobs.worker.update_one_trusted", fake_update_one):
+            first, second = await asyncio.gather(
+                w._lease_queued_job(dict(job_row)),
+                w._lease_queued_job(dict(job_row)),
+            )
+
+        assert sum(result is not None for result in (first, second)) == 1
+        assert filters_seen == [
+            {"id": "job-race", "status": "queued"},
+            {"id": "job-race", "status": "queued"},
+        ]
+
+    @pytest.mark.asyncio
+    async def test_worker_loop_exits_loudly_when_vector_store_init_fails(self):
+        import app.jobs.worker as w
+
+        runtime = _reset_runtime()
+
+        class FakeRedis:
+            def __init__(self):
+                self.values: dict[str, str] = {}
+
+            async def set(self, key: str, value: str):
+                self.values[key] = value
+                return True
+
+        redis = FakeRedis()
+
+        async def fail_vector_store():
+            raise RuntimeError("pgvector unavailable")
+
+        with (
+            patch("app.jobs.worker.initialize_vector_store", fail_vector_store),
+            patch("app.jobs.worker.get_redis", lambda: redis),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                await w._worker_loop(asyncio.Event())
+
+        assert exc_info.value.code == 1
+        assert runtime.status == "failed"
+        assert "pgvector unavailable" in (runtime.status_reason or "")
+        payload = json.loads(redis.values["omnix:worker:last_failure"])
+        assert payload["stage"] == "vector_store_init"
+        assert payload["worker_id"] == w._WORKER_ID
+        assert "pgvector unavailable" in payload["reason"]
+
 
 class TestProcessJob:
     def setup_method(self):
@@ -598,6 +677,36 @@ class TestHealthChecks:
         assert result["failed_jobs"] == 1
         assert result["queue_depth"] == 3
 
+    @pytest.mark.asyncio
+    async def test_check_ingestion_worker_includes_last_failure(self):
+        from app.health import checks
+
+        failure = {
+            "worker_id": "ingestion_worker_deadbeef",
+            "stage": "vector_store_init",
+            "reason": "pgvector unavailable",
+            "failed_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        mock_redis = AsyncMock()
+        mock_redis.llen = AsyncMock(return_value=0)
+        mock_redis.get = AsyncMock(return_value=json.dumps(failure))
+
+        async def fake_count_stuck(minutes):
+            return 0
+
+        fake_jobs_queue = MagicMock()
+        fake_jobs_queue.get_redis = MagicMock(return_value=mock_redis)
+
+        with (
+            patch.dict(sys.modules, {"app.jobs.queue": fake_jobs_queue}),
+            patch("app.health.checks._count_stuck_jobs", fake_count_stuck),
+        ):
+            result = await checks.check_ingestion_worker()
+
+        assert result["last_failure"]["stage"] == "vector_store_init"
+        assert result["last_failure"]["reason"] == "pgvector unavailable"
+
 
 # ===========================================================================
 # Section 5: Stuck job detection
@@ -605,18 +714,11 @@ class TestHealthChecks:
 
 class TestStuckJobDetection:
     @pytest.mark.asyncio
-    async def test_stuck_jobs_older_than_threshold_are_counted(self):
-        """Jobs with created_at older than 30m are counted; recent ones are not."""
+    async def test_stuck_jobs_push_timestamp_filter_into_supabase(self):
+        """Only stuck queued jobs should be fetched from Supabase."""
         from app.health import checks
 
-        old_ts = (datetime.now(timezone.utc) - timedelta(minutes=45)).isoformat()
-        recent_ts = datetime.now(timezone.utc).isoformat()
-
-        fake_rows = [
-            {"id": "old-1", "created_at": old_ts},
-            {"id": "old-2", "created_at": old_ts},
-            {"id": "fresh", "created_at": recent_ts},
-        ]
+        fake_rows = [{"id": f"old-{index}"} for index in range(3)]
         captured: dict = {}
 
         fake_svc = MagicMock()
@@ -625,6 +727,7 @@ class TestStuckJobDetection:
             captured["table"] = table
             captured["columns"] = columns
             captured["filters"] = filters
+            captured["limit"] = kwargs.get("limit")
             return fake_rows
 
         fake_svc.select_all_trusted = fake_select_all_trusted
@@ -632,26 +735,20 @@ class TestStuckJobDetection:
         with patch.dict(sys.modules, {"app.services.supabase_service": fake_svc}):
             count = await checks._count_stuck_jobs(minutes=30)
 
-        assert captured == {
-            "table": "jobs",
-            "columns": "id,created_at",
-            "filters": {"status": "queued"},
-        }
-        assert count == 2  # only the two old ones
+        assert captured["table"] == "jobs"
+        assert captured["columns"] == "id"
+        assert captured["filters"]["status"] == "queued"
+        assert "lt" in captured["filters"]["created_at"]
+        assert captured["limit"] == 1000
+        assert count == 3
 
     @pytest.mark.asyncio
     async def test_no_stuck_jobs_when_all_recent(self):
         """All jobs are recent → stuck count is 0."""
         from app.health import checks
 
-        recent_ts = datetime.now(timezone.utc).isoformat()
-        fake_rows = [
-            {"id": "j1", "created_at": recent_ts},
-            {"id": "j2", "created_at": recent_ts},
-        ]
-
         fake_svc = MagicMock()
-        fake_svc.select_all_trusted = AsyncMock(return_value=fake_rows)
+        fake_svc.select_all_trusted = AsyncMock(return_value=[])
 
         with patch.dict(sys.modules, {"app.services.supabase_service": fake_svc}):
             count = await checks._count_stuck_jobs(minutes=10)
@@ -686,17 +783,25 @@ class TestStuckJobDetection:
 
     @pytest.mark.asyncio
     async def test_stuck_10m_threshold_correct(self):
-        """Jobs 11 minutes old are stuck at 10m threshold."""
+        """Threshold value is pushed into the query for each requested window."""
         from app.health import checks
 
-        old_ts = (datetime.now(timezone.utc) - timedelta(minutes=11)).isoformat()
+        captured_filters: list[dict] = []
 
         fake_svc = MagicMock()
-        fake_svc.select_all_trusted = AsyncMock(return_value=[{"id": "j1", "created_at": old_ts}])
+
+        async def fake_select_all_trusted(table, columns, filters=None, **kwargs):
+            captured_filters.append(filters)
+            if filters and filters["created_at"]["lt"] > (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat():
+                return [{"id": "j1"}]
+            return []
+
+        fake_svc.select_all_trusted = fake_select_all_trusted
 
         with patch.dict(sys.modules, {"app.services.supabase_service": fake_svc}):
             count_10 = await checks._count_stuck_jobs(minutes=10)
             count_30 = await checks._count_stuck_jobs(minutes=30)
 
-        assert count_10 == 1   # 11m > 10m threshold → stuck
-        assert count_30 == 0   # 11m < 30m threshold → not stuck
+        assert count_10 == 1
+        assert count_30 == 0
+        assert captured_filters[0]["created_at"]["lt"] != captured_filters[1]["created_at"]["lt"]

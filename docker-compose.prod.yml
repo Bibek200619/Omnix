@@ -17,7 +17,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.backend
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--proxy-headers"]
+    command: ["sh", "scripts/start_api.sh", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--proxy-headers"]
     environment:
       OMNIX_ROLE: api
       OMNIX_UPLOAD_DIR: /app/uploads

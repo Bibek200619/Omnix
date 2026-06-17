@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { motion, useInView, AnimatePresence, type Variants } from "framer-motion";
-import { OmnixMark as BrandMark } from "@/components/brand/OmnixMark";
 
 // ─── Brand ───────────────────────────────────────────────────────────────────
 const C = {
@@ -26,7 +25,53 @@ const C = {
 
 // ─── Logo ─────────────────────────────────────────────────────────────────────
 function OmnixMark({ size = 36 }: { size?: number }) {
-  return <BrandMark size={size} />;
+  const s = size, cx = s/2, cy = s/2;
+  const R = s*0.42, ri = s*0.22;
+  const outer: [number,number][] = [
+    [cx, cy-R],[cx+R*0.71,cy-R*0.41],[cx+R*0.87,cy+R*0.2],[cx+R*0.5,cy+R*0.82],
+    [cx-R*0.05,cy+R*0.95],[cx-R*0.62,cy+R*0.72],[cx-R*0.9,cy+R*0.08],[cx-R*0.58,cy-R*0.58],
+  ];
+  const inner: [number,number][] = [
+    [cx+ri*0.1,cy-ri*1.1],[cx+ri*1.0,cy-ri*0.3],[cx+ri*0.85,cy+ri*0.7],[cx+ri*0.1,cy+ri*1.1],
+    [cx-ri*0.7,cy+ri*0.8],[cx-ri*1.0,cy-ri*0.1],[cx-ri*0.5,cy-ri*0.9],
+  ];
+  const all = [...outer,...inner];
+  const edges:[number,number][] = [
+    [0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,0],
+    [0,8],[1,9],[2,10],[3,11],[4,12],[5,13],[6,14],
+    [8,9],[9,10],[10,11],[11,12],[12,13],[13,14],[14,8],
+    [0,10],[2,13],[4,8],[6,11],
+  ];
+  const nr = s*0.028;
+  const uid = `om${s}`;
+  return (
+    <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} fill="none">
+      <defs>
+        <radialGradient id={`rg-${uid}`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={C.cyan} stopOpacity="0.18"/>
+          <stop offset="100%" stopColor={C.cyan} stopOpacity="0"/>
+        </radialGradient>
+        <filter id={`f-${uid}`}><feGaussianBlur stdDeviation="0.7"/></filter>
+      </defs>
+      <circle cx={cx} cy={cy} r={R*1.1} fill={`url(#rg-${uid})`}/>
+      {edges.map(([a,b],i) => {
+        const isIn = a>=8&&b>=8;
+        return <line key={i} x1={all[a][0]} y1={all[a][1]} x2={all[b][0]} y2={all[b][1]}
+          stroke={C.cyan} strokeWidth={isIn?s*0.012:s*0.016} strokeOpacity={isIn?0.42:0.72}/>;
+      })}
+      {edges.slice(0,8).map(([a,b],i)=>(
+        <line key={`gl${i}`} x1={all[a][0]} y1={all[a][1]} x2={all[b][0]} y2={all[b][1]}
+          stroke={C.cyan} strokeWidth={s*0.045} strokeOpacity={0.07} filter={`url(#f-${uid})`}/>
+      ))}
+      {all.map(([nx,ny],i)=>(
+        <circle key={i} cx={nx} cy={ny} r={i<8?nr*1.45:nr} fill={C.cyan} opacity={i<8?0.95:0.6}/>
+      ))}
+      {[0,2,5].map(i=>(
+        <circle key={`hl${i}`} cx={all[i][0]} cy={all[i][1]} r={nr*2.2}
+          fill={C.cyan} opacity={0.18} filter={`url(#f-${uid})`}/>
+      ))}
+    </svg>
+  );
 }
 
 // ─── SVG Icon Components ───────────────────────────────────────────────────────
@@ -238,7 +283,7 @@ function Navbar() {
       style={{background:sc?"rgba(10,25,47,0.92)":"transparent",backdropFilter:sc?"blur(24px)":"none",borderBottom:sc?`1px solid rgba(0,255,255,0.08)`:"1px solid transparent"}}>
       <div className="flex items-center gap-3">
         <OmnixMark size={32}/>
-        <span className="text-2xl font-semibold tracking-[-0.045em]" style={{color:C.white}}>Omnix</span>
+        <span className="font-black tracking-[0.14em] text-xl" style={{color:C.white}}>OMNIX</span>
       </div>
       <div className="hidden md:flex items-center gap-8">
         {[
@@ -1274,7 +1319,7 @@ function Footer() {
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-3 mb-4">
               <OmnixMark size={30}/>
-              <span className="text-xl font-semibold tracking-[-0.045em]" style={{color:C.white}}>Omnix</span>
+              <span className="font-black tracking-[0.14em] text-lg" style={{color:C.white}}>OMNIX</span>
             </div>
             <p className="text-sm leading-relaxed mb-6" style={{color:C.faint}}>
               AI workspace for knowledge teams. Precise answers, secure by design.

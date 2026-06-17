@@ -37,6 +37,65 @@ class _ImagePage:
         return {"/XObject": {"img": _ImageObject()}}
 
 
+class _DocxStyle:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+class _DocxParagraph:
+    def __init__(self, text: str, style_name: str = "Normal") -> None:
+        self.text = text
+        self.style = _DocxStyle(style_name)
+
+
+class _DocxCell:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+
+class _DocxRow:
+    def __init__(self, values: list[str]) -> None:
+        self.cells = [_DocxCell(value) for value in values]
+
+
+class _DocxTable:
+    def __init__(self, rows: list[list[str]]) -> None:
+        self.rows = [_DocxRow(row) for row in rows]
+
+
+class _TextBoxNode:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+
+class _DocxBody:
+    def xpath(self, query: str):
+        assert "txbxContent" in query
+        return [_TextBoxNode("Textbox launch note"), _TextBoxNode("Owner: Design")]
+
+
+class _DocxElement:
+    body = _DocxBody()
+
+
+class _DocxDocument:
+    paragraphs = [
+        _DocxParagraph("Launch Brief", "Heading 1"),
+        _DocxParagraph("Implementation Notes", "Heading 2"),
+        _DocxParagraph("Body copy that should remain searchable."),
+    ]
+    tables = [
+        _DocxTable(
+            [
+                ["Phase", "Owner", "Status"],
+                ["Discovery", "Product", "Done"],
+                ["Build", "Engineering", "Active"],
+            ]
+        )
+    ]
+    element = _DocxElement()
+
+
 def _install_fake_pypdf(monkeypatch: pytest.MonkeyPatch, pages: list[object]) -> None:
     module = types.ModuleType("pypdf")
 
@@ -46,6 +105,30 @@ def _install_fake_pypdf(monkeypatch: pytest.MonkeyPatch, pages: list[object]) ->
 
     module.PdfReader = PdfReader
     monkeypatch.setitem(sys.modules, "pypdf", module)
+
+
+def _install_fake_docx(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = types.ModuleType("docx")
+    module.Document = lambda _stream: _DocxDocument()
+    monkeypatch.setitem(sys.modules, "docx", module)
+
+
+def test_docx_extraction_includes_headings_tables_and_text_boxes(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_fake_docx(monkeypatch)
+
+    result = svc.extract_document_with_diagnostics(
+        "launch.docx",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        b"PK fake docx",
+    )
+
+    assert "# Launch Brief" in result.text
+    assert "## Implementation Notes" in result.text
+    assert "Phase | Owner | Status" in result.text
+    assert "Build | Engineering | Active" in result.text
+    assert "Textbox launch note Owner: Design" in result.text
+    assert result.diagnostics.extractor_used == "python-docx"
+    assert result.diagnostics.extraction_status == "searchable"
 
 
 def test_normal_text_pdf_is_searchable(monkeypatch: pytest.MonkeyPatch) -> None:

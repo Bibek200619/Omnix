@@ -110,9 +110,9 @@ export function WorkspaceTasksSurface() {
         Promise<WorkspaceInitiative[]>,
         Promise<WorkspaceMember[]> | null,
       ] = [
-        apiClient.get<WorkspaceTask[]>(`/workspaces/${activeWorkspaceId}/tasks`),
+        apiClient.getPaginatedItems<WorkspaceTask>(`/workspaces/${activeWorkspaceId}/tasks`),
         apiClient.get<WorkspaceTaskMomentum>(`/workspaces/${activeWorkspaceId}/tasks/momentum`),
-        apiClient.get<WorkspaceInitiative[]>(`/workspaces/${activeWorkspaceId}/initiatives`),
+        apiClient.getPaginatedItems<WorkspaceInitiative>(`/workspaces/${activeWorkspaceId}/initiatives`),
         withMembers ? apiClient.get<WorkspaceMember[]>(`/workspaces/${activeWorkspaceId}/members`) : null,
       ];
       const [incomingTasks, incomingMomentum, incomingInitiatives, incomingMembers] = await Promise.all([

@@ -2,6 +2,7 @@ import type { WorkspaceRole } from "@/lib/workspace-types";
 
 export type Message = {
   id: string;
+  conversationId?: string | null;
   role: "user" | "assistant";
   userId?: string | null;
   senderName?: string;
@@ -23,6 +24,7 @@ export type Message = {
   sourceMode?: SearchMode;
   webSearchUsed?: boolean;
   citations?: string[];
+  feedbackRating?: "good" | "bad" | null;
   // optional sources attached to assistant responses
   sources?: Array<{
     id?: string;

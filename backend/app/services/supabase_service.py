@@ -15,6 +15,7 @@ from ..db.supabase_client import get_async_supabase, get_supabase
 
 logger = logging.getLogger(__name__)
 INTERNAL_DB_ERROR = "Internal server error"
+FULL_TEXT_FILTER_OPERATORS = {"fts", "plfts", "phfts", "wfts"}
 SUPABASE_AUTH_ERROR = (
     "Supabase rejected the backend API key. Verify backend/.env "
     "SUPABASE_SERVICE_ROLE_KEY belongs to the configured SUPABASE_URL project."
@@ -233,6 +234,8 @@ def _apply_filters(
                     query = query.neq(column, val)
                 elif op == "ilike":
                     query = query.ilike(column, val)
+                elif op in FULL_TEXT_FILTER_OPERATORS:
+                    query = _apply_full_text_filter(query, column, op, val)
                 elif op == "is":
                     query = query.is_(column, val)
                 else:
@@ -241,6 +244,18 @@ def _apply_filters(
         else:
             query = query.eq(column, value)
     return query
+
+
+def _apply_full_text_filter(query: Any, column: str, operator: str, value: Any) -> Any:
+    config: str | None = None
+    criteria = value
+    if isinstance(value, Mapping):
+        criteria = value.get("query", "")
+        config_value = value.get("config")
+        config = str(config_value) if config_value else None
+
+    postgrest_operator = f"{operator}({config})" if config else operator
+    return query.filter(column, postgrest_operator, str(criteria))
 
 
 def _select_columns_after_missing_column(
@@ -833,6 +848,25 @@ async def select_one(
         if isinstance(exc, SupabaseServiceError):
             raise
         _raise_supabase_error("Query", table, exc)
+
+
+async def select_count_trusted(
+    table: str,
+    filters: Mapping[str, Any] | None = None,
+) -> int:
+    try:
+        client = await _async_client()
+        query = client.table(table).select("id", count="exact", head=True)
+        query = _apply_filters(query, filters)
+        response = await _execute_with_retry_async(query, operation=f"trusted count {table}")
+        count = getattr(response, "count", None)
+        if count is not None:
+            return int(count)
+        return len(list(getattr(response, "data", None) or []))
+    except Exception as exc:
+        if isinstance(exc, SupabaseServiceError):
+            raise
+        _raise_supabase_error("Count", table, exc)
 
 
 async def select_one_trusted(

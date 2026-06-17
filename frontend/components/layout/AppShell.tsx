@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { MobileDock } from "@/components/layout/MobileDock";
@@ -19,6 +20,7 @@ type AppShellProps = {
 };
 
 const sidebarCollapsedPreferenceKey = "omnix.sidebar.collapsed";
+const onboardingCompletedKey = "omnix.onboarding.completed";
 
 function readSidebarCollapsedPreference() {
   if (typeof window === "undefined") return false;
@@ -58,6 +60,8 @@ function writeSidebarCollapsedPreference(collapsed: boolean) {
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const pathname = usePathname();
+  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
@@ -74,6 +78,17 @@ export function AppShell({ children }: AppShellProps) {
 
     writeSidebarCollapsedPreference(isSidebarCollapsed);
   }, [isSidebarCollapsed, sidebarPreferenceLoaded]);
+
+  useEffect(() => {
+    try {
+      if (pathname !== "/onboarding" && window.localStorage?.getItem(onboardingCompletedKey) !== "true") {
+        router.replace("/onboarding");
+        return;
+      }
+    } catch {
+      return;
+    }
+  }, [pathname, router]);
 
   return (
     <WorkspaceProvider>
@@ -99,7 +114,7 @@ export function AppShell({ children }: AppShellProps) {
                     <div
                       className={cn(
                         "relative z-[1] flex h-full min-h-0 flex-col transition-[padding] duration-200 ease-out",
-                        isSidebarCollapsed ? "lg:pl-0" : "lg:pl-[var(--omnix-sidebar-w)]",
+                        isSidebarCollapsed ? "md:pl-0" : "md:pl-[var(--omnix-sidebar-w)]",
                       )}
                     >
                       <Header
@@ -107,7 +122,7 @@ export function AppShell({ children }: AppShellProps) {
                         onMenuClick={() => setIsSidebarOpen(true)}
                         onExpandSidebar={() => setIsSidebarCollapsed(false)}
                       />
-                      <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4.25rem_+_env(safe-area-inset-bottom))] lg:pb-0">
+                      <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4.25rem_+_env(safe-area-inset-bottom))] md:pb-0">
                         <PageTransition className="flex min-h-0 flex-1 flex-col">{children}</PageTransition>
                       </main>
                       <MobileDock onMoreClick={() => setIsSidebarOpen(true)} />

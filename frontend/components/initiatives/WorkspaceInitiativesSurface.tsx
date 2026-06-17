@@ -160,8 +160,8 @@ export function WorkspaceInitiativesSurface() {
     setLoading(true);
     try {
       const [incoming, taskOptions, channelOptions, memberOptions] = await Promise.all([
-        apiClient.get<WorkspaceInitiative[]>(`/workspaces/${activeWorkspaceId}/initiatives`),
-        includeOptions ? apiClient.get<WorkspaceTask[]>(`/workspaces/${activeWorkspaceId}/tasks`) : Promise.resolve(null),
+        apiClient.getPaginatedItems<WorkspaceInitiative>(`/workspaces/${activeWorkspaceId}/initiatives`),
+        includeOptions ? apiClient.getPaginatedItems<WorkspaceTask>(`/workspaces/${activeWorkspaceId}/tasks`) : Promise.resolve(null),
         includeOptions ? apiClient.get<WorkspaceChannel[]>(`/workspaces/${activeWorkspaceId}/channels`) : Promise.resolve(null),
         includeOptions ? apiClient.get<WorkspaceMember[]>(`/workspaces/${activeWorkspaceId}/members`) : Promise.resolve(null),
       ]);

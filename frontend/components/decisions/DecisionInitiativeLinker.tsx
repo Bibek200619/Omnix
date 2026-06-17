@@ -21,7 +21,7 @@ export function DecisionInitiativeLinker({ decision, onUpdate }: DecisionInitiat
   const loadInitiatives = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiClient.get<WorkspaceInitiative[]>(`/workspaces/${decision.workspace_id}/initiatives`);
+      const data = await apiClient.getPaginatedItems<WorkspaceInitiative>(`/workspaces/${decision.workspace_id}/initiatives`);
       setInitiatives(data);
     } catch (err) {
       console.error("Failed to load initiatives", err);
@@ -153,4 +153,3 @@ export function DecisionInitiativeLinker({ decision, onUpdate }: DecisionInitiat
     </div>
   );
 }
-

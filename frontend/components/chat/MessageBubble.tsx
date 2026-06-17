@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { memo, useState } from "react";
-import { Check, Copy, RotateCcw, FileText, ChevronDown, ChevronUp, ExternalLink, Globe2, Sparkles } from "lucide-react";
+import { Check, Copy, RotateCcw, FileText, ChevronDown, ChevronUp, ExternalLink, Globe2, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "@/components/chat/types";
 import { MarkdownRenderer, StreamingTextRenderer } from "@/components/chat/MarkdownRenderer";
@@ -20,11 +20,13 @@ type MessageBubbleProps = {
   message: Message;
   onRetry?: (message: Message) => void;
   onRegenerate?: (assistantMessageId: string) => void;
+  onFeedback?: (message: Message, rating: "good" | "bad") => void | Promise<void>;
 };
 
-export const MessageBubble = memo(function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, onRetry, onRegenerate, onFeedback }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
-  const [gaveFeedback, setGaveFeedback] = useState<null | "up" | "down">(null);
+  const [feedbackState, setFeedbackState] = useState<null | "good" | "bad">(message.feedbackRating ?? null);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [expandedSource, setExpandedSource] = useState<string | null>(null);
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
 
@@ -58,8 +60,18 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
     onRegenerate(message.id);
   }
 
-  function giveFeedback(type: "up" | "down") {
-    setGaveFeedback(type);
+  async function giveFeedback(rating: "good" | "bad") {
+    if (!onFeedback || feedbackSubmitting || activelyStreaming) return;
+
+    try {
+      setFeedbackSubmitting(true);
+      await onFeedback(message, rating);
+      setFeedbackState(rating);
+    } catch (err) {
+      console.error("Failed to submit message feedback", err);
+    } finally {
+      setFeedbackSubmitting(false);
+    }
   }
 
   function attachmentName(file: NonNullable<Message["attachments"]>[number]) {
@@ -414,28 +426,32 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
 
                 <button
                   type="button"
-                  onClick={() => giveFeedback("up")}
+                  onClick={() => giveFeedback("good")}
                   title="Helpful"
                   aria-label="Helpful"
+                  disabled={feedbackSubmitting || activelyStreaming || !onFeedback}
                   className={cn(
                     "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
-                    gaveFeedback === "up" && "bg-emerald-400/10 text-emerald-200",
+                    (feedbackSubmitting || activelyStreaming || !onFeedback) && "cursor-not-allowed opacity-50",
+                    feedbackState === "good" && "bg-emerald-400/10 text-emerald-200",
                   )}
                 >
-                  <Check className="h-3.5 w-3.5" />
+                  <ThumbsUp className="h-3.5 w-3.5" />
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => giveFeedback("down")}
+                  onClick={() => giveFeedback("bad")}
                   title="Not helpful"
                   aria-label="Not helpful"
+                  disabled={feedbackSubmitting || activelyStreaming || !onFeedback}
                   className={cn(
                     "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
-                    gaveFeedback === "down" && "bg-rose-400/10 text-rose-200",
+                    (feedbackSubmitting || activelyStreaming || !onFeedback) && "cursor-not-allowed opacity-50",
+                    feedbackState === "bad" && "bg-rose-400/10 text-rose-200",
                   )}
                 >
-                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2v18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  <ThumbsDown className="h-3.5 w-3.5" />
                 </button>
               </>
             ) : null}

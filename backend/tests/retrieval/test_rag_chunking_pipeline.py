@@ -4,6 +4,7 @@ import pytest
 
 from backend.app.rag.chunking import chunk_text, split_text_into_chunks
 from backend.app.rag.ingestion import RAGIngestionPipeline
+from backend.app.services.supabase_service import SupabaseServiceError
 from backend.app.rag.ingestion_service import parse_document_bytes
 from backend.app.rag.models import ParsedDocument, ParsedSection
 from backend.app.rag.token_utils import count_tokens
@@ -92,7 +93,7 @@ async def test_ingestion_rejects_excessive_chunk_counts(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
-async def test_reingestion_inserts_new_chunks_before_deleting_old(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_reingestion_deletes_old_chunks_before_inserting_new(monkeypatch: pytest.MonkeyPatch) -> None:
     class Store(VectorStore):
         def add_embeddings(self, *args, **kwargs):
             return None
@@ -101,6 +102,7 @@ async def test_reingestion_inserts_new_chunks_before_deleting_old(monkeypatch: p
             return []
 
     events: list[str] = []
+    inserted_payloads: list[dict[str, object]] = []
 
     async def fake_embeddings(texts: list[str]) -> list[list[float]]:
         events.append("embed")
@@ -110,8 +112,9 @@ async def test_reingestion_inserts_new_chunks_before_deleting_old(monkeypatch: p
         events.append("select_old")
         return [{"id": "old-1"}]
 
-    async def fake_insert_many(*args, **kwargs):
+    async def fake_insert_many(table: str, payloads: list[dict[str, object]], *args, **kwargs):
         events.append("insert_new")
+        inserted_payloads.extend(payloads)
         return []
 
     async def fake_delete_many_trusted(*args, **kwargs):
@@ -137,4 +140,29 @@ async def test_reingestion_inserts_new_chunks_before_deleting_old(monkeypatch: p
         workspace_id="workspace-1",
     )
 
-    assert events.index("insert_new") < events.index("delete_old")
+    assert events.index("delete_old") < events.index("insert_new")
+    assert inserted_payloads
+    assert all(payload.get("ingestion_version") for payload in inserted_payloads)
+
+
+@pytest.mark.asyncio
+async def test_insert_document_payloads_bounds_optional_column_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    import backend.app.rag.ingestion as ingestion
+
+    attempts = 0
+
+    async def fake_insert_many(table: str, payloads: list[dict[str, object]]) -> list[dict[str, object]]:
+        nonlocal attempts
+        attempts += 1
+        exc = SupabaseServiceError("Internal server error")
+        exc.__cause__ = Exception("column metadata does not exist")
+        raise exc
+
+    monkeypatch.setattr(ingestion, "insert_many", fake_insert_many)
+
+    with pytest.raises(RuntimeError, match="metadata"):
+        await RAGIngestionPipeline._insert_document_payloads(
+            [{"id": "chunk-1", "user_id": "user-1", "metadata": {"a": "b"}}]
+        )
+
+    assert attempts <= len(ingestion.OPTIONAL_DOCUMENT_COLUMNS) + 1
