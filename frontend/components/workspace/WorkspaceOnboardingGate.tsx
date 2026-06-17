@@ -20,6 +20,7 @@ import {
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import { useWorkspace } from "@/lib/workspace-context";
 import type { Workspace, WorkspaceFocus, WorkspaceInvite } from "@/lib/workspace-types";
 import { Button } from "@/components/ui/Button";
@@ -140,6 +141,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
   }, [error, hasWorkspaces, loading, workspaceLoadFailed]);
 
   const isBlocked = !loading && (workspaceLoadFailed || !hasWorkspaces || (onboardingStarted && !onboardingComplete));
+  const onboardingTrapRef = useFocusTrap<HTMLElement>(isBlocked);
 
   if (!isBlocked) {
     return <>{children}</>;
@@ -260,7 +262,10 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
   const StepIcon = steps[currentStepIndex]?.icon ?? UserCircle;
 
   return (
-    <main className="omnix-app-bg flex min-h-[100dvh] items-start justify-center overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] text-white sm:py-8">
+    <main
+      ref={onboardingTrapRef}
+      className="omnix-app-bg flex min-h-[100dvh] items-start justify-center overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] text-white sm:py-8"
+    >
       <div className="relative z-10 w-full max-w-5xl">
         <div className="mb-6 flex flex-col gap-4 text-center sm:mb-8">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 text-[var(--omnix-cyan)] shadow-[0_0_24px_rgba(0,255,255,0.15)]">

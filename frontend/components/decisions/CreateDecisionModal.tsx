@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { Portal } from "@/components/ui/Portal";
 import { MentionTextarea, mentionPayload } from "@/components/mentions/MentionTextarea";
 import { apiClient } from "@/lib/api";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { 
@@ -35,6 +36,7 @@ const statusOptions: { value: WorkspaceDecisionStatus; label: string }[] = [
 ];
 
 export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialValues }: CreateDecisionModalProps) {
+  const modalRef = useFocusTrap<HTMLFormElement>(true);
   const { activeMembers } = useWorkspace();
   const [title, setTitle] = useState(initialValues?.title ?? "");
   const [reason, setReason] = useState(initialValues?.reason ?? "");
@@ -75,6 +77,17 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
   useEffect(() => {
     void loadResources();
   }, [loadResources]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,6 +160,7 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
     <Portal>
       <div className="omnix-mobile-sheet-backdrop fixed inset-0 z-[100] flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-sm">
         <form 
+          ref={modalRef}
           onSubmit={handleSubmit}
           className="omnix-mobile-sheet omnix-panel-strong flex max-h-[calc(100dvh_-_2rem)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-cyan-400/20 shadow-2xl"
         >

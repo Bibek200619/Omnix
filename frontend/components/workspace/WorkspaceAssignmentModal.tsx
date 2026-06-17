@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { Portal } from "@/components/ui/Portal";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { logClientError } from "@/lib/errors";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import {
   isWorkspaceFounderRole,
 } from "@/lib/workspace-roles";
@@ -43,6 +44,7 @@ export function WorkspaceAssignmentModal({
   onAssign,
   currentUserRole,
 }: WorkspaceAssignmentModalProps) {
+  const modalRef = useFocusTrap<HTMLDivElement>(open);
   const [potentialMembers, setPotentialMembers] = useState<WorkspacePotentialMember[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -75,6 +77,19 @@ export function WorkspaceAssignmentModal({
       setError(null);
     }
   }, [open, fetchPotentialMembers]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
 
   const filteredMembers = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
@@ -111,7 +126,7 @@ export function WorkspaceAssignmentModal({
   return (
     <Portal>
       <div className="omnix-modal-backdrop fixed inset-0 z-[150] flex items-center justify-center p-4 backdrop-blur-md">
-        <div className="omnix-modal-card relative flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-[var(--omnix-border-2)] bg-[#0a0d14]/90 shadow-[0_32px_128px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+        <div ref={modalRef} className="omnix-modal-card relative flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-[var(--omnix-border-2)] bg-[#0a0d14]/90 shadow-[0_32px_128px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
           <div className="pointer-events-none absolute left-1/2 top-0 h-48 w-full -translate-x-1/2 bg-[var(--omnix-cyan)] opacity-5 blur-[80px]" />
           
           <div className="relative z-10 flex shrink-0 items-center justify-between border-b border-[var(--omnix-border)] px-4 py-4 sm:px-6 sm:py-5">

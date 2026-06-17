@@ -28,6 +28,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Portal } from "@/components/ui/Portal";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { WorkspaceSearchResponse, WorkspaceSearchResult } from "@/lib/workspace-types";
@@ -240,6 +241,7 @@ export function CommandPalette() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const dialogRef = useFocusTrap<HTMLDivElement>(open);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const requestRef = useRef(0);
@@ -517,6 +519,7 @@ export function CommandPalette() {
             }}
           >
             <div
+              ref={dialogRef}
               role="dialog"
               aria-modal="true"
               aria-label="Omnix command palette"

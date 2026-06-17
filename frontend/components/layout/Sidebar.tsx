@@ -47,6 +47,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { logClientError } from "@/lib/errors";
 import { useProfile } from "@/lib/profile-context";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
@@ -125,7 +126,6 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
   const { presence, statusForWorkspace, realtimeStatus } = useWorkspaceCollaboration();
   const [open, setOpen] = useState(false);
   const selectorRef = useRef<HTMLDivElement | null>(null);
-  const selectorMenuRef = useRef<HTMLDivElement | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showCreateSubspaceModal, setShowCreateSubspaceModal] = useState(false);
   const [newSubspaceName, setNewSubspaceName] = useState("");
@@ -148,6 +148,11 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const workspaceModalOpen = showCreateSubspaceModal || inviteOpen || renameOpen || deleteOpen;
+  const selectorMenuRef = useFocusTrap<HTMLDivElement>(open && !workspaceModalOpen);
+  const createSubspaceModalRef = useFocusTrap<HTMLDivElement>(showCreateSubspaceModal);
+  const renameModalRef = useFocusTrap<HTMLDivElement>(renameOpen);
+  const deleteModalRef = useFocusTrap<HTMLDivElement>(deleteOpen);
 
   const active = activeWorkspace;
   const activeSuperWorkspace =
@@ -179,6 +184,27 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!showCreateSubspaceModal && !renameOpen && !deleteOpen) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+
+      if (showCreateSubspaceModal && !creatingSubspace) {
+        setShowCreateSubspaceModal(false);
+        setNewSubspaceName("");
+        setCreateSubspaceError(null);
+      } else if (renameOpen && !renaming) {
+        setRenameOpen(false);
+      } else if (deleteOpen && !deleting) {
+        setDeleteOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [creatingSubspace, deleteOpen, deleting, renameOpen, renaming, showCreateSubspaceModal]);
 
   useEffect(() => {
     if (!activeRootWorkspace?.id || (activeRootWorkspace.workspace_type !== "super" && activeRootWorkspace.workspace_type !== "super_workspace")) {
@@ -785,7 +811,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
           {showCreateSubspaceModal && activeSuperWorkspace ? (
             <Portal>
               <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
-                <div className="omnix-modal-card w-full max-w-md p-5">
+                <div ref={createSubspaceModalRef} className="omnix-modal-card w-full max-w-md p-5">
                   <div className="relative z-10 flex items-start justify-between gap-4">
                     <div>
                       <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/10 text-emerald-100 shadow-[var(--omnix-glow-xs)]">
@@ -857,7 +883,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
           {renameOpen ? (
             <Portal>
               <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
-                <div className="omnix-modal-card w-full max-w-md p-5">
+                <div ref={renameModalRef} className="omnix-modal-card w-full max-w-md p-5">
                   <div className="relative z-10 flex items-start justify-between gap-4">
                     <div>
                       <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
@@ -923,7 +949,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
           {deleteOpen ? (
             <Portal>
               <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
-                <div className="omnix-modal-card w-full max-w-md border-rose-400/25 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.5),0_0_24px_rgba(244,63,94,0.14)]">
+                <div ref={deleteModalRef} className="omnix-modal-card w-full max-w-md border-rose-400/25 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.5),0_0_24px_rgba(244,63,94,0.14)]">
                   <div className="relative z-10 flex items-start justify-between gap-4">
                     <div>
                       <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-rose-300/30 bg-rose-400/10 text-rose-100">

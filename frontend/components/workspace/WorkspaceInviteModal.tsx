@@ -5,6 +5,7 @@ import { Mail, ShieldCheck, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Portal } from "@/components/ui/Portal";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import type { WorkspaceRole } from "@/lib/workspace-types";
 import { workspaceRoleBadgeClass } from "@/lib/workspace-roles";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ export function WorkspaceInviteModal({
   onSubmit,
 }: WorkspaceInviteModalProps) {
   const formId = useId();
+  const modalRef = useFocusTrap<HTMLDivElement>(open);
   const [target, setTarget] = useState("");
   const [role, setRole] = useState<WorkspaceRole>("member");
   const [localError, setLocalError] = useState<string | null>(null);
@@ -40,6 +42,19 @@ export function WorkspaceInviteModal({
       setLocalError(null);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -61,7 +76,7 @@ export function WorkspaceInviteModal({
   return (
     <Portal>
       <div className="omnix-modal-backdrop fixed inset-0 z-[150] flex items-center justify-center p-4 backdrop-blur-md">
-        <div className="omnix-modal-card relative flex max-h-[90dvh] w-full max-w-md flex-col p-4 sm:p-5">
+        <div ref={modalRef} className="omnix-modal-card relative flex max-h-[90dvh] w-full max-w-md flex-col p-4 sm:p-5">
           <div className="relative z-10 flex shrink-0 items-start justify-between gap-4">
             <div>
               <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
