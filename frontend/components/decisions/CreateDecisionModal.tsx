@@ -60,8 +60,8 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
     setLoadingResources(true);
     try {
       const [initData, taskData] = await Promise.all([
-        apiClient.get<WorkspaceInitiative[]>(`/workspaces/${workspaceId}/initiatives`),
-        apiClient.get<WorkspaceTask[]>(`/workspaces/${workspaceId}/tasks`),
+        apiClient.getPaginatedItems<WorkspaceInitiative>(`/workspaces/${workspaceId}/initiatives`),
+        apiClient.getPaginatedItems<WorkspaceTask>(`/workspaces/${workspaceId}/tasks`),
       ]);
       setInitiatives(initData);
       setTasks(taskData);

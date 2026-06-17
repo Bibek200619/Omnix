@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import asyncio
+import hashlib
 import logging
 import os
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
@@ -15,8 +16,13 @@ from ..services.document_intelligence_service import (
     extract_document_with_diagnostics,
     extraction_columns_payload,
 )
-from ..services.supabase_service import SupabaseServiceError, insert_one, update_one
-from ..services.document_context_service import store_extracted_text_chunks
+from ..services.supabase_service import SupabaseServiceError, insert_one, select_one_trusted
+from ..services.document_context_service import (
+    LOCAL_STORAGE_BACKEND,
+    configured_file_storage_backend,
+    supabase_storage_object_path,
+    upload_bytes_to_supabase_storage,
+)
 from ..services.workspace_service import active_workspace_id_from_request, require_workspace_access
 from ..services.workspace_collaboration_service import log_workspace_activity
 from .conversations import require_conversation_access
@@ -34,8 +40,20 @@ ALLOWED_MIMES = {
     "text/markdown",
     "text/x-markdown",
 }
+TEXT_EXTENSIONS = (".txt", ".md")
+DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 UPLOAD_DIR = os.environ.get("OMNIX_UPLOAD_DIR", "./uploads")
+FILE_DEDUPE_COLUMNS = (
+    "id,user_id,workspace_id,conversation_id,file_name,file_type,size_bytes,"
+    "storage_path,storage_backend,metadata,content_hash,created_at"
+)
+
+
+@dataclass(slots=True)
+class StoredUpload:
+    storage_path: str
+    storage_backend: str
 
 
 def _utc_now_iso() -> str:
@@ -52,8 +70,88 @@ async def _save_bytes_to_path(user_id: str, filename: str, data: bytes) -> str:
     return path
 
 
+async def _store_upload_bytes(
+    *,
+    user_id: str,
+    filename: str,
+    data: bytes,
+    file_type: str | None,
+) -> StoredUpload:
+    if configured_file_storage_backend() == LOCAL_STORAGE_BACKEND:
+        return StoredUpload(
+            storage_path=await _save_bytes_to_path(user_id, filename, data),
+            storage_backend=LOCAL_STORAGE_BACKEND,
+        )
+
+    storage_path = supabase_storage_object_path(user_id, filename)
+    await upload_bytes_to_supabase_storage(storage_path, data, content_type=file_type)
+    return StoredUpload(storage_path=storage_path, storage_backend="supabase")
+
+
+def _sha256_hex(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
 def _extract_text_from_bytes(filename: str, file_type: str | None, data: bytes) -> str:
     return extract_document_with_diagnostics(filename, file_type, data).text
+
+
+def _content_hash_column_missing(exc: SupabaseServiceError) -> bool:
+    message = str(exc.__cause__ or exc).lower()
+    return "content_hash" in message and "does not exist" in message
+
+
+async def _find_duplicate_file(
+    *,
+    content_hash: str,
+    user_id: str,
+    workspace_id: str | None,
+) -> dict[str, Any] | None:
+    filters: dict[str, Any] = {"content_hash": content_hash}
+    if workspace_id:
+        filters["workspace_id"] = workspace_id
+    else:
+        filters["user_id"] = user_id
+        filters["workspace_id"] = {"is": None}
+
+    try:
+        return await select_one_trusted("files", FILE_DEDUPE_COLUMNS, filters)
+    except SupabaseServiceError as exc:
+        if _content_hash_column_missing(exc):
+            logger.warning("files.content_hash is unavailable; upload deduplication skipped.")
+            return None
+        raise
+
+
+def _deduplicated_file_response(file_row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **file_row,
+        "status": "deduplicated",
+        "file_id": str(file_row.get("id") or ""),
+    }
+
+
+def _validate_upload_content(*, filename: str, file_type: str | None, data: bytes) -> None:
+    lower_name = filename.lower()
+    normalized_type = (file_type or "").lower()
+
+    if normalized_type == "application/pdf" or lower_name.endswith(".pdf"):
+        if not data.startswith(b"%PDF"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File content does not match PDF type.")
+        return
+
+    if normalized_type == DOCX_MIME or lower_name.endswith(".docx"):
+        if not data.startswith(b"PK"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File content does not match DOCX type.")
+        return
+
+    if normalized_type in {"text/plain", "text/markdown", "text/x-markdown"} or lower_name.endswith(TEXT_EXTENSIONS):
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File content does not match text type.") from exc
+        if b"\x00" in data[:4096]:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File content does not match text type.")
 
 
 def _metadata_with_diagnostics(
@@ -76,10 +174,11 @@ async def _insert_file_row(payload: dict[str, Any], user_id: str) -> dict[str, A
     except SupabaseServiceError as exc:
         message = str(exc.__cause__ or exc).lower()
         diagnostic_columns = set(ExtractionDiagnostics().__dataclass_fields__)
-        if not any(column in message for column in diagnostic_columns):
+        optional_columns = diagnostic_columns | {"storage_backend", "content_hash"}
+        if not any(column in message for column in optional_columns):
             raise
-        logger.warning("File diagnostics columns are unavailable; inserting file metadata without physical diagnostics columns.")
-        fallback_payload = {key: value for key, value in payload.items() if key not in diagnostic_columns}
+        logger.warning("Optional file columns are unavailable; inserting file metadata without them.")
+        fallback_payload = {key: value for key, value in payload.items() if key not in optional_columns}
         return await insert_one("files", {"user_id": user_id, **fallback_payload})
 
 
@@ -126,13 +225,33 @@ async def upload_file(
     filename = os.path.basename(file.filename or "unnamed")
     if file_type not in ALLOWED_MIMES and not any(filename.lower().endswith(ext) for ext in (".pdf", ".docx", ".txt", ".md")):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported file type")
+    _validate_upload_content(filename=filename, file_type=file_type or None, data=contents)
+    content_hash = _sha256_hex(contents)
 
-    # Save raw file to disk
     try:
-        storage_path = await _save_bytes_to_path(user_id, filename, contents)
+        duplicate_file = await _find_duplicate_file(
+            content_hash=content_hash,
+            user_id=user_id,
+            workspace_id=workspace_id,
+        )
+    except SupabaseServiceError as exc:
+        logger.exception("Failed to check duplicate file metadata: %s", exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to check duplicate file")
+
+    if duplicate_file is not None:
+        return _deduplicated_file_response(duplicate_file)
+
+    # Store raw file bytes
+    try:
+        stored_upload = await _store_upload_bytes(
+            user_id=user_id,
+            filename=filename,
+            data=contents,
+            file_type=file_type or None,
+        )
         logger.info("Document uploaded")
     except Exception as exc:
-        logger.exception("Failed to persist uploaded file to disk: %s", exc)
+        logger.exception("Failed to persist uploaded file: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to store file")
 
     processing_diagnostics = ExtractionDiagnostics(extraction_status="processing")
@@ -142,7 +261,9 @@ async def upload_file(
         "file_name": filename,
         "file_type": file_type or None,
         "size_bytes": size,
-        "storage_path": storage_path,
+        "storage_path": stored_upload.storage_path,
+        "storage_backend": stored_upload.storage_backend,
+        "content_hash": content_hash,
         "metadata": _metadata_with_diagnostics(diagnostics=processing_diagnostics),
         "conversation_id": conversation_id,
         **extraction_columns_payload(processing_diagnostics),
@@ -156,32 +277,6 @@ async def upload_file(
         logger.exception("Failed to insert file metadata: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to register file")
 
-    extraction_result = await asyncio.to_thread(extract_document_with_diagnostics, filename, file_type, contents)
-    normalized = extraction_result.text
-    diagnostics = extraction_result.diagnostics
-    metadata = _metadata_with_diagnostics(preview=normalized, diagnostics=diagnostics)
-    update_payload = {
-        "metadata": metadata,
-        **extraction_columns_payload(diagnostics),
-    }
-    try:
-        updated_file = await update_one("files", {"id": str(file_row["id"]), "user_id": user_id}, update_payload)
-        if updated_file:
-            file_row = updated_file
-        else:
-            file_row.update(update_payload)
-    except SupabaseServiceError:
-        logger.warning("File diagnostics columns may be unavailable; retrying metadata-only diagnostics update.")
-        try:
-            updated_file = await update_one("files", {"id": str(file_row["id"]), "user_id": user_id}, {"metadata": metadata})
-            if updated_file:
-                file_row = updated_file
-            else:
-                file_row["metadata"] = metadata
-        except SupabaseServiceError as exc:
-            logger.exception("Failed to persist extraction diagnostics: %s", exc)
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to persist extraction diagnostics")
-
     if workspace_id:
         await log_workspace_activity(
             workspace_id=workspace_id,
@@ -193,38 +288,11 @@ async def upload_file(
                 "file_type": file_type or None,
                 "size_bytes": size,
                 "conversation_id": conversation_id,
-                "extraction_status": diagnostics.extraction_status,
-                "extracted_character_count": diagnostics.extracted_character_count,
-                "ocr_used": diagnostics.ocr_used,
+                "extraction_status": processing_diagnostics.extraction_status,
+                "extracted_character_count": processing_diagnostics.extracted_character_count,
+                "ocr_used": processing_diagnostics.ocr_used,
             },
         )
-
-    # Persist lightweight chunks immediately so chat can use the upload even if
-    # Redis, the worker, or embedding generation is delayed on the EC2 host.
-    if diagnostics.extraction_status == "searchable" and normalized:
-        try:
-            stored_chunks = await store_extracted_text_chunks(
-                file_id=str(file_row.get("id")),
-                user_id=user_id,
-                text=normalized,
-                workspace_id=workspace_id,
-                replace_existing=True,
-            )
-            metadata = dict(file_row.get("metadata") or {})
-            metadata.update(
-                {
-                    "text_chunk_count": stored_chunks.chunk_count,
-                    "text_chunks_truncated": stored_chunks.truncated,
-                }
-            )
-            file_row["metadata"] = metadata
-            try:
-                await update_one("files", {"id": str(file_row["id"]), "user_id": user_id}, {"metadata": metadata})
-            except SupabaseServiceError:
-                logger.warning("Unable to persist immediate chunk diagnostics for file %s.", file_row.get("id"))
-            logger.info("Chunks created")
-        except Exception:
-            logger.exception("Failed to persist immediate text chunks for file %s.", file_row.get("id"))
 
     # Enqueue ingestion job to add embeddings asynchronously. Chat still works
     # through keyword/fallback retrieval if this background path is unavailable.

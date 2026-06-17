@@ -3,17 +3,25 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
+import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Literal
 
 import httpx
 from fastapi import status
 
+from ..bootstrap.redis import get_redis
 from ..core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
 MessageRole = Literal["system", "user", "assistant"]
+CIRCUIT_KEY_OLLAMA = "omnix:circuit:ollama"
+CIRCUIT_FAILURE_THRESHOLD = 3
+CIRCUIT_FAILURE_WINDOW_SECONDS = 60
+CIRCUIT_OPEN_SECONDS = 30
+CIRCUIT_STATE_TTL_SECONDS = 120
 
 
 @dataclass(frozen=True)
@@ -51,14 +59,118 @@ class OllamaChatService:
         self.request_timeout = self.settings.AI_REQUEST_TIMEOUT_SECONDS
         self.stream_timeout = self.settings.AI_STREAM_TIMEOUT_SECONDS
         self.max_retries = max(0, self.settings.AI_MAX_RETRIES)
-        self.max_output_tokens = max(1, min(int(self.settings.AI_MAX_OUTPUT_TOKENS), 512))
-        self.max_context_messages = max(1, min(int(self.settings.AI_MAX_CONTEXT_MESSAGES), 4))
-        self.max_context_chars = max(1000, min(int(self.settings.AI_MAX_CONTEXT_CHARS), 8000))
+        self.max_output_tokens = max(
+            1,
+            min(
+                int(self.settings.AI_MAX_OUTPUT_TOKENS),
+                int(self.settings.OLLAMA_MAX_OUTPUT_TOKENS),
+            ),
+        )
+        self.max_context_messages = max(1, int(self.settings.AI_MAX_CONTEXT_MESSAGES))
+        self.max_context_chars = max(1000, int(self.settings.AI_MAX_CONTEXT_CHARS))
         if self.settings.MODEL_URL.rstrip("/") != self.model_url.rstrip("/"):
             logger.warning(
                 "MODEL_URL points at %s; using native Ollama chat endpoint %s.",
                 self.settings.MODEL_URL,
                 self.model_url,
+            )
+
+    async def _load_circuit_state(self) -> dict[str, Any]:
+        try:
+            raw = await get_redis().get(CIRCUIT_KEY_OLLAMA)
+        except Exception:
+            logger.exception("Failed to load Ollama circuit breaker state from Redis.")
+            return {"state": "closed", "failures": 0}
+        if not raw:
+            return {"state": "closed", "failures": 0}
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8", errors="replace")
+        try:
+            state = json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning("Invalid Ollama circuit breaker state in Redis; treating as closed.")
+            return {"state": "closed", "failures": 0}
+        return state if isinstance(state, dict) else {"state": "closed", "failures": 0}
+
+    async def _save_circuit_state(self, state: dict[str, Any]) -> None:
+        try:
+            await get_redis().setex(CIRCUIT_KEY_OLLAMA, CIRCUIT_STATE_TTL_SECONDS, json.dumps(state))
+        except Exception:
+            logger.exception("Failed to save Ollama circuit breaker state to Redis.")
+
+    async def _clear_circuit_state(self) -> None:
+        try:
+            await get_redis().delete(CIRCUIT_KEY_OLLAMA)
+        except Exception:
+            logger.exception("Failed to clear Ollama circuit breaker state in Redis.")
+
+    async def _ensure_circuit_allows_request(self) -> None:
+        state = await self._load_circuit_state()
+        state_name = str(state.get("state") or "closed")
+        now = time.time()
+
+        if state_name == "open":
+            opened_at = float(state.get("opened_at") or now)
+            elapsed = now - opened_at
+            if elapsed < CIRCUIT_OPEN_SECONDS:
+                retry_in = max(1, math.ceil(CIRCUIT_OPEN_SECONDS - elapsed))
+                raise ModelServiceError(
+                    f"AI inference temporarily unavailable, retry in {retry_in} seconds",
+                    status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
+            await self._save_circuit_state(
+                {
+                    "state": "half_open",
+                    "failures": int(state.get("failures") or CIRCUIT_FAILURE_THRESHOLD),
+                    "opened_at": opened_at,
+                    "probe_started_at": now,
+                }
+            )
+            return
+
+        if state_name == "half_open":
+            raise ModelServiceError(
+                "AI inference temporarily unavailable, retry in 1 seconds",
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        first_failure_at = float(state.get("first_failure_at") or 0)
+        if first_failure_at and now - first_failure_at > CIRCUIT_FAILURE_WINDOW_SECONDS:
+            await self._clear_circuit_state()
+
+    async def _record_circuit_success(self) -> None:
+        await self._clear_circuit_state()
+
+    async def _record_circuit_failure(self) -> None:
+        state = await self._load_circuit_state()
+        now = time.time()
+        state_name = str(state.get("state") or "closed")
+
+        if state_name == "half_open":
+            await self._save_circuit_state(
+                {"state": "open", "failures": CIRCUIT_FAILURE_THRESHOLD, "opened_at": now}
+            )
+            return
+
+        first_failure_at = float(state.get("first_failure_at") or 0)
+        failures = int(state.get("failures") or 0)
+        if not first_failure_at or now - first_failure_at > CIRCUIT_FAILURE_WINDOW_SECONDS:
+            first_failure_at = now
+            failures = 0
+
+        failures += 1
+        if failures >= CIRCUIT_FAILURE_THRESHOLD:
+            await self._save_circuit_state(
+                {"state": "open", "failures": failures, "opened_at": now}
+            )
+        else:
+            await self._save_circuit_state(
+                {
+                    "state": "closed",
+                    "failures": failures,
+                    "first_failure_at": first_failure_at,
+                }
             )
 
     def _normalize_context(
@@ -119,7 +231,13 @@ class OllamaChatService:
         max_tokens: int | None = None,
         stream: bool = False,
     ) -> dict[str, Any]:
-        output_tokens = max(1, min(int(max_tokens or self.max_output_tokens), 512))
+        output_tokens = max(
+            1,
+            min(
+                int(max_tokens or self.max_output_tokens),
+                int(getattr(self.settings, "OLLAMA_MAX_OUTPUT_TOKENS", self.max_output_tokens)),
+            ),
+        )
         payload = {
             "model": model or self.default_model,
             "messages": self._build_messages(prompt, context, system_prompt),
@@ -192,6 +310,7 @@ class OllamaChatService:
         model: str | None = None,
         max_tokens: int | None = None,
     ) -> AIGeneration:
+        await self._ensure_circuit_allows_request()
         payload = self._build_payload(
             prompt,
             context,
@@ -212,7 +331,7 @@ class OllamaChatService:
                     response.raise_for_status()
                     data = response.json()
 
-                return AIGeneration(
+                generation = AIGeneration(
                     content=self._extract_content(data),
                     model=str(data.get("model") or payload["model"]),
                     usage={
@@ -221,6 +340,8 @@ class OllamaChatService:
                         "total_duration": data.get("total_duration"),
                     },
                 )
+                await self._record_circuit_success()
+                return generation
             except httpx.TimeoutException as exc:
                 last_error = exc
                 logger.warning("Ollama request timed out on attempt %s.", attempt + 1)
@@ -234,6 +355,7 @@ class OllamaChatService:
                         self.model_url,
                         exc.response.text[:500],
                     )
+                    await self._record_circuit_failure()
                     raise ModelServiceError(
                         "Ollama rejected the request. Check that phi3:mini is installed and MODEL_URL uses /api/chat.",
                         status.HTTP_502_BAD_GATEWAY,
@@ -246,6 +368,7 @@ class OllamaChatService:
             if attempt < self.max_retries:
                 await asyncio.sleep(0.25 * (2**attempt))
 
+        await self._record_circuit_failure()
         raise ModelServiceError(
             "Model service unavailable. Ensure Ollama is running and phi3:mini is installed.",
             status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -261,6 +384,7 @@ class OllamaChatService:
         model: str | None = None,
         max_tokens: int | None = None,
     ) -> AsyncGenerator[str, None]:
+        await self._ensure_circuit_allows_request()
         payload = self._build_payload(
             prompt,
             context,
@@ -282,16 +406,20 @@ class OllamaChatService:
                         if token:
                             emitted_token = True
                             yield token
+            await self._record_circuit_success()
         except httpx.TimeoutException as exc:
             logger.warning("Ollama stream timed out.")
+            await self._record_circuit_failure()
             raise ModelServiceError(
                 "Model stream timed out.",
                 status.HTTP_504_GATEWAY_TIMEOUT,
             ) from exc
         except ModelServiceError:
+            await self._record_circuit_failure()
             raise
         except httpx.HTTPError as exc:
             logger.warning("Ollama stream failed at %s: %s", self.model_url, exc)
+            fallback_failed = False
             if not emitted_token:
                 try:
                     logger.info("Retrying Ollama request once without streaming after pre-token stream failure.")
@@ -307,7 +435,10 @@ class OllamaChatService:
                         yield fallback.content
                         return
                 except Exception:
+                    fallback_failed = True
                     logger.exception("Non-streaming Ollama fallback failed.")
+            if not fallback_failed:
+                await self._record_circuit_failure()
             raise ModelServiceError(
                 "Model service unavailable. Ensure Ollama is running and phi3:mini is installed.",
                 status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -350,8 +481,10 @@ class OllamaChatService:
         return ""
 
 
-def get_chat_service() -> OllamaChatService:
-    return OllamaChatService()
+def get_chat_service() -> Any:
+    from .provider_manager import ProviderManager
+
+    return ProviderManager()
 
 
 async def generate_ai_response(
@@ -362,15 +495,17 @@ async def generate_ai_response(
     temperature: float = 0.2,
     model: str | None = None,
     max_tokens: int | None = None,
+    response_format: dict[str, Any] | None = None,
 ) -> AIGeneration:
-    return await get_chat_service().generate(
-        prompt,
-        context,
-        system_prompt=system_prompt,
-        temperature=temperature,
-        model=model,
-        max_tokens=max_tokens,
-    )
+    kwargs: dict[str, Any] = {
+        "system_prompt": system_prompt,
+        "temperature": temperature,
+        "model": model,
+        "max_tokens": max_tokens,
+    }
+    if response_format is not None:
+        kwargs["response_format"] = response_format
+    return await get_chat_service().generate(prompt, context, **kwargs)
 
 
 async def stream_ai_response(
@@ -400,6 +535,7 @@ async def call_llm(
     temperature: float = 0.2,
     model: str | None = None,
     max_tokens: int | None = None,
+    response_format: dict[str, Any] | None = None,
 ) -> str:
     generation = await generate_ai_response(
         prompt,
@@ -408,6 +544,7 @@ async def call_llm(
         temperature=temperature,
         model=model,
         max_tokens=max_tokens,
+        response_format=response_format,
     )
     return generation.content
 

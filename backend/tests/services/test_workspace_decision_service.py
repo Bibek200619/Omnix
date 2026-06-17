@@ -92,10 +92,11 @@ async def test_list_decisions_hydrates_creator_without_deriving_state(monkeypatc
 
     result = await decisions.list_decisions(workspace_id="workspace-1", user_id="user-1")
 
-    assert result[0]["title"] == "Adopt GitHub Flow"
-    assert result[0]["status"] == "accepted"
-    assert result[0]["creator_name"] == "Mira Patel"
-    assert "score" not in result[0]
+    item = result["items"][0]
+    assert item["title"] == "Adopt GitHub Flow"
+    assert item["status"] == "accepted"
+    assert item["creator_name"] == "Mira Patel"
+    assert "score" not in item
 
 
 @pytest.mark.asyncio
@@ -150,3 +151,57 @@ async def test_create_decision_persists_structured_mentions(monkeypatch: pytest.
     assert captured_sync["source_type"] == "decision"
     assert captured_sync["source_id"] == "decision-1"
     assert result["mentions"] == mention_metadata
+
+
+@pytest.mark.asyncio
+async def test_hydrate_decisions_batches_expanded_link_queries(monkeypatch: pytest.MonkeyPatch) -> None:
+    rows = [
+        {
+            "id": f"decision-{index}",
+            "workspace_id": "workspace-1",
+            "title": f"Decision {index}",
+            "status": "accepted",
+            "created_by": "user-1",
+            "initiative_id": f"initiative-{index % 2}",
+        }
+        for index in range(10)
+    ]
+    select_all_calls: list[tuple[str, dict[str, object]]] = []
+    select_one_calls: list[tuple[str, dict[str, object]]] = []
+
+    async def fake_mentions_by_source(**kwargs):
+        return {}
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    async def fake_select_all(table: str, columns: str, filters: dict[str, object], **kwargs):
+        select_all_calls.append((table, dict(filters)))
+        if table == "workspace_decision_tasks":
+            decision_ids = filters["decision_id"] if isinstance(filters["decision_id"], list) else [filters["decision_id"]]
+            return [{"decision_id": decision_id, "task_id": f"task-{decision_id}"} for decision_id in decision_ids]
+        if table == "workspace_tasks":
+            task_ids = filters["id"] if isinstance(filters["id"], list) else [filters["id"]]
+            return [{"id": task_id, "title": f"Task {task_id}", "status": "active"} for task_id in task_ids]
+        if table == "workspace_initiatives":
+            initiative_ids = filters["id"] if isinstance(filters["id"], list) else [filters["id"]]
+            return [{"id": initiative_id, "title": f"Initiative {initiative_id}", "status": "active"} for initiative_id in initiative_ids]
+        return []
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
+        select_one_calls.append((table, dict(filters)))
+        return None
+
+    monkeypatch.setattr(decisions, "mention_metadata_for_sources", fake_mentions_by_source)
+    monkeypatch.setattr(decisions, "get_profiles", fake_profiles)
+    monkeypatch.setattr(decisions, "select_all_trusted", fake_select_all)
+    monkeypatch.setattr(decisions, "select_one_trusted", fake_select_one)
+
+    hydrated = await decisions._hydrate_decisions(rows, expand_links=True)
+
+    assert all(len(row["linked_tasks"]) == 1 for row in hydrated)
+    assert all(row["initiative"] is not None for row in hydrated)
+    assert len([call for call in select_all_calls if call[0] == "workspace_decision_tasks"]) == 1
+    assert len([call for call in select_all_calls if call[0] == "workspace_tasks"]) == 1
+    assert len([call for call in select_all_calls if call[0] == "workspace_initiatives"]) == 1
+    assert select_one_calls == []

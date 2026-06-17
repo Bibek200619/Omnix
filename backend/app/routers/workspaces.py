@@ -67,7 +67,10 @@ from ..services.workspace_service import (
     utc_now_iso,
     validate_workspace_relationship,
 )
-from ..services.workspace_intelligence_service import build_workspace_intelligence_profile
+from ..services.workspace_intelligence_service import (
+    build_workspace_intelligence_profile,
+    invalidate_workspace_intelligence_cache,
+)
 from ..services.workspace_collaboration_service import (
     heartbeat_workspace_presence,
     invalidate_workspace_presence_cache,
@@ -833,6 +836,8 @@ async def update_workspace_intelligence(
             detail="Workspace not found.",
         )
 
+    await invalidate_workspace_intelligence_cache(workspace_id)
+
     await log_workspace_activity(
         workspace_id=workspace_id,
         actor_user_id=user_id,
@@ -879,6 +884,18 @@ async def update_workspace(
         )
 
     payload["updated_at"] = utc_now_iso()
+    invalidates_intelligence = bool(
+        {
+            "name",
+            "description",
+            "expertise_area",
+            "workspace_focus",
+            "ai_specialization",
+            "ai_instructions",
+            "intelligence_preferences",
+        }
+        & set(payload)
+    )
 
     try:
         updated_workspace = await update_one_trusted(
@@ -895,6 +912,9 @@ async def update_workspace(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Workspace not found.",
         )
+
+    if invalidates_intelligence:
+        await invalidate_workspace_intelligence_cache(workspace_id)
 
     return await _enriched_workspace_for_user(workspace_id, user_id)
 

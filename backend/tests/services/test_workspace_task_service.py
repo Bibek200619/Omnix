@@ -203,15 +203,16 @@ async def test_list_tasks_returns_response_safe_rows_when_optional_hydration_fai
 
     result = await tasks.list_tasks(workspace_id="workspace-1", user_id="user-1")
 
-    WorkspaceTaskRead.model_validate(result[0])
-    assert result[0]["title"] == "Untitled task"
-    assert result[0]["status"] == "idea"
-    assert result[0]["blockers"] == []
-    assert result[0]["linked_context"] == [
+    item = result["items"][0]
+    WorkspaceTaskRead.model_validate(item)
+    assert item["title"] == "Untitled task"
+    assert item["status"] == "idea"
+    assert item["blockers"] == []
+    assert item["linked_context"] == [
         {"context_type": "channel", "context_id": "channel-1", "label": "Launch", "metadata": {}}
     ]
-    assert result[0]["mentions"] == [{"user_id": "user-2", "label": "Bibek", "avatar_label": "B"}]
-    assert result[0]["momentum_metadata"] == {}
+    assert item["mentions"] == [{"user_id": "user-2", "label": "Bibek", "avatar_label": "B"}]
+    assert item["momentum_metadata"] == {}
 
 
 @pytest.mark.asyncio
@@ -325,12 +326,16 @@ async def test_momentum_reports_only_recorded_task_state(monkeypatch: pytest.Mon
     today = date.today()
 
     async def fake_list_tasks(**kwargs):
-        return [
-            {"status": "active", "blockers": ["Awaiting access"], "owner_user_id": "user-1", "due_date": today.isoformat()},
-            {"status": "planned", "blockers": [], "owner_user_id": None, "due_date": (today + timedelta(days=3)).isoformat()},
-            {"status": "review", "blockers": [], "owner_user_id": "user-2", "due_date": (today - timedelta(days=1)).isoformat()},
-            {"status": "complete", "blockers": ["Historical"], "owner_user_id": None, "due_date": None},
-        ]
+        return {
+            "items": [
+                {"status": "active", "blockers": ["Awaiting access"], "owner_user_id": "user-1", "due_date": today.isoformat()},
+                {"status": "planned", "blockers": [], "owner_user_id": None, "due_date": (today + timedelta(days=3)).isoformat()},
+                {"status": "review", "blockers": [], "owner_user_id": "user-2", "due_date": (today - timedelta(days=1)).isoformat()},
+                {"status": "complete", "blockers": ["Historical"], "owner_user_id": None, "due_date": None},
+            ],
+            "next_cursor": None,
+            "has_more": False,
+        }
 
     monkeypatch.setattr(tasks, "list_tasks", fake_list_tasks)
 
@@ -359,3 +364,49 @@ async def test_initiative_link_must_remain_inside_workspace(monkeypatch: pytest.
         await tasks._validate_initiative("workspace-1", "initiative-other")
 
     assert getattr(exc_info.value, "status_code", None) == 400
+
+
+@pytest.mark.asyncio
+async def test_hydrate_tasks_batches_linked_decision_queries(monkeypatch: pytest.MonkeyPatch) -> None:
+    rows = [
+        {
+            "id": f"task-{index}",
+            "workspace_id": "workspace-1",
+            "title": f"Task {index}",
+            "status": "active",
+            "created_by": "user-1",
+            "owner_user_id": "user-2",
+            "blockers": [],
+            "linked_context": [],
+            "activity_metadata": {},
+            "momentum_metadata": {},
+        }
+        for index in range(10)
+    ]
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    async def fake_mentions_by_source(**kwargs):
+        return {}
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    async def fake_select_all(table: str, columns: str, filters: dict[str, object], **kwargs):
+        calls.append((table, dict(filters)))
+        if table == "workspace_decision_tasks":
+            task_ids = filters["task_id"] if isinstance(filters["task_id"], list) else [filters["task_id"]]
+            return [{"task_id": task_id, "decision_id": f"decision-{task_id}"} for task_id in task_ids]
+        if table == "workspace_decisions":
+            decision_ids = filters["id"] if isinstance(filters["id"], list) else [filters["id"]]
+            return [{"id": decision_id, "title": f"Decision {decision_id}", "status": "accepted"} for decision_id in decision_ids]
+        return []
+
+    monkeypatch.setattr(tasks, "mention_metadata_for_sources", fake_mentions_by_source)
+    monkeypatch.setattr(tasks, "get_profiles", fake_profiles)
+    monkeypatch.setattr(tasks, "select_all_trusted", fake_select_all)
+
+    hydrated = await tasks._hydrate_tasks(rows)
+
+    assert all(len(row["linked_decisions"]) == 1 for row in hydrated)
+    assert len([call for call in calls if call[0] == "workspace_decision_tasks"]) == 1
+    assert len([call for call in calls if call[0] == "workspace_decisions"]) == 1

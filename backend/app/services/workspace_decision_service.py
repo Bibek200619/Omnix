@@ -21,6 +21,7 @@ from .workspace_mention_service import (
     prepare_mentions_for_workspace,
     sync_mentions_for_source,
 )
+from .workspace_pagination import DEFAULT_PAGE_LIMIT, cursor_filters, cursor_page, normalize_page_limit
 from .workspace_service import get_profiles, require_workspace_access, utc_now_iso
 
 DECISION_COLUMNS = (
@@ -31,6 +32,10 @@ TASK_PREVIEW_COLUMNS = "id,title,status,owner_user_id"
 INITIATIVE_PREVIEW_COLUMNS = "id,title,status,momentum_state"
 DECISION_STATUSES = ("proposed", "accepted", "rejected", "superseded")
 logger = logging.getLogger(__name__)
+
+
+def _one_or_many(values: list[str]) -> str | list[str]:
+    return values[0] if len(values) == 1 else values
 
 
 def _database_error() -> HTTPException:
@@ -69,6 +74,10 @@ async def _hydrate_decisions(rows: list[dict[str, Any]], expand_links: bool = Fa
         )
     creator_ids = sorted({str(row.get("created_by")) for row in rows if row.get("created_by")})
     profiles = await get_profiles(creator_ids)
+    linked_tasks_by_decision: dict[str, list[dict[str, Any]]] = {}
+    initiative_by_decision: dict[str, dict[str, Any] | None] = {}
+    if expand_links:
+        linked_tasks_by_decision, initiative_by_decision = await _expanded_decision_links(rows)
     hydrated: list[dict[str, Any]] = []
     for row in rows:
         creator = profiles.get(str(row.get("created_by") or ""), {})
@@ -78,53 +87,94 @@ async def _hydrate_decisions(rows: list[dict[str, Any]], expand_links: bool = Fa
             "creator_email": creator.get("email"),
             "creator_avatar_label": creator.get("avatar_label"),
             "mentions": mentions_by_source.get(str(row.get("id")), []),
-            "linked_tasks": [],
-            "initiative": None,
+            "linked_tasks": linked_tasks_by_decision.get(str(row.get("id")), []),
+            "initiative": initiative_by_decision.get(str(row.get("id"))),
         }
-
-        if expand_links:
-            workspace_id = row.get("workspace_id")
-            # Fetch linked tasks
-            try:
-                link_filters: dict[str, Any] = {"decision_id": row["id"]}
-                if workspace_id:
-                    link_filters["workspace_id"] = workspace_id
-                task_links = await select_all_trusted(
-                    "workspace_decision_tasks",
-                    "task_id",
-                    link_filters,
-                )
-                if task_links:
-                    task_ids = [str(tl["task_id"]) for tl in task_links]
-                    task_filters: dict[str, Any] = {"id": task_ids}
-                    if workspace_id:
-                        task_filters["workspace_id"] = workspace_id
-                    tasks = await select_all_trusted(
-                        "workspace_tasks",
-                        TASK_PREVIEW_COLUMNS,
-                        task_filters,
-                    )
-                    item["linked_tasks"] = tasks
-            except SupabaseServiceError:
-                logger.warning("Decision linked task hydration failed | decision_id=%s", row.get("id"), exc_info=True)
-
-            # Fetch initiative
-            if row.get("initiative_id"):
-                try:
-                    initiative_filters: dict[str, Any] = {"id": row["initiative_id"]}
-                    if workspace_id:
-                        initiative_filters["workspace_id"] = workspace_id
-                    initiative = await select_one_trusted(
-                        "workspace_initiatives",
-                        INITIATIVE_PREVIEW_COLUMNS,
-                        initiative_filters,
-                    )
-                    item["initiative"] = initiative
-                except SupabaseServiceError:
-                    logger.warning("Decision initiative hydration failed | decision_id=%s", row.get("id"), exc_info=True)
 
         hydrated.append(item)
     return hydrated
+
+
+async def _expanded_decision_links(
+    rows: list[dict[str, Any]],
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, dict[str, Any] | None]]:
+    decision_ids_by_workspace: dict[str, list[str]] = {}
+    initiative_ids_by_workspace: dict[str, set[str]] = {}
+    initiative_id_by_decision: dict[str, str] = {}
+    for row in rows:
+        decision_id = str(row.get("id") or "")
+        workspace_id = str(row.get("workspace_id") or "")
+        if decision_id and workspace_id:
+            decision_ids_by_workspace.setdefault(workspace_id, []).append(decision_id)
+        initiative_id = str(row.get("initiative_id") or "")
+        if decision_id and workspace_id and initiative_id:
+            initiative_id_by_decision[decision_id] = initiative_id
+            initiative_ids_by_workspace.setdefault(workspace_id, set()).add(initiative_id)
+
+    linked_tasks_by_decision: dict[str, list[dict[str, Any]]] = {}
+    initiative_by_decision: dict[str, dict[str, Any] | None] = {}
+
+    for workspace_id, raw_decision_ids in decision_ids_by_workspace.items():
+        decision_ids = list(dict.fromkeys(raw_decision_ids))
+        try:
+            task_links = await select_all_trusted(
+                "workspace_decision_tasks",
+                "decision_id,task_id",
+                {"decision_id": _one_or_many(decision_ids), "workspace_id": workspace_id},
+            )
+            task_ids = sorted({str(link.get("task_id")) for link in task_links if link.get("task_id")})
+            task_by_id: dict[str, dict[str, Any]] = {}
+            if task_ids:
+                tasks = await select_all_trusted(
+                    "workspace_tasks",
+                    TASK_PREVIEW_COLUMNS,
+                    {"id": task_ids, "workspace_id": workspace_id},
+                )
+                task_by_id = {str(task.get("id")): task for task in tasks if task.get("id")}
+            for link in task_links:
+                decision_id = str(link.get("decision_id") or (decision_ids[0] if len(decision_ids) == 1 else ""))
+                task = task_by_id.get(str(link.get("task_id") or ""))
+                if decision_id and task:
+                    linked_tasks_by_decision.setdefault(decision_id, []).append(task)
+        except SupabaseServiceError:
+            logger.warning(
+                "Decision linked task hydration failed | workspace_id=%s decision_count=%d",
+                workspace_id,
+                len(decision_ids),
+                exc_info=True,
+            )
+
+        initiative_ids = sorted(initiative_ids_by_workspace.get(workspace_id, set()))
+        if initiative_ids:
+            try:
+                if len(decision_ids) == 1 and len(initiative_ids) == 1:
+                    initiative = await select_one_trusted(
+                        "workspace_initiatives",
+                        INITIATIVE_PREVIEW_COLUMNS,
+                        {"id": initiative_ids[0], "workspace_id": workspace_id},
+                    )
+                    initiatives = [initiative] if initiative else []
+                else:
+                    initiatives = await select_all_trusted(
+                        "workspace_initiatives",
+                        INITIATIVE_PREVIEW_COLUMNS,
+                        {"id": initiative_ids, "workspace_id": workspace_id},
+                    )
+                initiative_by_id = {str(initiative.get("id")): initiative for initiative in initiatives if initiative.get("id")}
+                for decision_id in decision_ids:
+                    initiative_id = initiative_id_by_decision.get(decision_id)
+                    if not initiative_id:
+                        continue
+                    initiative_by_decision[decision_id] = initiative_by_id.get(initiative_id)
+            except SupabaseServiceError:
+                logger.warning(
+                    "Decision initiative hydration failed | workspace_id=%s initiative_count=%d",
+                    workspace_id,
+                    len(initiative_ids),
+                    exc_info=True,
+                )
+
+    return linked_tasks_by_decision, initiative_by_decision
 
 
 def _normalize_status(value: Any) -> str:
@@ -134,20 +184,27 @@ def _normalize_status(value: Any) -> str:
     return decision_status
 
 
-async def list_decisions(*, workspace_id: str, user_id: str) -> list[dict[str, Any]]:
+async def list_decisions(
+    *,
+    workspace_id: str,
+    user_id: str,
+    cursor: str | None = None,
+    limit: int = DEFAULT_PAGE_LIMIT,
+) -> dict[str, Any]:
     await require_workspace_access(workspace_id, user_id)
+    page_limit = normalize_page_limit(limit)
     try:
         rows = await select_all_trusted(
             "workspace_decisions",
             DECISION_COLUMNS,
-            filters={"workspace_id": workspace_id},
+            filters=cursor_filters({"workspace_id": workspace_id}, cursor),
             order_by="updated_at",
             desc=True,
-            limit=300,
+            limit=page_limit + 1,
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
-    return await _hydrate_decisions(rows)
+    return cursor_page(await _hydrate_decisions(rows[:page_limit]), has_more=len(rows) > page_limit)
 
 
 async def require_decision(*, workspace_id: str, decision_id: str, user_id: str) -> dict[str, Any]:

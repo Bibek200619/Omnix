@@ -49,7 +49,7 @@ export function WorkspaceContinuityProvider({ children }: { children: ReactNode 
     setError(null);
     try {
       const [initData, timelineData, unresolvedData] = await Promise.all([
-        apiClient.get<WorkspaceInitiative[]>(`/workspaces/${requestWorkspaceId}/initiatives`),
+        apiClient.getPaginatedItems<WorkspaceInitiative>(`/workspaces/${requestWorkspaceId}/initiatives`),
         apiClient.get<WorkspaceOperationalTimelineEvent[]>(`/workspaces/${requestWorkspaceId}/timeline`),
         apiClient.get<WorkspaceContinuityMemory[]>(`/workspaces/${requestWorkspaceId}/continuity/unresolved`)
       ]);

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
+import os
 import re
 import uuid
 from dataclasses import dataclass
 from typing import Any
 
+from ..db.supabase_client import get_supabase
 from ..rag.chunking import chunk_text
 from ..retrieval.context_builder import BuiltContext, ContextBuilder, ContextSupplement
 from ..retrieval.scoring import RetrievalResult
@@ -22,9 +25,13 @@ from ..services.workspace_service import utc_now_iso
 
 logger = logging.getLogger(__name__)
 
+SUPABASE_STORAGE_BACKEND = "supabase"
+LOCAL_STORAGE_BACKEND = "local"
+SUPABASE_DOCUMENTS_BUCKET = os.environ.get("OMNIX_DOCUMENTS_BUCKET", "omnix-documents")
+
 DOCUMENT_COLUMNS = "id,content,file_id,created_at,workspace_id,user_id,chunk_index"
 FILE_COLUMNS = (
-    "id,user_id,workspace_id,conversation_id,file_name,file_type,metadata,"
+    "id,user_id,workspace_id,conversation_id,file_name,file_type,storage_backend,metadata,"
     "page_count,extractor_used,extracted_character_count,image_page_count,text_page_count,"
     "extraction_status,extraction_failure_reason,ocr_used,ocr_character_count,created_at"
 )
@@ -41,6 +48,89 @@ class StoredDocumentChunks:
     chunk_count: int
     chunk_ids: list[str]
     truncated: bool = False
+
+
+def configured_file_storage_backend() -> str:
+    backend = os.environ.get("OMNIX_STORAGE_BACKEND", SUPABASE_STORAGE_BACKEND).strip().lower()
+    return LOCAL_STORAGE_BACKEND if backend == LOCAL_STORAGE_BACKEND else SUPABASE_STORAGE_BACKEND
+
+
+def supabase_storage_object_path(user_id: str, filename: str) -> str:
+    safe_name = os.path.basename(filename or "unnamed")
+    return f"{user_id}/{uuid.uuid4().hex}_{safe_name}"
+
+
+def _storage_bucket() -> Any:
+    return get_supabase().storage.from_(SUPABASE_DOCUMENTS_BUCKET)
+
+
+def _upload_bytes_sync(storage_path: str, data: bytes, content_type: str | None) -> None:
+    file_options = {"content-type": content_type or "application/octet-stream"}
+    try:
+        _storage_bucket().upload(storage_path, data, file_options=file_options)
+    except TypeError:
+        _storage_bucket().upload(storage_path, data)
+
+
+async def upload_bytes_to_supabase_storage(
+    storage_path: str,
+    data: bytes,
+    content_type: str | None = None,
+) -> None:
+    await asyncio.to_thread(_upload_bytes_sync, storage_path, data, content_type)
+
+
+def _signed_url_sync(storage_path: str, expires_in: int) -> str:
+    result = _storage_bucket().create_signed_url(storage_path, expires_in)
+    if isinstance(result, str):
+        return result
+    if isinstance(result, dict):
+        for key in ("signedURL", "signedUrl", "signed_url", "url"):
+            value = result.get(key)
+            if isinstance(value, str) and value:
+                return value
+    data = getattr(result, "data", None)
+    if isinstance(data, dict):
+        for key in ("signedURL", "signedUrl", "signed_url", "url"):
+            value = data.get(key)
+            if isinstance(value, str) and value:
+                return value
+    raise RuntimeError("Supabase Storage did not return a signed URL.")
+
+
+async def create_supabase_signed_url(storage_path: str, expires_in: int = 3600) -> str:
+    return await asyncio.to_thread(_signed_url_sync, storage_path, expires_in)
+
+
+def _download_bytes_sync(storage_path: str) -> bytes:
+    result = _storage_bucket().download(storage_path)
+    if isinstance(result, bytes):
+        return result
+    if isinstance(result, bytearray):
+        return bytes(result)
+    if hasattr(result, "read"):
+        return result.read()
+    data = getattr(result, "data", None)
+    if isinstance(data, bytes):
+        return data
+    raise RuntimeError("Supabase Storage did not return file bytes.")
+
+
+async def download_bytes_from_supabase_storage(storage_path: str) -> bytes:
+    return await asyncio.to_thread(_download_bytes_sync, storage_path)
+
+
+async def load_stored_file_bytes(file_row: dict[str, Any]) -> bytes:
+    storage_path = str(file_row.get("storage_path") or "")
+    if not storage_path:
+        raise FileNotFoundError("Stored file has no storage_path.")
+
+    backend = str(file_row.get("storage_backend") or LOCAL_STORAGE_BACKEND).lower()
+    if backend == SUPABASE_STORAGE_BACKEND:
+        return await download_bytes_from_supabase_storage(storage_path)
+
+    with open(storage_path, "rb") as fh:
+        return fh.read()
 
 
 def _important_terms(query: str) -> list[str]:

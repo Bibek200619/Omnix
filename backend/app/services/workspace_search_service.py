@@ -2,18 +2,23 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal, cast
 
 from fastapi import HTTPException, status
 
 from .supabase_service import SupabaseServiceError, select_all_trusted, select_one_trusted
-from .workspace_service import require_workspace_access
+from .workspace_service import list_user_workspaces, require_workspace_access
 
 logger = logging.getLogger(__name__)
 
 SEARCH_GROUP_LIMIT = 8
 FIELD_QUERY_LIMIT = 8
+FTS_CONFIG = "english"
+FTS_MAX_TERMS = 8
+SearchScope = Literal["workspace", "organization"]
+SEARCH_SCOPES = {"workspace", "organization"}
 CHANNEL_COLUMNS = (
     "id,workspace_id,created_by,name,purpose,visibility,is_archived,"
     "message_count,last_message_preview,last_message_at,created_at,updated_at"
@@ -23,19 +28,71 @@ TASK_COLUMNS = "id,workspace_id,title,description,status,created_at,updated_at"
 INITIATIVE_COLUMNS = "id,workspace_id,title,description,status,created_at,updated_at"
 DECISION_COLUMNS = "id,workspace_id,title,description,decision_reason,status,created_at,updated_at"
 CHANNEL_MEMBER_COLUMNS = "channel_id,user_id,role,created_at"
+FTS_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_]*")
 
 
 def _database_error() -> HTTPException:
     return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
+def _invalid_scope_error() -> HTTPException:
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid search scope.")
+
+
 def _normalize_query(query: str) -> str:
     return " ".join(str(query or "").split())[:120]
+
+
+def _normalize_scope(scope: str | None) -> SearchScope:
+    normalized = str(scope or "workspace").strip().lower()
+    if normalized not in SEARCH_SCOPES:
+        raise _invalid_scope_error()
+    return cast(SearchScope, normalized)
+
+
+def _workspace_id_list(workspace_id: str | list[str]) -> list[str]:
+    values = workspace_id if isinstance(workspace_id, list) else [workspace_id]
+    seen: set[str] = set()
+    normalized: list[str] = []
+    for value in values:
+        text = str(value or "").strip()
+        if text and text not in seen:
+            seen.add(text)
+            normalized.append(text)
+    return normalized
+
+
+def _workspace_filter_value(workspace_ids: list[str], *, force_list: bool = False) -> str | list[str]:
+    return workspace_ids if force_list or len(workspace_ids) != 1 else workspace_ids[0]
+
+
+def _filter_rows_to_workspaces(rows: list[dict[str, Any]], workspace_ids: list[str]) -> list[dict[str, Any]]:
+    allowed = set(workspace_ids)
+    return [row for row in rows if str(row.get("workspace_id") or "") in allowed]
 
 
 def _ilike_pattern(query: str) -> str:
     escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
+
+
+def _to_tsquery(query: str) -> str | None:
+    terms = []
+    for token in FTS_TOKEN_RE.findall(query.lower()):
+        if token:
+            terms.append(token)
+        if len(terms) >= FTS_MAX_TERMS:
+            break
+    if not terms:
+        return None
+    return " & ".join(f"{term}:*" for term in terms)
+
+
+def _fts_filter(query: str) -> dict[str, dict[str, str]] | None:
+    tsquery = _to_tsquery(query)
+    if not tsquery:
+        return None
+    return {"fts": {"config": FTS_CONFIG, "query": tsquery}}
 
 
 def _compact_text(value: Any, *, limit: int = 160) -> str | None:
@@ -69,16 +126,20 @@ async def _search_table_fields(
     *,
     table: str,
     columns: str,
-    workspace_id: str,
+    workspace_id: str | list[str],
     fields: tuple[str, ...],
+    query: str,
     pattern: str,
     extra_filters: Mapping[str, Any] | None = None,
     order_by: str = "updated_at",
 ) -> list[dict[str, Any]]:
-    async def query_field(field: str) -> list[dict[str, Any]]:
+    force_workspace_list = isinstance(workspace_id, list)
+    workspace_ids = _workspace_id_list(workspace_id)
+
+    async def query_field_with_filter(field: str, field_filter: Mapping[str, Any]) -> list[dict[str, Any]]:
         filters: dict[str, Any] = {
-            "workspace_id": workspace_id,
-            field: {"ilike": pattern},
+            "workspace_id": _workspace_filter_value(workspace_ids, force_list=force_workspace_list),
+            field: dict(field_filter),
         }
         if extra_filters:
             filters.update(extra_filters)
@@ -90,19 +151,36 @@ async def _search_table_fields(
             desc=True,
             limit=FIELD_QUERY_LIMIT,
         )
-        return [{**row, "_matched_field": field} for row in rows]
+        scoped_rows = _filter_rows_to_workspaces(rows, workspace_ids)
+        return [{**row, "_matched_field": field} for row in scoped_rows]
+
+    async def query_field(field: str) -> list[dict[str, Any]]:
+        fts_filter = _fts_filter(query)
+        if fts_filter is not None:
+            try:
+                return await query_field_with_filter(field, fts_filter)
+            except SupabaseServiceError:
+                logger.warning(
+                    "Full-text workspace search failed; falling back to ILIKE | table=%s field=%s",
+                    table,
+                    field,
+                )
+        return await query_field_with_filter(field, {"ilike": pattern})
 
     groups = await asyncio.gather(*(query_field(field) for field in fields))
     return [row for group in groups for row in group]
 
 
-async def _visible_channels(workspace_id: str, user_id: str) -> list[dict[str, Any]]:
+async def _visible_channels(workspace_id: str | list[str], user_id: str) -> list[dict[str, Any]]:
+    force_workspace_list = isinstance(workspace_id, list)
+    workspace_ids = _workspace_id_list(workspace_id)
     channels = await select_all_trusted(
         "workspace_channels",
         CHANNEL_COLUMNS,
-        filters={"workspace_id": workspace_id, "is_archived": False},
+        filters={"workspace_id": _workspace_filter_value(workspace_ids, force_list=force_workspace_list), "is_archived": False},
         order_by="created_at",
     )
+    channels = _filter_rows_to_workspaces(channels, workspace_ids)
     visible: list[dict[str, Any]] = []
     for channel in channels:
         if channel.get("visibility") == "workspace":
@@ -162,7 +240,7 @@ def _conversation_result_from_message(
     }
 
 
-async def _search_conversations(workspace_id: str, user_id: str, pattern: str) -> list[dict[str, Any]]:
+async def _search_conversations(workspace_id: str | list[str], user_id: str, query: str, pattern: str) -> list[dict[str, Any]]:
     channels = await _visible_channels(workspace_id, user_id)
     channel_ids = [str(channel["id"]) for channel in channels if channel.get("id")]
     if not channel_ids:
@@ -173,6 +251,7 @@ async def _search_conversations(workspace_id: str, user_id: str, pattern: str) -
         columns=CHANNEL_COLUMNS,
         workspace_id=workspace_id,
         fields=("name", "last_message_preview"),
+        query=query,
         pattern=pattern,
         extra_filters={"id": channel_ids, "is_archived": False},
     )
@@ -181,6 +260,7 @@ async def _search_conversations(workspace_id: str, user_id: str, pattern: str) -
         columns=MESSAGE_COLUMNS,
         workspace_id=workspace_id,
         fields=("content",),
+        query=query,
         pattern=pattern,
         extra_filters={"channel_id": channel_ids},
     )
@@ -247,35 +327,41 @@ async def search_workspace(
     workspace_id: str,
     user_id: str,
     query: str,
+    scope: SearchScope = "workspace",
 ) -> dict[str, list[dict[str, Any]]]:
-    await require_workspace_access(workspace_id, user_id)
+    normalized_scope = _normalize_scope(scope)
+    workspace_ids = await _resolve_search_workspace_ids(workspace_id, user_id, normalized_scope)
     normalized_query = _normalize_query(query)
     empty = {"conversations": [], "tasks": [], "initiatives": [], "decisions": []}
     if not normalized_query:
         return empty
 
+    workspace_filter: str | list[str] = workspace_ids if normalized_scope == "organization" else workspace_ids[0]
     pattern = _ilike_pattern(normalized_query)
     try:
-        conversations_task = _search_conversations(workspace_id, user_id, pattern)
+        conversations_task = _search_conversations(workspace_filter, user_id, normalized_query, pattern)
         tasks_task = _search_table_fields(
             table="workspace_tasks",
             columns=TASK_COLUMNS,
-            workspace_id=workspace_id,
+            workspace_id=workspace_filter,
             fields=("title", "description"),
+            query=normalized_query,
             pattern=pattern,
         )
         initiatives_task = _search_table_fields(
             table="workspace_initiatives",
             columns=INITIATIVE_COLUMNS,
-            workspace_id=workspace_id,
+            workspace_id=workspace_filter,
             fields=("title", "description"),
+            query=normalized_query,
             pattern=pattern,
         )
         decisions_task = _search_table_fields(
             table="workspace_decisions",
             columns=DECISION_COLUMNS,
-            workspace_id=workspace_id,
+            workspace_id=workspace_filter,
             fields=("title", "decision_reason", "description"),
+            query=normalized_query,
             pattern=pattern,
         )
         conversation_rows, task_rows, initiative_rows, decision_rows = await asyncio.gather(
@@ -294,3 +380,16 @@ async def search_workspace(
         "initiatives": _dedupe_results([_initiative_result(row) for row in initiative_rows]),
         "decisions": _dedupe_results([_decision_result(row) for row in decision_rows]),
     }
+
+
+async def _resolve_search_workspace_ids(workspace_id: str, user_id: str, scope: SearchScope) -> list[str]:
+    await require_workspace_access(workspace_id, user_id)
+    anchor_workspace_id = str(workspace_id)
+    if scope == "workspace":
+        return [anchor_workspace_id]
+
+    workspaces = await list_user_workspaces(user_id)
+    workspace_ids = _workspace_id_list([str(workspace.get("id") or "") for workspace in workspaces])
+    if anchor_workspace_id not in workspace_ids:
+        workspace_ids.insert(0, anchor_workspace_id)
+    return workspace_ids

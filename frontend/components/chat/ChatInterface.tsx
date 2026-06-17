@@ -117,6 +117,7 @@ function normalizeMessage(message: ApiMessage, index: number, senderLookup: Send
 
   return {
     id: message.id ?? `message-${index}`,
+    conversationId: message.conversation_id ?? null,
     role,
     userId,
     senderName,
@@ -724,6 +725,7 @@ export function ChatInterface() {
       const attachmentIds = attachments.map((file) => file.id).filter(Boolean);
       const userMessage: Message = {
         id: messageId,
+        conversationId: currentConversation,
         role: "user",
         userId: user?.id ?? null,
         senderName: "You",
@@ -873,6 +875,7 @@ export function ChatInterface() {
                 ...next,
                 {
                   id: assistantId as string,
+                  conversationId: streamConversationId,
                   role: "assistant",
                   senderName: "Omnix",
                   senderAvatar: "OX",
@@ -1041,6 +1044,34 @@ export function ChatInterface() {
     if (!prev || prev.role !== "user") return;
     sendMessage(prev.content, undefined, prev.attachments ?? []);
   }, [sendMessage]);
+
+  const handleMessageFeedback = useCallback(
+    async (message: Message, rating: "good" | "bad") => {
+      const targetConversationId =
+        message.conversationId ?? currentConversationRef.current ?? currentConversation;
+      if (!targetConversationId || message.role !== "assistant" || message.status === "streaming") {
+        return;
+      }
+
+      try {
+        await apiClient.post(`/conversations/${targetConversationId}/messages/${message.id}/feedback`, {
+          rating,
+          reason: null,
+        });
+        setMessages((current) =>
+          current.map((item) =>
+            item.id === message.id ? { ...item, feedbackRating: rating } : item,
+          ),
+        );
+      } catch (err) {
+        logClientError("Failed to submit message feedback", err, {
+          endpoint: `/conversations/${targetConversationId}/messages/${message.id}/feedback`,
+        });
+        throw err;
+      }
+    },
+    [currentConversation],
+  );
 
   function handleUploadSuccess(file: MessageAttachment) {
     console.debug("[upload] attaching uploaded file to pending chat message", {
@@ -1270,6 +1301,7 @@ export function ChatInterface() {
           typingMembers={conversationTypingMembers}
           onRetry={handleRetry}
           onRegenerate={handleRegenerate}
+          onFeedback={handleMessageFeedback}
         />
         <div className="shrink-0 bg-gradient-to-t from-[var(--omnix-bg)] via-[rgba(5,12,23,0.94)] to-transparent px-2.5 pb-2.5 pt-3 sm:px-[22px] sm:pb-[18px] sm:pt-10">
           <ChatInput

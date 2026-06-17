@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import time
 from typing import Any, AsyncIterator
@@ -10,8 +11,17 @@ from typing import Any, AsyncIterator
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from starlette.responses import StreamingResponse
 
+from ..bootstrap.redis import get_redis
 from ..core.security import get_current_user
-from ..schemas.chat import AIGenerationRequest, AIGenerationResponse, ChatRequest, ChatResponse, MessageRead
+from ..schemas.chat import (
+    AIGenerationRequest,
+    AIGenerationResponse,
+    ChatRequest,
+    ChatResponse,
+    MessageFeedbackCreate,
+    MessageFeedbackRead,
+    MessageRead,
+)
 from ..services.chat_service import (
     AIMessage,
     ModelServiceError,
@@ -31,6 +41,7 @@ from ..services.supabase_service import (
     select_one_trusted,
     update_one,
     update_one_trusted,
+    upsert_one,
 )
 from ..services.web_search import WebSearchResponse, get_web_search_service
 from ..services.workspace_intelligence_service import (
@@ -60,27 +71,48 @@ FILE_COLUMNS = (
     "extraction_status,extraction_failure_reason,ocr_used,ocr_character_count,created_at"
 )
 
-RATE_LIMIT_REQUESTS = 5
-RATE_LIMIT_WINDOW = 60.0
-_chat_rate_limits: dict[str, list[float]] = {}
+DEFAULT_RATE_LIMIT_RPM = 30
+RATE_LIMIT_WINDOW_SECONDS = 60
+RATE_LIMIT_KEY_PREFIX = "omnix:ratelimit"
 DOCUMENT_INTENT_RE = re.compile(
     r"\b(file|document|doc|pdf|docx|upload|attached|attachment|summari[sz]e|analy[sz]e|resume|contract|report|context|source)\b",
     re.IGNORECASE,
 )
 
 
-def _check_rate_limit(user_id: str) -> None:
-    now = time.time()
-    history = _chat_rate_limits.get(user_id, [])
-    history = [timestamp for timestamp in history if now - timestamp < RATE_LIMIT_WINDOW]
-    if len(history) >= RATE_LIMIT_REQUESTS:
-        _chat_rate_limits[user_id] = history
+def _rate_limit_rpm() -> int:
+    raw = os.environ.get("OMNIX_RATE_LIMIT_RPM", str(DEFAULT_RATE_LIMIT_RPM))
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        logger.warning("Invalid OMNIX_RATE_LIMIT_RPM=%r; using default %d.", raw, DEFAULT_RATE_LIMIT_RPM)
+        return DEFAULT_RATE_LIMIT_RPM
+    return max(value, 1)
+
+
+def _current_minute_bucket() -> int:
+    return int(time.time() // RATE_LIMIT_WINDOW_SECONDS)
+
+
+async def _check_rate_limit(user_id: str) -> None:
+    key = f"{RATE_LIMIT_KEY_PREFIX}:{user_id}:{_current_minute_bucket()}"
+    try:
+        redis = get_redis()
+        count = int(await redis.incr(key))
+        if count == 1:
+            await redis.expire(key, RATE_LIMIT_WINDOW_SECONDS)
+    except Exception as exc:
+        logger.exception("Redis rate limit check failed | user_id=%s", user_id)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Rate limiting is temporarily unavailable.",
+        ) from exc
+
+    if count > _rate_limit_rpm():
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Rate limit exceeded. Please try again later.",
         )
-    history.append(now)
-    _chat_rate_limits[user_id] = history
 
 
 def _user_id_from_claims(current_user: dict[str, Any]) -> str:
@@ -248,6 +280,15 @@ def _compact_text(value: Any, limit: int) -> str | None:
     if not text:
         return None
     return text[:limit]
+
+
+def _clean_feedback_reason(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = " ".join(str(value).split())
+    if not normalized:
+        return None
+    return normalized[:1000]
 
 
 def _compact_sources_for_payload(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -923,6 +964,76 @@ async def get_messages(
     return [_with_sources_payload(message) for message in messages]
 
 
+@router.post(
+    "/conversations/{conversation_id}/messages/{message_id}/feedback",
+    response_model=MessageFeedbackRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def submit_message_feedback(
+    conversation_id: str,
+    message_id: str,
+    payload: MessageFeedbackCreate,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    conversation, workspace_access = await require_conversation_access(conversation_id, user_id)
+    workspace_id = str(conversation.get("workspace_id") or "") if workspace_access is not None else None
+
+    try:
+        message = await select_one_trusted(
+            "messages",
+            MESSAGE_COLUMNS,
+            {"id": message_id, "conversation_id": conversation_id},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    if message is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found.")
+    if message.get("role") != "assistant":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Feedback can only be submitted for assistant messages.",
+        )
+    if workspace_id is None and str(message.get("user_id") or "") != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found.")
+
+    feedback_payload = {
+        "conversation_id": conversation_id,
+        "message_id": message_id,
+        "user_id": user_id,
+        "workspace_id": workspace_id,
+        "rating": payload.rating,
+        "reason": _clean_feedback_reason(payload.reason),
+        "updated_at": utc_now_iso(),
+    }
+
+    try:
+        feedback = await upsert_one(
+            "message_feedback",
+            feedback_payload,
+            on_conflict="message_id,user_id",
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    if workspace_id:
+        await log_workspace_activity(
+            workspace_id=workspace_id,
+            actor_user_id=user_id,
+            event_type="workspace.ai_feedback_submitted",
+            summary="AI response feedback was submitted.",
+            metadata={
+                "conversation_id": conversation_id,
+                "message_id": message_id,
+                "rating": payload.rating,
+                "has_reason": feedback_payload["reason"] is not None,
+            },
+        )
+
+    return feedback
+
+
 @router.delete(
     "/conversations/{conversation_id}/messages",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -955,7 +1066,7 @@ async def generate_ai(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> AIGenerationResponse:
     user_id = _user_id_from_claims(current_user)
-    _check_rate_limit(user_id)
+    await _check_rate_limit(user_id)
 
     try:
         generation = await generate_ai_response(
@@ -988,7 +1099,7 @@ async def chat(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> ChatResponse:
     user_id = _user_id_from_claims(current_user)
-    _check_rate_limit(user_id)
+    await _check_rate_limit(user_id)
     message_text = payload.message.strip()
     user_message_timestamp = utc_now_iso()
 
@@ -1189,7 +1300,7 @@ async def chat_stream(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> StreamingResponse:
     user_id = _user_id_from_claims(current_user)
-    _check_rate_limit(user_id)
+    await _check_rate_limit(user_id)
 
     message_text = payload.message.strip()
     if not message_text:

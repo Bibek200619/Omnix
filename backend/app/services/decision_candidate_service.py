@@ -44,17 +44,56 @@ def _json_payload(content: str) -> Any:
         return json.loads(content)
     except json.JSONDecodeError:
         match = re.search(r"\{.*\}", content, flags=re.DOTALL)
-        if not match:
-            return {}
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except json.JSONDecodeError:
+                pass
+        return _partial_candidates_payload(content)
+
+
+def _partial_candidates_payload(content: str) -> dict[str, Any]:
+    match = re.search(r'"candidates"\s*:\s*\[', content)
+    if not match:
+        return {}
+
+    index = content.find("[", match.start()) + 1
+    decoder = json.JSONDecoder()
+    recovered: list[Any] = []
+
+    while index < len(content):
+        while index < len(content) and content[index] in " \n\r\t,":
+            index += 1
+        if index >= len(content) or content[index] == "]":
+            break
         try:
-            return json.loads(match.group(0))
+            item, next_index = decoder.raw_decode(content, index)
         except json.JSONDecodeError:
-            return {}
+            break
+        recovered.append(item)
+        index = next_index
+
+    return {"candidates": recovered} if recovered else {}
 
 
-def _normalize_candidates(payload: Any, *, source_type: SourceType, source_id: str) -> list[dict[str, Any]]:
+def _normalize_candidates(
+    payload: Any,
+    *,
+    source_type: SourceType,
+    source_id: str,
+    model_output: str | None = None,
+) -> list[dict[str, Any]]:
     raw_candidates = payload.get("candidates") if isinstance(payload, dict) else None
     if not isinstance(raw_candidates, list):
+        logger.warning(
+            "Decision candidate payload validation failed: missing_or_invalid_candidates",
+            extra={
+                "source_type": source_type,
+                "source_id": source_id,
+                "payload_type": type(payload).__name__,
+                "model_output_excerpt": str(model_output or "")[:500],
+            },
+        )
         return []
 
     candidates: list[dict[str, Any]] = []
@@ -115,12 +154,18 @@ async def _extract_candidates(*, source_type: SourceType, source_id: str, source
             system_prompt=system_prompt,
             temperature=0.0,
             max_tokens=700,
+            response_format={"type": "json_object"},
         )
     except ModelServiceError as exc:
         logger.exception("Decision candidate extraction failed | source_type=%s source_id=%s", source_type, source_id)
         raise HTTPException(status_code=exc.status_code, detail="Decision candidate extraction is unavailable.") from exc
 
-    return _normalize_candidates(_json_payload(generation.content), source_type=source_type, source_id=source_id)
+    return _normalize_candidates(
+        _json_payload(generation.content),
+        source_type=source_type,
+        source_id=source_id,
+        model_output=generation.content,
+    )
 
 
 async def conversation_decision_candidates(

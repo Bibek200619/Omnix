@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -133,3 +134,56 @@ async def test_candidate_metrics_log_accept_and_dismiss_counts(monkeypatch: pyte
     assert events[1]["event_type"] == "decision_candidate.dismissed"
     assert events[1]["metadata"]["dismiss_count"] == 1
     assert access_checks == [("workspace-1", "user-1"), ("workspace-1", "user-1")]
+
+
+def test_json_payload_recovers_valid_candidates_from_partial_array() -> None:
+    model_output = (
+        'Preface {"candidates":['
+        '{"title":"Adopt Redis","reason":"The team agreed to use Redis.",'
+        '"confidence":"high","supporting_evidence":["Agreed to use Redis."]},'
+        '{"title":'
+    )
+
+    payload = candidates._json_payload(model_output)
+    result = candidates._normalize_candidates(
+        payload,
+        source_type="conversation",
+        source_id="channel-1",
+        model_output=model_output,
+    )
+
+    assert len(result) == 1
+    assert result[0]["title"] == "Adopt Redis"
+
+
+def test_invalid_candidate_payload_logs_warning(caplog: pytest.LogCaptureFixture) -> None:
+    model_output = "x" * 650
+    caplog.set_level(logging.WARNING, logger=candidates.logger.name)
+
+    result = candidates._normalize_candidates(
+        {"notes": []},
+        source_type="document",
+        source_id="file-1",
+        model_output=model_output,
+    )
+
+    assert result == []
+    assert "missing_or_invalid_candidates" in caplog.text
+    assert len(caplog.records[0].model_output_excerpt) == 500
+
+
+@pytest.mark.asyncio
+async def test_extract_candidates_requests_structured_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_generate(*args, **kwargs):
+        assert kwargs["response_format"] == {"type": "json_object"}
+        return SimpleNamespace(content='{"candidates":[]}')
+
+    monkeypatch.setattr(candidates, "generate_ai_response", fake_generate)
+
+    result = await candidates._extract_candidates(
+        source_type="conversation",
+        source_id="channel-1",
+        source_text="Ari: We agreed to defer the launch.",
+    )
+
+    assert result == []

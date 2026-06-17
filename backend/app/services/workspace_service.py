@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import json
 import logging
 from typing import Any, Literal
 
 from fastapi import HTTPException, Request, status
 from starlette.concurrency import run_in_threadpool
 
+from ..bootstrap.redis import get_redis
 from ..db.supabase_client import get_supabase
 from .supabase_service import (
     SupabaseServiceError,
@@ -34,6 +37,8 @@ WORKSPACE_INVITE_COLUMNS = (
     "created_at,updated_at,accepted_at"
 )
 MEMBERS_PREVIEW_LIMIT = 3
+PROFILE_CACHE_TTL_SECONDS = 300
+PROFILE_CACHE_PREFIX = "omnix:profile"
 
 WorkspaceRole = Literal["founder", "co_owner", "team_lead", "member"]
 WorkspaceInviteStatus = Literal["pending", "accepted", "declined", "revoked"]
@@ -400,50 +405,119 @@ def _avatar_label(full_name: str | None, email: str | None, user_id: str) -> str
     return "U"
 
 
+def _empty_profile(user_id: str) -> dict[str, Any]:
+    return {
+        "email": None,
+        "full_name": None,
+        "handle": None,
+        "avatar_url": None,
+        "avatar_label": _avatar_label(None, None, user_id),
+    }
+
+
+def _lookup_profile_sync(user_id: str) -> dict[str, Any]:
+    auth_admin = get_supabase().auth.admin
+    email: str | None = None
+    full_name: str | None = None
+
+    try:
+        user_response = auth_admin.get_user_by_id(user_id)
+        user = getattr(user_response, "user", None)
+        email = getattr(user, "email", None)
+        full_name = _display_name_for_user(user)
+    except Exception:
+        logger.exception("Failed to resolve user profile for %s.", user_id)
+
+    return {
+        "email": email,
+        "full_name": full_name,
+        "handle": None,
+        "avatar_url": None,
+        "avatar_label": _avatar_label(full_name, email, user_id),
+    }
+
+
+def _profile_cache_key(user_id: str) -> str:
+    return f"{PROFILE_CACHE_PREFIX}:{user_id}"
+
+
+async def _cached_auth_profiles(user_ids: list[str]) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    cached: dict[str, dict[str, Any]] = {}
+    missing: list[str] = []
+    try:
+        redis = get_redis()
+        for user_id in user_ids:
+            raw = await redis.get(_profile_cache_key(user_id))
+            if isinstance(raw, bytes):
+                raw = raw.decode("utf-8", errors="replace")
+            if raw:
+                try:
+                    value = json.loads(raw)
+                except json.JSONDecodeError:
+                    missing.append(user_id)
+                    continue
+                if isinstance(value, dict):
+                    cached[user_id] = value
+                    continue
+            missing.append(user_id)
+    except Exception:
+        logger.exception("Failed to read profile cache from Redis; resolving profiles directly.")
+        return {}, user_ids
+    return cached, missing
+
+
+async def _cache_auth_profiles(profiles: dict[str, dict[str, Any]]) -> None:
+    if not profiles:
+        return
+    try:
+        redis = get_redis()
+        for user_id, profile in profiles.items():
+            await redis.setex(_profile_cache_key(user_id), PROFILE_CACHE_TTL_SECONDS, json.dumps(profile))
+    except Exception:
+        logger.exception("Failed to write profile cache to Redis.")
+
+
+async def _lookup_auth_profiles(user_ids: list[str]) -> dict[str, dict[str, Any]]:
+    unique_ids = sorted({value for value in user_ids if value})
+    if not unique_ids:
+        return {}
+
+    cached, missing = await _cached_auth_profiles(unique_ids)
+    if not missing:
+        return cached
+
+    semaphore = asyncio.Semaphore(5)
+
+    async def resolve(user_id: str) -> tuple[str, dict[str, Any]]:
+        async with semaphore:
+            return user_id, await run_in_threadpool(_lookup_profile_sync, user_id)
+
+    fetched_pairs = await asyncio.gather(*(resolve(user_id) for user_id in missing))
+    fetched = {user_id: profile for user_id, profile in fetched_pairs}
+    await _cache_auth_profiles(fetched)
+    return {**cached, **fetched}
+
+
 def _lookup_profiles_sync(user_ids: list[str]) -> dict[str, dict[str, Any]]:
     profiles: dict[str, dict[str, Any]] = {}
-    auth_admin = get_supabase().auth.admin
-
     for user_id in sorted({value for value in user_ids if value}):
-        email: str | None = None
-        full_name: str | None = None
-
         try:
-            user_response = auth_admin.get_user_by_id(user_id)
-            user = getattr(user_response, "user", None)
-            email = getattr(user, "email", None)
-            full_name = _display_name_for_user(user)
+            profiles[user_id] = _lookup_profile_sync(user_id)
         except Exception:
             logger.exception("Failed to resolve user profile for %s.", user_id)
-
-        profiles[user_id] = {
-            "email": email,
-            "full_name": full_name,
-            "handle": None,
-            "avatar_url": None,
-            "avatar_label": _avatar_label(full_name, email, user_id),
-        }
-
+            profiles[user_id] = _empty_profile(user_id)
     return profiles
 
 
 async def get_profiles(user_ids: list[str]) -> dict[str, dict[str, Any]]:
     if not user_ids:
         return {}
-    auth_profiles = await run_in_threadpool(_lookup_profiles_sync, user_ids)
+    normalized_user_ids = sorted({value for value in user_ids if value})
+    auth_profiles = await _lookup_auth_profiles(normalized_user_ids)
     app_profiles = await get_user_profile_map(user_ids)
 
     for user_id, app_profile in app_profiles.items():
-        profile = auth_profiles.setdefault(
-            user_id,
-            {
-                "email": None,
-                "full_name": None,
-                "handle": None,
-                "avatar_url": None,
-                "avatar_label": _avatar_label(None, None, user_id),
-            },
-        )
+        profile = auth_profiles.setdefault(user_id, _empty_profile(user_id))
         display_name = app_profile.get("display_name") or profile.get("full_name")
         avatar_url = app_profile.get("avatar_url") or profile.get("avatar_url")
         handle = app_profile.get("username") or profile.get("handle")

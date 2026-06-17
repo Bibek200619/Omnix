@@ -71,6 +71,25 @@ class MessageRead(BaseModel):
     sources: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class MessageFeedbackCreate(BaseModel):
+    rating: Literal["good", "bad"]
+    reason: str | None = Field(default=None, max_length=1000)
+
+
+class MessageFeedbackRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    conversation_id: str
+    message_id: str
+    user_id: str
+    workspace_id: str | None = None
+    rating: Literal["good", "bad"]
+    reason: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=MAX_INPUT_SIZE)
     conversation_id: str | None = None
@@ -121,6 +140,7 @@ class FileCreate(BaseModel):
     file_type: str | None = Field(default=None, max_length=255)
     size_bytes: int | None = Field(default=None, ge=0)
     storage_path: str | None = Field(default=None, max_length=1024)
+    storage_backend: str | None = Field(default=None, max_length=32)
     metadata: dict[str, Any] | None = None
 
 
@@ -135,6 +155,7 @@ class FileRead(BaseModel):
     file_type: str | None = None
     size_bytes: int | None = None
     storage_path: str | None = None
+    storage_backend: str | None = None
     metadata: dict[str, Any] | None = None
     page_count: int | None = None
     extractor_used: str | None = None

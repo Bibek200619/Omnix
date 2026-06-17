@@ -177,9 +177,10 @@ async def test_task_hydration_with_decisions(mock_user_id, mock_workspace_id):
         ]
         
         result = await task_service.list_tasks(workspace_id=mock_workspace_id, user_id=mock_user_id)
-        assert len(result) == 1
-        assert len(result[0]["linked_decisions"]) == 1
-        assert result[0]["linked_decisions"][0]["title"] == "Decision 1"
+        items = result["items"]
+        assert len(items) == 1
+        assert len(items[0]["linked_decisions"]) == 1
+        assert items[0]["linked_decisions"][0]["title"] == "Decision 1"
 
 
 @pytest.mark.asyncio
@@ -228,9 +229,10 @@ async def test_initiative_hydration_with_decisions(mock_user_id, mock_workspace_
         ]
         
         result = await init_service.list_initiatives(workspace_id=mock_workspace_id, user_id=mock_user_id)
-        assert len(result) == 1
-        assert len(result[0]["linked_decisions"]) == 1
-        assert result[0]["linked_decisions"][0]["title"] == "Decision 1"
+        items = result["items"]
+        assert len(items) == 1
+        assert len(items[0]["linked_decisions"]) == 1
+        assert items[0]["linked_decisions"][0]["title"] == "Decision 1"
 
 
 @pytest.mark.asyncio

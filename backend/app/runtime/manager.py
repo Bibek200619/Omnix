@@ -14,6 +14,7 @@ class RuntimeManager:
         self.active_providers: List[str] = []
         self.streaming_sessions: Dict[str, Any] = {}
         self.status = "initializing"
+        self.status_reason: str | None = None
         # Ingestion worker counters (in-process only; reset on restart)
         self._jobs_processing: int = 0
         self._jobs_completed: int = 0
@@ -55,8 +56,9 @@ class RuntimeManager:
             self.active_providers.append(provider_name)
             logger.info("AI Provider %s registered", provider_name)
 
-    def set_status(self, status: str):
+    def set_status(self, status: str, reason: str | None = None):
         self.status = status
+        self.status_reason = reason
         logger.info("Runtime status changed to: %s", status)
 
     def get_ingestion_worker_metrics(self) -> Dict[str, Any]:
@@ -76,6 +78,7 @@ class RuntimeManager:
     def get_runtime_info(self) -> Dict[str, Any]:
         return {
             "status": self.status,
+            "status_reason": self.status_reason,
             "uptime_seconds": (datetime.now(timezone.utc) - self.start_time).total_seconds(),
             "active_workers_count": len(self.active_workers),
             "active_providers": self.active_providers,

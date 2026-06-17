@@ -73,7 +73,7 @@ export function WorkspaceDecisionsSurface() {
     const requestId = ++requestRef.current;
     setLoading(true);
     try {
-      const incoming = await apiClient.get<WorkspaceDecision[]>(`/workspaces/${activeWorkspaceId}/decisions`);
+      const incoming = await apiClient.getPaginatedItems<WorkspaceDecision>(`/workspaces/${activeWorkspaceId}/decisions`);
       if (requestId !== requestRef.current) return;
       setDecisions(incoming);
       setError(null);

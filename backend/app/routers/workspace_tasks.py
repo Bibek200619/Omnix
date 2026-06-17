@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from ..core.security import get_current_user
 from ..schemas.workspace_tasks import (
@@ -13,6 +13,7 @@ from ..schemas.workspace_tasks import (
     WorkspaceTaskFromAssistanceCreate,
     WorkspaceTaskFromMessageCreate,
     WorkspaceTaskMomentumRead,
+    WorkspaceTaskPageRead,
     WorkspaceTaskRead,
     WorkspaceTaskUpdate,
 )
@@ -43,12 +44,14 @@ def _user_id(current_user: dict[str, Any]) -> str:
     return str(current_user.get("sub") or current_user.get("id"))
 
 
-@router.get("", response_model=list[WorkspaceTaskRead])
+@router.get("", response_model=WorkspaceTaskPageRead)
 async def get_tasks(
     workspace_id: str,
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
     current_user: dict[str, Any] = Depends(get_current_user),
-) -> list[dict[str, Any]]:
-    return await list_tasks(workspace_id=workspace_id, user_id=_user_id(current_user))
+) -> dict[str, Any]:
+    return await list_tasks(workspace_id=workspace_id, user_id=_user_id(current_user), cursor=cursor, limit=limit)
 
 
 @router.post("", response_model=WorkspaceTaskRead, status_code=status.HTTP_201_CREATED)

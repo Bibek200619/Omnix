@@ -5,10 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import vector_store, observability, workers, redis, shutdown, middleware
 from ..runtime.manager import RuntimeManager
 from ..health.router import router as health_router
-from ..routers import conversations, files, cache, messages, upload, workspaces, workspace_conversations, workspace_tasks, workspace_decisions, workspace_search, workspace_mentions, actions, artifacts, insights, automations, google_drive, admin, profile, continuity, connectors
+from ..routers import conversations, files, cache, messages, upload, workspaces, workspace_conversations, workspace_tasks, workspace_decisions, workspace_search, workspace_mentions, analytics, actions, artifacts, insights, automations, google_drive, admin, profile, continuity, connectors
 from ..core.config import get_settings
 from ..core.deployment import cors_allow_credentials, cors_allowed_origins, public_api_docs_enabled
 from ..core.security import auth_context_middleware
+from ..services.workspace_intelligence_service import start_intelligence_cache_invalidation_listener
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(workspace_decisions.router)
     app.include_router(workspace_search.router)
     app.include_router(workspace_mentions.router)
+    app.include_router(analytics.router)
     app.include_router(actions.router)
     app.include_router(artifacts.router)
     app.include_router(insights.router)
@@ -66,6 +68,7 @@ def create_app() -> FastAPI:
         
         try:
             await redis.initialize_redis()
+            await start_intelligence_cache_invalidation_listener()
             await observability.initialize()
             await vector_store.initialize()
             await workers.initialize()

@@ -22,7 +22,7 @@ export function DecisionTaskLinker({ decision, onUpdate }: DecisionTaskLinkerPro
   const loadTasks = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiClient.get<WorkspaceTask[]>(`/workspaces/${decision.workspace_id}/tasks`);
+      const data = await apiClient.getPaginatedItems<WorkspaceTask>(`/workspaces/${decision.workspace_id}/tasks`);
       setTasks(data);
     } catch (err) {
       console.error("Failed to load tasks", err);
@@ -167,4 +167,3 @@ export function DecisionTaskLinker({ decision, onUpdate }: DecisionTaskLinkerPro
     </div>
   );
 }
-

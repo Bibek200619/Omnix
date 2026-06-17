@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from ..core.security import get_current_user
 from ..schemas.workspace_decisions import (
@@ -12,6 +12,7 @@ from ..schemas.workspace_decisions import (
     WorkspaceDecisionFromMessageCreate,
     WorkspaceDecisionLinkInitiative,
     WorkspaceDecisionLinkTask,
+    WorkspaceDecisionPageRead,
     WorkspaceDecisionRead,
     WorkspaceDecisionStatusUpdate,
 )
@@ -38,12 +39,14 @@ def _user_id(current_user: dict[str, Any]) -> str:
     return str(current_user.get("sub") or current_user.get("id"))
 
 
-@router.get("", response_model=list[WorkspaceDecisionRead])
+@router.get("", response_model=WorkspaceDecisionPageRead)
 async def get_workspace_decisions(
     workspace_id: str,
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
     current_user: dict[str, Any] = Depends(get_current_user),
-) -> list[dict[str, Any]]:
-    return await list_decisions(workspace_id=workspace_id, user_id=_user_id(current_user))
+) -> dict[str, Any]:
+    return await list_decisions(workspace_id=workspace_id, user_id=_user_id(current_user), cursor=cursor, limit=limit)
 
 
 @router.post("", response_model=WorkspaceDecisionRead, status_code=status.HTTP_201_CREATED)

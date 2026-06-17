@@ -20,7 +20,7 @@ FILE_COLUMNS = "id,file_name,metadata,workspace_id,user_id"
 
 
 class SemanticSearch:
-    """Provider-independent semantic search over the configured VectorStore."""
+    """Semantic search over the configured vector backend."""
 
     def __init__(self, vector_store: VectorStore) -> None:
         if not isinstance(vector_store, VectorStore):
@@ -56,6 +56,10 @@ class SemanticSearch:
             logger.exception("Semantic query embedding failed.")
             return []
 
+        search_kwargs: dict[str, Any] = {}
+        if getattr(self.vector_store, "supports_distance_threshold", False):
+            search_kwargs["distance_threshold"] = distance_threshold
+
         try:
             raw_matches = await run_in_threadpool(
                 self.vector_store.search,
@@ -63,6 +67,7 @@ class SemanticSearch:
                 user_id,
                 workspace_id,
                 top_k,
+                **search_kwargs,
             )
         except Exception:
             logger.exception("Vector store semantic search failed.")

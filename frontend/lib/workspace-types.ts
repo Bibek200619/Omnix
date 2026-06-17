@@ -8,6 +8,12 @@ export type WorkspaceRole =
   | "team_lead"
   | "sub_member";
 
+export type PaginatedResponse<T> = {
+  items: T[];
+  next_cursor?: string | null;
+  has_more: boolean;
+};
+
 export type WorkspaceMember = {
   workspace_id: string;
   user_id: string;

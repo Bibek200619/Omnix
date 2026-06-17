@@ -80,6 +80,12 @@ class WorkspaceDecisionRead(BaseModel):
     initiative: dict[str, Any] | None = None
 
 
+class WorkspaceDecisionPageRead(BaseModel):
+    items: list[WorkspaceDecisionRead] = Field(default_factory=list)
+    next_cursor: str | None = None
+    has_more: bool
+
+
 class WorkspaceDecisionStatusUpdate(BaseModel):
     status: DecisionStatus
 

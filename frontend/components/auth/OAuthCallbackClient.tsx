@@ -160,7 +160,7 @@ export function OAuthCallbackClient() {
           <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10">
             <OmnixMark size={27} />
           </span>
-          <span className="text-base font-semibold tracking-[-0.045em] text-white">
+          <span className="text-sm font-black uppercase tracking-[0.18em] text-white">
             Omnix
           </span>
         </Link>

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import logging
 import os
+
+import pytest
 
 os.environ.setdefault("SUPABASE_URL", "http://localhost:8001")
 os.environ.setdefault("SUPABASE_ANON_KEY", "anon")
@@ -115,3 +118,31 @@ def test_tavily_parser_sanitizes_and_deduplicates_results(monkeypatch) -> None:
     assert results[0].title == "Result One"
     assert results[0].domain == "example.com"
     assert results[0].snippet == "Fresh snippet"
+
+
+def test_tavily_auto_enables_when_api_key_is_present(monkeypatch) -> None:
+    monkeypatch.delenv("WEB_SEARCH_ENABLED", raising=False)
+    monkeypatch.setenv("TAVILY_API_KEY", "test-key")
+    get_settings.cache_clear()
+    service = TavilySearchService()
+    get_settings.cache_clear()
+
+    assert service.enabled is True
+    assert service.settings.WEB_SEARCH_ENABLED is True
+
+
+@pytest.mark.asyncio
+async def test_tavily_gracefully_disables_without_api_key(monkeypatch, caplog) -> None:
+    monkeypatch.delenv("WEB_SEARCH_ENABLED", raising=False)
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    get_settings.cache_clear()
+    service = TavilySearchService()
+    get_settings.cache_clear()
+
+    caplog.set_level(logging.WARNING)
+    response = await service.search("latest Omnix research")
+
+    assert service.enabled is False
+    assert response.results == []
+    assert response.error == "web_search_disabled_or_unconfigured"
+    assert "Web search skipped" in caplog.text

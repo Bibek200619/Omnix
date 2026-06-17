@@ -2,7 +2,6 @@
 
 import { forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
 import Link from "next/link";
-import { OmnixMark } from "@/components/brand/OmnixMark";
 import { cn } from "@/lib/utils";
 
 export const AUTH_C = {
@@ -60,15 +59,64 @@ export function AuthIcon({
 }
 
 export function AuthOmnixMark({ size = 36 }: { size?: number }) {
-  return <OmnixMark size={size} />;
+  const s = size, cx = s / 2, cy = s / 2;
+  const R = s * 0.42, ri = s * 0.22;
+  const outer: [number, number][] = [
+    [cx, cy - R], [cx + R * 0.71, cy - R * 0.41], [cx + R * 0.87, cy + R * 0.2], [cx + R * 0.5, cy + R * 0.82],
+    [cx - R * 0.05, cy + R * 0.95], [cx - R * 0.62, cy + R * 0.72], [cx - R * 0.9, cy + R * 0.08], [cx - R * 0.58, cy - R * 0.58],
+  ];
+  const inner: [number, number][] = [
+    [cx + ri * 0.1, cy - ri * 1.1], [cx + ri * 1.0, cy - ri * 0.3], [cx + ri * 0.85, cy + ri * 0.7], [cx + ri * 0.1, cy + ri * 1.1],
+    [cx - ri * 0.7, cy + ri * 0.8], [cx - ri * 1.0, cy - ri * 0.1], [cx - ri * 0.5, cy - ri * 0.9],
+  ];
+  const all = [...outer, ...inner];
+  const edges: [number, number][] = [
+    [0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,0],
+    [0,8],[1,9],[2,10],[3,11],[4,12],[5,13],[6,14],
+    [8,9],[9,10],[10,11],[11,12],[12,13],[13,14],[14,8],
+    [0,10],[2,13],[4,8],[6,11],
+  ];
+  const nr = s * 0.028;
+  const uid = `auth-omx-${s}`;
+
+  return (
+    <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} fill="none" aria-hidden="true">
+      <defs>
+        <radialGradient id={`rg-${uid}`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={AUTH_C.cyan} stopOpacity="0.18" />
+          <stop offset="100%" stopColor={AUTH_C.cyan} stopOpacity="0" />
+        </radialGradient>
+        <filter id={`f-${uid}`}><feGaussianBlur stdDeviation="0.7" /></filter>
+      </defs>
+      <circle cx={cx} cy={cy} r={R * 1.1} fill={`url(#rg-${uid})`} />
+      {edges.map(([a, b], i) => {
+        const isIn = a >= 8 && b >= 8;
+        return (
+          <line
+            key={i}
+            x1={all[a][0]}
+            y1={all[a][1]}
+            x2={all[b][0]}
+            y2={all[b][1]}
+            stroke={AUTH_C.cyan}
+            strokeWidth={isIn ? s * 0.012 : s * 0.016}
+            strokeOpacity={isIn ? 0.42 : 0.72}
+          />
+        );
+      })}
+      {all.map(([nx, ny], i) => (
+        <circle key={i} cx={nx} cy={ny} r={i < 8 ? nr * 1.45 : nr} fill={AUTH_C.cyan} opacity={i < 8 ? 0.95 : 0.6} />
+      ))}
+    </svg>
+  );
 }
 
 export function AuthBrand({ compact = false }: { compact?: boolean }) {
   return (
     <Link href="/" className="flex items-center gap-3" aria-label="Omnix home">
       <AuthOmnixMark size={compact ? 32 : 34} />
-      <span className="text-xl font-semibold tracking-[-0.045em]" style={{ color: AUTH_C.white }}>
-        Omnix
+      <span className="font-black tracking-[0.14em] text-xl" style={{ color: AUTH_C.white }}>
+        OMNIX
       </span>
     </Link>
   );

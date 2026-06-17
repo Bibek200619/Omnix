@@ -205,10 +205,11 @@ async def test_list_initiatives_normalizes_legacy_rows_for_response_validation(
 
     result = await initiatives.list_initiatives(workspace_id="workspace-1", user_id="user-1")
 
-    for row in result:
+    items = result["items"]
+    for row in items:
         WorkspaceInitiativeRead.model_validate(row)
-    assert result[0]["title"] == "Legacy rollout"
-    assert result[0]["status"] == "complete"
-    assert result[0]["linked_resources"] == []
-    assert result[0]["activity_metadata"] == {}
-    assert result[1]["status"] == "draft"
+    assert items[0]["title"] == "Legacy rollout"
+    assert items[0]["status"] == "complete"
+    assert items[0]["linked_resources"] == []
+    assert items[0]["activity_metadata"] == {}
+    assert items[1]["status"] == "draft"

@@ -1,4 +1,3 @@
-import { useId } from "react";
 import { cn } from "@/lib/utils";
 
 type OmnixMarkProps = {
@@ -6,64 +5,96 @@ type OmnixMarkProps = {
   className?: string;
 };
 
+const outer = [
+  [18, 3],
+  [31, 8],
+  [34, 18],
+  [27, 30],
+  [17, 34],
+  [7, 28],
+  [2, 17],
+  [8, 6],
+];
+
+const inner = [
+  [20, 9],
+  [27, 14],
+  [25, 24],
+  [18, 28],
+  [10, 23],
+  [9, 13],
+  [14, 8],
+];
+
+const edges = [
+  [0, 1],
+  [1, 2],
+  [2, 3],
+  [3, 4],
+  [4, 5],
+  [5, 6],
+  [6, 7],
+  [7, 0],
+  [0, 8],
+  [1, 9],
+  [2, 10],
+  [3, 11],
+  [4, 12],
+  [5, 13],
+  [6, 14],
+  [8, 9],
+  [9, 10],
+  [10, 11],
+  [11, 12],
+  [12, 13],
+  [13, 14],
+  [14, 8],
+  [0, 10],
+  [2, 13],
+  [4, 8],
+  [6, 11],
+];
+
 export function OmnixMark({ size = 36, className }: OmnixMarkProps) {
-  const prefix = useId().replace(/:/g, "");
-  const baseGradient = `${prefix}-base`;
-  const silverGradient = `${prefix}-silver`;
-  const blueGradient = `${prefix}-blue`;
-  const highlightGradient = `${prefix}-highlight`;
+  const points = [...outer, ...inner];
 
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 64 64"
+      viewBox="0 0 36 36"
       fill="none"
-      className={cn("drop-shadow-[0_0_14px_rgba(44,132,255,0.28)]", className)}
+      className={cn("text-cyan-300 drop-shadow-[0_0_14px_rgba(34,211,238,0.45)]", className)}
       aria-hidden="true"
     >
-      <defs>
-        <linearGradient id={baseGradient} x1="13" y1="8" x2="52" y2="57" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#F9FCFF" />
-          <stop offset="0.38" stopColor="#ADC5EA" />
-          <stop offset="0.63" stopColor="#3068D2" />
-          <stop offset="1" stopColor="#29C7FF" />
-        </linearGradient>
-        <linearGradient id={silverGradient} x1="13" y1="8" x2="45" y2="37" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#FBFDFF" />
-          <stop offset="0.42" stopColor="#E4EEF9" />
-          <stop offset="0.75" stopColor="#A9C3E8" />
-          <stop offset="1" stopColor="#547DC8" />
-        </linearGradient>
-        <linearGradient id={blueGradient} x1="13" y1="46" x2="53" y2="29" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#33CCFF" />
-          <stop offset="0.43" stopColor="#197EF0" />
-          <stop offset="1" stopColor="#214DB9" />
-        </linearGradient>
-        <linearGradient id={highlightGradient} x1="17" y1="14" x2="32" y2="31" gradientUnits="userSpaceOnUse">
-          <stop stopColor="white" stopOpacity="0.72" />
-          <stop offset="1" stopColor="white" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-
-      <path
-        fill={`url(#${baseGradient})`}
-        fillRule="evenodd"
-        d="M32 4C16.536 4 4 16.536 4 32s12.536 28 28 28 28-12.536 28-28S47.464 4 32 4Zm0 14.25c7.594 0 13.75 6.156 13.75 13.75S39.594 45.75 32 45.75 18.25 39.594 18.25 32 24.406 18.25 32 18.25Z"
-        clipRule="evenodd"
-      />
-      <path
-        d="M8.89 39.77C3.94 27.02 8.5 13.63 20.2 7.16 30.08 1.7 42.45 4.02 50.12 12.6c-7.23-3.44-16.03-2.75-22.63 2.46-7.72 6.08-9.52 16.3-4.34 24.52-5.7 3.17-10.28 3.25-14.26.19Z"
-        fill={`url(#${silverGradient})`}
-      />
-      <path
-        d="M55.11 24.23c4.95 12.75.39 26.14-11.31 32.61-9.88 5.46-22.25 3.14-29.92-5.44 7.23 3.44 16.03 2.75 22.63-2.46 7.72-6.08 9.52-16.3 4.34-24.52 5.7-3.17 10.28-3.25 14.26-.19Z"
-        fill={`url(#${blueGradient})`}
-      />
-      <path
-        d="M14.16 29.82c.64-8.58 7.45-16.33 16.33-17.6 4.63-.67 9.19.31 13.05 2.56-4.81-1.02-9.98-.01-14.02 3.17-5.04 3.97-7.47 10.09-6.75 16.01-3.45-.48-6.21-1.86-8.61-4.14Z"
-        fill={`url(#${highlightGradient})`}
-      />
+      <circle cx="18" cy="18" r="16" fill="currentColor" opacity="0.06" />
+      {edges.map(([from, to], index) => {
+        const [x1, y1] = points[from];
+        const [x2, y2] = points[to];
+        return (
+          <line
+            key={`${from}-${to}-${index}`}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke="currentColor"
+            strokeWidth={from >= 8 && to >= 8 ? 0.7 : 0.9}
+            strokeOpacity={from >= 8 && to >= 8 ? 0.42 : 0.8}
+            strokeLinecap="round"
+          />
+        );
+      })}
+      {points.map(([cx, cy], index) => (
+        <circle
+          key={`${cx}-${cy}-${index}`}
+          cx={cx}
+          cy={cy}
+          r={index < 8 ? 1.35 : 0.95}
+          fill="currentColor"
+          opacity={index < 8 ? 0.95 : 0.68}
+        />
+      ))}
     </svg>
   );
 }

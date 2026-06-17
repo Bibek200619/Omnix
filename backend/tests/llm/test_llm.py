@@ -1,5 +1,8 @@
+import json
 import os
+import time
 
+import httpx
 import pytest
 
 os.environ["SUPABASE_URL"] = "http://localhost:8001"
@@ -12,7 +15,7 @@ os.environ["AI_MAX_OUTPUT_TOKENS"] = "384"
 os.environ["AI_MAX_CONTEXT_MESSAGES"] = "4"
 
 from app.services import chat_service
-from app.services.chat_service import AIMessage, AIGeneration, OllamaChatService
+from app.services.chat_service import AIMessage, AIGeneration, ModelServiceError, OllamaChatService
 from app.services.llm.config import LLMSettings
 
 
@@ -100,3 +103,103 @@ async def test_call_llm_uses_service_abstraction(monkeypatch):
     )
 
     assert result.content == "Done"
+
+
+class MemoryRedis:
+    def __init__(self) -> None:
+        self.store: dict[str, str] = {}
+
+    async def get(self, key: str):
+        return self.store.get(key)
+
+    async def setex(self, key: str, _ttl: int, value: str):
+        self.store[key] = value
+
+    async def delete(self, key: str):
+        self.store.pop(key, None)
+
+
+class FailingClient:
+    calls = 0
+
+    def __init__(self, **kwargs) -> None:
+        return None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return None
+
+    async def post(self, url: str, json=None):
+        FailingClient.calls += 1
+        raise httpx.ConnectError("ollama down", request=httpx.Request("POST", url))
+
+
+class SuccessfulResponse:
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self):
+        return {"model": "phi3:mini", "message": {"content": "recovered"}, "done": True}
+
+
+class SuccessfulClient:
+    calls = 0
+
+    def __init__(self, **kwargs) -> None:
+        return None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return None
+
+    async def post(self, url: str, json=None):
+        SuccessfulClient.calls += 1
+        return SuccessfulResponse()
+
+
+@pytest.mark.asyncio
+async def test_ollama_circuit_opens_after_three_failures(monkeypatch):
+    redis = MemoryRedis()
+    FailingClient.calls = 0
+    monkeypatch.setattr(chat_service, "get_redis", lambda: redis, raising=False)
+    monkeypatch.setattr(chat_service.httpx, "AsyncClient", FailingClient)
+    service = OllamaChatService()
+    service.max_retries = 0
+
+    for _ in range(3):
+        with pytest.raises(ModelServiceError):
+            await service.generate("Hello")
+
+    state = json.loads(redis.store["omnix:circuit:ollama"])
+    assert state["state"] == "open"
+    assert FailingClient.calls == 3
+
+    with pytest.raises(ModelServiceError) as exc_info:
+        await service.generate("Hello")
+
+    assert exc_info.value.status_code == 503
+    assert "retry in" in str(exc_info.value)
+    assert FailingClient.calls == 3
+
+
+@pytest.mark.asyncio
+async def test_ollama_circuit_closes_after_successful_half_open_probe(monkeypatch):
+    redis = MemoryRedis()
+    SuccessfulClient.calls = 0
+    redis.store["omnix:circuit:ollama"] = json.dumps(
+        {"state": "open", "failures": 3, "opened_at": time.time() - 31}
+    )
+    monkeypatch.setattr(chat_service, "get_redis", lambda: redis, raising=False)
+    monkeypatch.setattr(chat_service.httpx, "AsyncClient", SuccessfulClient)
+    service = OllamaChatService()
+    service.max_retries = 0
+
+    result = await service.generate("Hello")
+
+    assert result.content == "recovered"
+    assert SuccessfulClient.calls == 1
+    assert "omnix:circuit:ollama" not in redis.store
