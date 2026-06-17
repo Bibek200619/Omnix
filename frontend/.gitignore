@@ -17,6 +17,8 @@ playwright-report
 test-results
 storybook-static
 *.tsbuildinfo
+omnix_frontend_audit_2026.md
+OMNIX_REMEDIATION_AGENT_PROMPT.md
 
 npm-debug.log*
 yarn-debug.log*
