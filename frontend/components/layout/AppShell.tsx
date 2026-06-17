@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { MobileDock } from "@/components/layout/MobileDock";
@@ -11,8 +12,12 @@ import { WorkspaceProvider } from "@/lib/workspace-context";
 import { WorkspaceCollaborationProvider } from "@/lib/workspace-collaboration-context";
 import { WorkspaceContinuityProvider } from "@/lib/workspace-continuity-context";
 import { WorkspaceNotificationsProvider } from "@/lib/workspace-notifications-context";
-import { WorkspaceOnboardingGate } from "@/components/workspace/WorkspaceOnboardingGate";
 import { cn } from "@/lib/utils";
+
+const WorkspaceOnboardingGate = dynamic(
+  () => import("@/components/workspace/WorkspaceOnboardingGate").then((mod) => ({ default: mod.WorkspaceOnboardingGate })),
+  { ssr: false, loading: () => null },
+);
 
 type AppShellProps = {
   children: React.ReactNode;

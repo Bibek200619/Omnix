@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import {
   AlertCircle,
   ChevronRight,
@@ -17,7 +18,11 @@ import { cn } from "@/lib/utils";
 import { InviteNotificationBar, InviteNotificationBell } from "@/components/workspace/InviteNotifications";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ProfileMenu } from "@/components/layout/ProfileMenu";
-import { CommandPalette } from "@/components/layout/CommandPalette";
+
+const CommandPalette = dynamic(
+  () => import("@/components/layout/CommandPalette").then((mod) => ({ default: mod.CommandPalette })),
+  { ssr: false, loading: () => null },
+);
 
 const routeTitles = [
   { match: "/dashboard", title: "Dashboard", subtitle: "Welcome back" },

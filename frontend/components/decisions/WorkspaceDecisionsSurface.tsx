@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { BadgeCheck, Loader2, Plus, RefreshCw, Target, ListTodo } from "lucide-react";
 import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
@@ -12,7 +13,11 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { WorkspaceDecision, WorkspaceDecisionStatus } from "@/lib/workspace-types";
 import { DecisionContextPanel } from "./DecisionContextPanel";
-import { CreateDecisionModal } from "./CreateDecisionModal";
+
+const CreateDecisionModal = dynamic(
+  () => import("./CreateDecisionModal").then((mod) => ({ default: mod.CreateDecisionModal })),
+  { ssr: false, loading: () => null },
+);
 
 const statusLabels: Record<WorkspaceDecisionStatus, string> = {
   proposed: "Proposed",
