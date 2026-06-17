@@ -186,6 +186,116 @@ textarea {
   isolation: isolate;
 }
 
+/* ── Auth component tokens ── */
+
+.auth-page-shell {
+  background: #061020;
+  font-family: "Inter", "DM Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.auth-left-panel {
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(145deg, rgba(0, 255, 255, 0.04) 0%, rgba(0, 51, 255, 0.05) 100%);
+}
+
+.auth-divider-line {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.auth-divider-label {
+  background: #061020;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.auth-text-cyan {
+  color: #00ffff;
+}
+
+.auth-text-white {
+  color: #fff;
+}
+
+.auth-text-muted {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.auth-text-faint {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.auth-text-quote {
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.auth-step-dot {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.auth-step-dot-active {
+  border-color: rgba(0, 255, 255, 0.35);
+  background: rgba(0, 255, 255, 0.1);
+  box-shadow: 0 0 18px rgba(0, 255, 255, 0.25);
+}
+
+.auth-step-dot-done {
+  border-color: #00ffff;
+  background: rgba(0, 255, 255, 0.2);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.15);
+}
+
+.auth-step-progress {
+  background: linear-gradient(90deg, #00ffff, transparent);
+  transform-origin: left;
+}
+
+.auth-benefit-icon {
+  border: 1px solid rgba(0, 255, 255, 0.22);
+  background: rgba(0, 255, 255, 0.1);
+}
+
+.auth-proof-card {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.auth-avatar-cyan {
+  background: rgba(0, 255, 255, 0.14);
+  color: #00ffff;
+}
+
+.auth-info-note {
+  border: 1px solid rgba(0, 255, 255, 0.12);
+  background: rgba(0, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.auth-info-note-strong {
+  border-color: rgba(0, 255, 255, 0.14);
+}
+
+.auth-mobile-icon-tile {
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  background: rgba(0, 255, 255, 0.08);
+}
+
+.auth-hero-mark {
+  border: 1px solid rgba(0, 255, 255, 0.24);
+  background: rgba(0, 255, 255, 0.1);
+  box-shadow: 0 0 28px rgba(0, 255, 255, 0.16);
+}
+
+.auth-eyebrow {
+  border: 1px solid rgba(0, 255, 255, 0.22);
+  background: rgba(0, 255, 255, 0.07);
+  color: #00ffff;
+}
+
+.auth-eyebrow-dot {
+  background: #00ffff;
+}
+
 .omnix-auth-shell::before {
   position: fixed;
   inset: var(--omnix-header-h) 0 0 var(--omnix-sidebar-w);

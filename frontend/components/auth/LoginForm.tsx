@@ -7,7 +7,6 @@ import { LoadingButton } from "@/components/ui/LoadingButton";
 import { Alert } from "@/components/ui/Alert";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import {
-  AUTH_C,
   AUTH_ICONS,
   AuthIcon,
   AuthInput,
@@ -100,10 +99,10 @@ export function LoginForm() {
       <OAuthButtons disabled={loading || !isConfigured} mode="login" onError={setError} />
       <div className="relative">
         <div className="absolute inset-0 flex items-center" aria-hidden="true">
-          <div className="h-px w-full" style={{ background: AUTH_C.border }} />
+          <div className="auth-divider-line h-px w-full" />
         </div>
         <div className="relative flex justify-center">
-          <span className="bg-[#061020] px-3 text-xs" style={{ color: AUTH_C.faint }}>
+          <span className="auth-divider-label px-3 text-xs">
             or continue with email
           </span>
         </div>
@@ -140,26 +139,24 @@ export function LoginForm() {
         isLoading={loading}
         loadingText="Signing in"
         disabled={!isConfigured}
-        rightIcon={<AuthIcon d={AUTH_ICONS.arrow} size={16} stroke={AUTH_C.navyDark} sw={2.5} />}
+        rightIcon={<AuthIcon d={AUTH_ICONS.arrow} size={16} stroke="#061020" sw={2.5} />}
       >
         Sign in to workspace
       </LoadingButton>
       <div
-        className="flex items-start gap-3 rounded-2xl p-3 text-xs leading-5"
-        style={{ background: "rgba(0,255,255,0.04)", border: "1px solid rgba(0,255,255,0.12)", color: AUTH_C.faint }}
+        className="auth-info-note flex items-start gap-3 rounded-2xl p-3 text-xs leading-5"
       >
-        <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full" style={{ color: AUTH_C.cyan }}>
+        <span className="auth-text-cyan mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full">
           <AuthIcon d={AUTH_ICONS.check} size={10} stroke="currentColor" sw={2.5} />
         </span>
         Your session keeps workspace research, files, and team history tied to
         your account.
       </div>
-      <p className="text-center text-xs" style={{ color: AUTH_C.faint }}>
+      <p className="auth-text-faint text-center text-xs">
         New to Omnix?{" "}
         <Link
           href={authLink("/register")}
-          className="font-semibold transition hover:opacity-80"
-          style={{ color: AUTH_C.cyan }}
+          className="auth-text-cyan font-semibold transition hover:opacity-80"
         >
           Create an account
         </Link>

@@ -7,7 +7,6 @@ import { Alert } from "@/components/ui/Alert";
 import { LoadingButton } from "@/components/ui/LoadingButton";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import {
-  AUTH_C,
   AUTH_ICONS,
   AuthIcon,
   AuthInput,
@@ -120,10 +119,10 @@ export function RegisterForm() {
       <OAuthButtons disabled={loading || !isConfigured} mode="register" onError={setError} />
       <div className="relative">
         <div className="absolute inset-0 flex items-center" aria-hidden="true">
-          <div className="h-px w-full" style={{ background: AUTH_C.border }} />
+          <div className="auth-divider-line h-px w-full" />
         </div>
         <div className="relative flex justify-center">
-          <span className="bg-[#061020] px-3 text-xs" style={{ color: AUTH_C.faint }}>
+          <span className="auth-divider-label px-3 text-xs">
             or create with email
           </span>
         </div>
@@ -180,8 +179,7 @@ export function RegisterForm() {
         error={fieldErrors.password}
       />
       <div
-        className="rounded-2xl p-3 text-xs leading-5"
-        style={{ background: "rgba(0,255,255,0.04)", border: "1px solid rgba(0,255,255,0.14)", color: AUTH_C.faint }}
+        className="auth-info-note auth-info-note-strong rounded-2xl p-3 text-xs leading-5"
       >
         Your Omnix handle is the identity teammates use for workspace invites
         and shared research.
@@ -193,17 +191,16 @@ export function RegisterForm() {
         isLoading={loading}
         loadingText="Creating account"
         disabled={!isConfigured}
-        leftIcon={<AuthIcon d={AUTH_ICONS.user} size={16} stroke={AUTH_C.navyDark} sw={2.1} />}
-        rightIcon={<AuthIcon d={AUTH_ICONS.arrow} size={16} stroke={AUTH_C.navyDark} sw={2.5} />}
+        leftIcon={<AuthIcon d={AUTH_ICONS.user} size={16} stroke="#061020" sw={2.1} />}
+        rightIcon={<AuthIcon d={AUTH_ICONS.arrow} size={16} stroke="#061020" sw={2.5} />}
       >
         Create account
       </LoadingButton>
-      <p className="text-center text-xs" style={{ color: AUTH_C.faint }}>
+      <p className="auth-text-faint text-center text-xs">
         Already have an account?{" "}
         <Link
           href={authLink("/login")}
-          className="font-semibold transition hover:opacity-80"
-          style={{ color: AUTH_C.cyan }}
+          className="auth-text-cyan font-semibold transition hover:opacity-80"
         >
           Sign in
         </Link>
