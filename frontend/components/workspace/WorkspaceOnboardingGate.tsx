@@ -20,6 +20,7 @@ import {
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
+import { markOnboardingCompleted, readOnboardingCompleted } from "@/lib/onboarding";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { useWorkspace } from "@/lib/workspace-context";
 import type { Workspace, WorkspaceFocus, WorkspaceInvite } from "@/lib/workspace-types";
@@ -98,8 +99,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
   } = useWorkspace();
   const { user, signOut } = useAuth();
 
-  const [onboardingStarted, setOnboardingStarted] = useState(false);
-  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState(readOnboardingCompleted);
   const [step, setStep] = useState<StepId>("account");
   const [onboardingWorkspaceId, setOnboardingWorkspaceId] = useState<string | null>(null);
 
@@ -132,16 +132,23 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
   const hasWorkspaceForFlow = Boolean(onboardingWorkspace);
 
   useEffect(() => {
+    if (loading) {
+      return;
+    }
     if (!loading && !hasWorkspaces && !error) {
-      setOnboardingStarted(true);
+      setStep("account");
     }
     if (workspaceLoadFailed) {
-      setOnboardingStarted(true);
       setStep("workspace");
+      return;
     }
-  }, [error, hasWorkspaces, loading, workspaceLoadFailed]);
+    if (hasWorkspaces && !onboardingComplete) {
+      setOnboardingWorkspaceId((current) => current ?? activeWorkspace?.id ?? activeWorkspaceId ?? workspaces[0]?.id ?? null);
+      setStep((current) => (current === "account" || current === "workspace" ? "team" : current));
+    }
+  }, [activeWorkspace?.id, activeWorkspaceId, error, hasWorkspaces, loading, onboardingComplete, workspaceLoadFailed, workspaces]);
 
-  const isBlocked = !loading && (workspaceLoadFailed || !hasWorkspaces || (onboardingStarted && !onboardingComplete));
+  const isBlocked = !loading && (workspaceLoadFailed || !hasWorkspaces || !onboardingComplete);
   const onboardingTrapRef = useFocusTrap<HTMLElement>(isBlocked);
 
   if (!isBlocked) {
@@ -257,6 +264,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       return;
     }
     setActiveWorkspace(onboardingWorkspace.id);
+    markOnboardingCompleted();
     setOnboardingComplete(true);
   }
 
