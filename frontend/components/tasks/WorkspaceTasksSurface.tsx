@@ -399,7 +399,7 @@ function WorkspaceTasksSurfaceContent() {
   }
 
   return (
-    <section className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
+    <section className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
       <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
@@ -578,7 +578,7 @@ function WorkspaceTasksSurfaceContent() {
                               <p className="truncate text-sm font-medium text-white">{task.title}</p>
                             </div>
                             {task.description ? (
-                              <p className="mt-1 line-clamp-1 text-xs text-[var(--omnix-text-2)] transition-all group-hover:line-clamp-none">
+                              <p className="mt-1 line-clamp-1 break-words text-xs text-[var(--omnix-text-2)] transition-all group-hover:line-clamp-none">
                                 <MentionText content={task.description} mentions={task.mentions} />
                               </p>
                             ) : null}
@@ -653,9 +653,10 @@ function WorkspaceTasksSurfaceContent() {
                                 type="button"
                                 key={blocker}
                                 onClick={() => void patchTask(task, { blockers: task.blockers.filter((entry) => entry !== blocker) })}
-                                className="inline-flex items-center gap-1 rounded-md border border-amber-300/20 bg-amber-300/[0.08] px-2 py-1 text-[10px] font-medium text-amber-100"
+                                className="inline-flex max-w-full items-center gap-1 rounded-md border border-amber-300/20 bg-amber-300/[0.08] px-2 py-1 text-left text-[10px] font-medium text-amber-100"
                               >
-                                {blocker} <X className="h-2.5 w-2.5 opacity-60" />
+                                <span className="min-w-0 break-words">{blocker}</span>
+                                <X className="h-2.5 w-2.5 shrink-0 opacity-60" />
                               </button>
                             ))}
                           </div>
@@ -737,7 +738,7 @@ function WorkspaceTasksSurfaceContent() {
             </div>
             {assistance ? (
               <div className="mt-3 rounded-lg border border-purple-300/15 bg-purple-300/[0.045] p-3">
-                <p className="whitespace-pre-wrap text-xs leading-5 text-[var(--omnix-text)]">{assistance.content}</p>
+                <p className="whitespace-pre-wrap break-words text-xs leading-5 text-[var(--omnix-text)]">{assistance.content}</p>
                 <p className="mt-2 text-[10px] text-[var(--omnix-text-3)]">Advisory only. Read from {assistance.source_task_count} task records.</p>
               </div>
             ) : null}

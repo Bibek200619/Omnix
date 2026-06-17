@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { ChannelList } from "@/components/conversations/ChannelList";
 import { ConversationAIPanel } from "@/components/conversations/ConversationAIPanel";
@@ -9,6 +10,7 @@ import { MessageThread } from "@/components/conversations/MessageThread";
 import { TaskFromMessageModal } from "@/components/conversations/TaskFromMessageModal";
 import { ThreadPanel } from "@/components/conversations/ThreadPanel";
 import { WorkspaceConversationChrome } from "@/components/conversations/WorkspaceConversationChrome";
+import { Button } from "@/components/ui/Button";
 import {
   type DecisionSource,
   type DisplayMessage,
@@ -60,6 +62,7 @@ function WorkspaceConversationSurfaceContent() {
   const [taskConfirmation, setTaskConfirmation] = useState<string | null>(null);
   const [decisionSource, setDecisionSource] = useState<DecisionSource | null>(null);
   const [decisionConfirmation, setDecisionConfirmation] = useState<string | null>(null);
+  const [mobileConversationView, setMobileConversationView] = useState<"channels" | "messages">("channels");
   const workspaceRef = useRef(activeWorkspaceId);
   const selectedChannelRef = useRef(selectedChannelId);
   const channelRequestRef = useRef(0);
@@ -94,6 +97,9 @@ function WorkspaceConversationSurfaceContent() {
         if (routeChannelId && incoming.some((channel) => channel.id === routeChannelId)) return routeChannelId;
         return incoming.some((channel) => channel.id === existing) ? existing : incoming[0]?.id ?? null;
       });
+      if (routeChannelId && incoming.some((channel) => channel.id === routeChannelId)) {
+        setMobileConversationView("messages");
+      }
       setError(null);
     } catch (err) {
       if (requestId === channelRequestRef.current) {
@@ -180,6 +186,7 @@ function WorkspaceConversationSurfaceContent() {
     setTaskConfirmation(null);
     setDecisionSource(null);
     setDecisionConfirmation(null);
+    setMobileConversationView("channels");
     void loadChannels();
   }, [activeWorkspaceId, loadChannels]);
 
@@ -253,6 +260,7 @@ function WorkspaceConversationSurfaceContent() {
       });
       setChannels((current) => [...current.filter((channel) => channel.id !== created.id), created]);
       setSelectedChannelId(created.id);
+      setMobileConversationView("messages");
       setChannelName("");
       setChannelPurpose("");
       setCreateOpen(false);
@@ -264,9 +272,21 @@ function WorkspaceConversationSurfaceContent() {
     }
   }
 
+  function handleSelectChannel(channelId: string) {
+    setSelectedChannelId(channelId);
+    setMobileConversationView("messages");
+  }
+
+  function handleBackToChannels() {
+    setThreadRoot(null);
+    setThreadMessages([]);
+    setMobileConversationView("channels");
+  }
+
   function openThread(message: WorkspaceChannelMessage) {
     if (!selectedChannelId) return;
     setThreadRoot(message);
+    setMobileConversationView("messages");
     sender.setThreadDraft("");
     sender.setThreadDraftMentions([]);
     void loadThread(selectedChannelId, message);
@@ -281,13 +301,24 @@ function WorkspaceConversationSurfaceContent() {
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
+    <section className="flex min-h-0 flex-1 flex-col overflow-x-hidden px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
       <WorkspaceConversationChrome activeCount={presence?.active_count ?? 0} channelsLoading={channelsLoading} decisionConfirmation={decisionConfirmation} error={error} onDismissDecision={() => setDecisionConfirmation(null)} onDismissError={() => setError(null)} onDismissTask={() => setTaskConfirmation(null)} onRetryConversations={() => void loadChannels()} realtimeStatus={realtimeStatus} taskConfirmation={taskConfirmation} workspaceName={activeWorkspace?.name} />
 
-      <div className={cn("grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3 lg:grid-rows-1", threadRoot ? "lg:grid-cols-[15.5rem_minmax(0,1fr)_22rem]" : "lg:grid-cols-[15.5rem_minmax(0,1fr)]")}>
-        <ChannelList channelName={channelName} channelPurpose={channelPurpose} channels={channels} channelsLoading={channelsLoading} createOpen={createOpen} creatingChannel={creatingChannel} mayCreateChannel={mayCreateChannel} onCreateChannel={handleCreateChannel} onSelectChannel={setSelectedChannelId} selectedChannelId={selectedChannelId} setChannelName={setChannelName} setChannelPurpose={setChannelPurpose} setCreateOpen={setCreateOpen} />
-        <MessageThread activeMembers={activeMembers} aiPanel={<ConversationAIPanel activeWorkspaceId={activeWorkspaceId} messagesCount={messages.length} onError={setError} onOpenDecision={setDecisionSource} onOpenTask={setTaskSource} selectedChannelId={selectedChannelId} threadRoot={threadRoot} />} channelTyping={channelTyping} draft={sender.draft} draftMentions={sender.draftMentions} mayPost={mayPost} messages={messages} messagesLoading={messagesLoading} onDraftChange={sender.setDraft} onDraftMentionsChange={sender.setDraftMentions} onOpenDecision={(message) => setDecisionSource({ kind: "message", message })} onOpenTask={(message) => setTaskSource({ kind: "message", message })} onOpenThread={openThread} onSend={(content, parent, mentions) => void sender.sendMessage(content, parent, mentions)} onTypingChange={(isTyping) => void sendTypingSignal(selectedChannelId, isTyping)} selectedChannel={selectedChannel} sending={sender.sending} threadOpen={Boolean(threadRoot)} />
-        <ThreadPanel activeMembers={activeMembers} mayPost={mayPost} onClose={() => setThreadRoot(null)} onOpenDecision={(message) => setDecisionSource({ kind: "message", message })} onOpenTask={(message) => setTaskSource({ kind: "message", message })} onSend={(content, parent, mentions) => void sender.sendMessage(content, parent, mentions)} onThreadDraftChange={sender.setThreadDraft} onThreadDraftMentionsChange={sender.setThreadDraftMentions} onTypingChange={(isTyping) => void sendTypingSignal(selectedChannelId, isTyping)} threadDraft={sender.threadDraft} threadDraftMentions={sender.threadDraftMentions} threadLoading={threadLoading} threadMessages={threadMessages} threadRoot={threadRoot} threadSending={sender.threadSending} />
+      <div className={cn("grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] gap-3 overflow-x-hidden md:grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-1", threadRoot ? "lg:grid-cols-[15.5rem_minmax(0,1fr)_22rem]" : "lg:grid-cols-[15.5rem_minmax(0,1fr)]")}>
+        <div className={cn("min-h-0 md:contents", mobileConversationView !== "channels" && "hidden md:contents")}>
+          <ChannelList channelName={channelName} channelPurpose={channelPurpose} channels={channels} channelsLoading={channelsLoading} createOpen={createOpen} creatingChannel={creatingChannel} mayCreateChannel={mayCreateChannel} onCreateChannel={handleCreateChannel} onSelectChannel={handleSelectChannel} selectedChannelId={selectedChannelId} setChannelName={setChannelName} setChannelPurpose={setChannelPurpose} setCreateOpen={setCreateOpen} />
+        </div>
+        <div className={cn("min-h-0 min-w-0 flex-col gap-3 md:contents", mobileConversationView !== "messages" ? "hidden md:contents" : "flex md:contents")}>
+          <div className="md:hidden">
+            <Button type="button" variant="ghost" size="sm" className="h-9 border-white/10 text-xs text-[var(--omnix-text-2)]" leftIcon={<ArrowLeft className="h-3.5 w-3.5" />} onClick={handleBackToChannels}>
+              Channels
+            </Button>
+          </div>
+          <MessageThread activeMembers={activeMembers} aiPanel={<ConversationAIPanel activeWorkspaceId={activeWorkspaceId} messagesCount={messages.length} onError={setError} onOpenDecision={setDecisionSource} onOpenTask={setTaskSource} selectedChannelId={selectedChannelId} threadRoot={threadRoot} />} channelTyping={channelTyping} draft={sender.draft} draftMentions={sender.draftMentions} mayPost={mayPost} messages={messages} messagesLoading={messagesLoading} onDraftChange={sender.setDraft} onDraftMentionsChange={sender.setDraftMentions} onOpenDecision={(message) => setDecisionSource({ kind: "message", message })} onOpenTask={(message) => setTaskSource({ kind: "message", message })} onOpenThread={openThread} onSend={(content, parent, mentions) => void sender.sendMessage(content, parent, mentions)} onTypingChange={(isTyping) => void sendTypingSignal(selectedChannelId, isTyping)} selectedChannel={selectedChannel} sending={sender.sending} threadOpen={Boolean(threadRoot)} />
+        </div>
+        <div className="hidden min-h-0 min-w-0 md:contents">
+          <ThreadPanel activeMembers={activeMembers} mayPost={mayPost} onClose={() => setThreadRoot(null)} onOpenDecision={(message) => setDecisionSource({ kind: "message", message })} onOpenTask={(message) => setTaskSource({ kind: "message", message })} onSend={(content, parent, mentions) => void sender.sendMessage(content, parent, mentions)} onThreadDraftChange={sender.setThreadDraft} onThreadDraftMentionsChange={sender.setThreadDraftMentions} onTypingChange={(isTyping) => void sendTypingSignal(selectedChannelId, isTyping)} threadDraft={sender.threadDraft} threadDraftMentions={sender.threadDraftMentions} threadLoading={threadLoading} threadMessages={threadMessages} threadRoot={threadRoot} threadSending={sender.threadSending} />
+        </div>
       </div>
       <TaskFromMessageModal activeMembers={activeMembers} activeWorkspaceId={activeWorkspaceId} onClose={() => setTaskSource(null)} onCreated={setTaskConfirmation} onError={setError} selectedChannelId={selectedChannelId} source={taskSource} threadRoot={threadRoot} />
       <DecisionFromMessageModal activeMembers={activeMembers} activeWorkspaceId={activeWorkspaceId} onClose={() => setDecisionSource(null)} onCreated={setDecisionConfirmation} onError={setError} selectedChannelId={selectedChannelId} source={decisionSource} />

@@ -450,7 +450,7 @@ function WorkspaceInitiativesSurfaceContent() {
   }
 
   return (
-    <section className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
+    <section className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
       <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
@@ -577,8 +577,8 @@ function WorkspaceInitiativesSurfaceContent() {
               )}>
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-300/60">Mission</p>
-                  <h2 className="omnix-display mt-2 text-2xl font-bold text-white">{selected.title}</h2>
-                  {selected.description ? <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--omnix-text-2)]">{selected.description}</p> : null}
+                  <h2 className="omnix-display mt-2 break-words text-2xl font-bold text-white">{selected.title}</h2>
+                  {selected.description ? <p className="mt-3 max-w-2xl break-words text-base leading-7 text-[var(--omnix-text-2)]">{selected.description}</p> : null}
                 </div>
                 <div className="flex flex-col items-end gap-3">
                   <select value={selected.status} disabled={updating} onChange={(event) => void patchInitiative({ status: event.target.value as WorkspaceInitiativeStatus })} className={cn(
@@ -640,7 +640,7 @@ function WorkspaceInitiativesSurfaceContent() {
                   mobileTab !== "brief" && "hidden lg:block"
                 )}>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-300/50">Mission Context</p>
-                  <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--omnix-text)]">{selected.initiative_context}</p>
+                  <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-[var(--omnix-text)]">{selected.initiative_context}</p>
                 </div>
               ) : null}
 
@@ -749,10 +749,10 @@ function WorkspaceInitiativesSurfaceContent() {
                     </form>
                     <div className="flex flex-wrap gap-2">
                       {selected.linked_resources.map((resource) => (
-                        <button key={`${resource.resource_type}-${resource.resource_id}`} type="button" onClick={() => void patchInitiative({ linked_resources: selected.linked_resources.filter((item) => item !== resource) })} className="inline-flex items-center gap-2 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.06] px-3 py-1.5 text-xs text-cyan-100/90 hover:bg-cyan-300/10 transition-colors" title="Remove link">
-                          <span className="text-[10px] font-bold uppercase text-cyan-400/60">{resource.resource_type}</span>
-                          {resource.label || resource.resource_id} 
-                          <X className="h-3 w-3 opacity-60" />
+                        <button key={`${resource.resource_type}-${resource.resource_id}`} type="button" onClick={() => void patchInitiative({ linked_resources: selected.linked_resources.filter((item) => item !== resource) })} className="inline-flex max-w-full items-center gap-2 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.06] px-3 py-1.5 text-left text-xs text-cyan-100/90 transition-colors hover:bg-cyan-300/10" title="Remove link">
+                          <span className="shrink-0 text-[10px] font-bold uppercase text-cyan-400/60">{resource.resource_type}</span>
+                          <span className="min-w-0 break-words">{resource.label || resource.resource_id}</span>
+                          <X className="h-3 w-3 shrink-0 opacity-60" />
                         </button>
                       ))}
                       {!selected.linked_resources.length ? <p className="text-xs text-[var(--omnix-text-3)]">No resources linked.</p> : null}
@@ -775,7 +775,7 @@ function WorkspaceInitiativesSurfaceContent() {
                   </div>
                   {assistance ? (
                     <div className="mt-4 rounded-xl border border-purple-300/20 bg-purple-300/[0.04] p-4">
-                      <p className="whitespace-pre-wrap text-xs leading-6 text-[var(--omnix-text)]">{assistance.content}</p>
+                      <p className="whitespace-pre-wrap break-words text-xs leading-6 text-[var(--omnix-text)]">{assistance.content}</p>
                       <p className="mt-3 text-[10px] font-medium leading-relaxed text-[var(--omnix-text-3)]">Read from {assistance.source_task_count} tasks and {assistance.source_message_count} messages.</p>
                     </div>
                   ) : null}
@@ -791,7 +791,7 @@ function WorkspaceInitiativesSurfaceContent() {
         )}>
           <section className="omnix-panel rounded-xl p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Movement</p>
-            <p className="mt-3 text-sm leading-6 text-white font-medium">{selected?.momentum.summary || "Select an initiative to see recorded movement."}</p>
+            <p className="mt-3 break-words text-sm font-medium leading-6 text-white">{selected?.momentum.summary || "Select an initiative to see recorded movement."}</p>
             {selected ? (
               <div className="mt-5 grid grid-cols-2 gap-2 text-center">
                 {[
@@ -821,7 +821,7 @@ function WorkspaceInitiativesSurfaceContent() {
             </div>
             {assistance ? (
               <div className="mt-4 rounded-xl border border-purple-300/20 bg-purple-300/[0.04] p-4">
-                <p className="whitespace-pre-wrap text-xs leading-6 text-[var(--omnix-text)]">{assistance.content}</p>
+                <p className="whitespace-pre-wrap break-words text-xs leading-6 text-[var(--omnix-text)]">{assistance.content}</p>
                 <p className="mt-3 text-[10px] font-medium leading-relaxed text-[var(--omnix-text-3)]">Read from {assistance.source_task_count} tasks and {assistance.source_message_count} messages.</p>
               </div>
             ) : null}

@@ -41,7 +41,7 @@ export function ChannelList({
   setCreateOpen,
 }: ChannelListProps) {
   return (
-    <aside className="omnix-panel flex shrink-0 flex-col rounded-xl p-3 lg:min-h-0">
+    <aside className="omnix-panel flex min-w-0 shrink-0 flex-col overflow-hidden rounded-xl p-3 lg:min-h-0">
       <div className="mb-3 flex items-center justify-between px-1">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Channels</p>
         {mayCreateChannel ? (
@@ -98,7 +98,7 @@ export function ChannelList({
             key={channel.id}
             onClick={() => onSelectChannel(channel.id)}
             className={cn(
-              "w-[min(12rem,76vw)] shrink-0 rounded-lg border px-3 py-2.5 text-left transition lg:w-full",
+              "w-[min(12rem,76vw)] min-w-0 shrink-0 rounded-lg border px-3 py-2.5 text-left transition lg:w-full",
               selectedChannelId === channel.id
                 ? "border-cyan-300/25 bg-cyan-300/[0.08]"
                 : "border-transparent hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface)]",

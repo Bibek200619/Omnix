@@ -74,9 +74,9 @@ export function ConversationMessageRow({
           {message.context_links.length ? (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {message.context_links.map((link) => (
-                <span key={`${link.entity_type}-${link.entity_id}`} className="inline-flex items-center gap-1 rounded-md border border-cyan-300/15 bg-cyan-300/5 px-2 py-1 text-[10px] text-cyan-100">
+                <span key={`${link.entity_type}-${link.entity_id}`} className="inline-flex max-w-full items-center gap-1 rounded-md border border-cyan-300/15 bg-cyan-300/5 px-2 py-1 text-[10px] text-cyan-100">
                   <FileText className="h-3 w-3" />
-                  {link.label || link.entity_type}
+                  <span className="min-w-0 truncate">{link.label || link.entity_type}</span>
                 </span>
               ))}
             </div>
@@ -164,11 +164,11 @@ export function MessageThread({
   }
 
   return (
-    <main className={cn("omnix-panel min-h-0 min-w-0 flex-col overflow-hidden rounded-xl lg:flex lg:min-h-[26rem]", threadOpen ? "hidden" : "flex")}>
+    <main className={cn("omnix-panel min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl lg:min-h-[26rem]", threadOpen ? "flex md:hidden lg:flex" : "flex")}>
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--omnix-border)] px-4 py-3">
-        <div>
-          <h2 className="text-base font-semibold text-white">{selectedChannel?.name || "Conversation"}</h2>
-          <p className="mt-0.5 text-xs text-[var(--omnix-text-2)]">{selectedChannel?.purpose || "Workspace operational discussion."}</p>
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-semibold text-white">{selectedChannel?.name || "Conversation"}</h2>
+          <p className="mt-0.5 break-words text-xs text-[var(--omnix-text-2)]">{selectedChannel?.purpose || "Workspace operational discussion."}</p>
         </div>
       </div>
       {aiPanel}
@@ -223,7 +223,7 @@ export function MessageThread({
           className="omnix-input min-h-[72px] w-full resize-none rounded-xl px-3 py-2.5 text-sm leading-6"
         />
         <div className="mt-2 flex items-center justify-between gap-2">
-          <p className="text-[10px] text-[var(--omnix-text-3)]">Context links for tasks, decisions, files, and initiatives are structurally ready.</p>
+          <p className="min-w-0 break-words text-[10px] text-[var(--omnix-text-3)]">Context links for tasks, decisions, files, and initiatives are structurally ready.</p>
           <Button type="submit" size="sm" disabled={!draft.trim() || !mayPost || sending} leftIcon={<SendHorizontal className="h-3.5 w-3.5" />}>
             Send
           </Button>
