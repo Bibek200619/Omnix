@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { KeyboardShortcutsModal } from "@/components/layout/KeyboardShortcutsModal";
 import { MobileDock } from "@/components/layout/MobileDock";
 import { PageTransition } from "@/components/layout/PageTransition";
 import { ConversationHistoryProvider } from "@/lib/conversation-history-context";
@@ -66,6 +67,7 @@ export function AppShell({ children }: AppShellProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
 
   useEffect(() => {
     setIsSidebarCollapsed(readSidebarCollapsedPreference());
@@ -79,6 +81,18 @@ export function AppShell({ children }: AppShellProps) {
 
     writeSidebarCollapsedPreference(isSidebarCollapsed);
   }, [isSidebarCollapsed, sidebarPreferenceLoaded]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "?" && !(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement)) {
+        event.preventDefault();
+        setIsShortcutsOpen(true);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <WorkspaceProvider>
@@ -125,6 +139,10 @@ export function AppShell({ children }: AppShellProps) {
                         <PageTransition className="flex min-h-0 flex-1 flex-col">{children}</PageTransition>
                       </main>
                       <MobileDock onMoreClick={() => setIsSidebarOpen(true)} />
+                      <KeyboardShortcutsModal
+                        isOpen={isShortcutsOpen}
+                        onClose={() => setIsShortcutsOpen(false)}
+                      />
                     </div>
                   </div>
                 </WorkspaceOnboardingGate>
