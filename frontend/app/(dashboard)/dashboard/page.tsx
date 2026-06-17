@@ -22,6 +22,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { PageTitle } from "@/components/ui/Typography";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
 import { useConversationHistory } from "@/lib/conversation-history-context";
@@ -115,12 +116,12 @@ function DashboardPageContent() {
                 <Sparkles className="h-3.5 w-3.5" />
                 Omnix command center
               </p>
-            <h1 className="omnix-page-title flex items-center gap-3">
+            <PageTitle className="flex items-center gap-3">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/[0.08] shadow-[var(--omnix-glow-sm)]">
                 <Sparkles className="h-4 w-4 text-[var(--omnix-cyan)] drop-shadow-[0_0_10px_rgba(0,255,255,0.9)]" />
               </span>
               <span className="omnix-gradient-text">{activeWorkspace?.name ?? "Workspace Overview"}</span>
-            </h1>
+            </PageTitle>
             <p className="omnix-page-subtitle">
               A real-time operating surface for workspace knowledge, AI sessions, hierarchy, and team access.
             </p>

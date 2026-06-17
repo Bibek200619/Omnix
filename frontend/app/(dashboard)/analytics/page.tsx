@@ -5,6 +5,7 @@ import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Database, LayoutDashboard, MessageSquare, RefreshCw, Sparkles, Users, Zap, Construction } from "lucide-react";
+import { PageTitle } from "@/components/ui/Typography";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
 import { useConversationHistory } from "@/lib/conversation-history-context";
@@ -135,7 +136,7 @@ function AnalyticsPageContent() {
       <div className="omnix-content-max flex flex-col gap-5">
         <div className="omnix-page-hero">
           <div>
-            <h1 className="omnix-page-title omnix-gradient-text">Analytics Studio</h1>
+            <PageTitle className="omnix-gradient-text">Analytics Studio</PageTitle>
             <p className="omnix-page-subtitle">
               Workspace telemetry and reporting. Custom boards are currently in development.
             </p>

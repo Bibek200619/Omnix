@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/Badge";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Portal } from "@/components/ui/Portal";
+import { PageTitle } from "@/components/ui/Typography";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModal";
 import { useAuth } from "@/lib/auth-context";
@@ -407,7 +408,7 @@ function TeamPageContent() {
                 <Users className="h-3.5 w-3.5" />
                 Team management
               </p>
-              <h1 className="omnix-page-title omnix-gradient-text">{activeWorkspace?.name ?? "Workspace"} team</h1>
+              <PageTitle className="omnix-gradient-text">{activeWorkspace?.name ?? "Workspace"} team</PageTitle>
               <p className="omnix-page-subtitle">
                 Primary workspace roles stay authoritative. Secondary labels help organize members by function.
               </p>
