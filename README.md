@@ -42,6 +42,17 @@ Still limited or environment-dependent:
 - Local development requires a configured Supabase project and applied migrations.
 - Redis-backed workers are wired through bootstrap/compose, but production job behavior depends on deployment configuration.
 
+## Repository Docs
+
+Keep root markdown limited to active, useful documents:
+
+- `README.md` for current product, architecture, setup, and operations.
+- `AGENTS.md` for non-negotiable assistant and architecture rules.
+- `OMNIX_CODEBASE_MAP.md` for detailed code navigation.
+- `SECURITY.md` for security policy and reporting.
+
+Put narrow technical notes under `docs/`, and update an existing canonical doc instead of adding another root `.md` file.
+
 ## Architecture Rules
 
 Omnix has a few non-negotiable product and architecture constraints:
