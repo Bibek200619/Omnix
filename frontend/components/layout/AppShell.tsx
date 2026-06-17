@@ -84,6 +84,12 @@ export function AppShell({ children }: AppShellProps) {
               <ConversationHistoryProvider>
                 <WorkspaceOnboardingGate>
                   <div className="omnix-app-bg omnix-auth-shell relative h-[100dvh] overflow-hidden text-white sm:h-screen">
+                    <a
+                      href="#main-content"
+                      className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[9999] focus:rounded-lg focus:bg-[var(--omnix-cyan)] focus:px-4 focus:py-2 focus:font-bold focus:text-[#050c17] focus:shadow-[var(--omnix-glow-md)]"
+                    >
+                      Skip to main content
+                    </a>
                     <div className="omnix-ambient-layer" aria-hidden="true" />
                     <div className="omnix-shell-scanline" aria-hidden="true" />
                     <div
@@ -107,7 +113,10 @@ export function AppShell({ children }: AppShellProps) {
                         onMenuClick={() => setIsSidebarOpen(true)}
                         onExpandSidebar={() => setIsSidebarCollapsed(false)}
                       />
-                      <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4.25rem_+_env(safe-area-inset-bottom))] lg:pb-0">
+                      <main
+                        id="main-content"
+                        className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4.25rem_+_env(safe-area-inset-bottom))] lg:pb-0"
+                      >
                         <PageTransition className="flex min-h-0 flex-1 flex-col">{children}</PageTransition>
                       </main>
                       <MobileDock onMoreClick={() => setIsSidebarOpen(true)} />
