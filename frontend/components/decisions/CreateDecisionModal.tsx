@@ -174,6 +174,8 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
             <button 
               type="button" 
               onClick={onClose} 
+              aria-label="Close decision modal"
+              title="Close decision modal"
               className="rounded-lg p-2 text-white/40 transition hover:bg-white/5 hover:text-white"
             >
               <X className="h-5 w-5" />

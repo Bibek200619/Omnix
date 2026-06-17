@@ -825,7 +825,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon"
+                      size={"icon"}
                       className="h-9 w-9"
                       aria-label="Close create subspace modal"
                       title="Close create subspace modal"
@@ -897,7 +897,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon"
+                      size={"icon"}
                       className="h-9 w-9"
                       aria-label="Close rename modal"
                       title="Close rename modal"
@@ -963,7 +963,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon"
+                      size={"icon"}
                       className="h-9 w-9"
                       aria-label="Close delete modal"
                       title="Close delete modal"
@@ -1249,7 +1249,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
+                  size={"icon"}
                   className="hidden h-[26px] w-[26px] rounded-[7px] border border-[var(--omnix-border)] bg-transparent text-[var(--omnix-text-3)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white lg:inline-flex"
                   aria-label="Collapse workspace sidebar"
                   title="Collapse workspace sidebar"
@@ -1260,7 +1260,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
+                  size={"icon"}
                   className="h-10 w-10 rounded-[10px] border border-[var(--omnix-border)] bg-transparent text-[var(--omnix-text-3)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white lg:hidden"
                   aria-label="Close navigation"
                   title="Close navigation"
@@ -1336,7 +1336,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
             </p>
             <Button
               type="button"
-              size="icon"
+              size={"icon"}
               variant="ghost"
               className="h-8 w-8 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)]"
               aria-label="New chat"
@@ -1437,7 +1437,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                           />
                           <Button
                             type="submit"
-                            size="icon"
+                            size={"icon"}
                             variant="ghost"
                             className="h-8 w-8"
                             disabled={isBusy}
@@ -1448,7 +1448,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                           </Button>
                           <Button
                             type="button"
-                            size="icon"
+                            size={"icon"}
                             variant="ghost"
                             className="h-8 w-8"
                             disabled={isBusy}
@@ -1497,7 +1497,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                             <div className="flex shrink-0 items-center gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
                               <Button
                                 type="button"
-                                size="icon"
+                                size={"icon"}
                                 variant="ghost"
                                 className="h-7 w-7"
                                 disabled={isBusy}
@@ -1509,7 +1509,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                               </Button>
                               <Button
                                 type="button"
-                                size="icon"
+                                size={"icon"}
                                 variant="ghost"
                                 className="h-7 w-7 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
                                 disabled={isBusy}

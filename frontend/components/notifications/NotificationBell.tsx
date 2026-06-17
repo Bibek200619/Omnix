@@ -20,7 +20,7 @@ export function NotificationBell() {
     <Button
       type="button"
       variant="ghost"
-      size="icon"
+      size={"icon"}
       aria-label={
         unreadCount === 1
           ? "Mention notifications, 1 unread"

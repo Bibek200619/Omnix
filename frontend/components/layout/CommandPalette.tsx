@@ -540,6 +540,7 @@ export function CommandPalette() {
                   <button
                     type="button"
                     onClick={closePalette}
+                    title="Close command palette"
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03] text-white/55 hover:bg-white/[0.06] hover:text-white/80"
                     aria-label="Close command palette"
                   >

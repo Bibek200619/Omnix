@@ -145,6 +145,7 @@ function MemberActionsMenu({
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-label={`Open actions for ${workspaceMemberName(member)}`}
+        title={`Open actions for ${workspaceMemberName(member)}`}
         onClick={onToggle}
         className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-slate-300 transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
       >

@@ -912,7 +912,15 @@ function WorkspaceConversationSurfaceContent() {
                 <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-purple-100/80">
                   <Sparkles className="h-3.5 w-3.5" /> Ambient assistance / {assistance.mode}
                 </p>
-                <button type="button" onClick={() => setAssistance(null)} className="text-white/30 hover:text-white"><X className="h-3.5 w-3.5" /></button>
+                <button
+                  type="button"
+                  onClick={() => setAssistance(null)}
+                  aria-label="Dismiss assistance"
+                  title="Dismiss assistance"
+                  className="text-white/30 hover:text-white"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
               <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--omnix-text)]">{assistance.content}</p>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">

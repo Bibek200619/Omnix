@@ -404,7 +404,11 @@ function HeroChat() {
               <div className="flex items-center gap-3 rounded-2xl px-3 py-3 sm:px-4"
                 style={{background:"rgba(255,255,255,0.04)",border:`1px solid rgba(255,255,255,0.08)`}}>
                 <span className="text-sm flex-1" style={{color:"rgba(255,255,255,0.25)"}}>Ask OMNIX anything about your knowledge base…</span>
-                <button className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                <button
+                  type="button"
+                  aria-label="Submit prompt"
+                  title="Submit prompt"
+                  className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{background:C.cyan,color:C.navyDark}}>
                   <Icon d={ICONS.arrow} size={14} stroke={C.navyDark} sw={2.5}/>
                 </button>

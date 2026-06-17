@@ -212,7 +212,8 @@ export function MessageList({
                   ? "border-cyan-300/60 ring-2 ring-cyan-300/20" 
                   : "border-[var(--omnix-border)]"
               )}
-              title="Jump to Latest"
+              aria-label="Jump to latest messages"
+              title="Jump to latest messages"
             >
               {newMessagesCount > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-cyan-500 px-1 text-[9px] font-bold text-[#050c17] shadow-[0_0_10px_rgba(6,182,212,0.6)] animate-in zoom-in duration-300">
@@ -227,4 +228,3 @@ export function MessageList({
     </div>
   );
 }
-

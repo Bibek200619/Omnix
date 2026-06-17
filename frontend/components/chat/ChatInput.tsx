@@ -187,7 +187,7 @@ export function ChatInput({
           <Button
             type="button"
             variant={uploadOpen ? "secondary" : "ghost"}
-            size="icon"
+            size={"icon"}
             aria-label={uploadOpen ? "Hide document upload" : "Attach document"}
             title={uploadOpen ? "Hide document upload" : "Attach document"}
             onClick={() => setUploadOpen((current) => !current)}
@@ -226,7 +226,7 @@ export function ChatInput({
         {loading ? (
           <Button
             type="button"
-            size="icon"
+            size={"icon"}
             aria-label="Stop generating"
             title="Stop generating"
             onClick={() => onCancel?.()}
@@ -237,7 +237,7 @@ export function ChatInput({
         ) : (
           <Button
             type="button"
-            size="icon"
+            size={"icon"}
             aria-label="Send message"
             title="Send message"
             disabled={!value.trim()}

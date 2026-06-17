@@ -93,7 +93,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
           <Button
             type="button"
             variant="ghost"
-            size="icon"
+            size={"icon"}
             className="h-10 w-10 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)] lg:hidden"
             aria-label="Open navigation"
             title="Open navigation"
@@ -105,7 +105,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
             <Button
               type="button"
               variant="ghost"
-              size="icon"
+              size={"icon"}
               className="hidden h-9 w-9 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)] lg:inline-flex"
               aria-label="Expand workspace sidebar"
               title="Expand workspace sidebar"
@@ -147,7 +147,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
           <Button
             type="button"
             variant="secondary"
-            size="icon"
+            size={"icon"}
             onClick={() => router.push("/chat")}
             className="hidden h-9 w-9 rounded-[10px] border-[var(--omnix-cyan)] bg-transparent text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] sm:inline-flex sm:w-auto sm:px-4"
             aria-label="Start new chat"

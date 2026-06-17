@@ -140,7 +140,10 @@ export function WorkspaceAssignmentModal({
               </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
+              aria-label="Close assignment modal"
+              title="Close assignment modal"
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white"
             >
               <X className="h-5 w-5" />

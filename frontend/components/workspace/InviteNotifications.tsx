@@ -203,7 +203,7 @@ export function InviteNotificationBell() {
       <Button
         type="button"
         variant="ghost"
-        size="icon"
+        size={"icon"}
         aria-label={
           pendingInvites.length === 1
             ? "Workspace invitations, 1 pending"

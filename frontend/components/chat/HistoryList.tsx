@@ -214,7 +214,7 @@ export function HistoryList() {
                         />
                         <Button
                           type="submit"
-                          size="icon"
+                          size={"icon"}
                           variant="secondary"
                           className="h-9 w-9"
                           disabled={isBusy}
@@ -225,7 +225,7 @@ export function HistoryList() {
                         </Button>
                         <Button
                           type="button"
-                          size="icon"
+                          size={"icon"}
                           variant="ghost"
                           className="h-9 w-9"
                           disabled={isBusy}
@@ -274,7 +274,7 @@ export function HistoryList() {
                         <div className="flex items-center gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
                           <Button
                             type="button"
-                            size="icon"
+                            size={"icon"}
                             variant="ghost"
                             className="h-8 w-8"
                             onClick={() => startRename(chat.id, chat.title)}
@@ -286,7 +286,7 @@ export function HistoryList() {
                           </Button>
                           <Button
                             type="button"
-                            size="icon"
+                            size={"icon"}
                             variant="ghost"
                             className="h-8 w-8 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
                             onClick={() => deleteChat(chat.id)}

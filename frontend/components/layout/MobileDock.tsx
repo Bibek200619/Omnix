@@ -51,6 +51,8 @@ export function MobileDock({ onMoreClick }: MobileDockProps) {
         <button
           type="button"
           onClick={onMoreClick}
+          aria-label="Open more navigation"
+          title="Open more navigation"
           className="relative flex min-h-[48px] flex-col items-center justify-center gap-1 rounded-xl border border-transparent text-[10px] font-medium text-[var(--omnix-text-3)] transition active:bg-white/[0.05]"
         >
           <MoreHorizontal className="h-[19px] w-[19px]" />
