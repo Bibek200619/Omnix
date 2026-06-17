@@ -43,6 +43,7 @@ import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { Portal } from "@/components/ui/Portal";
 import { ClientTime } from "@/components/ui/ClientTime";
 import { Input } from "@/components/ui/Input";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
@@ -456,15 +457,17 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
       >
         <div className="group/workspace flex items-stretch gap-1 px-1">
           {hasHierarchy ? (
-            <button
-              type="button"
-              onClick={() => toggleExpanded(workspace)}
-              className="flex h-12 w-7 shrink-0 items-center justify-center rounded-[7px] text-[var(--omnix-text-3)] transition hover:bg-white/5 hover:text-white"
-              aria-label={expanded ? `Collapse ${workspace.name}` : `Expand ${workspace.name}`}
-              title={expanded ? `Collapse ${workspace.name}` : `Expand ${workspace.name}`}
-            >
-              <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-300", expanded && "rotate-90")} />
-            </button>
+            <Tooltip content={expanded ? `Collapse ${workspace.name}` : `Expand ${workspace.name}`}>
+              <button
+                type="button"
+                onClick={() => toggleExpanded(workspace)}
+                className="flex h-12 w-7 shrink-0 items-center justify-center rounded-[7px] text-[var(--omnix-text-3)] transition hover:bg-white/5 hover:text-white"
+                aria-label={expanded ? `Collapse ${workspace.name}` : `Expand ${workspace.name}`}
+                title={expanded ? `Collapse ${workspace.name}` : `Expand ${workspace.name}`}
+              >
+                <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-300", expanded && "rotate-90")} />
+              </button>
+            </Tooltip>
           ) : (
             <span className="h-12 w-7 shrink-0" />
           )}
@@ -824,18 +827,20 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
                         Add a team space under <span className="font-medium text-slate-200">{activeSuperWorkspace.name}</span>.
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size={"icon"}
-                      className="h-9 w-9"
-                      aria-label="Close create subspace modal"
-                      title="Close create subspace modal"
-                      onClick={handleCancelSubspace}
-                      disabled={creatingSubspace}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    <Tooltip content="Close create subspace modal">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size={"icon"}
+                        className="h-9 w-9"
+                        aria-label="Close create subspace modal"
+                        title="Close create subspace modal"
+                        onClick={handleCancelSubspace}
+                        disabled={creatingSubspace}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </Tooltip>
                   </div>
 
                   <form
@@ -896,18 +901,20 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
                         Update the visible name for this workspace.
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size={"icon"}
-                      className="h-9 w-9"
-                      aria-label="Close rename modal"
-                      title="Close rename modal"
-                      onClick={() => setRenameOpen(false)}
-                      disabled={renaming}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    <Tooltip content="Close rename modal">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size={"icon"}
+                        className="h-9 w-9"
+                        aria-label="Close rename modal"
+                        title="Close rename modal"
+                        onClick={() => setRenameOpen(false)}
+                        disabled={renaming}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </Tooltip>
                   </div>
 
                   <form
@@ -962,18 +969,20 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
                         This removes <span className="font-medium text-slate-200">{active.name}</span> from the workspace list and clears it from the active session.
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size={"icon"}
-                      className="h-9 w-9"
-                      aria-label="Close delete modal"
-                      title="Close delete modal"
-                      onClick={() => setDeleteOpen(false)}
-                      disabled={deleting}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    <Tooltip content="Close delete modal">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size={"icon"}
+                        className="h-9 w-9"
+                        aria-label="Close delete modal"
+                        title="Close delete modal"
+                        onClick={() => setDeleteOpen(false)}
+                        disabled={deleting}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </Tooltip>
                   </div>
 
                   <div className="relative z-10 mt-5 space-y-4">
@@ -1248,28 +1257,32 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                 </div>
               </Link>
               <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size={"icon"}
-                  className="hidden h-[26px] w-[26px] rounded-[7px] border border-[var(--omnix-border)] bg-transparent text-[var(--omnix-text-3)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white lg:inline-flex"
-                  aria-label="Collapse workspace sidebar"
-                  title="Collapse workspace sidebar"
-                  onClick={onToggleCollapse}
-                >
-                  <PanelLeftClose className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size={"icon"}
-                  className="h-10 w-10 rounded-[10px] border border-[var(--omnix-border)] bg-transparent text-[var(--omnix-text-3)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white lg:hidden"
-                  aria-label="Close navigation"
-                  title="Close navigation"
-                  onClick={onClose}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                <Tooltip content="Collapse workspace sidebar" className="hidden lg:inline-flex">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size={"icon"}
+                    className="h-[26px] w-[26px] rounded-[7px] border border-[var(--omnix-border)] bg-transparent text-[var(--omnix-text-3)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white"
+                    aria-label="Collapse workspace sidebar"
+                    title="Collapse workspace sidebar"
+                    onClick={onToggleCollapse}
+                  >
+                    <PanelLeftClose className="h-4 w-4" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Close navigation" className="lg:hidden">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size={"icon"}
+                    className="h-10 w-10 rounded-[10px] border border-[var(--omnix-border)] bg-transparent text-[var(--omnix-text-3)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white"
+                    aria-label="Close navigation"
+                    title="Close navigation"
+                    onClick={onClose}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </Tooltip>
               </div>
             </div>
             <div className="space-y-2 pt-1">
@@ -1336,17 +1349,19 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">
               Recent chats
             </p>
-            <Button
-              type="button"
-              size={"icon"}
-              variant="ghost"
-              className="h-8 w-8 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)]"
-              aria-label="New chat"
-              title="New chat"
-              onClick={startNewChat}
-            >
-              <MessageSquarePlus className="h-4 w-4" />
-            </Button>
+            <Tooltip content="New chat">
+              <Button
+                type="button"
+                size={"icon"}
+                variant="ghost"
+                className="h-8 w-8 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)]"
+                aria-label="New chat"
+                title="New chat"
+                onClick={startNewChat}
+              >
+                <MessageSquarePlus className="h-4 w-4" />
+              </Button>
+            </Tooltip>
           </div>
 
           <Input
@@ -1437,29 +1452,33 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                             autoFocus
                             className="h-8 min-w-0 flex-1 rounded-md border border-cyan-300/30 bg-black/30 px-2 text-xs font-medium text-white outline-none focus:ring-2 focus:ring-cyan-300/20"
                           />
-                          <Button
-                            type="submit"
-                            size={"icon"}
-                            variant="ghost"
-                            className="h-8 w-8"
-                            disabled={isBusy}
-                            aria-label="Save title"
-                            title="Save title"
-                          >
-                            {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                          </Button>
-                          <Button
-                            type="button"
-                            size={"icon"}
-                            variant="ghost"
-                            className="h-8 w-8"
-                            disabled={isBusy}
-                            onClick={() => setEditingId(null)}
-                            aria-label="Cancel rename"
-                            title="Cancel rename"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
+                          <Tooltip content="Save title">
+                            <Button
+                              type="submit"
+                              size={"icon"}
+                              variant="ghost"
+                              className="h-8 w-8"
+                              disabled={isBusy}
+                              aria-label="Save title"
+                              title="Save title"
+                            >
+                              {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                            </Button>
+                          </Tooltip>
+                          <Tooltip content="Cancel rename">
+                            <Button
+                              type="button"
+                              size={"icon"}
+                              variant="ghost"
+                              className="h-8 w-8"
+                              disabled={isBusy}
+                              onClick={() => setEditingId(null)}
+                              aria-label="Cancel rename"
+                              title="Cancel rename"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </Tooltip>
                         </form>
                       ) : (
                         <>
@@ -1497,30 +1516,34 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                               </p>
                             </button>
                             <div className="flex shrink-0 items-center gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
-                              <Button
-                                type="button"
-                                size={"icon"}
-                                variant="ghost"
-                                className="h-7 w-7"
-                                disabled={isBusy}
-                                onClick={() => startRename(conversation.id, conversation.title)}
-                                aria-label="Rename chat"
-                                title="Rename chat"
-                              >
-                                <Edit3 className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                type="button"
-                                size={"icon"}
-                                variant="ghost"
-                                className="h-7 w-7 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
-                                disabled={isBusy}
-                                onClick={() => deleteConversation(conversation.id)}
-                                aria-label="Delete chat"
-                                title="Delete chat"
-                              >
-                                {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                              </Button>
+                              <Tooltip content="Rename chat">
+                                <Button
+                                  type="button"
+                                  size={"icon"}
+                                  variant="ghost"
+                                  className="h-7 w-7"
+                                  disabled={isBusy}
+                                  onClick={() => startRename(conversation.id, conversation.title)}
+                                  aria-label="Rename chat"
+                                  title="Rename chat"
+                                >
+                                  <Edit3 className="h-3.5 w-3.5" />
+                                </Button>
+                              </Tooltip>
+                              <Tooltip content="Delete chat">
+                                <Button
+                                  type="button"
+                                  size={"icon"}
+                                  variant="ghost"
+                                  className="h-7 w-7 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
+                                  disabled={isBusy}
+                                  onClick={() => deleteConversation(conversation.id)}
+                                  aria-label="Delete chat"
+                                  title="Delete chat"
+                                >
+                                  {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                                </Button>
+                              </Tooltip>
                             </div>
                           </div>
                         </>

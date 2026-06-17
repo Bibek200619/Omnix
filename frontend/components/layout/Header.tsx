@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -95,29 +96,33 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
       <InviteNotificationBar />
       <div className="relative flex h-[var(--omnix-header-h)] w-full items-center gap-1.5 px-3 sm:gap-3 sm:px-[22px]">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size={"icon"}
-            className="h-10 w-10 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)] lg:hidden"
-            aria-label="Open navigation"
-            title="Open navigation"
-            onClick={onMenuClick}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          {sidebarCollapsed ? (
+          <Tooltip content="Open navigation" className="lg:hidden">
             <Button
               type="button"
               variant="ghost"
               size={"icon"}
-              className="hidden h-9 w-9 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)] lg:inline-flex"
-              aria-label="Expand workspace sidebar"
-              title="Expand workspace sidebar"
-              onClick={onExpandSidebar}
+              className="h-10 w-10 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)]"
+              aria-label="Open navigation"
+              title="Open navigation"
+              onClick={onMenuClick}
             >
-              <PanelLeftOpen className="h-4 w-4" />
+              <Menu className="h-5 w-5" />
             </Button>
+          </Tooltip>
+          {sidebarCollapsed ? (
+            <Tooltip content="Expand workspace sidebar" className="hidden lg:inline-flex">
+              <Button
+                type="button"
+                variant="ghost"
+                size={"icon"}
+                className="h-9 w-9 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)]"
+                aria-label="Expand workspace sidebar"
+                title="Expand workspace sidebar"
+                onClick={onExpandSidebar}
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </Button>
+            </Tooltip>
           ) : null}
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 overflow-hidden">
@@ -149,18 +154,20 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
           <NotificationBell />
           <InviteNotificationBell />
           <div className="hidden h-[22px] w-px bg-[rgba(0,255,255,0.1)] sm:block" />
-          <Button
-            type="button"
-            variant="secondary"
-            size={"icon"}
-            onClick={() => router.push("/chat")}
-            className="hidden h-9 w-9 rounded-[10px] border-[var(--omnix-cyan)] bg-transparent text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] sm:inline-flex sm:w-auto sm:px-4"
-            aria-label="Start new chat"
-            title="Start new chat"
-          >
-            <MessageSquarePlus className="h-4 w-4 sm:mr-2 sm:h-3.5 sm:w-3.5" />
-            <span className="hidden sm:inline text-xs font-bold tracking-[0.03em]">New Chat</span>
-          </Button>
+          <Tooltip content="Start new chat" className="hidden sm:inline-flex">
+            <Button
+              type="button"
+              variant="secondary"
+              size={"icon"}
+              onClick={() => router.push("/chat")}
+              className="h-9 w-9 rounded-[10px] border-[var(--omnix-cyan)] bg-transparent text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] sm:w-auto sm:px-4"
+              aria-label="Start new chat"
+              title="Start new chat"
+            >
+              <MessageSquarePlus className="h-4 w-4 sm:mr-2 sm:h-3.5 sm:w-3.5" />
+              <span className="hidden text-xs font-bold tracking-[0.03em] sm:inline">New Chat</span>
+            </Button>
+          </Tooltip>
           <ProfileMenu user={user} signingOut={signingOut} onSignOut={handleSignOut} />
         </div>
       </div>
