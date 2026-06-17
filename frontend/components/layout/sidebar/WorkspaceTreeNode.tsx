@@ -44,7 +44,7 @@ function SubspaceRow({ subspace, index, onSelectWorkspace }: SubspaceRowProps) {
       type="button"
       onClick={() => onSelectWorkspace(subspace.id)}
       className={cn(
-        "relative my-0.5 flex min-h-[42px] w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-left transition-all duration-300 sm:min-h-9",
+        "relative my-0.5 flex min-h-[44px] w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-left transition-all duration-300 sm:min-h-[44px]",
         isActive
           ? "bg-cyan-300/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
           : "text-[var(--omnix-text-2)] hover:bg-[var(--omnix-surface)] hover:text-white",
@@ -125,7 +125,7 @@ export function WorkspaceTreeNode({
             <button
               type="button"
               onClick={() => onToggleExpanded(workspace)}
-              className="flex h-12 w-7 shrink-0 items-center justify-center rounded-[7px] text-[var(--omnix-text-3)] transition hover:bg-white/5 hover:text-white"
+              className="flex h-12 w-10 min-w-[44px] shrink-0 items-center justify-center rounded-[7px] text-[var(--omnix-text-3)] transition hover:bg-white/5 hover:text-white"
               aria-label={isExpanded ? `Collapse ${workspace.name}` : `Expand ${workspace.name}`}
               title={isExpanded ? `Collapse ${workspace.name}` : `Expand ${workspace.name}`}
             >
@@ -133,7 +133,7 @@ export function WorkspaceTreeNode({
             </button>
           </Tooltip>
         ) : (
-          <span className="h-12 w-7 shrink-0" />
+          <span className="h-12 w-10 min-w-[44px] shrink-0" />
         )}
 
         <button
@@ -214,7 +214,7 @@ export function WorkspaceTreeNode({
               <button
                 type="button"
                 onClick={() => void refreshWorkspaceSubspaces(workspace.id)}
-                className="my-1 flex w-full items-center gap-2 rounded-[7px] border border-rose-400/20 bg-rose-400/10 px-2.5 py-2 text-left text-[11px] text-rose-100"
+                className="my-1 flex min-h-[44px] w-full items-center gap-2 rounded-[7px] border border-rose-400/20 bg-rose-400/10 px-2.5 py-2 text-left text-[11px] text-rose-100"
               >
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                 <span className="min-w-0 flex-1 truncate">Subspaces could not be loaded. Retry</span>
@@ -255,7 +255,7 @@ export function WorkspaceListState({
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span className="min-w-0 flex-1">Workspace hierarchy could not be loaded.</span>
         </div>
-        <Button type="button" variant="ghost" size="sm" className="mt-2 h-7 w-full text-xs" onClick={onRetry}>
+        <Button type="button" variant="ghost" size="sm" className="mt-2 min-h-[44px] w-full text-xs" onClick={onRetry}>
           Retry
         </Button>
       </div>
