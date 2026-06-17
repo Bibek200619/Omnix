@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useWorkspaceNotifications } from "@/lib/workspace-notifications-context";
 import { cn } from "@/lib/utils";
@@ -174,8 +175,25 @@ function NotificationCenterSurfaceContent() {
       ) : null}
 
       {loading && mentions.length === 0 ? (
-        <div className="flex min-h-[18rem] items-center justify-center">
-          <Loader2 className="h-5 w-5 animate-spin text-cyan-100/45" />
+        <div className="grid min-h-[18rem] gap-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="flex flex-col gap-3 rounded-xl border border-[var(--omnix-border)] bg-black/[0.12] px-3 py-3 sm:flex-row sm:items-start sm:px-4">
+              <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Skeleton variant="line" className="h-3 w-24" />
+                  <Skeleton variant="line" className="h-3 w-16" />
+                </div>
+                <Skeleton variant="line" className="mt-2 h-4 w-full max-w-lg" />
+                <Skeleton className="mt-2 h-7 w-40 rounded-full" />
+                <Skeleton variant="line" className="mt-2 h-3 w-full max-w-md" />
+              </div>
+              <div className="flex shrink-0 gap-2 pl-[3.25rem] sm:w-32 sm:flex-col sm:items-end sm:pl-0">
+                <Skeleton className="h-7 w-16 rounded-full" />
+                <Skeleton className="h-9 w-24 rounded-lg sm:w-full" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : null}
 

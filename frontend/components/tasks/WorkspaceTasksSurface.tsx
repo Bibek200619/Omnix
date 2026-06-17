@@ -19,6 +19,7 @@ import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { MentionText } from "@/components/mentions/MentionText";
 import { MentionTextarea, mentionPayload } from "@/components/mentions/MentionTextarea";
 import { apiClient } from "@/lib/api";
@@ -504,7 +505,27 @@ function WorkspaceTasksSurfaceContent() {
           ) : null}
 
           <div ref={taskListRef} className="omnix-scrollbar overflow-y-auto xl:min-h-0 xl:flex-1">
-            {loading ? <Loader2 className="mx-auto mt-10 h-5 w-5 animate-spin text-cyan-100/50" /> : null}
+            {loading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="rounded-xl border border-[var(--omnix-border)] bg-black/[0.12] p-3.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <Skeleton variant="line" className="h-4 w-2/3" />
+                        <Skeleton variant="line" className="mt-2 h-3 w-full max-w-md" />
+                      </div>
+                      <Skeleton className="h-7 w-24 rounded-lg" />
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <Skeleton variant="line" className="h-3 w-28" />
+                      <Skeleton variant="line" className="h-3 w-24" />
+                      <Skeleton variant="line" className="h-3 w-32" />
+                    </div>
+                    <Skeleton variant="line" className="mt-3 h-3 w-full max-w-sm" />
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {!loading && displayedTasks.length === 0 ? (
               <div className="mx-auto mt-14 max-w-sm text-center">
                 <ClipboardCheck className="mx-auto h-7 w-7 text-cyan-100/35" />

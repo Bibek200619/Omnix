@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Portal } from "@/components/ui/Portal";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { Textarea } from "@/components/ui/Textarea";
 import { DecisionCandidatePanel } from "@/components/decisions/DecisionCandidatePanel";
 import { MentionText } from "@/components/mentions/MentionText";
@@ -839,7 +840,20 @@ function WorkspaceConversationSurfaceContent() {
             </form>
           ) : null}
           <div className="omnix-scrollbar flex min-h-0 gap-2 overflow-x-auto pb-1 lg:block lg:flex-1 lg:space-y-1 lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0">
-            {channelsLoading ? <Loader2 className="mx-auto mt-6 h-4 w-4 animate-spin text-cyan-100/60" /> : null}
+            {channelsLoading ? (
+              <>
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="w-[min(12rem,76vw)] shrink-0 rounded-lg border border-transparent px-3 py-2.5 lg:w-full">
+                    <div className="flex items-center justify-between gap-2">
+                      <Skeleton variant="line" className="h-3.5 w-24" />
+                      <Skeleton className="h-4 w-9 rounded" />
+                    </div>
+                    <Skeleton variant="line" className="mt-2 h-3 w-full" />
+                    <Skeleton variant="line" className="mt-2 h-2.5 w-20" />
+                  </div>
+                ))}
+              </>
+            ) : null}
             {channels.map((channel) => (
               <button
                 type="button"
