@@ -1336,6 +1336,8 @@ textarea {
 .omnix-page-enter-delay-2 { animation-delay: 0.12s; }
 .omnix-page-enter-delay-3 { animation-delay: 0.18s; }
 .omnix-page-enter-delay-4 { animation-delay: 0.24s; }
+.omnix-page-enter-delay-5 { animation-delay: 0.30s; }
+.omnix-page-enter-delay-6 { animation-delay: 0.36s; }
 
 /* ── Source card status variants ────────────────────────────── */
 

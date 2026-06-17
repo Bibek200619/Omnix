@@ -37,6 +37,19 @@ type FileData = {
   id: string;
 };
 
+const pageEnterDelayClasses = [
+  "omnix-page-enter-delay-1",
+  "omnix-page-enter-delay-2",
+  "omnix-page-enter-delay-3",
+  "omnix-page-enter-delay-4",
+  "omnix-page-enter-delay-5",
+  "omnix-page-enter-delay-6",
+];
+
+function pageEnterDelay(index: number) {
+  return pageEnterDelayClasses[Math.min(index, pageEnterDelayClasses.length - 1)];
+}
+
 export default function DashboardPage() {
   return (
     <Suspense fallback={<PageSkeleton />}>
@@ -169,7 +182,7 @@ function DashboardPageContent() {
               workspaceName={activeWorkspace?.name}
             />
 
-            <section className="omnix-section-card p-4 sm:p-6" style={{ animation: "omnix-card-enter 0.45s ease-out 0.18s both" }}>
+            <section className="omnix-section-card omnix-page-enter omnix-page-enter-delay-3 p-4 sm:p-6">
               {/* Top beam */}
               <div className="omnix-top-line" />
               <div className="relative z-10 mb-5 flex items-center justify-between">
@@ -189,10 +202,9 @@ function DashboardPageContent() {
                       key={action.label}
                       type="button"
                       onClick={() => router.push(action.href)}
-                      className="omnix-command-button group relative z-10 flex items-center gap-4 p-4 text-left"
+                      className={cn("omnix-command-button omnix-page-enter group relative z-10 flex items-center gap-4 p-4 text-left", pageEnterDelay(i + 3))}
                       style={{
                         "--command-color": action.color,
-                        animation: `omnix-card-enter 0.4s ease-out ${0.22 + i * 0.06}s both`,
                       } as CSSProperties}
                     >
                       <span
@@ -219,7 +231,7 @@ function DashboardPageContent() {
             </section>
 
             {/* Recent AI Sessions */}
-            <section className="omnix-section-card p-4 sm:p-6" style={{ animation: "omnix-card-enter 0.45s ease-out 0.26s both" }}>
+            <section className="omnix-section-card omnix-page-enter omnix-page-enter-delay-4 p-4 sm:p-6">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="flex items-center gap-2.5 text-lg font-semibold text-white">
                   <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10">
@@ -241,8 +253,11 @@ function DashboardPageContent() {
                     key={chat.id}
                     type="button"
                     onClick={() => router.push(`/chat?conversation=${chat.id}`)}
-                    className="group relative z-10 flex w-full items-center justify-between gap-3 rounded-[var(--omnix-radius-sm)] border border-transparent p-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)]"
-                    style={{ animation: `omnix-card-enter 0.38s ease-out ${0.3 + i * 0.07}s both` } as CSSProperties}
+                    className={cn(
+                      "group relative z-10 flex w-full items-center justify-between gap-3 rounded-[var(--omnix-radius-sm)] border border-transparent p-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)]",
+                      "omnix-page-enter",
+                      pageEnterDelay(i + 4),
+                    )}
                   >
                     <span className="flex min-w-0 items-center gap-3">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] text-cyan-100 shadow-[0_0_10px_rgba(0,255,255,0.1)]">
@@ -278,7 +293,7 @@ function DashboardPageContent() {
 
           {/* ── Sidebar panels ── */}
           <aside className="space-y-6">
-            <section className="omnix-section-card p-4 sm:p-6" style={{ animation: "omnix-card-enter 0.45s ease-out 0.28s both" }}>
+            <section className="omnix-section-card omnix-page-enter omnix-page-enter-delay-5 p-4 sm:p-6">
               <div className="omnix-top-line" />
               <h2 className="relative z-10 mb-5 flex items-center gap-2 text-lg font-semibold text-white">
                 <Layers3 className="h-4 w-4 text-[var(--omnix-purple)]" />
