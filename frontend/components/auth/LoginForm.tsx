@@ -22,6 +22,7 @@ export function LoginForm() {
   const { authError, isConfigured, refreshSession } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,12 +31,29 @@ export function LoginForm() {
       return;
     }
 
-    setError(null);
-    setLoading(true);
-
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
+    const nextFieldErrors: { email?: string; password?: string } = {};
+
+    if (!email) {
+      nextFieldErrors.email = "Enter your email address.";
+    }
+    if (!password) {
+      nextFieldErrors.password = "Enter your password.";
+    } else if (password.length < 8) {
+      nextFieldErrors.password = "Use at least 8 characters.";
+    }
+
+    setError(null);
+    setFieldErrors(nextFieldErrors);
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setError("Check the highlighted fields and try again.");
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const { data, error: signInError } =
@@ -44,6 +62,10 @@ export function LoginForm() {
       if (signInError) {
         logClientError("Sign in failed", signInError);
         setError("Unable to sign in. Check your email and password, then try again.");
+        setFieldErrors({
+          email: "Check this email address.",
+          password: "Check this password.",
+        });
         setLoading(false);
         return;
       }
@@ -64,7 +86,7 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:gap-5">
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4 sm:gap-5">
       {!isConfigured ? (
         <Alert variant="warning" title="Authentication is not configured">
           {authError}
@@ -96,6 +118,7 @@ export function LoginForm() {
         required
         icon={<AuthIcon d={AUTH_ICONS.mail} size={16} stroke="currentColor" sw={1.8} />}
         disabled={loading || !isConfigured}
+        error={fieldErrors.email}
       />
       <AuthInput
         id="password"
@@ -108,6 +131,7 @@ export function LoginForm() {
         minLength={8}
         icon={<AuthIcon d={AUTH_ICONS.lock} size={16} stroke="currentColor" sw={1.8} />}
         disabled={loading || !isConfigured}
+        error={fieldErrors.password}
       />
       <LoadingButton
         type="submit"

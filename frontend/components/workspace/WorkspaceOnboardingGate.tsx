@@ -474,6 +474,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
                       disabled={creating}
                       autoFocus
                       placeholder="Acme Operations"
+                      error={createError === "Workspace name is required." ? createError : undefined}
                     />
                     <label className="block space-y-2">
                       <span className="text-sm font-medium text-slate-200">Description</span>
@@ -507,7 +508,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
                         ))}
                       </div>
                     </div>
-                    {createError ? (
+                    {createError && createError !== "Workspace name is required." ? (
                       <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
                         {createError}
                       </div>
@@ -547,8 +548,9 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
                     disabled={inviting}
                     icon={<Mail className="h-4 w-4" />}
                     placeholder="teammate@company.com"
+                    error={inviteError === "Enter an email address to invite." ? inviteError : undefined}
                   />
-                  {inviteError ? (
+                  {inviteError && inviteError !== "Enter an email address to invite." ? (
                     <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
                       {inviteError}
                     </div>

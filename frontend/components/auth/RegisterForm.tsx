@@ -23,6 +23,7 @@ export function RegisterForm() {
   const { authError, isConfigured, refreshSession } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ handle?: string; email?: string; password?: string }>({});
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -31,20 +32,34 @@ export function RegisterForm() {
       return;
     }
 
-    setError(null);
-    setLoading(true);
-
     const formData = new FormData(event.currentTarget);
     const name = String(formData.get("name") ?? "").trim();
     const handle = String(formData.get("handle") ?? "").trim().replace(/^@/, "").toLowerCase();
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
+    const nextFieldErrors: { handle?: string; email?: string; password?: string } = {};
 
     if (!/^[a-z0-9][a-z0-9_-]{2,29}$/.test(handle)) {
-      setError("Choose a handle with 3-30 lowercase letters, numbers, hyphens, or underscores.");
-      setLoading(false);
+      nextFieldErrors.handle = "Use 3-30 lowercase letters, numbers, hyphens, or underscores.";
+    }
+    if (!email) {
+      nextFieldErrors.email = "Enter your email address.";
+    }
+    if (!password) {
+      nextFieldErrors.password = "Create a password.";
+    } else if (password.length < 8) {
+      nextFieldErrors.password = "Use at least 8 characters.";
+    }
+
+    setError(null);
+    setFieldErrors(nextFieldErrors);
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setError("Check the highlighted fields and try again.");
       return;
     }
+
+    setLoading(true);
 
     try {
       const { data, error: signUpError } = await supabase.auth.signUp({
@@ -61,6 +76,9 @@ export function RegisterForm() {
       if (signUpError) {
         logClientError("Registration failed", signUpError);
         setError("Unable to create account. Check the details and try again.");
+        setFieldErrors({
+          email: "Check this email address or sign in instead.",
+        });
         setLoading(false);
         return;
       }
@@ -88,7 +106,7 @@ export function RegisterForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:gap-5">
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4 sm:gap-5">
       {!isConfigured ? (
         <Alert variant="warning" title="Authentication is not configured">
           {authError}
@@ -133,6 +151,7 @@ export function RegisterForm() {
         icon={<AuthIcon d={AUTH_ICONS.at} size={16} stroke="currentColor" sw={1.8} />}
         hint="Unique ID for workspace invites. Lowercase letters, numbers, hyphens, and underscores."
         disabled={loading || !isConfigured}
+        error={fieldErrors.handle}
       />
       <AuthInput
         id="email"
@@ -144,6 +163,7 @@ export function RegisterForm() {
         required
         icon={<AuthIcon d={AUTH_ICONS.mail} size={16} stroke="currentColor" sw={1.8} />}
         disabled={loading || !isConfigured}
+        error={fieldErrors.email}
       />
       <AuthInput
         id="password"
@@ -157,6 +177,7 @@ export function RegisterForm() {
         icon={<AuthIcon d={AUTH_ICONS.lock} size={16} stroke="currentColor" sw={1.8} />}
         hint="Use at least 8 characters."
         disabled={loading || !isConfigured}
+        error={fieldErrors.password}
       />
       <div
         className="rounded-2xl p-3 text-xs leading-5"
