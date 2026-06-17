@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import dynamic from "next/dynamic";
 
 const WorkspaceInitiativesSurface = dynamic(
@@ -8,5 +10,13 @@ const WorkspaceInitiativesSurface = dynamic(
 );
 
 export default function InitiativesPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <InitiativesPageContent />
+    </Suspense>
+  );
+}
+
+function InitiativesPageContent() {
   return <WorkspaceInitiativesSurface />;
 }

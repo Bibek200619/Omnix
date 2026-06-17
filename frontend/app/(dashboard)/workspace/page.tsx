@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type { CSSProperties, FormEvent } from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -65,6 +67,14 @@ function selectedWorkspace(workspaces: Workspace[], selectedId: string | null, f
 }
 
 export default function WorkspacePage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <WorkspacePageContent />
+    </Suspense>
+  );
+}
+
+function WorkspacePageContent() {
   const router = useRouter();
   const {
     activeWorkspace,

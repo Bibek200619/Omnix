@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -36,6 +38,14 @@ type FileData = {
 };
 
 export default function DashboardPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <DashboardPageContent />
+    </Suspense>
+  );
+}
+
+function DashboardPageContent() {
   const router = useRouter();
   const { conversations } = useConversationHistory();
   const {

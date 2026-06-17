@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import dynamic from "next/dynamic";
 import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -327,6 +329,14 @@ function newestConnector(connectors: WorkspaceConnector[], type: ConnectorType) 
 }
 
 export default function FilesPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <FilesPageContent />
+    </Suspense>
+  );
+}
+
+function FilesPageContent() {
   const { activeWorkspace, activeMembers, activeWorkspaceId, activeWorkspaceIntelligence } = useWorkspace();
   const [files, setFiles] = useState<FileData[]>([]);
   const [connectors, setConnectors] = useState<WorkspaceConnector[]>([]);

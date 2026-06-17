@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Database, LayoutDashboard, MessageSquare, RefreshCw, Sparkles, Users, Zap, Construction } from "lucide-react";
@@ -54,6 +56,14 @@ function MetricCard({ metric }: { metric: Metric }) {
 }
 
 export default function AnalyticsPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <AnalyticsPageContent />
+    </Suspense>
+  );
+}
+
+function AnalyticsPageContent() {
   const { conversations, loading: conversationsLoading, refreshConversations } = useConversationHistory();
   const { activeWorkspace, activeMembers, activeInvites, workspaces } = useWorkspace();
   const [files, setFiles] = useState<FileData[]>([]);

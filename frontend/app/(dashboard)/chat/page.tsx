@@ -1,5 +1,6 @@
 "use client";
 
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
 
@@ -9,6 +10,14 @@ const ChatInterface = dynamic(
 );
 
 export default function ChatPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <ChatPageContent />
+    </Suspense>
+  );
+}
+
+function ChatPageContent() {
   return (
     <Suspense fallback={<div className="text-sm text-slate-400">Loading chat...</div>}>
       <ChatInterface />

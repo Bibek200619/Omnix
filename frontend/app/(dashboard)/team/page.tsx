@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Ban,
@@ -211,6 +213,14 @@ function MemberActionsMenu({
 }
 
 export default function TeamPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <TeamPageContent />
+    </Suspense>
+  );
+}
+
+function TeamPageContent() {
   const {
     activeWorkspace,
     activeMembers,
