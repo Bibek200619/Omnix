@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BrainCircuit, Check, GitBranch, Layers3, Loader2, Plus, Settings, ShieldCheck, Sparkles, Trash2, Users } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -221,12 +222,12 @@ export function WorkspaceSettingsPanel() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className={cn("rounded-full border px-3 py-1 text-xs font-semibold", workspaceRoleBadgeClass(activeWorkspace.current_user_role))}>
+            <Badge variant="role" className={workspaceRoleBadgeClass(activeWorkspace.current_user_role)}>
               {workspaceRoleLabel(activeWorkspace.current_user_role)}
-            </span>
-            <span className="rounded-full border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 py-1 text-xs text-[var(--omnix-text-2)]">
+            </Badge>
+            <Badge className="font-normal">
               {activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "member" : "members"}
-            </span>
+            </Badge>
           </div>
         </div>
       </section>
@@ -341,9 +342,9 @@ export function WorkspaceSettingsPanel() {
               Define the cognitive posture Omnix should use inside this workspace. It shapes chat, continuity, and retrieval-aware reasoning without changing Omnix identity.
             </p>
           </div>
-          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+          <Badge variant="info">
             {activeWorkspaceIntelligence?.source_count ?? 0} sources active
-          </span>
+          </Badge>
         </div>
 
         <div className="relative z-10 grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -456,9 +457,9 @@ export function WorkspaceSettingsPanel() {
               Create and review real child workspaces attached to this hierarchy.
             </p>
           </div>
-          <span className="rounded-full border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 py-1 text-xs text-[var(--omnix-text-2)]">
+          <Badge className="font-normal">
             {visibleSubspaces.length} subworkspace{visibleSubspaces.length === 1 ? "" : "s"}
-          </span>
+          </Badge>
         </div>
 
         <div className="relative z-10 grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">

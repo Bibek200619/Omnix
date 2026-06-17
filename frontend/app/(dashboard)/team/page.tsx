@@ -23,6 +23,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Portal } from "@/components/ui/Portal";
@@ -510,10 +511,10 @@ function TeamPageContent() {
                   <div className="min-w-0">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <h2 className="truncate text-sm font-semibold text-white">{name}</h2>
-                      <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold", workspaceRoleBadgeClass(member.role))}>
+                      <Badge variant="role" className={cn("gap-1 px-2 py-0.5 !text-[11px]", workspaceRoleBadgeClass(member.role))}>
                         <RoleIcon className="h-3 w-3" />
                         {displayRole(member.role)}
-                      </span>
+                      </Badge>
                     </div>
                     <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-[var(--omnix-text-3)]">
                       <Mail className="h-3 w-3 shrink-0" />

@@ -37,6 +37,7 @@ import {
     X,
 } from "lucide-react";
 import { OmnixMark } from "@/components/brand/OmnixMark";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { Portal } from "@/components/ui/Portal";
@@ -84,16 +85,17 @@ function WorkspaceTypeBadge({ workspace }: { workspace?: Workspace | null }) {
   if (!label) return null;
 
   return (
-    <span
+    <Badge
+      variant="role"
       className={cn(
-        "shrink-0 rounded border px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.08em]",
+        "shrink-0 !rounded px-1.5 py-0.5 !text-[8px] uppercase tracking-[0.08em]",
         label === "Super" && "border-indigo-300/20 bg-indigo-400/10 text-indigo-200",
         label === "Global" && "border-amber-300/25 bg-amber-400/10 text-amber-200",
         label === "Team" && "border-emerald-300/20 bg-emerald-400/10 text-emerald-200",
       )}
     >
       {label}
-    </span>
+    </Badge>
   );
 }
 
@@ -514,9 +516,9 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
                 <span className="h-0.5 w-0.5 rounded-full bg-white/10" />
                 <span>{liveStatus?.source_count ?? 0} logic</span>
                 <span className="h-0.5 w-0.5 rounded-full bg-white/10" />
-                <span className={cn("px-1.5 py-0.5 rounded border border-white/5", workspaceRoleBadgeClass(workspace.current_user_role))}>
+                <Badge variant="role" className={cn("!rounded border-white/5 px-1.5 py-0.5 !text-[9px]", workspaceRoleBadgeClass(workspace.current_user_role))}>
                   {workspaceRoleLabel(workspace.current_user_role)}
-                </span>
+                </Badge>
               </span>
             </span>
           </button>
@@ -591,9 +593,9 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
               <WorkspaceTypeBadge workspace={active} />
             </div>
             <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--omnix-text-3)]">
-               <span className={cn("px-1.5 py-0.5 rounded border border-white/5", workspaceRoleBadgeClass(active?.current_user_role))}>
+               <Badge variant="role" className={cn("!rounded border-white/5 px-1.5 py-0.5 !text-[10px]", workspaceRoleBadgeClass(active?.current_user_role))}>
                   {active ? workspaceRoleLabel(active.current_user_role) : "Workspace"}
-               </span>
+               </Badge>
                {active && (
                  <>
                    <span className="h-0.5 w-0.5 rounded-full bg-white/10" />
