@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   AlertTriangle,
   CalendarDays,
@@ -96,6 +97,7 @@ function WorkspaceTasksSurfaceContent() {
   const [assisting, setAssisting] = useState<WorkspaceTaskAssistanceMode | null>(null);
   const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
   const taskRefs = useRef<Record<string, HTMLElement | null>>({});
+  const taskListRef = useRef<HTMLDivElement | null>(null);
   const workspaceRef = useRef(activeWorkspaceId);
   const requestRef = useRef(0);
 
@@ -235,13 +237,24 @@ function WorkspaceTasksSurfaceContent() {
     });
   }, [filter, tasks, session?.user.id]);
 
+  const taskVirtualizer = useVirtualizer({
+    count: displayedTasks.length,
+    getScrollElement: () => taskListRef.current,
+    estimateSize: () => 88,
+    overscan: 6,
+  });
+
   useEffect(() => {
     if (!focusedTaskId || loading) return;
+    const focusedIndex = displayedTasks.findIndex((task) => task.id === focusedTaskId);
+    if (focusedIndex >= 0) {
+      taskVirtualizer.scrollToIndex(focusedIndex, { align: "center" });
+    }
     const timer = window.setTimeout(() => {
       taskRefs.current[focusedTaskId]?.scrollIntoView({ block: "center", behavior: "smooth" });
     }, 80);
     return () => window.clearTimeout(timer);
-  }, [displayedTasks, focusedTaskId, loading]);
+  }, [displayedTasks, focusedTaskId, loading, taskVirtualizer]);
 
   const executionOverview = useMemo(() => {
     if (!tasks.length) return null;
@@ -490,7 +503,7 @@ function WorkspaceTasksSurfaceContent() {
             </form>
           ) : null}
 
-          <div className="space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+          <div ref={taskListRef} className="omnix-scrollbar overflow-y-auto xl:min-h-0 xl:flex-1">
             {loading ? <Loader2 className="mx-auto mt-10 h-5 w-5 animate-spin text-cyan-100/50" /> : null}
             {!loading && displayedTasks.length === 0 ? (
               <div className="mx-auto mt-14 max-w-sm text-center">
@@ -508,140 +521,155 @@ function WorkspaceTasksSurfaceContent() {
                 </Button>
               </div>
             ) : null}
-            {displayedTasks.map((task) => {
-              const isMyTask = task.owner_user_id === session?.user.id;
-              const isBlocked = task.blockers.length > 0;
-              const isActive = task.status === "active";
-              
-              const now = new Date();
-              const threeDaysFromNow = new Date();
-              threeDaysFromNow.setDate(now.getDate() + 3);
-              const isDueSoon = task.due_date && new Date(task.due_date) <= threeDaysFromNow;
+            {!loading && displayedTasks.length > 0 ? (
+              <div className="relative w-full" style={{ height: taskVirtualizer.getTotalSize() }}>
+                {taskVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const task = displayedTasks[virtualRow.index];
+                  if (!task) return null;
 
-              return (
-                <article
-                  key={task.id}
-                  ref={(node) => {
-                    taskRefs.current[task.id] = node;
-                  }}
-                  className={cn(
-                  "group relative rounded-xl border p-3.5 transition",
-                  focusedTaskId === task.id
-                    ? "border-cyan-300/45 bg-cyan-300/[0.07] shadow-[var(--omnix-glow-xs)]"
-                    : isBlocked ? "border-amber-400/30 bg-amber-400/[0.03]" : "border-[var(--omnix-border)] bg-black/[0.12] hover:bg-white/[0.03]"
-                )}>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        {isBlocked && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-300" />}
-                        {isActive && <div className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />}
-                        <p className="truncate text-sm font-medium text-white">{task.title}</p>
-                      </div>
-                      {task.description ? (
-                        <p className="mt-1 line-clamp-1 text-xs text-[var(--omnix-text-2)] transition-all group-hover:line-clamp-none">
-                          <MentionText content={task.description} mentions={task.mentions} />
-                        </p>
-                      ) : null}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={task.status}
-                        disabled={updatingId === task.id}
-                        onChange={(event) => void patchTask(task, { status: event.target.value as WorkspaceTaskStatus })}
+                  const isMyTask = task.owner_user_id === session?.user.id;
+                  const isBlocked = task.blockers.length > 0;
+                  const isActive = task.status === "active";
+
+                  const now = new Date();
+                  const threeDaysFromNow = new Date();
+                  threeDaysFromNow.setDate(now.getDate() + 3);
+                  const isDueSoon = task.due_date && new Date(task.due_date) <= threeDaysFromNow;
+
+                  return (
+                    <div
+                      key={task.id}
+                      data-index={virtualRow.index}
+                      ref={taskVirtualizer.measureElement}
+                      className="absolute left-0 top-0 w-full pb-2"
+                      style={{ transform: `translateY(${virtualRow.start}px)` }}
+                    >
+                      <article
+                        ref={(node) => {
+                          taskRefs.current[task.id] = node;
+                        }}
                         className={cn(
-                          "omnix-input h-7 rounded-lg px-2 text-[11px] font-semibold transition",
-                          task.status === "active" ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-100" : "bg-black/20"
+                          "group relative rounded-xl border p-3.5 transition",
+                          focusedTaskId === task.id
+                            ? "border-cyan-300/45 bg-cyan-300/[0.07] shadow-[var(--omnix-glow-xs)]"
+                            : isBlocked ? "border-amber-400/30 bg-amber-400/[0.03]" : "border-[var(--omnix-border)] bg-black/[0.12] hover:bg-white/[0.03]"
                         )}
-                        aria-label={`Status for ${task.title}`}
                       >
-                        {flow.map((phase) => <option key={phase.value} value={phase.value}>{phase.label}</option>)}
-                      </select>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              {isBlocked && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-300" />}
+                              {isActive && <div className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />}
+                              <p className="truncate text-sm font-medium text-white">{task.title}</p>
+                            </div>
+                            {task.description ? (
+                              <p className="mt-1 line-clamp-1 text-xs text-[var(--omnix-text-2)] transition-all group-hover:line-clamp-none">
+                                <MentionText content={task.description} mentions={task.mentions} />
+                              </p>
+                            ) : null}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={task.status}
+                              disabled={updatingId === task.id}
+                              onChange={(event) => void patchTask(task, { status: event.target.value as WorkspaceTaskStatus })}
+                              className={cn(
+                                "omnix-input h-7 rounded-lg px-2 text-[11px] font-semibold transition",
+                                task.status === "active" ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-100" : "bg-black/20"
+                              )}
+                              aria-label={`Status for ${task.title}`}
+                            >
+                              {flow.map((phase) => <option key={phase.value} value={phase.value}>{phase.label}</option>)}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                          {/* Simplified Metadata */}
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1.5 text-[11px] text-[var(--omnix-text-2)]">
+                              <UserRound className={cn("h-3 w-3", isMyTask ? "text-emerald-300" : "text-[var(--omnix-text-3)]")} />
+                              <select
+                                value={task.owner_user_id || ""}
+                                disabled={updatingId === task.id}
+                                onChange={(event) => void patchTask(task, { owner_user_id: event.target.value || null })}
+                                className="bg-transparent outline-none"
+                              >
+                                <option value="">Unassigned</option>
+                                {members.map((member) => <option key={member.user_id} value={member.user_id}>{member.full_name || member.email || "Teammate"}</option>)}
+                              </select>
+                            </div>
+
+                            <div className={cn("flex items-center gap-1.5 text-[11px]", isDueSoon ? "text-rose-300 font-medium" : "text-[var(--omnix-text-2)]")}>
+                              <CalendarDays className="h-3 w-3" />
+                              <input
+                                type="date"
+                                value={task.due_date || ""}
+                                disabled={updatingId === task.id}
+                                onChange={(event) => void patchTask(task, { due_date: event.target.value || null })}
+                                className="bg-transparent outline-none"
+                              />
+                              {!task.due_date && <span className="text-[var(--omnix-text-3)]">No date</span>}
+                            </div>
+                          </div>
+
+                          {/* Secondary metadata hidden until hover/focus */}
+                          <div className="flex items-center gap-3 opacity-100 transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                            <div className="flex items-center gap-1.5 text-[11px] text-[var(--omnix-text-3)]">
+                              <Compass className="h-3 w-3" />
+                              <select
+                                value={task.initiative_id || ""}
+                                disabled={updatingId === task.id}
+                                onChange={(event) => void patchTask(task, { initiative_id: event.target.value || null })}
+                                className="max-w-[120px] truncate bg-transparent outline-none"
+                              >
+                                <option value="">No initiative</option>
+                                {initiatives.map((initiative) => <option key={initiative.id} value={initiative.id}>{initiative.title}</option>)}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Blockers Area */}
+                        {task.blockers.length > 0 && (
+                          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                            {task.blockers.map((blocker) => (
+                              <button
+                                type="button"
+                                key={blocker}
+                                onClick={() => void patchTask(task, { blockers: task.blockers.filter((entry) => entry !== blocker) })}
+                                className="inline-flex items-center gap-1 rounded-md border border-amber-300/20 bg-amber-300/[0.08] px-2 py-1 text-[10px] font-medium text-amber-100"
+                              >
+                                {blocker} <X className="h-2.5 w-2.5 opacity-60" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Phase 3: Linked Decisions */}
+                        <DecisionTraceabilityList decisions={task.linked_decisions} />
+
+                        {/* Inline Blocker Adder (Simplified) */}
+                        <div className="mt-2.5 border-t border-white/[0.04] pt-2.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                          <input
+                            value={blockerDrafts[task.id] || ""}
+                            onChange={(event) => setBlockerDrafts((current) => ({ ...current, [task.id]: event.target.value }))}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                addBlocker(task);
+                              }
+                            }}
+                            placeholder="Add blocker..."
+                            className="h-6 w-full bg-transparent px-1 text-[10px] text-[var(--omnix-text-3)] outline-none placeholder:text-white/10 focus:placeholder:text-white/20"
+                          />
+                        </div>
+                      </article>
                     </div>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    {/* Simplified Metadata */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5 text-[11px] text-[var(--omnix-text-2)]">
-                        <UserRound className={cn("h-3 w-3", isMyTask ? "text-emerald-300" : "text-[var(--omnix-text-3)]")} />
-                        <select
-                          value={task.owner_user_id || ""}
-                          disabled={updatingId === task.id}
-                          onChange={(event) => void patchTask(task, { owner_user_id: event.target.value || null })}
-                          className="bg-transparent outline-none"
-                        >
-                          <option value="">Unassigned</option>
-                          {members.map((member) => <option key={member.user_id} value={member.user_id}>{member.full_name || member.email || "Teammate"}</option>)}
-                        </select>
-                      </div>
-
-                      <div className={cn("flex items-center gap-1.5 text-[11px]", isDueSoon ? "text-rose-300 font-medium" : "text-[var(--omnix-text-2)]")}>
-                        <CalendarDays className="h-3 w-3" />
-                        <input
-                          type="date"
-                          value={task.due_date || ""}
-                          disabled={updatingId === task.id}
-                          onChange={(event) => void patchTask(task, { due_date: event.target.value || null })}
-                          className="bg-transparent outline-none"
-                        />
-                        {!task.due_date && <span className="text-[var(--omnix-text-3)]">No date</span>}
-                      </div>
-                    </div>
-
-                    {/* Secondary metadata hidden until hover/focus */}
-                    <div className="flex items-center gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                      <div className="flex items-center gap-1.5 text-[11px] text-[var(--omnix-text-3)]">
-                        <Compass className="h-3 w-3" />
-                        <select
-                          value={task.initiative_id || ""}
-                          disabled={updatingId === task.id}
-                          onChange={(event) => void patchTask(task, { initiative_id: event.target.value || null })}
-                          className="bg-transparent outline-none max-w-[120px] truncate"
-                        >
-                          <option value="">No initiative</option>
-                          {initiatives.map((initiative) => <option key={initiative.id} value={initiative.id}>{initiative.title}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Blockers Area */}
-                  {task.blockers.length > 0 && (
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                      {task.blockers.map((blocker) => (
-                        <button
-                          type="button"
-                          key={blocker}
-                          onClick={() => void patchTask(task, { blockers: task.blockers.filter((entry) => entry !== blocker) })}
-                          className="inline-flex items-center gap-1 rounded-md border border-amber-300/20 bg-amber-300/[0.08] px-2 py-1 text-[10px] font-medium text-amber-100"
-                        >
-                          {blocker} <X className="h-2.5 w-2.5 opacity-60" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Phase 3: Linked Decisions */}
-                  <DecisionTraceabilityList decisions={task.linked_decisions} />
-                  
-                  {/* Inline Blocker Adder (Simplified) */}
-                  <div className="mt-2.5 border-t border-white/[0.04] pt-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                    <input
-                      value={blockerDrafts[task.id] || ""}
-                      onChange={(event) => setBlockerDrafts((current) => ({ ...current, [task.id]: event.target.value }))}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          addBlocker(task);
-                        }
-                      }}
-                      placeholder="Add blocker..."
-                      className="h-6 w-full bg-transparent px-1 text-[10px] text-[var(--omnix-text-3)] outline-none placeholder:text-white/10 focus:placeholder:text-white/20"
-                    />
-                  </div>
-                </article>
-              );
-            })}
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         </main>
 
