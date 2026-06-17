@@ -354,6 +354,7 @@ export function ChatInterface() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [responding, setResponding] = useState(false);
+  const [streamingContent, setStreamingContent] = useState("");
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentConversation, setCurrentConversation] = useState<string | null>(
@@ -415,16 +416,33 @@ export function ChatInterface() {
   const messageSyncInFlightRef = useRef<Map<string, Promise<boolean>>>(new Map());
   const loadRequestIdRef = useRef(0);
   const activeStreamAbortRef = useRef<AbortController | null>(null);
+  const streamAnnouncerClearTimerRef = useRef<number | null>(null);
   const senderLookupRef = useRef(senderLookup);
   const activeWorkspaceIdRef = useRef<string | null>(activeWorkspaceId);
+
+  const clearStreamAnnouncerTimer = useCallback(() => {
+    if (streamAnnouncerClearTimerRef.current !== null) {
+      window.clearTimeout(streamAnnouncerClearTimerRef.current);
+      streamAnnouncerClearTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleStreamAnnouncerClear = useCallback(() => {
+    clearStreamAnnouncerTimer();
+    streamAnnouncerClearTimerRef.current = window.setTimeout(() => {
+      setStreamingContent("");
+      streamAnnouncerClearTimerRef.current = null;
+    }, 2000);
+  }, [clearStreamAnnouncerTimer]);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      clearStreamAnnouncerTimer();
       activeStreamAbortRef.current?.abort();
     };
-  }, []);
+  }, [clearStreamAnnouncerTimer]);
 
   useEffect(() => {
     currentConversationRef.current = currentConversation;
@@ -766,6 +784,8 @@ export function ChatInterface() {
       let streamConversationId: string | null = currentConversation;
       const streamAbortController = new AbortController();
       activeStreamAbortRef.current = streamAbortController;
+      clearStreamAnnouncerTimer();
+      setStreamingContent("");
       let pendingTokenText = "";
       let tokenFlushFrame: number | null = null;
 
@@ -903,6 +923,7 @@ export function ChatInterface() {
             if (!assistantId) return;
             const txt = obj.text ?? "";
             if (!txt) return;
+            setStreamingContent((current) => current + txt);
             pendingTokenText += txt;
             scheduleTokenFlush();
           } else if (t === "error") {
@@ -928,6 +949,7 @@ export function ChatInterface() {
             if (!conversationId && obj.conversation_id) {
               router.replace(`/chat?conversation=${obj.conversation_id}`, { scroll: false });
             }
+            scheduleStreamAnnouncerClear();
           }
         };
 
@@ -1017,10 +1039,12 @@ export function ChatInterface() {
       currentConversation,
       activeWorkspace?.current_user_role,
       activeWorkspaceId,
+      clearStreamAnnouncerTimer,
       pendingAttachments,
       refreshConversations,
       reconcileConversationMessages,
       router,
+      scheduleStreamAnnouncerClear,
       searchMode,
       senderLookup,
       setActiveConversation,
@@ -1071,6 +1095,14 @@ export function ChatInterface() {
 
   return (
     <section className="relative flex h-full w-full overflow-hidden bg-[var(--omnix-bg)] text-[var(--omnix-text)]">
+      <div
+        aria-live="polite"
+        aria-atomic="false"
+        className="sr-only"
+        id="ai-stream-announcer"
+      >
+        {streamingContent}
+      </div>
       <div className="pointer-events-none absolute left-[18%] top-[-18%] h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle,rgba(0,255,255,0.075),transparent_68%)] blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-20%] right-[4%] h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,rgba(0,51,255,0.085),transparent_70%)] blur-3xl" />
       {historyOpen ? (
