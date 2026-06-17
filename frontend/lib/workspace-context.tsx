@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { apiClient } from "./api";
+import { apiClient, setApiWorkspaceId } from "./api";
 import { useAuth } from "./auth-context";
 import { logClientError } from "./errors";
 import { logger } from "./logger";
@@ -441,6 +441,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       requestGenerationRef.current += 1;
     }
     setActiveWorkspaceId(id);
+    setApiWorkspaceId(id);
     try {
       if (typeof window !== "undefined") {
         if (id) {
@@ -1144,6 +1145,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     try {
       const saved = typeof window !== "undefined" ? window.localStorage.getItem(workspaceStorageKey()) : null;
       logger.debug("[workspace] hydration read saved active workspace", { saved });
+      setApiWorkspaceId(saved);
       if (saved) {
         setActiveWorkspaceId(saved);
       }
