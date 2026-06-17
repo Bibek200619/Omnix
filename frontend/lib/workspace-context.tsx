@@ -6,6 +6,7 @@ import { useAuth } from "./auth-context";
 import { logClientError } from "./errors";
 import { logger } from "./logger";
 import { isWorkspaceFounderRole } from "./workspace-roles";
+import { flattenWorkspaces } from "./workspace-utils";
 import {
   getWorkspaceInviteId,
   type Workspace,
@@ -278,18 +279,6 @@ function normalizeWorkspaceForest(records: WorkspaceApiRecord[] | null | undefin
   }
 
   return roots.map((workspace) => attachChildren(workspace));
-}
-
-function flattenWorkspaces(workspaces: Workspace[]) {
-  const flattened: Workspace[] = [];
-
-  function visit(workspace: Workspace) {
-    flattened.push(workspace);
-    workspace.subspaces?.forEach(visit);
-  }
-
-  workspaces.forEach(visit);
-  return flattened;
 }
 
 function findWorkspaceById(workspaces: Workspace[], workspaceId: string | null) {

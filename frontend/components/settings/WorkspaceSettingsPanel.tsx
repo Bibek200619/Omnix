@@ -10,20 +10,11 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Toggle } from "@/components/ui/Toggle";
 import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
+import { flattenWorkspaces } from "@/lib/workspace-utils";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { Workspace } from "@/lib/workspace-types";
 import type { WorkspaceFocus } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
-
-function flattenWorkspaces(workspaces: Workspace[]) {
-  const list: Workspace[] = [];
-  const visit = (workspace: Workspace) => {
-    list.push(workspace);
-    workspace.subspaces?.forEach(visit);
-  };
-  workspaces.forEach(visit);
-  return list;
-}
 
 function findWorkspace(workspaces: Workspace[], workspaceId?: string | null) {
   if (!workspaceId) return null;
