@@ -6,6 +6,7 @@ import { ArrowUpRight, AtSign, BadgeCheck, Check, ClipboardCheck, Loader2, Messa
 import { useRouter } from "next/navigation";
 import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -198,25 +199,12 @@ function NotificationCenterSurfaceContent() {
       ) : null}
 
       {!loading && mentions.length === 0 ? (
-        <div className="mx-auto flex min-h-[22rem] max-w-sm flex-col items-center justify-center text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-300/12 bg-cyan-300/[0.045] text-cyan-100/45">
-            <AtSign className="h-5 w-5" />
-          </div>
-          <p className="mt-4 text-sm font-medium text-white">You&apos;re all caught up.</p>
-          <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">
-            New @mentions from conversations, tasks, and decisions will appear here with a direct path back to the source.
-          </p>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => router.push("/conversations")}
-            className="mt-4 min-h-10"
-            rightIcon={<ArrowUpRight className="h-3.5 w-3.5" />}
-          >
-            Review conversations
-          </Button>
-        </div>
+        <EmptyState
+          icon={AtSign}
+          title="You're all caught up"
+          description="Notifications about mentions and workspace activity appear here"
+          className="mx-auto min-h-[22rem] max-w-lg"
+        />
       ) : null}
 
       {mentions.length > 0 ? (

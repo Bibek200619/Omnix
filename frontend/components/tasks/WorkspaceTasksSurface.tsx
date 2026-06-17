@@ -17,6 +17,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -527,20 +528,13 @@ function WorkspaceTasksSurfaceContent() {
               </div>
             ) : null}
             {!loading && displayedTasks.length === 0 ? (
-              <div className="mx-auto mt-14 max-w-sm text-center">
-                <ClipboardCheck className="mx-auto h-7 w-7 text-cyan-100/35" />
-                <p className="mt-3 text-sm text-[var(--omnix-text-2)]">No tasks recorded in this view.</p>
-                <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">Capture only the next steps that require shared visibility, or change the phase filter above.</p>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="mt-4 min-h-10"
-                  leftIcon={<Plus className="h-3.5 w-3.5" />}
-                  onClick={() => setCreateOpen(true)}
-                >
-                  Record task
-                </Button>
-              </div>
+              <EmptyState
+                icon={ClipboardCheck}
+                title="No tasks yet"
+                description="Create your first task to start tracking execution"
+                action={{ label: "Create Task", onClick: () => setCreateOpen(true) }}
+                className="mx-auto mt-10 max-w-lg"
+              />
             ) : null}
             {!loading && displayedTasks.length > 0 ? (
               <div className="relative w-full" style={{ height: taskVirtualizer.getTotalSize() }}>

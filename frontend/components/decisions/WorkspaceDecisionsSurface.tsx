@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { BadgeCheck, Loader2, Plus, RefreshCw, Target, ListTodo } from "lucide-react";
 import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
@@ -200,72 +201,13 @@ function WorkspaceDecisionsSurfaceContent() {
       ) : null}
 
       {!loading && decisions.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-dashed border-cyan-400/10 bg-cyan-400/[0.01] p-8 text-center sm:p-12">
-          <div className="relative mb-8">
-            <div className="absolute inset-0 -m-12 animate-pulse bg-cyan-400/5 blur-3xl rounded-full" />
-            <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-cyan-400/20 bg-black/40 shadow-[0_0_30px_rgba(34,211,238,0.1)]">
-              <BadgeCheck className="h-10 w-10 text-cyan-400" />
-            </div>
-          </div>
-          
-          <h2 className="omnix-display text-2xl font-bold text-white sm:text-3xl">Decision Memory</h2>
-          <p className="mt-3 max-w-lg text-base text-[var(--omnix-text-2)]">
-            Capture important organizational choices. Decisions preserve context, rationale, and follow-through.
-          </p>
-
-          <div className="mt-8 grid max-w-2xl gap-4 text-left sm:grid-cols-2">
-            {[
-              { title: "Preserve Rationale", desc: "Why a choice was made and the historical context.", icon: Target },
-              { title: "Execution Linkage", desc: "What work came from it and which tasks it spawned.", icon: ListTodo },
-              { title: "Strategic Impact", desc: "Which initiative it supports and how it fits the roadmap.", icon: BadgeCheck },
-              { title: "Operational Audit", desc: "A searchable timeline of team consensus and shifts.", icon: RefreshCw },
-            ].map((feature, i) => (
-              <div key={i} className="flex gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-4 transition hover:bg-white/[0.04]">
-                <feature.icon className="h-5 w-5 shrink-0 text-cyan-400/60" />
-                <div>
-                  <h4 className="text-sm font-semibold text-white">{feature.title}</h4>
-                  <p className="mt-1 text-xs text-[var(--omnix-text-3)] leading-relaxed">{feature.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-10 flex flex-col items-center gap-4">
-            <Button size="lg" onClick={() => setCreateOpen(true)} leftIcon={<Plus className="h-5 w-5" />} className="h-12 px-8 text-base shadow-[0_0_25px_rgba(34,211,238,0.2)]">
-              Create First Decision
-            </Button>
-            <p className="text-xs text-[var(--omnix-text-3)]">
-              Important conversations can also be converted into decisions.
-            </p>
-          </div>
-
-          {/* Example Card (Phase 4) */}
-          <div className="mt-12 w-full max-w-md text-left opacity-50 grayscale hover:opacity-80 hover:grayscale-0 transition-all duration-500">
-            <p className="mb-3 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--omnix-text-3)]">Example Decision</p>
-            <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-5 shadow-2xl">
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-emerald-400">Accepted</span>
-                  <h3 className="mt-2 text-sm font-bold text-white">Use Supabase Realtime</h3>
-                </div>
-                <BadgeCheck className="h-5 w-5 text-cyan-400/40" />
-              </div>
-              <p className="mt-3 text-[11px] text-[var(--omnix-text-2)] leading-relaxed">
-                Reduce operational complexity by leveraging built-in sync.
-              </p>
-              <div className="mt-4 flex items-center gap-3 border-t border-white/5 pt-4">
-                <div className="flex items-center gap-1.5">
-                  <ListTodo className="h-3 w-3 text-white/20" />
-                  <span className="text-[10px] font-medium text-white/40">4 tasks</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Target className="h-3 w-3 text-white/20" />
-                  <span className="text-[10px] font-medium text-white/40">1 initiative</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <EmptyState
+          icon={BadgeCheck}
+          title="No decisions recorded"
+          description="Capture decisions to build your organization's memory"
+          action={{ label: "Record Decision", onClick: () => setCreateOpen(true) }}
+          className="flex-1"
+        />
       ) : (
         <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:grid-rows-1">
           <aside className={cn(

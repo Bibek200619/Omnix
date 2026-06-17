@@ -20,6 +20,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Textarea } from "@/components/ui/Textarea";
@@ -501,20 +502,13 @@ function WorkspaceInitiativesSurfaceContent() {
           <div className="omnix-scrollbar flex min-h-0 gap-2 overflow-x-auto pb-1 lg:block lg:flex-1 lg:space-y-2 lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0">
             {loading ? <Loader2 className="mx-auto mt-8 h-5 w-5 animate-spin text-cyan-100/50" /> : null}
             {!loading && initiatives.length === 0 ? (
-              <div className="px-3 py-10 text-center">
-                <Compass className="mx-auto h-7 w-7 text-cyan-100/30" />
-                <p className="mt-3 text-sm text-[var(--omnix-text-2)]">No initiatives open.</p>
-                <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">Name the shared outcome that current execution serves.</p>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="mt-4 min-h-10"
-                  leftIcon={<Plus className="h-3.5 w-3.5" />}
-                  onClick={() => setCreateOpen(true)}
-                >
-                  Create initiative
-                </Button>
-              </div>
+              <EmptyState
+                icon={Compass}
+                title="No initiatives yet"
+                description="Initiatives track strategic direction across your workspace"
+                action={{ label: "Create Initiative", onClick: () => setCreateOpen(true) }}
+                className="min-w-[min(17rem,78vw)] lg:min-w-0"
+              />
             ) : null}
             {sortedInitiatives.map((initiative) => (
               <button key={initiative.id} type="button" onClick={() => { setSelectedId(initiative.id); setAssistance(null); }} className={cn("group w-[min(15rem,78vw)] shrink-0 rounded-xl border p-3.5 text-left transition lg:w-full", selected?.id === initiative.id ? "border-cyan-300/35 bg-cyan-300/[0.08] shadow-[var(--omnix-glow-xs)]" : "border-[var(--omnix-border)] bg-black/10 hover:bg-white/[0.025]")}>
