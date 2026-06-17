@@ -13,6 +13,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { apiClient } from "./api";
 import { useAuth } from "./auth-context";
+import { logger } from "./logger";
 import { useWorkspace } from "./workspace-context";
 import { realtimeRegistry } from "./realtime-registry";
 import type {
@@ -320,7 +321,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
               filter: `workspace_id=eq.${activeWorkspaceId}`,
             },
             () => {
-              console.debug("[realtime] presence change detected, refreshing...");
+              logger.debug("[realtime] presence change detected, refreshing...");
               void refreshPresenceRef.current();
             }
           )
@@ -358,7 +359,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
               filter: `workspace_id=eq.${activeWorkspaceId}`,
             },
             (payload) => {
-              console.debug("[realtime] activity insert detected", payload);
+              logger.debug("[realtime] activity insert detected", payload);
               void refreshActivityRef.current();
             }
           )

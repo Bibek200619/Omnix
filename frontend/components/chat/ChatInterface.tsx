@@ -31,6 +31,7 @@ import { ApiError, apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { logClientError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { useProfile } from "@/lib/profile-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -1043,7 +1044,7 @@ export function ChatInterface() {
   }, [sendMessage]);
 
   function handleUploadSuccess(file: MessageAttachment) {
-    console.debug("[upload] attaching uploaded file to pending chat message", {
+    logger.debug("[upload] attaching uploaded file to pending chat message", {
       fileId: file.id,
       conversationId: currentConversation,
       workspaceId: activeWorkspaceId,

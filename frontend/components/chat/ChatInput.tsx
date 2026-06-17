@@ -6,6 +6,7 @@ import { Database, FileText, Globe2, Layers3, Paperclip, Send, Square, Sparkles,
 import { Button } from "@/components/ui/Button";
 import { UploadDropzone } from "@/components/upload/UploadDropzone";
 import type { MessageAttachment, SearchMode } from "@/components/chat/types";
+import { logger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 
 type ChatInputProps = {
@@ -75,12 +76,12 @@ export function ChatInput({
   }
 
   function handleUploadSuccess(file: MessageAttachment) {
-    console.debug("[upload] composer received successful upload", { fileId: file.id, conversationId });
+    logger.debug("[upload] composer received successful upload", { fileId: file.id, conversationId });
     onUploadSuccess?.(file);
   }
 
   function handleUploadComplete(result: { hasSuccess: boolean }) {
-    console.debug("[upload] composer upload batch complete", { conversationId, hasSuccess: result.hasSuccess });
+    logger.debug("[upload] composer upload batch complete", { conversationId, hasSuccess: result.hasSuccess });
     if (result.hasSuccess) {
       setUploadOpen(false);
     }

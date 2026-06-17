@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { API_BASE_URL } from "@/lib/api";
+import { logger } from "@/lib/logger";
 import type { MessageAttachment } from "@/components/chat/types";
 
 
@@ -44,7 +45,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
   }, [onUploadComplete]);
 
   const upload = useCallback(async (item: UploadItem) => {
-    console.debug("[upload] starting upload", { fileName: item.file.name, conversationId });
+    logger.debug("[upload] starting upload", { fileName: item.file.name, conversationId });
     setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "uploading" } : it));
 
     const fd = new FormData();
@@ -69,21 +70,21 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
         try {
           const uploaded = JSON.parse(xhr.responseText) as MessageAttachment;
           if (uploaded?.id) {
-            console.debug("[upload] upload success", { fileId: uploaded.id, conversationId });
+            logger.debug("[upload] upload success", { fileId: uploaded.id, conversationId });
             onUploadSuccess?.(uploaded);
           }
         } catch (err) {
           console.error("Unable to parse upload response", err);
         }
       } else {
-        console.debug("[upload] upload failed", { fileName: item.file.name, status: xhr.status });
+        logger.debug("[upload] upload failed", { fileName: item.file.name, status: xhr.status });
         setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "error" } : it));
       }
       markUploadSettled(xhr.status >= 200 && xhr.status < 300);
     };
 
     xhr.onerror = () => {
-      console.debug("[upload] upload network error", { fileName: item.file.name });
+      logger.debug("[upload] upload network error", { fileName: item.file.name });
       setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "error" } : it));
       markUploadSettled(false);
     };
