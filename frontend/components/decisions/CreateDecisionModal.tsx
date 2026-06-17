@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useId } from "react";
 import { X, BadgeCheck, Loader2, Target, ListTodo, Search, Link2, Unlink2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Portal } from "@/components/ui/Portal";
+import { Modal } from "@/components/ui/Modal";
 import { MentionTextarea, mentionPayload } from "@/components/mentions/MentionTextarea";
 import { apiClient } from "@/lib/api";
-import { useFocusTrap } from "@/lib/use-focus-trap";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { 
@@ -36,7 +35,7 @@ const statusOptions: { value: WorkspaceDecisionStatus; label: string }[] = [
 ];
 
 export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialValues }: CreateDecisionModalProps) {
-  const modalRef = useFocusTrap<HTMLFormElement>(true);
+  const formId = useId();
   const { activeMembers } = useWorkspace();
   const [title, setTitle] = useState(initialValues?.title ?? "");
   const [reason, setReason] = useState(initialValues?.reason ?? "");
@@ -77,17 +76,6 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
   useEffect(() => {
     void loadResources();
   }, [loadResources]);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,15 +145,41 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
   );
 
   return (
-    <Portal>
-      <div className="omnix-mobile-sheet-backdrop fixed inset-0 z-[100] flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-sm">
-        <form 
-          ref={modalRef}
-          onSubmit={handleSubmit}
-          className="omnix-mobile-sheet omnix-panel-strong flex max-h-[calc(100dvh_-_2rem)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-cyan-400/20 shadow-2xl"
-        >
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Record New Decision"
+      backdropClassName="z-[100] px-4 py-6"
+      className="omnix-mobile-sheet omnix-panel-strong max-h-[calc(100dvh_-_2rem)] max-w-xl rounded-2xl border-cyan-400/20 shadow-2xl"
+      footerClassName="border-white/5 bg-black/20 p-4 sm:px-6 sm:py-4"
+      footer={(
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="text-[var(--omnix-text-3)] hover:text-white"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form={formId}
+            size="sm"
+            isLoading={creating}
+            disabled={!title.trim() || !reason.trim()}
+            leftIcon={<BadgeCheck className="h-3.5 w-3.5" />}
+            className="min-w-[140px] shadow-[0_0_20px_rgba(34,211,238,0.15)]"
+          >
+            Record Decision
+          </Button>
+        </>
+      )}
+    >
+      <form id={formId} onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           {/* Header */}
-          <div className="flex shrink-0 items-start justify-between border-b border-white/5 p-4 sm:p-6">
+          <Modal.Header className="border-white/5 p-4 sm:p-6">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400/70">Decision Memory</p>
               <h2 className="mt-1 text-xl font-bold text-white">Record New Decision</h2>
@@ -180,10 +194,10 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
             >
               <X className="h-5 w-5" />
             </button>
-          </div>
+          </Modal.Header>
 
           {/* Scrollable Content */}
-          <div className="omnix-scrollbar min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+          <Modal.Body className="p-4 sm:p-6">
             <div className="space-y-6">
               {/* Basic Info */}
               <div className="space-y-4">
@@ -407,32 +421,8 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Footer */}
-          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-white/5 bg-black/20 p-4 sm:px-6 sm:py-4">
-            <Button 
-              type="button" 
-              variant="ghost" 
-              size="sm" 
-              onClick={onClose}
-              className="text-[var(--omnix-text-3)] hover:text-white"
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              size="sm" 
-              isLoading={creating}
-              disabled={!title.trim() || !reason.trim()}
-              leftIcon={<BadgeCheck className="h-3.5 w-3.5" />}
-              className="min-w-[140px] shadow-[0_0_20px_rgba(34,211,238,0.15)]"
-            >
-              Record Decision
-            </Button>
-          </div>
+          </Modal.Body>
         </form>
-      </div>
-    </Portal>
+    </Modal>
   );
 }
