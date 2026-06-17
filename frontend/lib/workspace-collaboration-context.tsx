@@ -36,6 +36,7 @@ type CollaborationContextType = {
   refreshPresence: () => Promise<WorkspacePresenceSnapshot | null>;
   refreshActivity: () => Promise<WorkspaceActivityEvent[]>;
   refreshLiveStatuses: () => Promise<Record<string, WorkspaceLiveStatus>>;
+  retryRealtimeConnection: () => Promise<void>;
   leaveWorkspace: (workspaceId?: string | null) => Promise<void>;
   sendTypingSignal: (conversationId?: string | null, isTyping?: boolean) => Promise<void>;
   statusForWorkspace: (workspaceId?: string | null) => WorkspaceLiveStatus | null;
@@ -90,6 +91,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
   const [loadingPresence] = useState(false);
   const [loadingActivity, setLoadingActivity] = useState(false);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
   
   const typingSentAtRef = useRef(0);
   const lastPresenceWorkspaceIdRef = useRef<string | null>(null);
@@ -296,6 +298,22 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     [activeWorkspaceId, userAvatarUrl, userEmail, userFullName, userId],
   );
 
+  const retryRealtimeConnection = useCallback(async () => {
+    if (!userId || !activeWorkspaceId) {
+      setRealtimeStatus("disconnected");
+      return;
+    }
+
+    setRealtimeStatus("connecting");
+    setReconnectAttempt((attempt) => attempt + 1);
+
+    await Promise.allSettled([
+      heartbeatPresence(),
+      refreshActivity(),
+      refreshLiveStatuses(),
+    ]);
+  }, [activeWorkspaceId, heartbeatPresence, refreshActivity, refreshLiveStatuses, userId]);
+
   // Realtime Subscriptions
   useEffect(() => {
     if (!userId || !activeWorkspaceId) {
@@ -391,7 +409,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       realtimeRegistry.unsubscribe({ type: "activity", workspaceId: activeWorkspaceId });
       realtimeRegistry.unsubscribe({ type: "revocation" });
     };
-  }, [activeWorkspaceId, userId]);
+  }, [activeWorkspaceId, reconnectAttempt, userId]);
 
   // Periodic Refresh / Heartbeat
   useEffect(() => {
@@ -482,6 +500,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       refreshPresence: heartbeatPresence,
       refreshActivity,
       refreshLiveStatuses,
+      retryRealtimeConnection,
       leaveWorkspace,
       sendTypingSignal,
       statusForWorkspace: (workspaceId?: string | null) =>
@@ -497,6 +516,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       presence,
       refreshActivity,
       refreshLiveStatuses,
+      retryRealtimeConnection,
       heartbeatPresence,
       leaveWorkspace,
       sendTypingSignal,
