@@ -30,8 +30,8 @@
   --omnix-purple: #9b5cff;
   --omnix-pink: #ff4df4;
   --omnix-text: rgba(255, 255, 255, 0.95);
-  --omnix-text-2: rgba(255, 255, 255, 0.55);
-  --omnix-text-3: rgba(255, 255, 255, 0.3);
+  --omnix-text-2: rgba(255, 255, 255, 0.65);
+  --omnix-text-3: rgba(255, 255, 255, 0.48);
   --omnix-grad-primary: linear-gradient(135deg, #00ffff 0%, #0088ff 50%, #0000ff 100%);
   --omnix-grad-cyan: linear-gradient(135deg, #00ffff 0%, #00cccc 100%);
   --omnix-grad-glow: linear-gradient(135deg, rgba(0, 255, 255, 0.15) 0%, rgba(0, 0, 255, 0.08) 100%);
