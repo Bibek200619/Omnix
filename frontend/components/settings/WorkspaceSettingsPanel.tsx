@@ -5,6 +5,7 @@ import { BrainCircuit, Check, GitBranch, Layers3, Loader2, Plus, Settings, Shiel
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { Toggle } from "@/components/ui/Toggle";
 import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -250,20 +251,18 @@ export function WorkspaceSettingsPanel() {
               }}
               disabled={!canEdit || saving}
             />
-            <label className="block">
-              <span className="text-sm font-medium text-slate-300">Description</span>
-              <textarea
-                value={description}
-                onChange={(event) => {
-                  setDescription(event.target.value);
-                  setSaved(false);
-                }}
-                disabled={!canEdit || saving}
-                rows={4}
-                className="omnix-input mt-2 w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                placeholder="What is this workspace for?"
-              />
-            </label>
+            <Textarea
+              label="Description"
+              value={description}
+              onChange={(event) => {
+                setDescription(event.target.value);
+                setSaved(false);
+              }}
+              disabled={!canEdit || saving}
+              rows={4}
+              className="bg-black/20"
+              placeholder="What is this workspace for?"
+            />
           </div>
 
           {!canEdit ? (
@@ -372,35 +371,31 @@ export function WorkspaceSettingsPanel() {
               </div>
             </div>
 
-            <label className="block">
-              <span className="text-sm font-medium text-slate-300">Expertise area</span>
-              <textarea
-                value={expertiseArea}
-                onChange={(event) => {
-                  setExpertiseArea(event.target.value);
-                  setIntelligenceSaved(false);
-                }}
-                disabled={!canEdit || savingIntelligence}
-                rows={3}
-                className="omnix-input mt-2 w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                placeholder="UI systems, APIs, launch strategy, operations..."
-              />
-            </label>
+            <Textarea
+              label="Expertise area"
+              value={expertiseArea}
+              onChange={(event) => {
+                setExpertiseArea(event.target.value);
+                setIntelligenceSaved(false);
+              }}
+              disabled={!canEdit || savingIntelligence}
+              rows={3}
+              className="bg-black/20"
+              placeholder="UI systems, APIs, launch strategy, operations..."
+            />
 
-            <label className="block">
-              <span className="text-sm font-medium text-slate-300">Workspace instructions</span>
-              <textarea
-                value={aiInstructions}
-                onChange={(event) => {
-                  setAiInstructions(event.target.value);
-                  setIntelligenceSaved(false);
-                }}
-                disabled={!canEdit || savingIntelligence}
-                rows={5}
-                className="omnix-input mt-2 w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                placeholder="Tell Omnix how to answer for this workspace, what standards to follow, and what context matters."
-              />
-            </label>
+            <Textarea
+              label="Workspace instructions"
+              value={aiInstructions}
+              onChange={(event) => {
+                setAiInstructions(event.target.value);
+                setIntelligenceSaved(false);
+              }}
+              disabled={!canEdit || savingIntelligence}
+              rows={5}
+              className="bg-black/20"
+              placeholder="Tell Omnix how to answer for this workspace, what standards to follow, and what context matters."
+            />
           </div>
 
           <aside className="space-y-4">
@@ -511,12 +506,13 @@ export function WorkspaceSettingsPanel() {
                 }}
                 disabled={!canEdit || creatingSubspace}
               />
-              <textarea
+              <Textarea
+                aria-label="Subworkspace purpose or scope"
                 value={subspaceDescription}
                 onChange={(event) => setSubspaceDescription(event.target.value)}
                 disabled={!canEdit || creatingSubspace}
                 rows={3}
-                className="omnix-input w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                className="bg-black/20"
                 placeholder="Purpose or scope"
               />
               {subspaceError ? (

@@ -22,6 +22,7 @@ import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
+import { Textarea } from "@/components/ui/Textarea";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
@@ -487,13 +488,13 @@ function WorkspaceInitiativesSurfaceContent() {
           {createOpen ? (
             <form onSubmit={createInitiative} className="mb-3 space-y-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.035] p-3">
               <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Investor demo" className="h-9 text-sm" autoFocus />
-              <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Shared outcome" className="omnix-input h-16 w-full resize-none rounded-lg p-2 text-xs" />
+              <Textarea aria-label="Initiative shared outcome" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Shared outcome" className="h-16 !min-h-16 p-2 text-xs" />
               <select value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className="omnix-input h-9 w-full rounded-lg px-2 text-xs">
                 <option value="">No owner recorded</option>
                 {members.map((member) => <option key={member.user_id} value={member.user_id}>{member.full_name || member.email || member.user_id}</option>)}
               </select>
               <input type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} className="omnix-input h-9 w-full rounded-lg px-2 text-xs" />
-              <textarea value={context} onChange={(event) => setContext(event.target.value)} placeholder="Planning context, optional" className="omnix-input h-16 w-full resize-none rounded-lg p-2 text-xs" />
+              <Textarea aria-label="Initiative planning context" value={context} onChange={(event) => setContext(event.target.value)} placeholder="Planning context, optional" className="h-16 !min-h-16 p-2 text-xs" />
               <Button type="submit" size="sm" className="w-full" isLoading={creating} disabled={!title.trim()}>Create initiative</Button>
             </form>
           ) : null}

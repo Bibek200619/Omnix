@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Portal } from "@/components/ui/Portal";
+import { Textarea } from "@/components/ui/Textarea";
 import { DecisionCandidatePanel } from "@/components/decisions/DecisionCandidatePanel";
 import { MentionText } from "@/components/mentions/MentionText";
 import { MentionTextarea, mentionPayload } from "@/components/mentions/MentionTextarea";
@@ -830,7 +831,7 @@ function WorkspaceConversationSurfaceContent() {
           {createOpen ? (
             <form onSubmit={handleCreateChannel} className="mb-3 space-y-2 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.04] p-2.5">
               <Input value={channelName} onChange={(event) => setChannelName(event.target.value)} placeholder="backend" className="h-9 text-sm" autoFocus />
-              <textarea value={channelPurpose} onChange={(event) => setChannelPurpose(event.target.value)} placeholder="Operational purpose" className="omnix-input h-16 w-full resize-none rounded-lg p-2 text-xs" />
+              <Textarea aria-label="Channel purpose" value={channelPurpose} onChange={(event) => setChannelPurpose(event.target.value)} placeholder="Operational purpose" className="h-16 !min-h-16 p-2 text-xs" />
               <div className="flex gap-2">
                 <Button type="submit" size="sm" disabled={!channelName.trim()} isLoading={creatingChannel} className="h-8 flex-1 text-xs">Open</Button>
                 <Button type="button" size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setCreateOpen(false)}>Cancel</Button>

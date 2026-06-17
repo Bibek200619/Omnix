@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Database, FileText, Globe2, Layers3, Paperclip, Send, Square, Sparkles, X, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/Textarea";
 import { UploadDropzone } from "@/components/upload/UploadDropzone";
 import type { MessageAttachment, SearchMode } from "@/components/chat/types";
 import { logger } from "@/lib/logger";
@@ -155,8 +156,9 @@ export function ChatInput({
         </div>
       ) : null}
 
-        <textarea
+        <Textarea
           ref={textareaRef}
+          aria-label="Message composer"
           value={value}
           onChange={(event) => {
             const nextValue = event.target.value;
@@ -180,7 +182,7 @@ export function ChatInput({
           rows={1}
           placeholder="Type a message or '/' for commands..."
           disabled={loading}
-          className="block max-h-40 min-h-[54px] w-full resize-none border border-transparent bg-transparent px-[15px] py-[13px] text-sm leading-[1.6] text-white outline-none transition placeholder:text-[var(--omnix-text-3)] disabled:cursor-not-allowed disabled:opacity-70 sm:text-base"
+          className="block max-h-40 !min-h-[54px] resize-none !rounded-none !border-transparent !bg-transparent px-[15px] py-[13px] text-sm leading-[1.6] text-white !shadow-none outline-none transition placeholder:text-[var(--omnix-text-3)] hover:!border-transparent focus:!border-transparent focus:!bg-transparent focus:!ring-0 disabled:cursor-not-allowed disabled:opacity-70 sm:text-base"
         />
       <div className="flex flex-col gap-2 border-t border-[var(--omnix-border)] bg-[rgba(0,0,0,0.2)] px-2.5 py-2.5 transition focus-within:bg-[var(--omnix-surface)] min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between sm:px-3">
         <div className="omnix-scrollbar flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 min-[420px]:flex-wrap min-[420px]:overflow-visible min-[420px]:pb-0">

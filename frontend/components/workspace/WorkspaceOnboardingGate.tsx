@@ -25,6 +25,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 import type { Workspace, WorkspaceFocus, WorkspaceInvite } from "@/lib/workspace-types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { UploadDropzone } from "@/components/upload/UploadDropzone";
 import type { MessageAttachment } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
@@ -476,17 +477,15 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
                       placeholder="Acme Operations"
                       error={createError === "Workspace name is required." ? createError : undefined}
                     />
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium text-slate-200">Description</span>
-                      <textarea
-                        value={workspaceDescription}
-                        onChange={(event) => setWorkspaceDescription(event.target.value)}
-                        disabled={creating}
-                        rows={3}
-                        className="omnix-input w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                        placeholder="What will this workspace help your team do?"
-                      />
-                    </label>
+                    <Textarea
+                      label="Description"
+                      value={workspaceDescription}
+                      onChange={(event) => setWorkspaceDescription(event.target.value)}
+                      disabled={creating}
+                      rows={3}
+                      className="bg-black/20"
+                      placeholder="What will this workspace help your team do?"
+                    />
                     <div className="space-y-2">
                       <span className="text-sm font-medium text-slate-200">Workspace focus</span>
                       <div className="grid gap-2 sm:grid-cols-2">
