@@ -19,7 +19,8 @@ const config: Config = {
         soft: "0 22px 80px rgba(0, 0, 0, 0.35)",
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "Inter", "system-ui", "sans-serif"],
+        sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["var(--font-space-grotesk)", "var(--font-inter)", "sans-serif"],
       },
     },
   },
