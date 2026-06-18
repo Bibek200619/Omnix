@@ -132,9 +132,28 @@ function WorkspaceInitiativesSurfaceContent() {
   const [assistance, setAssistance] = useState<WorkspaceInitiativeAssistance | null>(null);
   const [assisting, setAssisting] = useState<WorkspaceInitiativeAssistanceMode | null>(null);
   const [mobileTab, setMobileTab] = useState<"brief" | "plan" | "assist">("brief");
+  const liveRegionRef = useRef<HTMLDivElement | null>(null);
+  const liveAnnouncementRef = useRef("");
   const workspaceRef = useRef(activeWorkspaceId);
   const requestRef = useRef(0);
   const refreshTimerRef = useRef<number | null>(null);
+  const [liveAnnouncementVersion, setLiveAnnouncementVersion] = useState(0);
+
+  const announceMutation = useCallback((message: string) => {
+    liveAnnouncementRef.current = message;
+    setLiveAnnouncementVersion((version) => version + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!liveRegionRef.current) return;
+    liveRegionRef.current.textContent = "";
+    const timer = window.setTimeout(() => {
+      if (liveRegionRef.current) {
+        liveRegionRef.current.textContent = liveAnnouncementRef.current;
+      }
+    }, 10);
+    return () => window.clearTimeout(timer);
+  }, [liveAnnouncementVersion]);
 
   const sortedInitiatives = useMemo(() => {
     const statusOrder: Record<WorkspaceInitiativeStatus, number> = {
@@ -315,6 +334,7 @@ function WorkspaceInitiativesSurfaceContent() {
       setTargetDate("");
       setContext("");
       setCreateOpen(false);
+      announceMutation(`Initiative ${created.title} created.`);
       void loadInitiatives(true);
     } catch (err) {
       setInitiatives((current) => current.filter((initiative) => initiative.client_nonce !== nonce));
@@ -336,6 +356,7 @@ function WorkspaceInitiativesSurfaceContent() {
         payload,
       );
       setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
+      announceMutation(`Initiative ${changed.title} updated.`);
     } catch (err) {
       setInitiatives((current) => current.map((item) => (item.id === before.id ? before : item)));
       logClientError("Failed to update initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}` });
@@ -354,6 +375,7 @@ function WorkspaceInitiativesSurfaceContent() {
       );
       setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
       setTaskToAttach("");
+      announceMutation(`Task attached to ${changed.title}.`);
       void loadInitiatives(true);
     } catch (err) {
       logClientError("Failed to attach task to initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/tasks/${taskToAttach}` });
@@ -368,6 +390,7 @@ function WorkspaceInitiativesSurfaceContent() {
     setUpdating(true);
     try {
       await apiClient.patch<WorkspaceTask>(`/workspaces/${activeWorkspaceId}/tasks/${task.id}`, { initiative_id: null });
+      announceMutation(`Task ${task.title} detached from initiative.`);
       void loadInitiatives(true);
     } catch (err) {
       logClientError("Failed to detach task from initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks/${task.id}` });
@@ -387,6 +410,7 @@ function WorkspaceInitiativesSurfaceContent() {
       );
       setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
       setChannelToAttach("");
+      announceMutation(`Conversation attached to ${changed.title}.`);
     } catch (err) {
       logClientError("Failed to attach conversation to initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels` });
       setError("Unable to attach conversation.");
@@ -400,6 +424,7 @@ function WorkspaceInitiativesSurfaceContent() {
     setUpdating(true);
     try {
       await apiClient.delete(`/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels/${channelId}`);
+      announceMutation(`Conversation detached from ${selected.title}.`);
       void loadInitiatives(true);
     } catch (err) {
       logClientError("Failed to detach conversation from initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels/${channelId}` });
@@ -451,6 +476,7 @@ function WorkspaceInitiativesSurfaceContent() {
 
   return (
     <section className="omnix-container-responsive omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
+      <div ref={liveRegionRef} aria-live="polite" aria-atomic="true" className="sr-only" />
       <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">

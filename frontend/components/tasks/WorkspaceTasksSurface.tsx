@@ -100,10 +100,29 @@ function WorkspaceTasksSurfaceContent() {
   const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
   const taskRefs = useRef<Record<string, HTMLElement | null>>({});
   const taskListRef = useRef<HTMLDivElement | null>(null);
+  const liveRegionRef = useRef<HTMLDivElement | null>(null);
+  const liveAnnouncementRef = useRef("");
   const workspaceRef = useRef(activeWorkspaceId);
   const requestRef = useRef(0);
+  const [liveAnnouncementVersion, setLiveAnnouncementVersion] = useState(0);
 
   workspaceRef.current = activeWorkspaceId;
+
+  const announceMutation = useCallback((message: string) => {
+    liveAnnouncementRef.current = message;
+    setLiveAnnouncementVersion((version) => version + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!liveRegionRef.current) return;
+    liveRegionRef.current.textContent = "";
+    const timer = window.setTimeout(() => {
+      if (liveRegionRef.current) {
+        liveRegionRef.current.textContent = liveAnnouncementRef.current;
+      }
+    }, 10);
+    return () => window.clearTimeout(timer);
+  }, [liveAnnouncementVersion]);
 
   const loadExecution = useCallback(async (withMembers = false) => {
     if (!activeWorkspaceId) {
@@ -342,6 +361,7 @@ function WorkspaceTasksSurfaceContent() {
       setInitialBlocker("");
       setInitiativeId("");
       setCreateOpen(false);
+      announceMutation(`Task ${created.title} created.`);
       void loadExecution();
     } catch (err) {
       setTasks((current) => current.filter((task) => task.client_nonce !== nonce));
@@ -360,6 +380,8 @@ function WorkspaceTasksSurfaceContent() {
     try {
       const updated = await apiClient.patch<WorkspaceTask>(`/workspaces/${activeWorkspaceId}/tasks/${task.id}`, payload);
       setTasks((current) => current.map((item) => (item.id === task.id ? updated : item)));
+      const blockerRemoved = Array.isArray(payload.blockers) && payload.blockers.length < task.blockers.length;
+      announceMutation(blockerRemoved ? `Blocker removed from ${updated.title}.` : `Task ${updated.title} updated.`);
       void loadExecution();
     } catch (err) {
       setTasks((current) => current.map((item) => (item.id === task.id ? before : item)));
@@ -400,6 +422,7 @@ function WorkspaceTasksSurfaceContent() {
 
   return (
     <section className="omnix-container-responsive omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
+      <div ref={liveRegionRef} aria-live="polite" aria-atomic="true" className="sr-only" />
       <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">

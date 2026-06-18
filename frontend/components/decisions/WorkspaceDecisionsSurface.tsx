@@ -53,6 +53,25 @@ function WorkspaceDecisionsSurfaceContent() {
   const [statusFilter, setStatusFilter] = useState<WorkspaceDecisionStatus | "all">("all");
   const [createOpen, setCreateOpen] = useState(false);
   const requestRef = useRef(0);
+  const liveRegionRef = useRef<HTMLDivElement | null>(null);
+  const liveAnnouncementRef = useRef("");
+  const [liveAnnouncementVersion, setLiveAnnouncementVersion] = useState(0);
+
+  const announceMutation = useCallback((message: string) => {
+    liveAnnouncementRef.current = message;
+    setLiveAnnouncementVersion((version) => version + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!liveRegionRef.current) return;
+    liveRegionRef.current.textContent = "";
+    const timer = window.setTimeout(() => {
+      if (liveRegionRef.current) {
+        liveRegionRef.current.textContent = liveAnnouncementRef.current;
+      }
+    }, 10);
+    return () => window.clearTimeout(timer);
+  }, [liveAnnouncementVersion]);
 
   const stats = useMemo(() => {
     return {
@@ -76,7 +95,8 @@ function WorkspaceDecisionsSurfaceContent() {
 
   const handleDecisionUpdate = useCallback((updated: WorkspaceDecision) => {
     setDecisions((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
-  }, []);
+    announceMutation(`Decision ${updated.title} updated.`);
+  }, [announceMutation]);
 
   const loadDecisions = useCallback(async () => {
     if (!activeWorkspaceId) {
@@ -127,6 +147,7 @@ function WorkspaceDecisionsSurfaceContent() {
 
   return (
     <section className="omnix-container-responsive flex min-h-0 flex-1 flex-col overflow-x-hidden px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
+      <div ref={liveRegionRef} aria-live="polite" aria-atomic="true" className="sr-only" />
       <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-4 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.015)] px-4 py-4 sm:px-6 sm:py-5">
         <div>
           <p className="mb-1.5 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400/70">
@@ -170,6 +191,7 @@ function WorkspaceDecisionsSurfaceContent() {
             setDecisions(prev => [decision, ...prev]);
             setSelectedId(decision.id);
             setCreateOpen(false);
+            announceMutation(`Decision ${decision.title} created.`);
           }}
         />
       )}
