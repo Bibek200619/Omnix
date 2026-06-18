@@ -52,7 +52,7 @@ export default function InvitePage() {
         }, 700);
       } catch (err) {
         logClientError("Failed to accept invitation", err, { endpoint: `/workspace-invites/${inviteId}/accept` });
-        setError("Unable to accept this invitation.");
+        setError("Unable to accept this invitation. Your session may have expired; sign in again and retry the invite link.");
       } finally {
         setAccepting(false);
       }

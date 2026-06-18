@@ -83,7 +83,7 @@ function DashboardPageContent() {
     } catch (err) {
       setFiles([]);
       logClientError("Failed to load source count", err, { endpoint: "/files" });
-      setFilesError("Unable to load source count.");
+      setFilesError("Unable to load source count. Check your connection and try again.");
     } finally {
       setFilesLoading(false);
     }

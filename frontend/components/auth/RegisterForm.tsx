@@ -99,7 +99,7 @@ export function RegisterForm() {
       setLoading(false);
     } catch (err) {
       logClientError("Unexpected registration failure", err);
-      setError("Unable to create account.");
+      setError("Unable to create account. Check your connection and try again.");
       setLoading(false);
     }
   }

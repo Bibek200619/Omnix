@@ -66,7 +66,7 @@ export function ActionsMenu({ className }: { className?: string }) {
       setOpen(false);
     } catch (err) {
       logClientError("Conversation action failed", err);
-      setError("Unable to perform action.");
+      setError("Unable to perform action. Check your connection and try again.");
     } finally {
       setBusyAction(null);
     }

@@ -98,7 +98,7 @@ export function DecisionFromMessageModal({
       onClose();
     } catch (err) {
       logClientError("Failed to record decision from discussion", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions` });
-      onError("Unable to record decision from discussion.");
+      onError("Unable to record decision from discussion. Check your connection and try again.");
     } finally {
       setCreating(false);
     }

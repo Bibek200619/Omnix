@@ -112,7 +112,7 @@ export function WorkspaceSettingsPanel() {
       window.setTimeout(() => setSaved(false), 2200);
     } catch (err) {
       logClientError("Failed to update workspace", err, { endpoint: `/workspaces/${activeWorkspace.id}` });
-      setError("Unable to update workspace.");
+      setError("Unable to update workspace. Your session may have expired; refresh and try again.");
     } finally {
       setSaving(false);
     }
@@ -138,7 +138,7 @@ export function WorkspaceSettingsPanel() {
       setActiveWorkspace(created.id);
     } catch (err) {
       logClientError("Failed to create subworkspace", err);
-      setSubspaceError("Unable to create subworkspace.");
+      setSubspaceError("Unable to create subworkspace. Check your connection and try again.");
     } finally {
       setCreatingSubspace(false);
     }
@@ -152,7 +152,7 @@ export function WorkspaceSettingsPanel() {
       await deleteWorkspace(activeWorkspace.id);
     } catch (err) {
       logClientError("Failed to delete workspace", err, { endpoint: `/workspaces/${activeWorkspace.id}` });
-      setDeleteError("Unable to delete workspace.");
+      setDeleteError("Unable to delete workspace. Your session may have expired; refresh and try again.");
     } finally {
       setDeleting(false);
     }
@@ -179,7 +179,7 @@ export function WorkspaceSettingsPanel() {
       window.setTimeout(() => setIntelligenceSaved(false), 2200);
     } catch (err) {
       logClientError("Failed to update intelligence profile", err, { endpoint: `/workspaces/${activeWorkspace.id}/intelligence` });
-      setIntelligenceError("Unable to update intelligence profile.");
+      setIntelligenceError("Unable to update intelligence profile. Please try again in a moment.");
     } finally {
       setSavingIntelligence(false);
     }

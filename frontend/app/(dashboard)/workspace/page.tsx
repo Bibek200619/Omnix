@@ -173,7 +173,7 @@ function WorkspacePageContent() {
       setCreateOpen(false);
     } catch (err) {
       logClientError("Failed to create workspace", err, { endpoint: "/workspaces" });
-      setCreateError("Unable to create workspace.");
+      setCreateError("Unable to create workspace. Check your connection and try again.");
     } finally {
       setCreating(false);
     }
@@ -205,7 +205,7 @@ function WorkspacePageContent() {
       setSubspaceOpen(false);
     } catch (err) {
       logClientError("Failed to create subworkspace", err);
-      setSubspaceError("Unable to create subworkspace.");
+      setSubspaceError("Unable to create subworkspace. Check your connection and try again.");
     } finally {
       setCreatingSubspace(false);
     }

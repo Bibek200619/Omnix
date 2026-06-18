@@ -54,9 +54,9 @@ export function WorkspaceConversationChrome({
         <OmnixErrorState
           compact
           className="mb-3"
-          title={error === "Unable to load conversations." ? "Conversations are unavailable" : "Conversation action needs attention"}
+          title={error.startsWith("Unable to load conversations.") ? "Conversations are unavailable" : "Conversation action needs attention"}
           message={error}
-          onRetry={error === "Unable to load conversations." ? onRetryConversations : undefined}
+          onRetry={error.startsWith("Unable to load conversations.") ? onRetryConversations : undefined}
           isRetrying={channelsLoading}
           onDismiss={onDismissError}
         />

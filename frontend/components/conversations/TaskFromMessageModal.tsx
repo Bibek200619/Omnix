@@ -99,7 +99,7 @@ export function TaskFromMessageModal({
       onClose();
     } catch (err) {
       logClientError("Failed to open task from discussion", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks` });
-      onError("Unable to open task from discussion.");
+      onError("Unable to open task from discussion. Check your connection and try again.");
     } finally {
       setCreating(false);
     }

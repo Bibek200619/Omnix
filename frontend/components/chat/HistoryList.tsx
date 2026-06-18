@@ -78,7 +78,7 @@ export function HistoryList() {
       setDraftTitle("");
     } catch (err) {
       logClientError("Failed to rename chat", err, { endpoint: `/conversations/${chatId}` });
-      setActionError("Unable to rename chat.");
+      setActionError("Unable to rename chat. Your session may have expired; refresh and try again.");
     } finally {
       setBusyId(null);
     }
@@ -94,7 +94,7 @@ export function HistoryList() {
       }
     } catch (err) {
       logClientError("Failed to delete chat", err, { endpoint: `/conversations/${chatId}` });
-      setActionError("Unable to delete chat.");
+      setActionError("Unable to delete chat. Your session may have expired; refresh and try again.");
     } finally {
       setBusyId(null);
     }

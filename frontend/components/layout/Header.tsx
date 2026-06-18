@@ -118,7 +118,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
 
     if (error) {
       logClientError("Unable to sign out", error);
-      setSignOutError("Unable to sign out.");
+      setSignOutError("Unable to sign out. Check your connection and try again.");
       setSigningOut(false);
       return;
     }

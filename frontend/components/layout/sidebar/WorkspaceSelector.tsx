@@ -137,7 +137,7 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
       finishWorkspaceAction();
     } catch (err) {
       logClientError("Failed to create workspace", err, { endpoint: "/workspaces" });
-      setCreateError("Unable to create workspace.");
+      setCreateError("Unable to create workspace. Check your connection and try again.");
     } finally {
       setCreatingWorkspace(false);
     }
@@ -156,7 +156,7 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
       finishWorkspaceAction();
     } catch (err) {
       logClientError("Failed to create subspace", err);
-      setCreateSubspaceError("Unable to create subspace.");
+      setCreateSubspaceError("Unable to create subspace. Check your connection and try again.");
     } finally {
       setCreatingSubspace(false);
     }
@@ -171,7 +171,7 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
       finishWorkspaceAction();
     } catch (err) {
       logClientError("Failed to invite teammate", err);
-      setInviteError("Unable to invite teammate.");
+      setInviteError("Unable to invite teammate. Check the email address and try again.");
     } finally {
       setInviting(false);
     }
@@ -187,7 +187,7 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
       finishWorkspaceAction();
     } catch (err) {
       logClientError("Failed to rename workspace", err, { endpoint: `/workspaces/${active.id}` });
-      setRenameError("Unable to rename workspace.");
+      setRenameError("Unable to rename workspace. Your session may have expired; refresh and try again.");
     } finally {
       setRenaming(false);
     }
@@ -203,7 +203,7 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
       finishWorkspaceAction();
     } catch (err) {
       logClientError("Failed to delete workspace", err, { endpoint: `/workspaces/${active.id}` });
-      setDeleteError("Unable to delete workspace.");
+      setDeleteError("Unable to delete workspace. Your session may have expired; refresh and try again.");
     } finally {
       setDeleting(false);
     }

@@ -63,7 +63,7 @@ export function ConversationAIPanel({
       );
     } catch (err) {
       logClientError("Failed to load conversation assistance", err, { endpoint: `/workspaces/${activeWorkspaceId}/channels/${selectedChannelId}/assist` });
-      onError("Conversation assistance is unavailable.");
+      onError("Conversation assistance is temporarily unavailable. Please try again in a moment.");
     } finally {
       setAssistanceLoading(null);
     }
@@ -82,7 +82,7 @@ export function ConversationAIPanel({
       setDecisionCandidates(result.candidates);
     } catch (err) {
       logClientError("Failed to extract decision candidates", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/conversation/${selectedChannelId}` });
-      setDecisionCandidatesError("Unable to scan this conversation for decision candidates.");
+      setDecisionCandidatesError("Unable to scan this conversation for decision candidates. Please try again in a moment.");
     } finally {
       setDecisionCandidatesLoading(false);
     }

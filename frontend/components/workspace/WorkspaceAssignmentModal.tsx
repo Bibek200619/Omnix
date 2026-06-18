@@ -60,7 +60,7 @@ export function WorkspaceAssignmentModal({
       setPotentialMembers(data || []);
     } catch (err) {
       logClientError("Failed to fetch potential members", err, { endpoint: `/workspaces/${workspaceId}/potential-members` });
-      setError("Unable to load organizational members.");
+      setError("Unable to load organizational members. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -98,7 +98,7 @@ export function WorkspaceAssignmentModal({
       setSelectedUserId(null);
     } catch (err) {
       logClientError("Failed to assign workspace member", err, { endpoint: `/workspaces/${workspaceId}/members` });
-      setError("Assignment failed.");
+      setError("Assignment failed. Your session may have expired; refresh and try again.");
     } finally {
       setAssigningId(null);
     }

@@ -296,7 +296,7 @@ function TeamPageContent() {
       setInviteOpen(false);
     } catch (err) {
       logClientError("Failed to invite teammate", err);
-      setInviteError("Unable to invite teammate.");
+      setInviteError("Unable to invite teammate. Check the email address and try again.");
     } finally {
       setInviting(false);
     }
@@ -371,7 +371,7 @@ function TeamPageContent() {
       setSelectedRole(null);
     } catch (err) {
       logClientError("Failed to update member role", err);
-      setMemberActionError("Unable to update member role.");
+      setMemberActionError("Unable to update member role. Your session may have expired; refresh and try again.");
       await reconcileTeamState();
     } finally {
       setBusyAction(null);
@@ -390,7 +390,7 @@ function TeamPageContent() {
       setRemoveMember(null);
     } catch (err) {
       logClientError("Failed to remove member", err);
-      setMemberActionError("Unable to remove member.");
+      setMemberActionError("Unable to remove member. Your session may have expired; refresh and try again.");
       await reconcileTeamState();
     } finally {
       setBusyAction(null);

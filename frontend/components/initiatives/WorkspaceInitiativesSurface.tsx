@@ -212,7 +212,7 @@ function WorkspaceInitiativesSurfaceContent() {
     } catch (err) {
       if (requestId === requestRef.current) {
         logClientError("Failed to load initiatives", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives` });
-        setError("Unable to load initiatives.");
+        setError("Unable to load initiatives. Check your connection and try again.");
       }
     } finally {
       if (requestId === requestRef.current) setLoading(false);
@@ -342,7 +342,7 @@ function WorkspaceInitiativesSurfaceContent() {
     } catch (err) {
       setInitiatives((current) => current.filter((initiative) => initiative.client_nonce !== nonce));
       logClientError("Failed to open initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives` });
-      setError("Unable to open initiative.");
+      setError("Unable to open initiative. Check your connection and try again.");
     } finally {
       setCreating(false);
     }
@@ -364,7 +364,7 @@ function WorkspaceInitiativesSurfaceContent() {
     } catch (err) {
       setInitiatives((current) => current.map((item) => (item.id === before.id ? before : item)));
       logClientError("Failed to update initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}` });
-      setError("Unable to update initiative.");
+      setError("Unable to update initiative. Your session may have expired; refresh and try again.");
     } finally {
       setUpdating(false);
     }
@@ -384,7 +384,7 @@ function WorkspaceInitiativesSurfaceContent() {
       void loadInitiatives(true);
     } catch (err) {
       logClientError("Failed to attach task to initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/tasks/${taskToAttach}` });
-      setError("Unable to attach task.");
+      setError("Unable to attach task. Check your connection and try again.");
     } finally {
       setUpdating(false);
     }
@@ -400,7 +400,7 @@ function WorkspaceInitiativesSurfaceContent() {
       void loadInitiatives(true);
     } catch (err) {
       logClientError("Failed to detach task from initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks/${task.id}` });
-      setError("Unable to detach task.");
+      setError("Unable to detach task. Check your connection and try again.");
     } finally {
       setUpdating(false);
     }
@@ -420,7 +420,7 @@ function WorkspaceInitiativesSurfaceContent() {
       showToast({ title: "Conversation linked", message: changed.title });
     } catch (err) {
       logClientError("Failed to attach conversation to initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels` });
-      setError("Unable to attach conversation.");
+      setError("Unable to attach conversation. Check your connection and try again.");
     } finally {
       setUpdating(false);
     }
@@ -436,7 +436,7 @@ function WorkspaceInitiativesSurfaceContent() {
       void loadInitiatives(true);
     } catch (err) {
       logClientError("Failed to detach conversation from initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels/${channelId}` });
-      setError("Unable to detach conversation.");
+      setError("Unable to detach conversation. Check your connection and try again.");
     } finally {
       setUpdating(false);
     }
@@ -468,7 +468,7 @@ function WorkspaceInitiativesSurfaceContent() {
       );
     } catch (err) {
       logClientError("Failed to load initiative assistance", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/assist` });
-      setError("Initiative assistance is unavailable.");
+      setError("Initiative assistance is temporarily unavailable. Please try again in a moment.");
     } finally {
       setAssisting(null);
     }
@@ -503,9 +503,9 @@ function WorkspaceInitiativesSurfaceContent() {
         <OmnixErrorState
           compact
           className="mb-4"
-          title={error === "Unable to load initiatives." ? "Initiatives are unavailable" : "Initiative action needs attention"}
+          title={error.startsWith("Unable to load initiatives.") ? "Initiatives are unavailable" : "Initiative action needs attention"}
           message={error}
-          onRetry={error === "Unable to load initiatives." ? () => void loadInitiatives(true) : undefined}
+          onRetry={error.startsWith("Unable to load initiatives.") ? () => void loadInitiatives(true) : undefined}
           isRetrying={loading}
           onDismiss={() => setError(null)}
         />

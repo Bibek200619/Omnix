@@ -56,7 +56,7 @@ function InviteActionButtons({
       logClientError("Invite action failed", err, { endpoint: `/workspace-invites/${inviteId}/${action}` });
       setState({
         busyInviteId: null,
-        error: "Invite action failed.",
+        error: "Invite action failed. Your session may have expired; refresh and try again.",
       });
       return;
     }

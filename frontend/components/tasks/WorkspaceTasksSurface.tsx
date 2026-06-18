@@ -175,7 +175,7 @@ function WorkspaceTasksSurfaceContent() {
     } catch (err) {
       if (requestId === requestRef.current) {
         logClientError("Failed to load tasks", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks` });
-        setError("Unable to load tasks.");
+        setError("Unable to load tasks. Check your connection and try again.");
       }
     } finally {
       if (requestId === requestRef.current) setLoading(false);
@@ -369,7 +369,7 @@ function WorkspaceTasksSurfaceContent() {
     } catch (err) {
       setTasks((current) => current.filter((task) => task.client_nonce !== nonce));
       logClientError("Failed to open task", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks` });
-      setError("Unable to open task.");
+      setError("Unable to open task. Check your connection and try again.");
     } finally {
       setCreating(false);
     }
@@ -390,7 +390,7 @@ function WorkspaceTasksSurfaceContent() {
     } catch (err) {
       setTasks((current) => current.map((item) => (item.id === task.id ? before : item)));
       logClientError("Failed to update task", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks/${task.id}` });
-      setError("Unable to update task.");
+      setError("Unable to update task. Your session may have expired; refresh and try again.");
     } finally {
       setUpdatingId(null);
     }
@@ -410,7 +410,7 @@ function WorkspaceTasksSurfaceContent() {
       setAssistance(await apiClient.post<WorkspaceTaskAssistance>(`/workspaces/${activeWorkspaceId}/tasks/assist`, { mode }));
     } catch (err) {
       logClientError("Failed to load task assistance", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks/assist` });
-      setError("Execution assistance is unavailable.");
+      setError("Execution assistance is temporarily unavailable. Please try again in a moment.");
     } finally {
       setAssisting(null);
     }
@@ -461,9 +461,9 @@ function WorkspaceTasksSurfaceContent() {
         <OmnixErrorState
           compact
           className="mb-4"
-          title={error === "Unable to load tasks." ? "Tasks are unavailable" : "Task action needs attention"}
+          title={error.startsWith("Unable to load tasks.") ? "Tasks are unavailable" : "Task action needs attention"}
           message={error}
-          onRetry={error === "Unable to load tasks." ? () => void loadExecution(true) : undefined}
+          onRetry={error.startsWith("Unable to load tasks.") ? () => void loadExecution(true) : undefined}
           isRetrying={loading}
           onDismiss={() => setError(null)}
         />

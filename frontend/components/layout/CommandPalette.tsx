@@ -379,7 +379,7 @@ export function CommandPalette() {
             endpoint: `/workspaces/${activeWorkspaceId}/search`,
           });
           setResults(emptyResults);
-          setError("Workspace search is unavailable.");
+          setError("Workspace search is temporarily unavailable. Please try again in a moment.");
         })
         .finally(() => {
           if (requestId === requestRef.current) setLoading(false);

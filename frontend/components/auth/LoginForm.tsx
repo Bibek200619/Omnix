@@ -79,7 +79,7 @@ export function LoginForm() {
       router.replace(redirectFromWindow());
     } catch (err) {
       logClientError("Unexpected sign in failure", err);
-      setError("Unable to sign in.");
+      setError("Unable to sign in. Check your connection and try again.");
       setLoading(false);
     }
   }

@@ -104,7 +104,7 @@ function WorkspaceConversationSurfaceContent() {
     } catch (err) {
       if (requestId === channelRequestRef.current) {
         logClientError("Failed to load workspace conversations", err, { endpoint: `/workspaces/${activeWorkspaceId}/channels` });
-        setError("Unable to load conversations.");
+        setError("Unable to load conversations. Check your connection and try again.");
       }
     } finally {
       if (requestId === channelRequestRef.current) setChannelsLoading(false);
@@ -124,7 +124,7 @@ function WorkspaceConversationSurfaceContent() {
     } catch (err) {
       if (requestId === messageRequestRef.current) {
         logClientError("Failed to load discussion", err, { endpoint: `/workspaces/${activeWorkspaceId}/channels/${channelId}/messages` });
-        setError("Unable to load discussion.");
+        setError("Unable to load discussion. Check your connection and try again.");
       }
     } finally {
       if (requestId === messageRequestRef.current) setMessagesLoading(false);
@@ -143,7 +143,7 @@ function WorkspaceConversationSurfaceContent() {
     } catch (err) {
       if (requestId === threadRequestRef.current) {
         logClientError("Failed to open thread", err, { endpoint: `/workspaces/${activeWorkspaceId}/channels/${channelId}/messages` });
-        setError("Unable to open thread.");
+        setError("Unable to open thread. Check your connection and try again.");
       }
     } finally {
       if (requestId === threadRequestRef.current) setThreadLoading(false);
@@ -266,7 +266,7 @@ function WorkspaceConversationSurfaceContent() {
       setCreateOpen(false);
     } catch (err) {
       logClientError("Failed to create operational channel", err, { endpoint: `/workspaces/${activeWorkspaceId}/channels` });
-      setError("Unable to create operational channel.");
+      setError("Unable to create operational channel. Your session may have expired; refresh and try again.");
     } finally {
       setCreatingChannel(false);
     }

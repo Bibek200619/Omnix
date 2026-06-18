@@ -393,7 +393,7 @@ function FilesPageContent() {
       setFiles(data);
     } catch (err) {
       logClientError("Failed to load files", err, { endpoint: "/files" });
-      setError("Unable to load files.");
+      setError("Unable to load files. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -411,7 +411,7 @@ function FilesPageContent() {
       setConnectors(data);
     } catch (err) {
       logClientError("Failed to load connectors", err, { endpoint: "/connectors" });
-      setConnectorError("Unable to load connectors.");
+      setConnectorError("Unable to load connectors. Check your connection and try again.");
     } finally {
       setConnectorsLoading(false);
     }
@@ -454,7 +454,7 @@ function FilesPageContent() {
       setFiles((s) => s.filter((f) => f.id !== id));
     } catch (err) {
       logClientError("Failed to delete file", err, { endpoint: `/files/${id}` });
-      setError("Unable to delete file.");
+      setError("Unable to delete file. Your session may have expired; refresh and try again.");
     }
   }
 
@@ -472,7 +472,7 @@ function FilesPageContent() {
       document.body.removeChild(a);
     } catch (err) {
       logClientError("Failed to download file", err, { endpoint: `/files/${id}/download` });
-      setError("Unable to download file.");
+      setError("Unable to download file. Check your connection and try again.");
     }
   }
 
@@ -493,7 +493,7 @@ function FilesPageContent() {
       setDecisionCandidates(result.candidates);
     } catch (err) {
       logClientError("Failed to extract document decision candidates", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/document/${file.id}` });
-      setDecisionCandidatesError("Unable to scan this document for decision candidates.");
+      setDecisionCandidatesError("Unable to scan this document for decision candidates. Please try again in a moment.");
     } finally {
       setDecisionCandidatesLoading(false);
     }
@@ -627,7 +627,7 @@ function FilesPageContent() {
       setSetupMessage(null);
     } catch (err) {
       logClientError("Failed to save connector", err, { endpoint: "/connectors" });
-      setSetupMessage("Unable to save connector.");
+      setSetupMessage("Unable to save connector. Check the configuration and try again.");
     } finally {
       setSavingConnector(false);
     }
@@ -641,7 +641,7 @@ function FilesPageContent() {
       upsertConnector(updated);
     } catch (err) {
       logClientError("Failed to retry connector", err, { endpoint: `/connectors/${connector.id}/retry` });
-      setConnectorError("Unable to retry connector.");
+      setConnectorError("Unable to retry connector. Please try again in a moment.");
     } finally {
       setActionConnectorId(null);
     }
@@ -658,7 +658,7 @@ function FilesPageContent() {
       }
     } catch (err) {
       logClientError("Failed to remove connector", err, { endpoint: `/connectors/${connector.id}` });
-      setConnectorError("Unable to delete connector.");
+      setConnectorError("Unable to delete connector. Your session may have expired; refresh and try again.");
     } finally {
       setActionConnectorId(null);
     }
@@ -673,7 +673,7 @@ function FilesPageContent() {
       window.location.assign(result.authorize_url);
     } catch (err) {
       logClientError("Failed to start connector authentication", err, { endpoint: "/integrations/google_drive/connect" });
-      setConnectorError("Unable to start connector authentication.");
+      setConnectorError("Unable to start connector authentication. Check your connection and try again.");
     } finally {
       setAuthConnectorId(null);
     }
@@ -842,9 +842,9 @@ function FilesPageContent() {
             <OmnixErrorState
               compact
               className="relative z-10 mt-4"
-              title={connectorError === "Unable to load connectors." ? "Connectors are unavailable" : "Connector action needs attention"}
+              title={connectorError.startsWith("Unable to load connectors.") ? "Connectors are unavailable" : "Connector action needs attention"}
               message={connectorError}
-              onRetry={connectorError === "Unable to load connectors." ? () => void loadConnectors() : undefined}
+              onRetry={connectorError.startsWith("Unable to load connectors.") ? () => void loadConnectors() : undefined}
               isRetrying={connectorsLoading}
               onDismiss={() => setConnectorError(null)}
             />
@@ -975,9 +975,9 @@ function FilesPageContent() {
             <OmnixErrorState
               compact
               className="relative z-10 mt-4"
-              title={error === "Unable to load files." ? "Files are unavailable" : "File action needs attention"}
+              title={error.startsWith("Unable to load files.") ? "Files are unavailable" : "File action needs attention"}
               message={error}
-              onRetry={error === "Unable to load files." ? () => void loadFiles() : undefined}
+              onRetry={error.startsWith("Unable to load files.") ? () => void loadFiles() : undefined}
               isRetrying={loading}
               onDismiss={() => setError(null)}
             />

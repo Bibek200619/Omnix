@@ -190,7 +190,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       goTo("team", { allowPendingWorkspace: true });
     } catch (err) {
       logClientError("Failed to create onboarding workspace", err, { endpoint: "/workspaces" });
-      setCreateError("Unable to create workspace.");
+      setCreateError("Unable to create workspace. Check your connection and try again.");
     } finally {
       setCreating(false);
     }
@@ -204,7 +204,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       goTo("team", { allowPendingWorkspace: true });
     } catch (err) {
       logClientError("Failed to accept onboarding invite", err, { endpoint: `/workspace-invites/${inviteId}/accept` });
-      setCreateError("Unable to accept invite.");
+      setCreateError("Unable to accept invite. Your session may have expired; refresh and try again.");
     } finally {
       setAcceptingId(null);
     }
@@ -216,7 +216,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       await declineInvite(inviteId);
     } catch (err) {
       logClientError("Failed to decline onboarding invite", err, { endpoint: `/workspace-invites/${inviteId}/decline` });
-      setCreateError("Unable to decline invite.");
+      setCreateError("Unable to decline invite. Your session may have expired; refresh and try again.");
     } finally {
       setDecliningId(null);
     }
@@ -247,7 +247,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       await refreshActiveWorkspaceData({ force: true, silent: true });
     } catch (err) {
       logClientError("Failed to send onboarding invite", err, { endpoint: `/workspaces/${workspaceId}/invites` });
-      setInviteError("Unable to send invite.");
+      setInviteError("Unable to send invite. Check the email address and try again.");
     } finally {
       setInviting(false);
     }

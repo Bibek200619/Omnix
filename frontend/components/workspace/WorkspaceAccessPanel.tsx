@@ -254,7 +254,7 @@ export function WorkspaceAccessPanel() {
       setInviteOpen(false);
     } catch (err) {
       logClientError("Failed to invite teammate", err);
-      setInviteError("Unable to invite teammate.");
+      setInviteError("Unable to invite teammate. Check the email address and try again.");
     } finally {
       setInviteLoading(false);
     }
@@ -271,7 +271,7 @@ export function WorkspaceAccessPanel() {
       await revokeInvite(inviteId);
     } catch (err) {
       logClientError("Failed to revoke invite", err);
-      setActionError("Unable to revoke invite.");
+      setActionError("Unable to revoke invite. Your session may have expired; refresh and try again.");
     } finally {
       setBusyKey(null);
     }
@@ -298,7 +298,7 @@ export function WorkspaceAccessPanel() {
       setOpenMemberMenu(null);
     } catch (err) {
       logClientError("Failed to update team member", err);
-      setActionError("Unable to update team member.");
+      setActionError("Unable to update team member. Your session may have expired; refresh and try again.");
     } finally {
       setBusyKey(null);
     }

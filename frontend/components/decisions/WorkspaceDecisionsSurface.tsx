@@ -115,7 +115,7 @@ function WorkspaceDecisionsSurfaceContent() {
     } catch (err) {
       if (requestId === requestRef.current) {
         logClientError("Failed to load decisions", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions` });
-        setError("Unable to load decisions.");
+        setError("Unable to load decisions. Check your connection and try again.");
       }
     } finally {
       if (requestId === requestRef.current) setLoading(false);
