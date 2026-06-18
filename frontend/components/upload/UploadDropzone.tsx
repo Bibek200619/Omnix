@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { API_BASE_URL } from "@/lib/api";
+import { logger } from "@/lib/logger";
 import type { MessageAttachment } from "@/components/chat/types";
 
 
@@ -44,7 +45,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
   }, [onUploadComplete]);
 
   const upload = useCallback(async (item: UploadItem) => {
-    console.debug("[upload] starting upload", { fileName: item.file.name, conversationId });
+    logger.debug("[upload] starting upload", { fileName: item.file.name, conversationId });
     setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "uploading" } : it));
 
     const fd = new FormData();
@@ -69,21 +70,21 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
         try {
           const uploaded = JSON.parse(xhr.responseText) as MessageAttachment;
           if (uploaded?.id) {
-            console.debug("[upload] upload success", { fileId: uploaded.id, conversationId });
+            logger.debug("[upload] upload success", { fileId: uploaded.id, conversationId });
             onUploadSuccess?.(uploaded);
           }
         } catch (err) {
           console.error("Unable to parse upload response", err);
         }
       } else {
-        console.debug("[upload] upload failed", { fileName: item.file.name, status: xhr.status });
+        logger.debug("[upload] upload failed", { fileName: item.file.name, status: xhr.status });
         setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "error" } : it));
       }
       markUploadSettled(xhr.status >= 200 && xhr.status < 300);
     };
 
     xhr.onerror = () => {
-      console.debug("[upload] upload network error", { fileName: item.file.name });
+      logger.debug("[upload] upload network error", { fileName: item.file.name });
       setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "error" } : it));
       markUploadSettled(false);
     };
@@ -176,8 +177,8 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         animate={{
-          borderColor: isDragActive ? "var(--omnix-rgba-rgba-0-255-255-0-5)" : "var(--omnix-rgba-rgba-0-255-255-0-12)",
-          backgroundColor: isDragActive ? "var(--omnix-rgba-rgba-0-255-255-0-06)" : "var(--omnix-rgba-rgba-0-255-255-0-035)",
+          borderColor: isDragActive ? "var(--omnix-rgba-0-255-255-0-5)" : "var(--omnix-rgba-0-255-255-0-12)",
+          backgroundColor: isDragActive ? "var(--omnix-rgba-0-255-255-0-06)" : "var(--omnix-rgba-0-255-255-0-035)",
           scale: isDragActive ? 1.01 : 1,
         }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -193,7 +194,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
                 scale: isDragActive ? 1.1 : 1,
                 rotate: isDragActive ? 10 : 0,
                 color: isDragActive ? "var(--omnix-color-22d3ee)" : "var(--omnix-color-67e8f9)",
-                backgroundColor: isDragActive ? "var(--omnix-rgba-rgba-34-211-238-0-1)" : "var(--omnix-rgba-rgba-255-255-255-0-03)"
+                backgroundColor: isDragActive ? "var(--omnix-rgba-34-211-238-0-1)" : "var(--omnix-rgba-255-255-255-0-03)"
               }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
               className={cn("flex shrink-0 items-center justify-center rounded-xl", compact ? "h-10 w-10" : "h-14 w-14")}
@@ -279,10 +280,10 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
                 ) : it.status === "error" ? (
                   <span className="text-xs font-medium text-rose-400">Failed</span>
                 ) : (
-                  <Button type="button" size="sm" variant="ghost" className="min-h-10" onClick={() => upload(it)}>Upload</Button>
+                  <Button type="button" size="sm" variant="ghost" className="min-h-11" onClick={() => upload(it)}>Upload</Button>
                 )}
                 
-                <button type="button" onClick={() => setItems((s) => s.filter((_i) => _i.id !== it.id))} className="flex min-h-10 min-w-10 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-cyan-300/10 hover:text-slate-100" aria-label={`Remove ${it.file.name}`}>
+                <button type="button" onClick={() => setItems((s) => s.filter((_i) => _i.id !== it.id))} className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-cyan-300/10 hover:text-slate-100" aria-label={`Remove ${it.file.name}`}>
                   <X className="h-4 w-4" />
                 </button>
               </div>

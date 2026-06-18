@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { formatRelativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import type { WorkspaceActivityEvent } from "@/lib/workspace-types";
 
@@ -43,20 +44,6 @@ function actorName(item: WorkspaceActivityEvent) {
   return name;
 }
 
-function formatRelativeTime(value?: string | null) {
-  if (!value) return "Just now";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Just now";
-  const deltaMs = Date.now() - date.getTime();
-  const minutes = Math.max(0, Math.round(deltaMs / 60000));
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
-}
-
 export function WorkspaceActivityFeed({
   activity,
   loading,
@@ -67,11 +54,11 @@ export function WorkspaceActivityFeed({
 
   return (
     <section className={cn(
-      "relative overflow-hidden rounded-[16px] border border-white/10 bg-[linear-gradient(180deg,var(--omnix-rgba-rgba-255-255-255-0-03),var(--omnix-rgba-rgba-0-0-0-0-4))] shadow-2xl backdrop-blur-xl", 
+      "relative overflow-hidden rounded-[16px] border border-white/10 bg-[linear-gradient(180deg,var(--omnix-rgba-255-255-255-0-03),var(--omnix-rgba-0-0-0-0-4))] shadow-2xl backdrop-blur-xl", 
       compact ? "p-4" : "p-5", 
       className
     )}>
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-rgba-155-92-255-0-4),var(--omnix-rgba-rgba-0-255-255-0-3),transparent)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-155-92-255-0-4),var(--omnix-rgba-0-255-255-0-3),transparent)]" />
       <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-white/5 to-transparent" />
 
       <div className="relative z-10 mb-6 flex items-center justify-between gap-3">
@@ -134,7 +121,12 @@ export function WorkspaceActivityFeed({
                         {item.summary}
                       </p>
                       <span className="shrink-0 text-[9px] sm:text-[10px] font-medium text-white/30">
-                        {formatRelativeTime(item.created_at)}
+                        {formatRelativeTime(item.created_at, {
+                          fallback: "Just now",
+                          includeAgo: true,
+                          localeAfterDays: false,
+                          rounding: "round",
+                        })}
                       </span>
                     </div>
                     <div className="mt-0.5 sm:mt-1 flex items-center gap-1.5 sm:gap-2">

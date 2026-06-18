@@ -153,9 +153,9 @@ export function OAuthCallbackClient() {
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--omnix-color-061020)] px-4 py-10 text-white">
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-[linear-gradient(var(--omnix-rgba-rgba-34-211-238-0-035)_1px,transparent_1px),linear-gradient(90deg,var(--omnix-rgba-rgba-34-211-238-0-035)_1px,transparent_1px)] bg-[size:56px_56px]"
+        className="absolute inset-0 bg-[linear-gradient(var(--omnix-rgba-34-211-238-0-035)_1px,transparent_1px),linear-gradient(90deg,var(--omnix-rgba-34-211-238-0-035)_1px,transparent_1px)] bg-[size:56px_56px]"
       />
-      <section className="relative z-10 w-full max-w-md rounded-lg border border-cyan-300/14 bg-[var(--omnix-color-07111f)]/94 p-6 shadow-[0_44px_140px_var(--omnix-rgba-rgba-0-0-0-0-58),0_0_90px_var(--omnix-rgba-rgba-34-211-238-0-09)] backdrop-blur-xl">
+      <section className="relative z-10 w-full max-w-md rounded-lg border border-cyan-300/14 bg-[var(--omnix-color-07111f)]/94 p-6 shadow-[0_44px_140px_var(--omnix-rgba-0-0-0-0-58),0_0_90px_var(--omnix-rgba-34-211-238-0-09)] backdrop-blur-xl">
         <Link href="/" className="inline-flex items-center gap-3" aria-label="Omnix home">
           <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10">
             <OmnixMark size={27} />

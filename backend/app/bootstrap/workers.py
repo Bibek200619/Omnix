@@ -22,3 +22,4 @@ async def initialize():
             raise
     else:
         logger.info("Skipping Automation Scheduler initialization (Role: %s)", role)
+        # Integrated worker is now automatically registered by RuntimeManager

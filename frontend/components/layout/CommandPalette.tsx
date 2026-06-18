@@ -28,6 +28,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Portal } from "@/components/ui/Portal";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { WorkspaceSearchResponse, WorkspaceSearchResult } from "@/lib/workspace-types";
@@ -240,6 +241,7 @@ export function CommandPalette() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const dialogRef = useFocusTrap<HTMLDivElement>(open);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const requestRef = useRef(0);
@@ -377,7 +379,7 @@ export function CommandPalette() {
             endpoint: `/workspaces/${activeWorkspaceId}/search`,
           });
           setResults(emptyResults);
-          setError("Workspace search is unavailable.");
+          setError("Workspace search is temporarily unavailable. Please try again in a moment.");
         })
         .finally(() => {
           if (requestId === requestRef.current) setLoading(false);
@@ -486,7 +488,7 @@ export function CommandPalette() {
           setOpen(true);
           setQuery("");
         }}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--omnix-rgba-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-rgba-0-255-255-0-04)] text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-rgba-rgba-0-255-255-0-3)] hover:bg-[var(--omnix-rgba-rgba-0-255-255-0-08)] active:scale-[0.97] md:hidden"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--omnix-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-0-255-255-0-04)] text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-rgba-0-255-255-0-3)] hover:bg-[var(--omnix-rgba-0-255-255-0-08)] active:scale-[0.97] md:hidden"
         aria-label="Open command palette"
         title="Open command palette"
       >
@@ -517,11 +519,12 @@ export function CommandPalette() {
             }}
           >
             <div
+              ref={dialogRef}
               role="dialog"
               aria-modal="true"
               aria-label="Omnix command palette"
               onKeyDown={handleKeyDown}
-              className="fixed inset-x-0 bottom-0 flex max-h-[min(86dvh,44rem)] flex-col overflow-hidden rounded-t-[20px] border border-cyan-300/15 bg-[var(--omnix-rgba-rgba-3-8-18-0-97)] shadow-[0_-24px_80px_var(--omnix-rgba-rgba-0-0-0-0-55),var(--omnix-glow-sm)] backdrop-blur-2xl md:bottom-auto md:left-1/2 md:right-auto md:top-[12vh] md:max-h-[min(42rem,calc(100dvh-8rem))] md:w-[min(42rem,calc(100vw-2rem))] md:-translate-x-1/2 md:rounded-2xl"
+              className="fixed inset-x-0 bottom-0 flex max-h-[min(86dvh,44rem)] flex-col overflow-hidden rounded-t-[20px] border border-cyan-300/15 bg-[var(--omnix-rgba-3-8-18-0-97)] shadow-[0_-24px_80px_var(--omnix-rgba-0-0-0-0-55),var(--omnix-glow-sm)] backdrop-blur-2xl md:bottom-auto md:left-1/2 md:right-auto md:top-[12vh] md:max-h-[min(42rem,calc(100dvh-8rem))] md:w-[min(42rem,calc(100vw-2rem))] md:-translate-x-1/2 md:rounded-2xl"
             >
               <div className="border-b border-white/5 p-3 sm:p-4">
                 <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/15 md:hidden" />
@@ -537,7 +540,8 @@ export function CommandPalette() {
                   <button
                     type="button"
                     onClick={closePalette}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03] text-white/55 hover:bg-white/[0.06] hover:text-white/80"
+                    title="Close command palette"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03] text-white/55 hover:bg-white/[0.06] hover:text-white/80"
                     aria-label="Close command palette"
                   >
                     <X className="h-4 w-4" />
@@ -558,7 +562,7 @@ export function CommandPalette() {
                     <button
                       type="button"
                       onClick={() => setQuery("")}
-                      className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-white/35 hover:bg-white/5 hover:text-white/70"
+                      className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-white/35 hover:bg-white/5 hover:text-white/70"
                       aria-label="Clear command palette query"
                     >
                       <X className="h-4 w-4" />

@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type { CSSProperties, FormEvent } from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -65,6 +67,14 @@ function selectedWorkspace(workspaces: Workspace[], selectedId: string | null, f
 }
 
 export default function WorkspacePage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <WorkspacePageContent />
+    </Suspense>
+  );
+}
+
+function WorkspacePageContent() {
   const router = useRouter();
   const {
     activeWorkspace,
@@ -163,7 +173,7 @@ export default function WorkspacePage() {
       setCreateOpen(false);
     } catch (err) {
       logClientError("Failed to create workspace", err, { endpoint: "/workspaces" });
-      setCreateError("Unable to create workspace.");
+      setCreateError("Unable to create workspace. Check your connection and try again.");
     } finally {
       setCreating(false);
     }
@@ -195,7 +205,7 @@ export default function WorkspacePage() {
       setSubspaceOpen(false);
     } catch (err) {
       logClientError("Failed to create subworkspace", err);
-      setSubspaceError("Unable to create subworkspace.");
+      setSubspaceError("Unable to create subworkspace. Check your connection and try again.");
     } finally {
       setCreatingSubspace(false);
     }
@@ -670,7 +680,7 @@ export default function WorkspacePage() {
                       setSubspaceError(null);
                     }}
                     disabled={creatingSubspace}
-                    className="omnix-input h-11 w-full rounded-lg bg-black/20 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    className="omnix-input h-11 w-full rounded-lg bg-black/20 px-3 text-sm focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <option value="">Choose parent</option>
                     {workspaces.map((workspace) => (

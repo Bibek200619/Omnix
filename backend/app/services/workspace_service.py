@@ -28,6 +28,8 @@ WORKSPACE_COLUMNS = (
     "expertise_area,workspace_focus,ai_specialization,ai_instructions,intelligence_preferences,"
     "created_at,updated_at"
 )
+HIERARCHY_WORKSPACE_COLUMNS = "id,user_id,name,description,parent_workspace_id,workspace_type,is_global,created_at,updated_at"
+LEGACY_WORKSPACE_COLUMNS = "id,user_id,name,description,created_at,updated_at"
 WORKSPACE_MEMBER_COLUMNS = "workspace_id,user_id,role,operational_label,created_at,updated_at"
 WORKSPACE_INVITE_COLUMNS = (
     "id,workspace_id,email,role,status,invited_by,accepted_by_user_id,"
@@ -227,20 +229,39 @@ def _workspace_not_found() -> HTTPException:
     )
 
 
+async def _select_workspace_record(filters: Mapping[str, Any]) -> dict[str, Any] | None:
+    column_sets = (
+        ("current", WORKSPACE_COLUMNS),
+        ("hierarchy", HIERARCHY_WORKSPACE_COLUMNS),
+        ("legacy", LEGACY_WORKSPACE_COLUMNS),
+    )
+    last_error: SupabaseServiceError | None = None
+    for label, columns in column_sets:
+        try:
+            return await select_one_trusted(
+                "workspaces",
+                columns,
+                filters,
+            )
+        except SupabaseServiceError as exc:
+            last_error = exc
+            if label != "legacy":
+                logger.warning(
+                    "Workspace read using %s schema failed; retrying narrower columns.",
+                    label,
+                    exc_info=True,
+                )
+
+    raise _database_error() from last_error
+
+
 from app.services.workspace_permissions import OrganizationalAccessAuthority
 
 async def resolve_workspace_access(
     workspace_id: str,
     user_id: str,
 ) -> WorkspaceAccess | None:
-    try:
-        workspace = await select_one_trusted(
-            "workspaces",
-            WORKSPACE_COLUMNS,
-            {"id": workspace_id},
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
+    workspace = await _select_workspace_record({"id": workspace_id})
 
     if workspace is None:
         return None
@@ -274,14 +295,7 @@ async def resolve_workspace_access(
         return None
 
     # 2. It is a subworkspace. Let's get the parent workspace to check super founder or global visibility
-    try:
-        parent_workspace = await select_one_trusted(
-            "workspaces",
-            WORKSPACE_COLUMNS,
-            {"id": parent_workspace_id},
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
+    parent_workspace = await _select_workspace_record({"id": parent_workspace_id})
 
     if parent_workspace is None:
         return None
@@ -524,14 +538,7 @@ async def membership_source_workspace(workspace: dict[str, Any]) -> dict[str, An
     if not normalized.get("is_global"):
         return normalized
 
-    try:
-        parent_workspace = await select_one_trusted(
-            "workspaces",
-            WORKSPACE_COLUMNS,
-            {"id": str(parent_workspace_id)},
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
+    parent_workspace = await _select_workspace_record({"id": str(parent_workspace_id)})
 
     if parent_workspace is None:
         return normalized
@@ -614,7 +621,7 @@ async def list_potential_subspace_members(
     ]
     
     # Also include the parent owner if not already a member
-    parent_workspace = await select_one_trusted("workspaces", WORKSPACE_COLUMNS, {"id": parent_workspace_id})
+    parent_workspace = await _select_workspace_record({"id": parent_workspace_id})
     if parent_workspace:
         parent_owner_id = str(parent_workspace.get("user_id") or "")
         if parent_owner_id and parent_owner_id not in current_user_ids:

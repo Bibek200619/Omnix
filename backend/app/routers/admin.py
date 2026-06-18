@@ -10,7 +10,16 @@ async def get_runtime_status():
 
 @router.get("/workers")
 async def get_workers():
-    return RuntimeManager.get().active_workers
+    workers_dict = RuntimeManager.get().active_workers
+    return [
+        {
+            "id": wid,
+            "name": wid,
+            "status": info.get("status", "unknown"),
+            "last_heartbeat": info.get("registered_at")
+        }
+        for wid, info in workers_dict.items()
+    ]
 
 @router.get("/providers")
 async def get_providers():

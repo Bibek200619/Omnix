@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { BadgeCheck, Loader2, Plus, RefreshCw, Target, ListTodo } from "lucide-react";
+import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
@@ -11,7 +14,11 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { WorkspaceDecision, WorkspaceDecisionStatus } from "@/lib/workspace-types";
 import { DecisionContextPanel } from "./DecisionContextPanel";
-import { CreateDecisionModal } from "./CreateDecisionModal";
+
+const CreateDecisionModal = dynamic(
+  () => import("./CreateDecisionModal").then((mod) => ({ default: mod.CreateDecisionModal })),
+  { ssr: false, loading: () => null },
+);
 
 const statusLabels: Record<WorkspaceDecisionStatus, string> = {
   proposed: "Proposed",
@@ -27,7 +34,15 @@ function statusClass(status: WorkspaceDecisionStatus) {
   return "border-cyan-300/20 bg-cyan-300/[0.07] text-cyan-100";
 }
 
-export function WorkspaceDecisionsSurface() {
+export const WorkspaceDecisionsSurface = memo(function WorkspaceDecisionsSurface() {
+  return (
+    <SurfaceErrorBoundary surfaceName="Workspace decisions">
+      <WorkspaceDecisionsSurfaceContent />
+    </SurfaceErrorBoundary>
+  );
+});
+
+function WorkspaceDecisionsSurfaceContent() {
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const searchParams = useSearchParams();
   const routeCreateDecision = searchParams?.get("create") === "decision";
@@ -38,6 +53,25 @@ export function WorkspaceDecisionsSurface() {
   const [statusFilter, setStatusFilter] = useState<WorkspaceDecisionStatus | "all">("all");
   const [createOpen, setCreateOpen] = useState(false);
   const requestRef = useRef(0);
+  const liveRegionRef = useRef<HTMLDivElement | null>(null);
+  const liveAnnouncementRef = useRef("");
+  const [liveAnnouncementVersion, setLiveAnnouncementVersion] = useState(0);
+
+  const announceMutation = useCallback((message: string) => {
+    liveAnnouncementRef.current = message;
+    setLiveAnnouncementVersion((version) => version + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!liveRegionRef.current) return;
+    liveRegionRef.current.textContent = "";
+    const timer = window.setTimeout(() => {
+      if (liveRegionRef.current) {
+        liveRegionRef.current.textContent = liveAnnouncementRef.current;
+      }
+    }, 10);
+    return () => window.clearTimeout(timer);
+  }, [liveAnnouncementVersion]);
 
   const stats = useMemo(() => {
     return {
@@ -61,7 +95,8 @@ export function WorkspaceDecisionsSurface() {
 
   const handleDecisionUpdate = useCallback((updated: WorkspaceDecision) => {
     setDecisions((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
-  }, []);
+    announceMutation(`Decision ${updated.title} updated.`);
+  }, [announceMutation]);
 
   const loadDecisions = useCallback(async () => {
     if (!activeWorkspaceId) {
@@ -80,7 +115,7 @@ export function WorkspaceDecisionsSurface() {
     } catch (err) {
       if (requestId === requestRef.current) {
         logClientError("Failed to load decisions", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions` });
-        setError("Unable to load decisions.");
+        setError("Unable to load decisions. Check your connection and try again.");
       }
     } finally {
       if (requestId === requestRef.current) setLoading(false);
@@ -111,8 +146,9 @@ export function WorkspaceDecisionsSurface() {
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
-      <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-4 rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-0-255-255-0-015)] px-4 py-4 sm:px-6 sm:py-5">
+    <section className="omnix-container-responsive flex min-h-0 flex-1 flex-col overflow-x-hidden px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
+      <div ref={liveRegionRef} aria-live="polite" aria-atomic="true" className="sr-only" />
+      <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-4 rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-0-255-255-0-015)] px-4 py-4 sm:px-6 sm:py-5">
         <div>
           <p className="mb-1.5 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400/70">
             <BadgeCheck className="h-4 w-4" />
@@ -123,13 +159,13 @@ export function WorkspaceDecisionsSurface() {
             Architectural and operational choices for <span className="text-cyan-100/90 font-medium">{activeWorkspace?.name}</span>.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
           <Button
             type="button"
             size="sm"
             onClick={() => setCreateOpen(true)}
             leftIcon={<Plus className="h-3.5 w-3.5" />}
-            className="h-9 px-4 shadow-[0_0_15px_var(--omnix-rgba-rgba-34-211-238-0-1)]"
+            className="h-9 flex-1 px-4 shadow-[0_0_15px_var(--omnix-rgba-34-211-238-0-1)] sm:flex-none"
           >
             New Decision
           </Button>
@@ -139,7 +175,7 @@ export function WorkspaceDecisionsSurface() {
             variant="ghost"
             onClick={() => void loadDecisions()}
             disabled={loading}
-            className="h-9 px-4 border border-cyan-300/10 hover:bg-cyan-300/5"
+            className="h-9 flex-1 border border-cyan-300/10 px-4 hover:bg-cyan-300/5 sm:flex-none"
             leftIcon={loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           >
             Refresh Memory
@@ -155,12 +191,13 @@ export function WorkspaceDecisionsSurface() {
             setDecisions(prev => [decision, ...prev]);
             setSelectedId(decision.id);
             setCreateOpen(false);
+            announceMutation(`Decision ${decision.title} created.`);
           }}
         />
       )}
 
       {/* Decision Overview Strip */}
-      <div className={cn("mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4", selectedId && "hidden lg:grid")}>
+      <div className={cn("mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4", selectedId && "hidden xl:grid")}>
         {[
           { label: "Accepted", value: stats.accepted, color: "text-emerald-400", bg: "bg-emerald-400/5" },
           { label: "Proposed", value: stats.proposed, color: "text-cyan-400", bg: "bg-cyan-400/5" },
@@ -186,77 +223,17 @@ export function WorkspaceDecisionsSurface() {
       ) : null}
 
       {!loading && decisions.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-dashed border-cyan-400/10 bg-cyan-400/[0.01] p-8 text-center sm:p-12">
-          <div className="relative mb-8">
-            <div className="absolute inset-0 -m-12 animate-pulse bg-cyan-400/5 blur-3xl rounded-full" />
-            <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-cyan-400/20 bg-black/40 shadow-[0_0_30px_var(--omnix-rgba-rgba-34-211-238-0-1)]">
-              <BadgeCheck className="h-10 w-10 text-cyan-400" />
-            </div>
-          </div>
-          
-          <h2 className="omnix-display text-2xl font-bold text-white sm:text-3xl">Decision Memory</h2>
-          <p className="mt-3 max-w-lg text-base text-[var(--omnix-text-2)]">
-            Capture important organizational choices. Decisions preserve context, rationale, and follow-through.
-          </p>
-
-          <div className="mt-8 grid max-w-2xl gap-4 text-left sm:grid-cols-2">
-            {[
-              { title: "Preserve Rationale", desc: "Why a choice was made and the historical context.", icon: Target },
-              { title: "Execution Linkage", desc: "What work came from it and which tasks it spawned.", icon: ListTodo },
-              { title: "Strategic Impact", desc: "Which initiative it supports and how it fits the roadmap.", icon: BadgeCheck },
-              { title: "Operational Audit", desc: "A searchable timeline of team consensus and shifts.", icon: RefreshCw },
-            ].map((feature, i) => (
-              <div key={i} className="flex gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-4 transition hover:bg-white/[0.04]">
-                <feature.icon className="h-5 w-5 shrink-0 text-cyan-400/60" />
-                <div>
-                  <h4 className="text-sm font-semibold text-white">{feature.title}</h4>
-                  <p className="mt-1 text-xs text-[var(--omnix-text-3)] leading-relaxed">{feature.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-10 flex flex-col items-center gap-4">
-            <Button size="lg" onClick={() => setCreateOpen(true)} leftIcon={<Plus className="h-5 w-5" />} className="h-12 px-8 text-base shadow-[0_0_25px_var(--omnix-rgba-rgba-34-211-238-0-2)]">
-              Create First Decision
-            </Button>
-            <p className="text-xs text-[var(--omnix-text-3)]">
-              Important conversations can also be converted into decisions.
-            </p>
-          </div>
-
-          {/* Example Card (Phase 4) */}
-          <div className="mt-12 w-full max-w-md text-left opacity-50 grayscale hover:opacity-80 hover:grayscale-0 transition-all duration-500">
-            <p className="mb-3 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--omnix-text-3)]">Example Decision</p>
-            <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-5 shadow-2xl">
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-emerald-400">Accepted</span>
-                  <h3 className="mt-2 text-sm font-bold text-white">Use Supabase Realtime</h3>
-                </div>
-                <BadgeCheck className="h-5 w-5 text-cyan-400/40" />
-              </div>
-              <p className="mt-3 text-[11px] text-[var(--omnix-text-2)] leading-relaxed">
-                Reduce operational complexity by leveraging built-in sync.
-              </p>
-              <div className="mt-4 flex items-center gap-3 border-t border-white/5 pt-4">
-                <div className="flex items-center gap-1.5">
-                  <ListTodo className="h-3 w-3 text-white/20" />
-                  <span className="text-[10px] font-medium text-white/40">4 tasks</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Target className="h-3 w-3 text-white/20" />
-                  <span className="text-[10px] font-medium text-white/40">1 initiative</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <EmptyState
+          icon={BadgeCheck}
+          title="No decisions recorded"
+          description="Capture decisions to build your organization's memory"
+          action={{ label: "Record Decision", onClick: () => setCreateOpen(true) }}
+          className="flex-1"
+        />
       ) : (
-        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:grid-rows-1">
+        <div className="omnix-decisions-workbench" data-selection={selectedId ? "active" : "empty"}>
           <aside className={cn(
-            "omnix-panel flex min-h-0 flex-col rounded-2xl p-4 shadow-xl",
-            selectedId && "hidden lg:flex"
+            "omnix-panel omnix-decisions-list flex min-h-0 flex-col rounded-2xl p-4 shadow-xl",
           )}>
             <div className="mb-4">
               <div className="mb-3 flex items-center justify-between px-1">
@@ -275,7 +252,7 @@ export function WorkspaceDecisionsSurface() {
                     className={cn(
                       "flex-1 rounded-md py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all",
                       statusFilter === s 
-                        ? "bg-cyan-400/10 text-cyan-400 shadow-[inset_0_1px_1px_var(--omnix-rgba-rgba-255-255-255-0-05)]" 
+                        ? "bg-cyan-400/10 text-cyan-400 shadow-[inset_0_1px_1px_var(--omnix-rgba-255-255-255-0-05)]" 
                         : "text-[var(--omnix-text-3)] hover:text-[var(--omnix-text-2)]"
                     )}
                   >
@@ -312,7 +289,7 @@ export function WorkspaceDecisionsSurface() {
                     className={cn(
                       "group relative mb-2 flex flex-col rounded-xl border p-4 text-left transition-all duration-300",
                       active
-                        ? "border-cyan-400/30 bg-cyan-400/[0.07] shadow-[0_0_20px_var(--omnix-rgba-rgba-34-211-238-0-05)]"
+                        ? "border-cyan-400/30 bg-cyan-400/[0.07] shadow-[0_0_20px_var(--omnix-rgba-34-211-238-0-05)]"
                         : "border-transparent hover:border-white/10 hover:bg-white/[0.03]",
                     )}
                   >
@@ -326,8 +303,8 @@ export function WorkspaceDecisionsSurface() {
                       </span>
                       <div className={cn(
                         "h-1.5 w-1.5 shrink-0 rounded-full mt-1.5",
-                        decision.status === "accepted" ? "bg-emerald-400 shadow-[0_0_8px_var(--omnix-rgba-rgba-52-211-153-0-5)]" :
-                        decision.status === "proposed" ? "bg-cyan-400 shadow-[0_0_8px_var(--omnix-rgba-rgba-34-211-238-0-5)]" :
+                        decision.status === "accepted" ? "bg-emerald-400 shadow-[0_0_8px_var(--omnix-rgba-52-211-153-0-5)]" :
+                        decision.status === "proposed" ? "bg-cyan-400 shadow-[0_0_8px_var(--omnix-rgba-34-211-238-0-5)]" :
                         "bg-amber-400"
                       )} />
                     </div>
@@ -347,8 +324,7 @@ export function WorkspaceDecisionsSurface() {
           </aside>
 
           <main className={cn(
-            "omnix-panel min-h-0 min-w-0 overflow-hidden rounded-2xl border-[var(--omnix-border)] shadow-2xl",
-            !selectedId && "hidden lg:flex"
+            "omnix-panel omnix-decisions-detail flex min-h-0 min-w-0 overflow-hidden rounded-2xl border-[var(--omnix-border)] shadow-2xl",
           )}>
             {selected ? (
               <div className="flex h-full min-h-0 flex-col">
@@ -359,7 +335,7 @@ export function WorkspaceDecisionsSurface() {
                         <button
                           type="button"
                           onClick={() => setSelectedId(null)}
-                          className="flex items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-200 lg:hidden"
+                          className="omnix-decisions-back flex items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-200"
                         >
                           ‹ Back
                         </button>

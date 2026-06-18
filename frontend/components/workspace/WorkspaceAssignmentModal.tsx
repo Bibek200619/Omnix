@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
-import { Portal } from "@/components/ui/Portal";
+import { Modal } from "@/components/ui/Modal";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { logClientError } from "@/lib/errors";
 import {
@@ -60,7 +60,7 @@ export function WorkspaceAssignmentModal({
       setPotentialMembers(data || []);
     } catch (err) {
       logClientError("Failed to fetch potential members", err, { endpoint: `/workspaces/${workspaceId}/potential-members` });
-      setError("Unable to load organizational members.");
+      setError("Unable to load organizational members. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -98,23 +98,41 @@ export function WorkspaceAssignmentModal({
       setSelectedUserId(null);
     } catch (err) {
       logClientError("Failed to assign workspace member", err, { endpoint: `/workspaces/${workspaceId}/members` });
-      setError("Assignment failed.");
+      setError("Assignment failed. Your session may have expired; refresh and try again.");
     } finally {
       setAssigningId(null);
     }
   }
 
-  if (!open) return null;
-
   const canAssignLeader = isWorkspaceFounderRole(currentUserRole);
 
   return (
-    <Portal>
-      <div className="omnix-modal-backdrop fixed inset-0 z-[150] flex items-center justify-center p-4 backdrop-blur-md">
-        <div className="omnix-modal-card relative flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-[var(--omnix-border-2)] bg-[var(--omnix-color-0a0d14)]/90 shadow-[0_32px_128px_var(--omnix-rgba-rgba-0-0-0-0-6)] ring-1 ring-white/10">
-          <div className="pointer-events-none absolute left-1/2 top-0 h-48 w-full -translate-x-1/2 bg-[var(--omnix-cyan)] opacity-5 blur-[80px]" />
-          
-          <div className="relative z-10 flex shrink-0 items-center justify-between border-b border-[var(--omnix-border)] px-4 py-4 sm:px-6 sm:py-5">
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      title="Add Collaborator"
+      className="max-w-xl rounded-3xl border-[var(--omnix-border-2)] bg-[var(--omnix-color-0a0d14)]/90 shadow-[0_32px_128px_var(--omnix-rgba-0-0-0-0-6)] ring-1 ring-white/10"
+      footerClassName="gap-3 px-4 py-4 sm:justify-end sm:px-6"
+      footer={(
+        <>
+          <Button variant="ghost" className="flex-1 sm:flex-none" onClick={onClose} disabled={Boolean(assigningId)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleAssign}
+            disabled={!selectedUserId}
+            isLoading={Boolean(assigningId)}
+            className="flex-1 rounded-xl px-4 sm:flex-none sm:px-6"
+          >
+            Add to workspace
+          </Button>
+        </>
+      )}
+    >
+      <div className="pointer-events-none absolute left-1/2 top-0 h-48 w-full -translate-x-1/2 bg-[var(--omnix-cyan)] opacity-5 blur-[80px]" />
+
+      <Modal.Header className="items-center justify-between px-4 py-4 sm:px-6 sm:py-5">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--omnix-grad-primary)] text-white shadow-[var(--omnix-glow-sm)]">
                 <UserPlus className="h-5 w-5" />
@@ -125,14 +143,17 @@ export function WorkspaceAssignmentModal({
               </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white"
+              aria-label="Close assignment modal"
+              title="Close assignment modal"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white"
             >
               <X className="h-5 w-5" />
             </button>
-          </div>
+      </Modal.Header>
 
-          <div className="relative z-10 flex-1 overflow-y-auto p-4 sm:p-6">
+      <Modal.Body className="p-4 sm:p-6">
             <div className="relative mb-6">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               <input
@@ -250,24 +271,7 @@ export function WorkspaceAssignmentModal({
                 {error}
               </div>
             )}
-          </div>
-
-          <div className="relative z-10 flex shrink-0 items-center gap-3 border-t border-[var(--omnix-border)] bg-black/20 px-4 py-4 pb-safe sm:justify-end sm:px-6">
-            <Button variant="ghost" className="flex-1 sm:flex-none" onClick={onClose} disabled={Boolean(assigningId)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleAssign}
-              disabled={!selectedUserId}
-              isLoading={Boolean(assigningId)}
-              className="flex-1 rounded-xl px-4 sm:flex-none sm:px-6"
-            >
-              Add to workspace
-            </Button>
-          </div>
-        </div>
-      </div>
-    </Portal>
+      </Modal.Body>
+    </Modal>
   );
 }

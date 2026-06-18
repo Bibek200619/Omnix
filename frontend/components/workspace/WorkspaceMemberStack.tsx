@@ -49,10 +49,10 @@ export function WorkspaceMemberStack({
                 handle={member.handle}
                 avatarUrl={member.avatar_url}
                 className={cn(
-                  "rounded-lg font-semibold shadow-[0_8px_18px_var(--omnix-rgba-rgba-0-0-0-0-22)]",
+                  "rounded-lg font-semibold shadow-[0_8px_18px_var(--omnix-rgba-0-0-0-0-22)]",
                   workspaceRoleAvatarClass(member.role),
                   sizeClasses[size],
-                  showPresence && presence?.is_online && "ring-1 ring-emerald-300/55 shadow-[0_0_18px_var(--omnix-rgba-rgba-0-232-122-0-22)]",
+                  showPresence && presence?.is_online && "ring-1 ring-emerald-300/55 shadow-[0_0_18px_var(--omnix-rgba-0-232-122-0-22)]",
                 )}
               />
               {showPresence && presence ? (

@@ -90,7 +90,7 @@ export function AccountProfileSettings() {
       window.setTimeout(() => setMessage(null), 2200);
     } catch (err) {
       logClientError("Failed to save display name", err, { endpoint: "/profile" });
-      setError("Unable to save display name.");
+      setError("Unable to save display name. Check your connection and try again.");
     } finally {
       setSavingName(false);
     }
@@ -111,7 +111,7 @@ export function AccountProfileSettings() {
       window.setTimeout(() => setMessage(null), 2200);
     } catch (err) {
       logClientError("Failed to reserve handle", err, { endpoint: "/profile" });
-      setError("Unable to reserve handle.");
+      setError("Unable to reserve handle. Try a different handle or retry in a moment.");
     } finally {
       setSavingHandle(false);
     }
@@ -136,7 +136,7 @@ export function AccountProfileSettings() {
       setRemoveAvatar(false);
     } catch (err) {
       logClientError("Failed to prepare avatar", err);
-      setError("Unable to prepare avatar.");
+      setError("Unable to prepare avatar. Choose another image and try again.");
     } finally {
       event.target.value = "";
     }
@@ -153,7 +153,7 @@ export function AccountProfileSettings() {
       window.setTimeout(() => setMessage(null), 2200);
     } catch (err) {
       logClientError("Failed to save avatar", err, { endpoint: "/profile" });
-      setError("Unable to save avatar.");
+      setError("Unable to save avatar. Check your connection and try again.");
     } finally {
       setSavingAvatar(false);
     }

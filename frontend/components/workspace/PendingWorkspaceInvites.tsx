@@ -53,7 +53,7 @@ export function PendingWorkspaceInvites({
       setMessage(`Joined ${workspace.name}.`);
     } catch (err) {
       logClientError("Failed to accept invite", err, { endpoint: `/workspace-invites/${inviteId}/accept` });
-      setActionError("Unable to accept invite.");
+      setActionError("Unable to accept invite. Your session may have expired; refresh and try again.");
     } finally {
       setBusyKey(null);
     }
@@ -68,7 +68,7 @@ export function PendingWorkspaceInvites({
       setMessage("Invite declined.");
     } catch (err) {
       logClientError("Failed to decline invite", err, { endpoint: `/workspace-invites/${inviteId}/decline` });
-      setActionError("Unable to decline invite.");
+      setActionError("Unable to decline invite. Your session may have expired; refresh and try again.");
     } finally {
       setBusyKey(null);
     }
@@ -81,7 +81,7 @@ export function PendingWorkspaceInvites({
   return (
     <section
       className={cn(
-        "rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] shadow-[inset_0_1px_0_var(--omnix-rgba-rgba-255-255-255-0-035)]",
+        "rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-035)]",
         compact ? "p-2.5" : "p-4 sm:p-5",
         className,
       )}

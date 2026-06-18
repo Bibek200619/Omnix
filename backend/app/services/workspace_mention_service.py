@@ -179,8 +179,14 @@ async def mention_metadata_for_sources(
             desc=False,
             limit=500,
         )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
+    except SupabaseServiceError:
+        logger.warning(
+            "Mention metadata hydration failed | workspace_id=%s | source_type=%s",
+            workspace_id,
+            source_type,
+            exc_info=True,
+        )
+        return {source_id: [] for source_id in unique_source_ids}
 
     if not rows:
         return {source_id: [] for source_id in unique_source_ids}
@@ -242,8 +248,9 @@ async def _conversation_source_details(
             "id,workspace_id,channel_id,content,created_at",
             filters={"workspace_id": workspace_id, "id": source_ids},
         )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
+    except SupabaseServiceError:
+        logger.warning("Mention conversation source hydration failed | workspace_id=%s", workspace_id, exc_info=True)
+        return {}
 
     channel_ids = sorted({str(message.get("channel_id")) for message in messages if message.get("channel_id")})
     channels = []
@@ -261,7 +268,12 @@ async def _conversation_source_details(
                 filters={"channel_id": channel_ids, "user_id": user_id},
             )
         except SupabaseServiceError as exc:
-            raise _database_error() from exc
+            logger.warning(
+                "Mention conversation channel hydration failed | workspace_id=%s",
+                workspace_id,
+                exc_info=True,
+            )
+            return {}
 
     channel_by_id = {str(channel.get("id")): channel for channel in channels}
     member_channel_ids = {str(member.get("channel_id")) for member in memberships}
@@ -292,8 +304,9 @@ async def _task_source_details(workspace_id: str, source_ids: list[str]) -> dict
             "id,title,description",
             filters={"workspace_id": workspace_id, "id": source_ids},
         )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
+    except SupabaseServiceError:
+        logger.warning("Mention task source hydration failed | workspace_id=%s", workspace_id, exc_info=True)
+        return {}
     return {
         str(task["id"]): {
             "title": str(task.get("title") or "Task"),
@@ -311,8 +324,9 @@ async def _decision_source_details(workspace_id: str, source_ids: list[str]) -> 
             "id,title,description,decision_reason",
             filters={"workspace_id": workspace_id, "id": source_ids},
         )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
+    except SupabaseServiceError:
+        logger.warning("Mention decision source hydration failed | workspace_id=%s", workspace_id, exc_info=True)
+        return {}
     return {
         str(decision["id"]): {
             "title": str(decision.get("title") or "Decision"),
@@ -344,8 +358,14 @@ async def list_mentions_for_user(
             desc=True,
             limit=limit,
         )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
+    except SupabaseServiceError:
+        logger.warning(
+            "Mention inbox storage unavailable | workspace_id=%s | user_id=%s",
+            workspace_id,
+            user_id,
+            exc_info=True,
+        )
+        return []
 
     if not rows:
         return []

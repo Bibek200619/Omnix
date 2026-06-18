@@ -1,12 +1,9 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   color-scheme: dark;
-  --font-geist-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --omnix-cyan: #00ffff;
   --omnix-cyan-dim: #00cccc;
   --omnix-cyan-glow: rgba(0, 255, 255, 0.18);
@@ -30,8 +27,8 @@
   --omnix-purple: #9b5cff;
   --omnix-pink: #ff4df4;
   --omnix-text: rgba(255, 255, 255, 0.95);
-  --omnix-text-2: rgba(255, 255, 255, 0.55);
-  --omnix-text-3: rgba(255, 255, 255, 0.3);
+  --omnix-text-2: rgba(255, 255, 255, 0.65);
+  --omnix-text-3: rgba(255, 255, 255, 0.48);
   --omnix-grad-primary: linear-gradient(135deg, #00ffff 0%, #0088ff 50%, #0000ff 100%);
   --omnix-grad-cyan: linear-gradient(135deg, #00ffff 0%, #00cccc 100%);
   --omnix-grad-glow: linear-gradient(135deg, rgba(0, 255, 255, 0.15) 0%, rgba(0, 0, 255, 0.08) 100%);
@@ -55,8 +52,203 @@
   --omnix-radius-sm: 8px;
   --omnix-radius-lg: 16px;
   --omnix-radius-xl: 20px;
-  --omnix-font: var(--font-geist-sans);
-  --omnix-font-display: "Space Grotesk", var(--font-geist-sans);
+  --omnix-font: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --omnix-font-display: var(--font-space-grotesk), var(--font-inter), sans-serif;
+
+  /* Component literal color variables: generated for audit remediation. */
+  --omnix-color-0033ff: #0033ff;
+  --omnix-color-0055ff: #0055ff;
+  --omnix-color-0088ff: #0088ff;
+  --omnix-color-00aaff: #00aaff;
+  --omnix-color-05070b: #05070b;
+  --omnix-color-060a14: #060a14;
+  --omnix-color-06101d: #06101d;
+  --omnix-color-061020: #061020;
+  --omnix-color-07111f: #07111f;
+  --omnix-color-07131f: #07131f;
+  --omnix-color-08111f: #08111f;
+  --omnix-color-09131b: #09131b;
+  --omnix-color-0a0d14: #0a0d14;
+  --omnix-color-0d2440: #0d2440;
+  --omnix-color-10b981: #10b981;
+  --omnix-color-197ef0: #197ef0;
+  --omnix-color-214db9: #214db9;
+  --omnix-color-22c55e: #22c55e;
+  --omnix-color-22d3ee: #22d3ee;
+  --omnix-color-28c840: #28c840;
+  --omnix-color-29c7ff: #29c7ff;
+  --omnix-color-3068d2: #3068d2;
+  --omnix-color-33ccff: #33ccff;
+  --omnix-color-34a853: #34a853;
+  --omnix-color-34d399: #34d399;
+  --omnix-color-4285f4: #4285f4;
+  --omnix-color-4ade80: #4ade80;
+  --omnix-color-547dc8: #547dc8;
+  --omnix-color-67e8f9: #67e8f9;
+  --omnix-color-818cf8: #818cf8;
+  --omnix-color-a855f7: #a855f7;
+  --omnix-color-a9c3e8: #a9c3e8;
+  --omnix-color-adc5ea: #adc5ea;
+  --omnix-color-c084fc: #c084fc;
+  --omnix-color-e4eef9: #e4eef9;
+  --omnix-color-ea4335: #ea4335;
+  --omnix-color-f472b6: #f472b6;
+  --omnix-color-f8fafc: #f8fafc;
+  --omnix-color-f9fcff: #f9fcff;
+  --omnix-color-fb923c: #fb923c;
+  --omnix-color-fbbc05: #fbbc05;
+  --omnix-color-fbbf24: #fbbf24;
+  --omnix-color-fbfdff: #fbfdff;
+  --omnix-color-febc2e: #febc2e;
+  --omnix-color-ff5f57: #ff5f57;
+  --omnix-color-fff: #fff;
+  --omnix-color-ffffff: #ffffff;
+  --omnix-rgba-0-0-0-0-18: rgba(0, 0, 0, 0.18);
+  --omnix-rgba-0-0-0-0-2: rgba(0, 0, 0, 0.2);
+  --omnix-rgba-0-0-0-0-22: rgba(0, 0, 0, 0.22);
+  --omnix-rgba-0-0-0-0-24: rgba(0, 0, 0, 0.24);
+  --omnix-rgba-0-0-0-0-26: rgba(0, 0, 0, 0.26);
+  --omnix-rgba-0-0-0-0-28: rgba(0, 0, 0, 0.28);
+  --omnix-rgba-0-0-0-0-3: rgba(0, 0, 0, 0.3);
+  --omnix-rgba-0-0-0-0-34: rgba(0, 0, 0, 0.34);
+  --omnix-rgba-0-0-0-0-38: rgba(0, 0, 0, 0.38);
+  --omnix-rgba-0-0-0-0-4: rgba(0, 0, 0, 0.4);
+  --omnix-rgba-0-0-0-0-45: rgba(0, 0, 0, 0.45);
+  --omnix-rgba-0-0-0-0-5: rgba(0, 0, 0, 0.5);
+  --omnix-rgba-0-0-0-0-55: rgba(0, 0, 0, 0.55);
+  --omnix-rgba-0-0-0-0-58: rgba(0, 0, 0, 0.58);
+  --omnix-rgba-0-0-0-0-6: rgba(0, 0, 0, 0.6);
+  --omnix-rgba-0-0-0-0-7: rgba(0, 0, 0, 0.7);
+  --omnix-rgba-0-0-0-0-8: rgba(0, 0, 0, 0.8);
+  --omnix-rgba-0-100-255-0-15: rgba(0, 100, 255, 0.15);
+  --omnix-rgba-0-232-122-0-06: rgba(0, 232, 122, 0.06);
+  --omnix-rgba-0-232-122-0-16: rgba(0, 232, 122, 0.16);
+  --omnix-rgba-0-232-122-0-22: rgba(0, 232, 122, 0.22);
+  --omnix-rgba-0-255-255-0-015: rgba(0, 255, 255, 0.015);
+  --omnix-rgba-0-255-255-0-025: rgba(0, 255, 255, 0.025);
+  --omnix-rgba-0-255-255-0-03: rgba(0, 255, 255, 0.03);
+  --omnix-rgba-0-255-255-0-035: rgba(0, 255, 255, 0.035);
+  --omnix-rgba-0-255-255-0-04: rgba(0, 255, 255, 0.04);
+  --omnix-rgba-0-255-255-0-045: rgba(0, 255, 255, 0.045);
+  --omnix-rgba-0-255-255-0-05: rgba(0, 255, 255, 0.05);
+  --omnix-rgba-0-255-255-0-055: rgba(0, 255, 255, 0.055);
+  --omnix-rgba-0-255-255-0-06: rgba(0, 255, 255, 0.06);
+  --omnix-rgba-0-255-255-0-07: rgba(0, 255, 255, 0.07);
+  --omnix-rgba-0-255-255-0-075: rgba(0, 255, 255, 0.075);
+  --omnix-rgba-0-255-255-0-08: rgba(0, 255, 255, 0.08);
+  --omnix-rgba-0-255-255-0-09: rgba(0, 255, 255, 0.09);
+  --omnix-rgba-0-255-255-0-1: rgba(0, 255, 255, 0.1);
+  --omnix-rgba-0-255-255-0-11: rgba(0, 255, 255, 0.11);
+  --omnix-rgba-0-255-255-0-12: rgba(0, 255, 255, 0.12);
+  --omnix-rgba-0-255-255-0-14: rgba(0, 255, 255, 0.14);
+  --omnix-rgba-0-255-255-0-15: rgba(0, 255, 255, 0.15);
+  --omnix-rgba-0-255-255-0-16: rgba(0, 255, 255, 0.16);
+  --omnix-rgba-0-255-255-0-18: rgba(0, 255, 255, 0.18);
+  --omnix-rgba-0-255-255-0-2: rgba(0, 255, 255, 0.2);
+  --omnix-rgba-0-255-255-0-22: rgba(0, 255, 255, 0.22);
+  --omnix-rgba-0-255-255-0-24: rgba(0, 255, 255, 0.24);
+  --omnix-rgba-0-255-255-0-25: rgba(0, 255, 255, 0.25);
+  --omnix-rgba-0-255-255-0-28: rgba(0, 255, 255, 0.28);
+  --omnix-rgba-0-255-255-0-3: rgba(0, 255, 255, 0.3);
+  --omnix-rgba-0-255-255-0-35: rgba(0, 255, 255, 0.35);
+  --omnix-rgba-0-255-255-0-45: rgba(0, 255, 255, 0.45);
+  --omnix-rgba-0-255-255-0-5: rgba(0, 255, 255, 0.5);
+  --omnix-rgba-0-255-255-0-55: rgba(0, 255, 255, 0.55);
+  --omnix-rgba-0-255-255-0-6: rgba(0, 255, 255, 0.6);
+  --omnix-rgba-0-255-255-0-68: rgba(0, 255, 255, 0.68);
+  --omnix-rgba-0-255-255-0-7: rgba(0, 255, 255, 0.7);
+  --omnix-rgba-0-255-255-0-9: rgba(0, 255, 255, 0.9);
+  --omnix-rgba-0-51-255-0-05: rgba(0, 51, 255, 0.05);
+  --omnix-rgba-0-51-255-0-06: rgba(0, 51, 255, 0.06);
+  --omnix-rgba-0-51-255-0-07: rgba(0, 51, 255, 0.07);
+  --omnix-rgba-0-51-255-0-085: rgba(0, 51, 255, 0.085);
+  --omnix-rgba-0-51-255-0-09: rgba(0, 51, 255, 0.09);
+  --omnix-rgba-0-51-255-0-2: rgba(0, 51, 255, 0.2);
+  --omnix-rgba-10-18-32-0-85: rgba(10, 18, 32, 0.85);
+  --omnix-rgba-10-25-47-0: rgba(10, 25, 47, 0);
+  --omnix-rgba-10-25-47-0-88: rgba(10, 25, 47, 0.88);
+  --omnix-rgba-10-25-47-0-92: rgba(10, 25, 47, 0.92);
+  --omnix-rgba-15-23-42-0-8: rgba(15, 23, 42, 0.8);
+  --omnix-rgba-155-92-255-0-4: rgba(155, 92, 255, 0.4);
+  --omnix-rgba-16-185-129-0-5: rgba(16, 185, 129, 0.5);
+  --omnix-rgba-168-85-247-0-2: rgba(168, 85, 247, 0.2);
+  --omnix-rgba-244-63-94-0-14: rgba(244, 63, 94, 0.14);
+  --omnix-rgba-251-113-133-0-05: rgba(251, 113, 133, 0.05);
+  --omnix-rgba-251-113-133-0-75: rgba(251, 113, 133, 0.75);
+  --omnix-rgba-251-113-133-0-8: rgba(251, 113, 133, 0.8);
+  --omnix-rgba-251-191-36-0-05: rgba(251, 191, 36, 0.05);
+  --omnix-rgba-251-191-36-0-08: rgba(251, 191, 36, 0.08);
+  --omnix-rgba-251-191-36-0-5: rgba(251, 191, 36, 0.5);
+  --omnix-rgba-252-211-77-0-75: rgba(252, 211, 77, 0.75);
+  --omnix-rgba-255-255-255-0-01: rgba(255, 255, 255, 0.01);
+  --omnix-rgba-255-255-255-0-02: rgba(255, 255, 255, 0.02);
+  --omnix-rgba-255-255-255-0-03: rgba(255, 255, 255, 0.03);
+  --omnix-rgba-255-255-255-0-035: rgba(255, 255, 255, 0.035);
+  --omnix-rgba-255-255-255-0-04: rgba(255, 255, 255, 0.04);
+  --omnix-rgba-255-255-255-0-045: rgba(255, 255, 255, 0.045);
+  --omnix-rgba-255-255-255-0-05: rgba(255, 255, 255, 0.05);
+  --omnix-rgba-255-255-255-0-055: rgba(255, 255, 255, 0.055);
+  --omnix-rgba-255-255-255-0-06: rgba(255, 255, 255, 0.06);
+  --omnix-rgba-255-255-255-0-07: rgba(255, 255, 255, 0.07);
+  --omnix-rgba-255-255-255-0-08: rgba(255, 255, 255, 0.08);
+  --omnix-rgba-255-255-255-0-14: rgba(255, 255, 255, 0.14);
+  --omnix-rgba-255-255-255-0-18: rgba(255, 255, 255, 0.18);
+  --omnix-rgba-255-255-255-0-2: rgba(255, 255, 255, 0.2);
+  --omnix-rgba-255-255-255-0-22: rgba(255, 255, 255, 0.22);
+  --omnix-rgba-255-255-255-0-25: rgba(255, 255, 255, 0.25);
+  --omnix-rgba-255-255-255-0-28: rgba(255, 255, 255, 0.28);
+  --omnix-rgba-255-255-255-0-3: rgba(255, 255, 255, 0.3);
+  --omnix-rgba-255-255-255-0-32: rgba(255, 255, 255, 0.32);
+  --omnix-rgba-255-255-255-0-35: rgba(255, 255, 255, 0.35);
+  --omnix-rgba-255-255-255-0-38: rgba(255, 255, 255, 0.38);
+  --omnix-rgba-255-255-255-0-5: rgba(255, 255, 255, 0.5);
+  --omnix-rgba-255-255-255-0-55: rgba(255, 255, 255, 0.55);
+  --omnix-rgba-255-255-255-0-56: rgba(255, 255, 255, 0.56);
+  --omnix-rgba-255-255-255-0-6: rgba(255, 255, 255, 0.6);
+  --omnix-rgba-255-255-255-0-82: rgba(255, 255, 255, 0.82);
+  --omnix-rgba-255-255-255-0-9: rgba(255, 255, 255, 0.9);
+  --omnix-rgba-255-255-255-0-92: rgba(255, 255, 255, 0.92);
+  --omnix-rgba-3-8-18-0-96: rgba(3, 8, 18, 0.96);
+  --omnix-rgba-3-8-18-0-97: rgba(3, 8, 18, 0.97);
+  --omnix-rgba-34-197-94-0-1: rgba(34, 197, 94, 0.1);
+  --omnix-rgba-34-197-94-0-12: rgba(34, 197, 94, 0.12);
+  --omnix-rgba-34-211-238-0-035: rgba(34, 211, 238, 0.035);
+  --omnix-rgba-34-211-238-0-05: rgba(34, 211, 238, 0.05);
+  --omnix-rgba-34-211-238-0-09: rgba(34, 211, 238, 0.09);
+  --omnix-rgba-34-211-238-0-1: rgba(34, 211, 238, 0.1);
+  --omnix-rgba-34-211-238-0-15: rgba(34, 211, 238, 0.15);
+  --omnix-rgba-34-211-238-0-5: rgba(34, 211, 238, 0.5);
+  --omnix-rgba-34-211-238-0-6: rgba(34, 211, 238, 0.6);
+  --omnix-rgba-34-211-238-0-8: rgba(34, 211, 238, 0.8);
+  --omnix-rgba-4-10-20-0-985: rgba(4, 10, 20, 0.985);
+  --omnix-rgba-44-132-255-0-28: rgba(44, 132, 255, 0.28);
+  --omnix-rgba-5-12-23-0-34: rgba(5, 12, 23, 0.34);
+  --omnix-rgba-5-12-23-0-48: rgba(5, 12, 23, 0.48);
+  --omnix-rgba-5-12-23-0-6: rgba(5, 12, 23, 0.6);
+  --omnix-rgba-5-12-23-0-82: rgba(5, 12, 23, 0.82);
+  --omnix-rgba-5-12-23-0-85: rgba(5, 12, 23, 0.85);
+  --omnix-rgba-5-12-23-0-92: rgba(5, 12, 23, 0.92);
+  --omnix-rgba-5-12-23-0-94: rgba(5, 12, 23, 0.94);
+  --omnix-rgba-5-12-23-0-96: rgba(5, 12, 23, 0.96);
+  --omnix-rgba-5-12-23-0-98: rgba(5, 12, 23, 0.98);
+  --omnix-rgba-5-14-26-0-99: rgba(5, 14, 26, 0.99);
+  --omnix-rgba-52-211-153-0-05: rgba(52, 211, 153, 0.05);
+  --omnix-rgba-52-211-153-0-1: rgba(52, 211, 153, 0.1);
+  --omnix-rgba-52-211-153-0-5: rgba(52, 211, 153, 0.5);
+  --omnix-rgba-52-211-153-0-75: rgba(52, 211, 153, 0.75);
+  --omnix-rgba-52-211-153-0-8: rgba(52, 211, 153, 0.8);
+  --omnix-rgba-6-10-20-0-6: rgba(6, 10, 20, 0.6);
+  --omnix-rgba-6-16-32-1: rgba(6, 16, 32, 1);
+  --omnix-rgba-6-18-30-0-98: rgba(6, 18, 30, 0.98);
+  --omnix-rgba-6-18-32-0-98: rgba(6, 18, 32, 0.98);
+  --omnix-rgba-6-182-212-0-6: rgba(6, 182, 212, 0.6);
+  --omnix-rgba-6-20-38-0-99: rgba(6, 20, 38, 0.99);
+  --omnix-rgba-6-8-16-0-6: rgba(6, 8, 16, 0.6);
+  --omnix-rgba-7-18-24-0-96: rgba(7, 18, 24, 0.96);
+  --omnix-rgba-8-12-24-0-85: rgba(8, 12, 24, 0.85);
+  --omnix-rgba-8-16-30-0-82: rgba(8, 16, 30, 0.82);
+  --omnix-rgba-8-16-30-0-9: rgba(8, 16, 30, 0.9);
+  /* End component literal color variables. */
 
   /* Component literal color variables: generated for audit remediation. */
   --omnix-color-0033ff: #0033ff;
@@ -288,7 +480,7 @@ body {
   margin: 0;
   background: var(--omnix-bg);
   color: var(--omnix-text);
-  font-family: var(--font-geist-sans);
+  font-family: var(--omnix-font);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -385,6 +577,116 @@ textarea {
   isolation: isolate;
 }
 
+/* ── Auth component tokens ── */
+
+.auth-page-shell {
+  background: #061020;
+  font-family: "Inter", "DM Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.auth-left-panel {
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(145deg, rgba(0, 255, 255, 0.04) 0%, rgba(0, 51, 255, 0.05) 100%);
+}
+
+.auth-divider-line {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.auth-divider-label {
+  background: #061020;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.auth-text-cyan {
+  color: #00ffff;
+}
+
+.auth-text-white {
+  color: #fff;
+}
+
+.auth-text-muted {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.auth-text-faint {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.auth-text-quote {
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.auth-step-dot {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.auth-step-dot-active {
+  border-color: rgba(0, 255, 255, 0.35);
+  background: rgba(0, 255, 255, 0.1);
+  box-shadow: 0 0 18px rgba(0, 255, 255, 0.25);
+}
+
+.auth-step-dot-done {
+  border-color: #00ffff;
+  background: rgba(0, 255, 255, 0.2);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.15);
+}
+
+.auth-step-progress {
+  background: linear-gradient(90deg, #00ffff, transparent);
+  transform-origin: left;
+}
+
+.auth-benefit-icon {
+  border: 1px solid rgba(0, 255, 255, 0.22);
+  background: rgba(0, 255, 255, 0.1);
+}
+
+.auth-proof-card {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.auth-avatar-cyan {
+  background: rgba(0, 255, 255, 0.14);
+  color: #00ffff;
+}
+
+.auth-info-note {
+  border: 1px solid rgba(0, 255, 255, 0.12);
+  background: rgba(0, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.auth-info-note-strong {
+  border-color: rgba(0, 255, 255, 0.14);
+}
+
+.auth-mobile-icon-tile {
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  background: rgba(0, 255, 255, 0.08);
+}
+
+.auth-hero-mark {
+  border: 1px solid rgba(0, 255, 255, 0.24);
+  background: rgba(0, 255, 255, 0.1);
+  box-shadow: 0 0 28px rgba(0, 255, 255, 0.16);
+}
+
+.auth-eyebrow {
+  border: 1px solid rgba(0, 255, 255, 0.22);
+  background: rgba(0, 255, 255, 0.07);
+  color: #00ffff;
+}
+
+.auth-eyebrow-dot {
+  background: #00ffff;
+}
+
 .omnix-auth-shell::before {
   position: fixed;
   inset: var(--omnix-header-h) 0 0 var(--omnix-sidebar-w);
@@ -472,43 +774,6 @@ textarea {
   background: rgba(5, 12, 23, 0.84);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38), var(--omnix-glow-xs);
   backdrop-filter: blur(22px);
-}
-
-.omnix-replit-panel {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--omnix-border);
-  border-radius: var(--omnix-radius);
-  background: var(--omnix-surface);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
-  backdrop-filter: blur(18px);
-  transition:
-    transform 180ms ease,
-    border-color 180ms ease,
-    background 180ms ease,
-    box-shadow 180ms ease;
-}
-
-.omnix-replit-panel::before {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 100% 0%, rgba(0, 255, 255, 0.1), transparent 36%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.025), transparent 42%);
-  content: "";
-  opacity: 0.65;
-  transition: opacity 180ms ease;
-}
-
-.omnix-replit-panel:hover {
-  border-color: var(--omnix-border-active);
-  box-shadow: var(--omnix-glow-sm);
-  transform: translateY(-2px);
-}
-
-.omnix-replit-panel:hover::before {
-  opacity: 1;
 }
 
 .omnix-section-card {
@@ -727,6 +992,164 @@ textarea {
   max-width: none;
   margin-inline: 0;
   padding-bottom: 22px;
+}
+
+.omnix-container-responsive {
+  container-type: inline-size;
+}
+
+.omnix-decisions-workbench {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.omnix-decisions-workbench[data-selection="active"] .omnix-decisions-list {
+  display: none;
+}
+
+.omnix-decisions-workbench[data-selection="empty"] .omnix-decisions-detail {
+  display: none;
+}
+
+.omnix-decisions-workbench[data-selection="active"],
+.omnix-decisions-workbench[data-selection="empty"] {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.omnix-decisions-detail,
+.omnix-decisions-list {
+  min-width: 0;
+}
+
+.omnix-decision-context-grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.omnix-task-workbench,
+.omnix-initiative-workbench {
+  display: grid;
+  min-width: 0;
+  gap: 0.75rem;
+}
+
+.omnix-conversation-workbench {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0.75rem;
+  overflow-x: hidden;
+}
+
+.omnix-conversation-channels,
+.omnix-conversation-messages,
+.omnix-conversation-thread {
+  min-width: 0;
+}
+
+.omnix-conversation-thread {
+  display: none;
+}
+
+.omnix-conversation-channels > *,
+.omnix-conversation-thread > * {
+  height: 100%;
+  min-height: 0;
+}
+
+@container (min-width: 64rem) {
+  .omnix-decision-context-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(17rem, 22rem);
+    gap: 2rem;
+  }
+}
+
+@container (min-width: 48rem) {
+  .omnix-conversation-workbench {
+    grid-template-columns: minmax(14rem, 15.5rem) minmax(0, 1fr);
+  }
+
+  .omnix-conversation-workbench[data-view] .omnix-conversation-channels {
+    display: block;
+  }
+
+  .omnix-conversation-workbench[data-view] .omnix-conversation-messages {
+    display: flex;
+  }
+
+  .omnix-conversation-workbench[data-thread="open"] .omnix-conversation-messages {
+    display: none;
+  }
+
+  .omnix-conversation-workbench[data-thread="open"] .omnix-conversation-thread {
+    display: flex;
+  }
+
+  .omnix-conversation-mobile-back {
+    display: none;
+  }
+
+  .omnix-conversation-channel-list-items {
+    display: block;
+    flex: 1 1 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-bottom: 0;
+  }
+
+  .omnix-conversation-channel-list-items .omnix-conversation-channel-item {
+    width: 100%;
+  }
+
+  .omnix-conversation-channel-note {
+    display: block;
+  }
+}
+
+@container (min-width: 68rem) {
+  .omnix-task-workbench {
+    min-height: 0;
+    flex: 1 1 auto;
+    grid-template-columns: minmax(0, 1fr) minmax(17rem, 20rem);
+  }
+}
+
+@container (min-width: 76rem) {
+  .omnix-decisions-workbench {
+    grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .omnix-decisions-workbench[data-selection] .omnix-decisions-list,
+  .omnix-decisions-workbench[data-selection] .omnix-decisions-detail {
+    display: flex;
+  }
+
+  .omnix-decisions-back {
+    display: none;
+  }
+
+  .omnix-conversation-workbench[data-thread="open"] {
+    grid-template-columns: minmax(14rem, 15.5rem) minmax(0, 1fr) minmax(18rem, 22rem);
+  }
+
+  .omnix-conversation-workbench[data-thread="open"] .omnix-conversation-messages {
+    display: flex;
+  }
+
+  .omnix-conversation-workbench[data-thread="open"] .omnix-conversation-thread {
+    display: flex;
+  }
+
+  .omnix-initiative-workbench {
+    min-height: 0;
+    flex: 1 1 auto;
+    grid-template-columns: minmax(18rem, 20rem) minmax(0, 1fr) minmax(17rem, 19rem);
+  }
 }
 
 .omnix-cinematic-card {
@@ -1128,6 +1551,33 @@ textarea {
   }
 }
 
+@keyframes omnix-sheen-sweep {
+  0% { transform: translateX(-100%) skewX(-45deg); opacity: 0; }
+  20% { opacity: 0.4; }
+  50% { opacity: 0.6; }
+  80% { opacity: 0.4; }
+  100% { transform: translateX(200%) skewX(-45deg); opacity: 0; }
+}
+
+@keyframes omnix-glitch-text {
+  0% { text-shadow: 0.05em 0 0 rgba(255, 0, 80, 0.75), -0.025em -0.05em 0 rgba(0, 255, 0, 0.75), 0.025em 0.05em 0 rgba(0, 0, 255, 0.75); }
+  14% { text-shadow: 0.05em 0 0 rgba(255, 0, 80, 0.75), -0.025em -0.05em 0 rgba(0, 255, 0, 0.75), 0.025em 0.05em 0 rgba(0, 0, 255, 0.75); }
+  15% { text-shadow: -0.05em -0.025em 0 rgba(255, 0, 80, 0.75), 0.025em 0.025em 0 rgba(0, 255, 0, 0.75), -0.05em -0.05em 0 rgba(0, 0, 255, 0.75); }
+  49% { text-shadow: -0.05em -0.025em 0 rgba(255, 0, 80, 0.75), 0.025em 0.025em 0 rgba(0, 255, 0, 0.75), -0.05em -0.05em 0 rgba(0, 0, 255, 0.75); }
+  50% { text-shadow: 0.025em 0.05em 0 rgba(255, 0, 80, 0.75), 0.05em 0 0 rgba(0, 255, 0, 0.75), 0 -0.05em 0 rgba(0, 0, 255, 0.75); }
+  99% { text-shadow: 0.025em 0.05em 0 rgba(255, 0, 80, 0.75), 0.05em 0 0 rgba(0, 255, 0, 0.75), 0 -0.05em 0 rgba(0, 0, 255, 0.75); }
+  100% { text-shadow: -0.025em 0 0 rgba(255, 0, 80, 0.75), -0.025em -0.025em 0 rgba(0, 255, 0, 0.75), -0.025em -0.05em 0 rgba(0, 0, 255, 0.75); }
+}
+
+@keyframes omnix-float-subtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.omnix-float-subtle {
+  animation: omnix-float-subtle 3s ease-in-out infinite;
+}
+
 @keyframes omnix-fade-in {
   from {
     opacity: 0;
@@ -1425,6 +1875,8 @@ textarea {
 .omnix-page-enter-delay-2 { animation-delay: 0.12s; }
 .omnix-page-enter-delay-3 { animation-delay: 0.18s; }
 .omnix-page-enter-delay-4 { animation-delay: 0.24s; }
+.omnix-page-enter-delay-5 { animation-delay: 0.30s; }
+.omnix-page-enter-delay-6 { animation-delay: 0.36s; }
 
 /* ── Source card status variants ────────────────────────────── */
 
@@ -1448,12 +1900,16 @@ textarea {
 
 /* ── Logo animation ─────────────────────────────────────────── */
 
-.omnix-logo-glow {
-  animation: omnix-logo-pulse 3s ease-in-out infinite;
+@keyframes omnix-logo-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.5));
+  }
+  50% {
+    filter: drop-shadow(0 0 18px rgba(0, 255, 255, 0.9))
+            drop-shadow(0 0 36px rgba(0, 255, 255, 0.35));
+  }
 }
 
-/* ── Input focus glow ring ──────────────────────────────────── */
-.omnix-input-focus:focus-within {
-  border-color: rgba(0, 255, 255, 0.45) !important;
-  box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.08), 0 0 16px rgba(0, 255, 255, 0.18) !important;
+.omnix-logo-glow {
+  animation: omnix-logo-pulse 3s ease-in-out infinite;
 }

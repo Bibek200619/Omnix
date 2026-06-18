@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { AtSign, Bell, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
@@ -11,7 +12,7 @@ function countLabel(count: number) {
   return String(count);
 }
 
-export function NotificationBell() {
+export const NotificationBell = memo(function NotificationBell() {
   const router = useRouter();
   const { unreadCount, loading, refreshNotifications } = useWorkspaceNotifications();
   const hasUnread = unreadCount > 0;
@@ -20,7 +21,7 @@ export function NotificationBell() {
     <Button
       type="button"
       variant="ghost"
-      size="icon"
+      size={"icon"}
       aria-label={
         unreadCount === 1
           ? "Mention notifications, 1 unread"
@@ -45,7 +46,7 @@ export function NotificationBell() {
         className={cn(
           "absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border px-1 text-[10px] font-semibold leading-none",
           hasUnread
-            ? "border-cyan-300/25 bg-cyan-300/15 text-cyan-50 shadow-[0_0_14px_var(--omnix-rgba-rgba-0-255-255-0-16)]"
+            ? "border-cyan-300/25 bg-cyan-300/15 text-cyan-50 shadow-[0_0_14px_var(--omnix-rgba-0-255-255-0-16)]"
             : "border-white/10 bg-white/[0.04] text-white/40",
         )}
       >
@@ -53,4 +54,4 @@ export function NotificationBell() {
       </span>
     </Button>
   );
-}
+});

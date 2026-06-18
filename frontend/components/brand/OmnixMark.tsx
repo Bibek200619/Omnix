@@ -19,7 +19,7 @@ export function OmnixMark({ size = 36, className }: OmnixMarkProps) {
       height={size}
       viewBox="0 0 64 64"
       fill="none"
-      className={cn("drop-shadow-[0_0_14px_var(--omnix-rgba-rgba-44-132-255-0-28)]", className)}
+      className={cn("drop-shadow-[0_0_14px_var(--omnix-rgba-44-132-255-0-28)]", className)}
       aria-hidden="true"
     >
       <defs>

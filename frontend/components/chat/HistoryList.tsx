@@ -17,6 +17,7 @@ import {
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { useConversationHistory } from "@/lib/conversation-history-context";
@@ -77,7 +78,7 @@ export function HistoryList() {
       setDraftTitle("");
     } catch (err) {
       logClientError("Failed to rename chat", err, { endpoint: `/conversations/${chatId}` });
-      setActionError("Unable to rename chat.");
+      setActionError("Unable to rename chat. Your session may have expired; refresh and try again.");
     } finally {
       setBusyId(null);
     }
@@ -93,7 +94,7 @@ export function HistoryList() {
       }
     } catch (err) {
       logClientError("Failed to delete chat", err, { endpoint: `/conversations/${chatId}` });
-      setActionError("Unable to delete chat.");
+      setActionError("Unable to delete chat. Your session may have expired; refresh and try again.");
     } finally {
       setBusyId(null);
     }
@@ -190,7 +191,7 @@ export function HistoryList() {
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.18, ease: "easeOut" }}
                   className={cn(
-                    "group relative overflow-hidden rounded-xl border p-4 text-left shadow-[inset_0_1px_0_var(--omnix-rgba-rgba-255-255-255-0-03)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)]",
+                    "group relative overflow-hidden rounded-xl border p-4 text-left shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-03)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)]",
                     isActive
                       ? "border-cyan-300/35 bg-cyan-300/10 shadow-[var(--omnix-glow-xs)]"
                       : "border-[var(--omnix-border)] bg-[var(--omnix-surface)]",
@@ -214,9 +215,9 @@ export function HistoryList() {
                         />
                         <Button
                           type="submit"
-                          size="icon"
+                          size={"icon"}
                           variant="secondary"
-                          className="h-9 w-9"
+                          className="h-11 w-11"
                           disabled={isBusy}
                           aria-label="Save title"
                           title="Save title"
@@ -225,9 +226,9 @@ export function HistoryList() {
                         </Button>
                         <Button
                           type="button"
-                          size="icon"
+                          size={"icon"}
                           variant="ghost"
-                          className="h-9 w-9"
+                          className="h-11 w-11"
                           disabled={isBusy}
                           onClick={() => setEditingId(null)}
                           aria-label="Cancel rename"
@@ -274,9 +275,9 @@ export function HistoryList() {
                         <div className="flex items-center gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
                           <Button
                             type="button"
-                            size="icon"
+                            size={"icon"}
                             variant="ghost"
-                            className="h-8 w-8"
+                            className="h-11 w-11"
                             onClick={() => startRename(chat.id, chat.title)}
                             disabled={isBusy}
                             aria-label="Rename chat"
@@ -286,9 +287,9 @@ export function HistoryList() {
                           </Button>
                           <Button
                             type="button"
-                            size="icon"
+                            size={"icon"}
                             variant="ghost"
-                            className="h-8 w-8 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
+                            className="h-11 w-11 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
                             onClick={() => deleteChat(chat.id)}
                             disabled={isBusy}
                             aria-label="Delete chat"
@@ -319,29 +320,19 @@ export function HistoryList() {
           </AnimatePresence>
         </div>
       ) : (
-        <div className="omnix-cinematic-card flex min-h-[360px] flex-col items-center justify-center border-dashed p-8 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
-            <MessageSquareText className="h-5 w-5" />
-          </div>
-          <h2 className="mt-4 text-lg font-semibold text-white">
-            {query ? "No matching conversations" : "No conversations yet"}
-          </h2>
-          <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
-            {query
-              ? "Adjust the search term or open a new chat."
-              : "Your saved conversations will appear here after the API stores the first thread."}
-          </p>
-          <Button
-            type="button"
-            className="mt-5"
-            onClick={() => {
+        <EmptyState
+          icon={MessageSquareText}
+          title={query ? "No matching conversations" : "No conversations yet"}
+          description={query ? "Adjust the search term or open a new chat." : "Your saved conversations will appear here after the API stores the first thread."}
+          action={{
+            label: "Start chat",
+            onClick: () => {
               setActiveConversation(null);
               router.push("/chat");
-            }}
-          >
-            Start chat
-          </Button>
-        </div>
+            },
+          }}
+          className="min-h-[360px] border-dashed"
+        />
       )}
       </div>
     </section>
