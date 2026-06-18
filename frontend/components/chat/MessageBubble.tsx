@@ -145,11 +145,11 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
           email={message.senderEmail}
           handle={message.senderHandle}
           avatarUrl={message.senderAvatarUrl}
-          className={cn("mt-1 h-8 w-8 text-xs shadow-[inset_0_1px_0_var(--omnix-rgba-rgba-255-255-255-0-05)] sm:h-9 sm:w-9", workspaceRoleAvatarClass(senderRole))}
+          className={cn("mt-1 h-8 w-8 text-xs shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-05)] sm:h-9 sm:w-9", workspaceRoleAvatarClass(senderRole))}
         />
       ) : (
         <div
-          className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-cyan-300/20 bg-[linear-gradient(135deg,var(--omnix-rgba-rgba-0-255-255-0-1),var(--omnix-rgba-rgba-0-100-255-0-15))] text-cyan-100 shadow-[inset_0_1px_0_var(--omnix-rgba-rgba-255-255-255-0-05)] sm:h-9 sm:w-9 sm:rounded-[12px]"
+          className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-cyan-300/20 bg-[linear-gradient(135deg,var(--omnix-rgba-0-255-255-0-1),var(--omnix-rgba-0-100-255-0-15))] text-cyan-100 shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-05)] sm:h-9 sm:w-9 sm:rounded-[12px]"
           title={senderName}
         >
           <Sparkles className="h-4 w-4 drop-shadow-sm opacity-80" />
@@ -326,7 +326,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                             target="_blank"
                             rel="noreferrer"
                             onClick={(event) => event.stopPropagation()}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-cyan-300/10 hover:text-cyan-100"
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-500 transition hover:bg-cyan-300/10 hover:text-cyan-100"
                             aria-label={`Open ${source.title || domain}`}
                             title="Open source"
                           >
@@ -389,7 +389,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                 type="button"
                 onClick={copyMessage}
                 className={cn(
-                  "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
+                  "inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
                   isOwn && "text-emerald-100/50 hover:text-emerald-50",
                   isOtherHuman && "text-sky-100/50 hover:text-sky-50",
                 )}
@@ -407,7 +407,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                   onClick={handleRegenerate}
                   title="Regenerate"
                   aria-label="Regenerate"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                 </button>
@@ -418,7 +418,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                   title="Helpful"
                   aria-label="Helpful"
                   className={cn(
-                    "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
+                    "inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
                     gaveFeedback === "up" && "bg-emerald-400/10 text-emerald-200",
                   )}
                 >
@@ -431,7 +431,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                   title="Not helpful"
                   aria-label="Not helpful"
                   className={cn(
-                    "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
+                    "inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-500 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
                     gaveFeedback === "down" && "bg-rose-400/10 text-rose-200",
                   )}
                 >

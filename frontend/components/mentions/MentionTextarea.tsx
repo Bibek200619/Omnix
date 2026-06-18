@@ -182,7 +182,7 @@ export function MentionTextarea({
         {...props}
       />
       {pickerOpen ? (
-        <div className="absolute bottom-full left-0 z-30 mb-2 w-full max-w-[min(22rem,calc(100vw_-_2rem))] overflow-hidden rounded-xl border border-cyan-300/18 bg-[var(--omnix-rgba-rgba-7-18-24-0-96)] shadow-2xl shadow-cyan-950/30 backdrop-blur-xl">
+        <div className="absolute bottom-full left-0 z-30 mb-2 w-full max-w-[min(22rem,calc(100vw_-_2rem))] overflow-hidden rounded-xl border border-cyan-300/18 bg-[var(--omnix-rgba-7-18-24-0-96)] shadow-2xl shadow-cyan-950/30 backdrop-blur-xl">
           <div className="flex items-center gap-2 border-b border-white/5 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/60">
             <AtSign className="h-3.5 w-3.5" />
             Mention teammate

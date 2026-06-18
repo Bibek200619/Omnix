@@ -47,9 +47,11 @@ export function Toggle({
       </span>
       <input
         type="checkbox"
+        {...props}
+        role="switch"
+        aria-checked={Boolean(checked)}
         checked={checked}
         className="sr-only"
-        {...props}
       />
     </label>
   );

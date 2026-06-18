@@ -3,6 +3,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "./api";
 import { logClientError } from "./errors";
+import { invalidateQueries, queryGet } from "./query";
 import { useWorkspace } from "./workspace-context";
 import type { 
   WorkspaceInitiative, 
@@ -49,7 +50,7 @@ export function WorkspaceContinuityProvider({ children }: { children: ReactNode 
     setError(null);
     try {
       const [initData, timelineData, unresolvedData] = await Promise.all([
-        apiClient.get<WorkspaceInitiative[]>(`/workspaces/${requestWorkspaceId}/initiatives`),
+        queryGet<WorkspaceInitiative[]>(`/workspaces/${requestWorkspaceId}/initiatives`),
         apiClient.get<WorkspaceOperationalTimelineEvent[]>(`/workspaces/${requestWorkspaceId}/timeline`),
         apiClient.get<WorkspaceContinuityMemory[]>(`/workspaces/${requestWorkspaceId}/continuity/unresolved`)
       ]);
@@ -88,6 +89,7 @@ export function WorkspaceContinuityProvider({ children }: { children: ReactNode 
       description
     });
     
+    invalidateQueries(`/workspaces/${activeWorkspaceId}/initiatives`);
     setInitiatives(prev => [initiative, ...prev]);
     void refreshContinuity(); // Refresh timeline as well
     return initiative;

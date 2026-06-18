@@ -1,21 +1,21 @@
 "use client";
 
-import { forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
+import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from "react";
 import Link from "next/link";
 import { OmnixMark } from "@/components/brand/OmnixMark";
 import { cn } from "@/lib/utils";
 
 export const AUTH_C = {
-  cyan: "var(--omnix-color-00ffff)",
+  cyan: "var(--omnix-cyan)",
   blue: "var(--omnix-color-0033ff)",
-  navy: "var(--omnix-color-0a192f)",
+  navy: "var(--omnix-bg-2)",
   navyDark: "var(--omnix-color-061020)",
-  card: "var(--omnix-rgba-rgba-255-255-255-0-03)",
-  border: "var(--omnix-rgba-rgba-255-255-255-0-08)",
-  borderC: "var(--omnix-rgba-rgba-0-255-255-0-22)",
+  card: "var(--omnix-rgba-255-255-255-0-03)",
+  border: "var(--omnix-rgba-255-255-255-0-08)",
+  borderC: "var(--omnix-rgba-0-255-255-0-22)",
   white: "var(--omnix-color-ffffff)",
-  muted: "var(--omnix-rgba-rgba-255-255-255-0-55)",
-  faint: "var(--omnix-rgba-rgba-255-255-255-0-3)",
+  muted: "var(--omnix-rgba-255-255-255-0-55)",
+  faint: "var(--omnix-rgba-255-255-255-0-3)",
 };
 
 export const AUTH_ICONS = {
@@ -108,7 +108,7 @@ export function AuthMovingGrid() {
       <div
         className="h-full w-full animate-[auth-grid_22s_linear_infinite]"
         style={{
-          backgroundImage: "linear-gradient(var(--omnix-rgba-rgba-0-255-255-0-5) 1px,transparent 1px),linear-gradient(90deg,var(--omnix-rgba-rgba-0-255-255-0-5) 1px,transparent 1px)",
+          backgroundImage: "linear-gradient(var(--omnix-rgba-0-255-255-0-5) 1px,transparent 1px),linear-gradient(90deg,var(--omnix-rgba-0-255-255-0-5) 1px,transparent 1px)",
           backgroundSize: "64px 64px",
         }}
       />
@@ -120,33 +120,48 @@ type AuthInputProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   hint?: string;
   icon: ReactNode;
+  error?: string;
 };
 
 export const AuthInput = forwardRef<HTMLInputElement, AuthInputProps>(
-  ({ className, label, hint, icon, id, ...props }, ref) => (
-    <label className="group flex flex-col gap-1.5" htmlFor={id}>
-      <span className="text-xs font-bold" style={{ color: AUTH_C.muted }}>
-        {label}
-      </span>
-      <span className="relative block">
-        <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 transition-colors group-focus-within:text-cyan-300">
-          {icon}
+  ({ className, label, hint, icon, id, error, "aria-describedby": ariaDescribedBy, "aria-invalid": ariaInvalid, ...props }, ref) => {
+    const generatedId = useId();
+    const inputId = id ?? generatedId;
+    const errorId = error ? `${inputId}-error` : undefined;
+    const describedBy = [ariaDescribedBy, errorId].filter(Boolean).join(" ") || undefined;
+
+    return (
+      <label className="group flex flex-col gap-1.5" htmlFor={inputId}>
+        <span className="text-xs font-bold" style={{ color: AUTH_C.muted }}>
+          {label}
         </span>
-        <input
-          ref={ref}
-          id={id}
-          className={cn(
-            "w-full rounded-xl border border-white/[0.08] bg-white/[0.04] py-3 pl-10 pr-4 text-sm text-white outline-none transition-all duration-200",
-            "placeholder:text-white/30 hover:border-white/[0.16] focus:border-cyan-300/40 focus:bg-white/[0.055] focus:ring-2 focus:ring-cyan-300/10",
-            "disabled:cursor-not-allowed disabled:opacity-55",
-            className,
-          )}
-          {...props}
-        />
-      </span>
-      {hint ? <span className="text-xs leading-5" style={{ color: AUTH_C.faint }}>{hint}</span> : null}
-    </label>
-  ),
+        <span className="relative block">
+          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 transition-colors group-focus-within:text-cyan-300">
+            {icon}
+          </span>
+          <input
+            ref={ref}
+            id={inputId}
+            aria-describedby={describedBy}
+            aria-invalid={error ? true : ariaInvalid}
+            className={cn(
+              "w-full rounded-xl border border-white/[0.08] bg-white/[0.04] py-3 pl-10 pr-4 text-sm text-white outline-none transition-all duration-200",
+              "placeholder:text-white/30 hover:border-white/[0.16] focus:border-cyan-300/40 focus:bg-white/[0.055] focus:ring-2 focus:ring-cyan-300/10",
+              "disabled:cursor-not-allowed disabled:opacity-55",
+              className,
+            )}
+            {...props}
+          />
+        </span>
+        {hint ? <span className="text-xs leading-5" style={{ color: AUTH_C.faint }}>{hint}</span> : null}
+        {error ? (
+          <span id={errorId} className="text-xs leading-5 text-rose-200">
+            {error}
+          </span>
+        ) : null}
+      </label>
+    );
+  },
 );
 
 AuthInput.displayName = "AuthInput";

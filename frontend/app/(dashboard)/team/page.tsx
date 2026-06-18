@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Ban,
@@ -21,9 +23,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Portal } from "@/components/ui/Portal";
+import { PageTitle } from "@/components/ui/Typography";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModal";
 import { useAuth } from "@/lib/auth-context";
@@ -211,6 +215,14 @@ function MemberActionsMenu({
 }
 
 export default function TeamPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <TeamPageContent />
+    </Suspense>
+  );
+}
+
+function TeamPageContent() {
   const {
     activeWorkspace,
     activeMembers,
@@ -284,7 +296,7 @@ export default function TeamPage() {
       setInviteOpen(false);
     } catch (err) {
       logClientError("Failed to invite teammate", err);
-      setInviteError("Unable to invite teammate.");
+      setInviteError("Unable to invite teammate. Check the email address and try again.");
     } finally {
       setInviting(false);
     }
@@ -359,7 +371,7 @@ export default function TeamPage() {
       setSelectedRole(null);
     } catch (err) {
       logClientError("Failed to update member role", err);
-      setMemberActionError("Unable to update member role.");
+      setMemberActionError("Unable to update member role. Your session may have expired; refresh and try again.");
       await reconcileTeamState();
     } finally {
       setBusyAction(null);
@@ -378,7 +390,7 @@ export default function TeamPage() {
       setRemoveMember(null);
     } catch (err) {
       logClientError("Failed to remove member", err);
-      setMemberActionError("Unable to remove member.");
+      setMemberActionError("Unable to remove member. Your session may have expired; refresh and try again.");
       await reconcileTeamState();
     } finally {
       setBusyAction(null);
@@ -396,7 +408,7 @@ export default function TeamPage() {
                 <Users className="h-3.5 w-3.5" />
                 Team management
               </p>
-              <h1 className="omnix-page-title omnix-gradient-text">{activeWorkspace?.name ?? "Workspace"} team</h1>
+              <PageTitle className="omnix-gradient-text">{activeWorkspace?.name ?? "Workspace"} team</PageTitle>
               <p className="omnix-page-subtitle">
                 Primary workspace roles stay authoritative. Secondary labels help organize members by function.
               </p>
@@ -500,10 +512,10 @@ export default function TeamPage() {
                   <div className="min-w-0">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <h2 className="truncate text-sm font-semibold text-white">{name}</h2>
-                      <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold", workspaceRoleBadgeClass(member.role))}>
+                      <Badge variant="role" className={cn("gap-1 px-2 py-0.5 !text-[11px]", workspaceRoleBadgeClass(member.role))}>
                         <RoleIcon className="h-3 w-3" />
                         {displayRole(member.role)}
-                      </span>
+                      </Badge>
                     </div>
                     <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-[var(--omnix-text-3)]">
                       <Mail className="h-3 w-3 shrink-0" />

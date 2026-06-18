@@ -1,34 +1,51 @@
 "use client";
 
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Database, LayoutDashboard, MessageSquare, RefreshCw, Sparkles, Users, Zap, Construction } from "lucide-react";
+import { Activity, AlertCircle, Cpu, Database, LayoutDashboard, MessageSquare, RefreshCw, Server, Users, Sparkles, Globe } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { PageTitle } from "@/components/ui/Typography";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspace } from "@/lib/workspace-context";
+import { cn } from "@/lib/utils";
+import { IntelligenceDashboard } from "@/components/workspace/IntelligenceDashboard";
 
 type FileData = {
   id: string;
 };
 
+type RuntimeInfo = {
+  status: string;
+  version: string;
+  uptime_seconds: number;
+  environment: string;
+};
+
+type WorkerStatus = {
+  id: string;
+  name: string;
+  status: string;
+  last_heartbeat: string;
+};
+
 type Metric = {
   label: string;
-  value: string | number;
+  value: ReactNode;
   detail: string;
   icon: ReactNode;
   color: string;
 };
 
-function StudioCard({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+function StudioCard({ title, subtitle, children, className }: { title: string; subtitle: string; children: ReactNode; className?: string }) {
   return (
-    <section className="relative overflow-hidden rounded-[var(--omnix-radius)] border border-[rgba(0,255,255,0.1)] bg-[linear-gradient(145deg,rgba(0,255,255,0.055),rgba(155,92,255,0.028)_52%,rgba(0,0,0,0.16))] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.035)]">
-      <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-cyan-300/10 blur-[70px]" />
-      <div className="relative z-10 mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="omnix-display text-sm font-bold text-white">{title}</h2>
-          <p className="mt-1 text-[11px] leading-5 text-[var(--omnix-text-3)]">{subtitle}</p>
-        </div>
+    <section className={cn("relative overflow-hidden rounded-[var(--omnix-radius)] border border-white/5 bg-black/20 p-5 shadow-inner", className)}>
+      <div className="relative z-10 mb-6 flex flex-col gap-1">
+        <h2 className="text-[13px] font-bold tracking-wide text-white">{title}</h2>
+        <p className="text-[11px] leading-relaxed text-[var(--omnix-text-3)]">{subtitle}</p>
       </div>
       <div className="relative z-10">{children}</div>
     </section>
@@ -54,80 +71,117 @@ function MetricCard({ metric }: { metric: Metric }) {
 }
 
 export default function AnalyticsPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <AnalyticsPageContent />
+    </Suspense>
+  );
+}
+
+function AnalyticsPageContent() {
   const { conversations, loading: conversationsLoading, refreshConversations } = useConversationHistory();
-  const { activeWorkspace, activeMembers, activeInvites, workspaces } = useWorkspace();
+  const { activeWorkspace, activeMembers, workspaces } = useWorkspace();
   const [files, setFiles] = useState<FileData[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
-  const [filesError, setFilesError] = useState<string | null>(null);
+  const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
+  const [workers, setWorkers] = useState<WorkerStatus[]>([]);
+  const [loadingRuntime, setLoadingRuntime] = useState(false);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
   const loadFiles = useCallback(async () => {
     setFilesLoading(true);
-    setFilesError(null);
     try {
       const data = await apiClient.get<FileData[]>("/files");
       setFiles(data);
     } catch (err) {
       setFiles([]);
-      logClientError("Failed to load source metrics", err, { endpoint: "/files" });
-      setFilesError("Unable to load source metrics.");
+      logClientError("Failed to load source metrics", err);
     } finally {
       setFilesLoading(false);
     }
   }, []);
 
+  const loadRuntimeInfo = useCallback(async () => {
+    setLoadingRuntime(true);
+    setRuntimeError(null);
+    try {
+      const [runtime, workerList] = await Promise.all([
+        apiClient.get<RuntimeInfo>("/admin/runtime/"),
+        apiClient.get<WorkerStatus[]>("/admin/runtime/workers")
+      ]);
+      setRuntimeInfo(runtime);
+      setWorkers(workerList || []);
+    } catch (err) {
+      setRuntimeInfo(null);
+      setWorkers([]);
+      setRuntimeError("Runtime telemetry is unavailable. Please try again in a moment.");
+      logClientError("Failed to load runtime telemetry", err);
+    } finally {
+      setLoadingRuntime(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadFiles();
-  }, [loadFiles, activeWorkspace?.id]);
+    void loadRuntimeInfo();
+  }, [loadFiles, loadRuntimeInfo, activeWorkspace?.id]);
 
-  const realMetrics = useMemo<Record<string, Metric>>(
-    () => ({
-      conversations: {
+  const realMetrics = useMemo<Metric[]>(
+    () => [
+      {
         label: "Conversations",
-        value: conversationsLoading ? "..." : conversations.length,
-        detail: conversations.length ? "Saved chat sessions for this workspace context." : "No saved conversations yet.",
+        value: conversationsLoading ? <Skeleton className="h-8 w-16 rounded-full" /> : conversations.length,
+        detail: "Active sessions in workspace.",
         icon: <MessageSquare className="h-4 w-4" />,
         color: "#00FFFF",
       },
-      members: {
-        label: "Members",
+      {
+        label: "Team Members",
         value: activeWorkspace?.member_count ?? activeMembers.length,
-        detail: activeWorkspace ? `Membership loaded for ${activeWorkspace.name}.` : "No active workspace selected.",
+        detail: "Authorized workspace agents.",
         icon: <Users className="h-4 w-4" />,
         color: "#9b5cff",
       },
-      sources: {
-        label: "Sources",
-        value: filesLoading ? "..." : files.length,
-        detail: filesError ? "Source count could not be loaded." : files.length ? "Uploaded source records from the backend." : "No uploaded sources yet.",
+      {
+        label: "Data Sources",
+        value: filesLoading ? <Skeleton className="h-8 w-16 rounded-full" /> : files.length,
+        detail: "Indexed knowledge assets.",
         icon: <Database className="h-4 w-4" />,
         color: "#00e87a",
       },
-      invites: {
-        label: "Pending Invites",
-        value: activeInvites.filter((invite) => invite.status === "pending").length,
-        detail: "Pending workspace invite records.",
-        icon: <Zap className="h-4 w-4" />,
+      {
+        label: "System Uptime",
+        value: loadingRuntime ? <Skeleton className="h-8 w-24 rounded-full" /> : runtimeInfo ? `${Math.floor(runtimeInfo.uptime_seconds / 3600)}h ${Math.floor((runtimeInfo.uptime_seconds % 3600) / 60)}m` : "Unavailable",
+        detail: runtimeInfo?.version ? `Omnix ${runtimeInfo.version} node` : "Runtime version not reported.",
+        icon: <Activity className="h-4 w-4" />,
         color: "#ffb800",
       },
-      workspaces: {
-        label: "Workspaces",
-        value: workspaces.length,
-        detail: "Root workspaces loaded from the hierarchy API.",
-        icon: <LayoutDashboard className="h-4 w-4" />,
+      {
+        label: "Active Workers",
+        value: loadingRuntime ? <Skeleton className="h-8 w-16 rounded-full" /> : runtimeInfo ? workers.length : "Unavailable",
+        detail: runtimeInfo ? "Workers reported by runtime telemetry." : "Worker status not reported.",
+        icon: <Cpu className="h-4 w-4" />,
         color: "#ff4df4",
       },
-    }),
-    [activeInvites, activeMembers.length, activeWorkspace, conversations.length, conversationsLoading, files.length, filesError, filesLoading, workspaces.length],
+      {
+        label: "Workspaces",
+        value: workspaces.length,
+        detail: "Configured super-workspaces.",
+        icon: <LayoutDashboard className="h-4 w-4" />,
+        color: "#3366ff",
+      },
+    ],
+    [conversations.length, conversationsLoading, activeWorkspace, activeMembers.length, files.length, filesLoading, loadingRuntime, runtimeInfo, workers.length, workspaces.length],
   );
 
   return (
     <section className="omnix-page-frame omnix-scrollbar">
-      <div className="omnix-content-max flex flex-col gap-5">
+      <div className="omnix-content-max flex flex-col gap-6">
         <div className="omnix-page-hero">
           <div>
-            <h1 className="omnix-page-title omnix-gradient-text">Analytics Studio</h1>
+            <PageTitle className="omnix-gradient-text">Analytics Studio</PageTitle>
             <p className="omnix-page-subtitle">
-              Workspace telemetry and reporting. Custom boards are currently in development.
+              Live workspace telemetry and platform operational status.
             </p>
           </div>
           <button
@@ -135,55 +189,110 @@ export default function AnalyticsPage() {
             onClick={() => {
               void refreshConversations({ force: true });
               void loadFiles();
+              void loadRuntimeInfo();
             }}
-            className="inline-flex h-10 items-center gap-2 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-4 text-xs font-bold text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)]"
+            className="omnix-command-button flex h-10 items-center gap-2 rounded-xl border border-white/5 bg-white/5 px-4 text-xs font-bold text-white transition hover:bg-white/10"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Refresh
+            <RefreshCw className={cn("h-3.5 w-3.5", loadingRuntime && "animate-spin")} />
+            Sync Dashboard
           </button>
         </div>
 
-        <div className="space-y-5">
-          <section className="omnix-cinematic-card p-5 sm:p-6">
-            <div className="pointer-events-none absolute right-[-6rem] top-[-6rem] h-72 w-72 rounded-full bg-purple-400/10 blur-[88px]" />
-            <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">
-                  <Sparkles className="h-3.5 w-3.5 text-cyan-200" />
-                  Workspace Overview
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {realMetrics.map((metric) => (
+            <MetricCard key={metric.label} metric={metric} />
+          ))}
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <StudioCard title="Runtime Environment" subtitle="Operational health of the underlying service infrastructure.">
+            <div className="space-y-4">
+              {runtimeError ? (
+                <div className="flex items-start gap-3 rounded-lg border border-amber-300/20 bg-amber-300/10 p-3 text-xs leading-5 text-amber-100">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{runtimeError}</span>
                 </div>
-                <h2 className="omnix-display mt-2 text-2xl font-semibold text-white">
-                  Real-time Platform Telemetry
-                </h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--omnix-text-2)]">
-                  These metrics reflect true records from the backend database for your current workspace context.
-                </p>
+              ) : null}
+              <div className="flex items-center justify-between rounded-lg border border-white/5 bg-black/40 p-4">
+                <div className="flex items-center gap-3">
+                  <Server className="h-4 w-4 text-cyan-400" />
+                  <span className="text-xs font-semibold text-white">Service Status</span>
+                </div>
+                {loadingRuntime ? (
+                  <Skeleton className="h-6 w-24 rounded-full" />
+                ) : (
+                  <span className={cn(
+                    "flex h-6 items-center rounded-full px-2.5 text-[10px] font-bold uppercase tracking-wider",
+                    runtimeInfo?.status === "healthy" ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"
+                  )}>
+                    {runtimeInfo?.status || "Unavailable"}
+                  </span>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg border border-white/5 bg-black/40 p-4">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--omnix-text-3)]">Environment</p>
+                  {loadingRuntime ? <Skeleton className="mt-2 h-4 w-24 rounded-full" /> : <p className="mt-1.5 text-sm font-semibold text-white capitalize">{runtimeInfo?.environment || "Not reported"}</p>}
+                </div>
+                <div className="rounded-lg border border-white/5 bg-black/40 p-4">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--omnix-text-3)]">Version</p>
+                  {loadingRuntime ? <Skeleton className="mt-2 h-4 w-20 rounded-full" /> : <p className="mt-1.5 text-sm font-semibold text-white">{runtimeInfo?.version || "Not reported"}</p>}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-white/5 bg-black/40 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--omnix-text-3)]">Telemetry Source</p>
+                  <Globe className="h-3.5 w-3.5 text-white/20" />
+                </div>
+                <p className="mt-1.5 text-sm font-semibold text-white">{runtimeInfo ? "Runtime API" : "Not reported"}</p>
               </div>
             </div>
-          </section>
+          </StudioCard>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {Object.values(realMetrics).map((metric) => (
-              <MetricCard key={metric.label} metric={metric} />
-            ))}
-          </div>
-
-          {filesError ? (
-            <div className="rounded-xl border border-rose-400/25 bg-rose-400/10 p-4 text-sm text-rose-100">
-              {filesError}
-            </div>
-          ) : null}
-
-          <StudioCard title="Custom Dashboards (Beta)" subtitle="Build custom reporting boards from real workspace data.">
-            <div className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/15 p-6 text-center">
-              <Construction className="h-9 w-9 text-cyan-200/35" />
-              <p className="mt-4 text-sm font-semibold text-white">Custom boards are under construction</p>
-              <p className="mt-1 max-w-md text-xs leading-5 text-[var(--omnix-text-3)]">
-                Query volume, token usage, department trends, and custom reporting will be available once the event telemetry engine is completed.
-              </p>
+          <StudioCard title="Background Workers" subtitle="Status of ingestion and automation workers.">
+            <div className="space-y-4">
+              {workers.length > 0 ? (
+                workers.map(worker => (
+                  <div key={worker.id} className="flex items-center justify-between rounded-lg border border-white/5 bg-black/40 p-4 transition-colors hover:bg-black/60">
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex h-2.5 w-2.5 items-center justify-center">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40"></span>
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                      </div>
+                      <span className="text-xs font-semibold text-white">{worker.name}</span>
+                    </div>
+                    <span className="text-[10px] text-[var(--omnix-text-3)] font-medium">
+                      Pulse: {new Date(worker.last_heartbeat).toLocaleTimeString()}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center rounded-lg border border-white/5 bg-black/40 py-8 text-center">
+                  <Activity className="h-6 w-6 text-white/10" />
+                  <p className="mt-3 text-xs text-[var(--omnix-text-3)]">
+                    Standalone workers not detected.<br/>Using integrated runtime execution.
+                  </p>
+                </div>
+              )}
+              <div className="mt-2 rounded-lg border border-cyan-500/10 bg-cyan-500/5 p-4 text-[10px] leading-relaxed text-cyan-200/70">
+                <strong className="text-cyan-400">Note:</strong> Distributed workers require a Redis instance for coordination. Integrated workers handle standard ingestion.
+              </div>
             </div>
           </StudioCard>
         </div>
+
+        <section className="omnix-cinematic-card p-5 sm:p-6 overflow-hidden">
+          <div className="pointer-events-none absolute right-[-6rem] top-[-6rem] h-72 w-72 rounded-full bg-cyan-400/5 blur-[88px]" />
+          <div className="relative z-10">
+            <div className="mb-6 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/50">
+              <Sparkles className="h-3.5 w-3.5" />
+              Custom Intelligence Dashboards
+            </div>
+            <IntelligenceDashboard />
+          </div>
+        </section>
       </div>
     </section>
   );

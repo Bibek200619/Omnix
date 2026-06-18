@@ -31,16 +31,16 @@ function creatorLabel(decision: WorkspaceDecision) {
 
 export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPanelProps) {
   return (
-    <div className="omnix-scrollbar h-full overflow-y-auto p-5 sm:p-8">
+    <div className="omnix-container-responsive omnix-scrollbar h-full overflow-y-auto p-4 sm:p-6 xl:p-8">
       <div className="mx-auto max-w-6xl">
-        <div className="grid gap-8 lg:grid-cols-[1fr_22rem]">
+        <div className="omnix-decision-context-grid">
           {/* Main Content: Overview & Provenance */}
-          <div className="space-y-8">
-            <section className="relative overflow-hidden rounded-2xl border border-[var(--omnix-border)] bg-black/40 p-6 sm:p-8 shadow-2xl">
+          <div className="min-w-0 space-y-6 xl:space-y-8">
+            <section className="relative overflow-hidden rounded-2xl border border-[var(--omnix-border)] bg-black/40 p-4 shadow-2xl sm:p-6 xl:p-8">
               <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-cyan-400/5 blur-[100px]" />
               
               <div className="relative z-10">
-                <div className="mb-6 flex items-center justify-between">
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                   <p className="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400/80">
                     <BadgeCheck className="h-4 w-4" />
                     Strategic Context
@@ -71,14 +71,14 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
               </div>
             </section>
 
-            <section className="rounded-2xl border border-[var(--omnix-border)] bg-white/[0.01] p-6 sm:p-8">
+            <section className="rounded-2xl border border-[var(--omnix-border)] bg-white/[0.01] p-4 sm:p-6 xl:p-8">
               <p className="mb-6 flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--omnix-text-3)]">
                 <CircleDot className="h-4 w-4 text-cyan-400/40" />
                 Audit Trail & Provenance
               </p>
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="flex items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-400/10 shadow-[0_0_15px_var(--omnix-rgba-rgba-34-211-238-0-1)]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-400/10 shadow-[0_0_15px_var(--omnix-rgba-34-211-238-0-1)]">
                     <User className="h-4 w-4 text-cyan-400" />
                   </div>
                   <div>
@@ -87,7 +87,7 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
                   </div>
                 </div>
                 <div className="flex items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-400/10 shadow-[0_0_15px_var(--omnix-rgba-rgba-34-211-238-0-1)]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-400/10 shadow-[0_0_15px_var(--omnix-rgba-34-211-238-0-1)]">
                     <Calendar className="h-4 w-4 text-cyan-400" />
                   </div>
                   <div>
@@ -97,7 +97,7 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
                 </div>
                 {decision.source_message_id && (
                   <div className="flex items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-4 sm:col-span-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400/10 shadow-[0_0_15px_var(--omnix-rgba-rgba-52-211-153-0-1)]">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400/10 shadow-[0_0_15px_var(--omnix-rgba-52-211-153-0-1)]">
                       <MessageSquare className="h-4 w-4 text-emerald-400" />
                     </div>
                     <div>
@@ -111,7 +111,7 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
           </div>
 
           {/* Sidebar: Execution & Impact */}
-          <aside className="space-y-8">
+          <aside className="min-w-0 space-y-6 xl:space-y-8">
             <div className="space-y-2">
               <h4 className="px-2 text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-400">Execution Impact</h4>
               <p className="px-2 text-[11px] text-[var(--omnix-text-3)] leading-relaxed">

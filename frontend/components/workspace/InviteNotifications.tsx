@@ -56,7 +56,7 @@ function InviteActionButtons({
       logClientError("Invite action failed", err, { endpoint: `/workspace-invites/${inviteId}/${action}` });
       setState({
         busyInviteId: null,
-        error: "Invite action failed.",
+        error: "Invite action failed. Your session may have expired; refresh and try again.",
       });
       return;
     }
@@ -130,7 +130,7 @@ export function InviteNotificationBar() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
           transition={{ duration: 0.18, ease: "easeOut" }}
-          className="border-b border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-5-12-23-0-96)] shadow-[0_16px_40px_var(--omnix-rgba-rgba-0-0-0-0-26),var(--omnix-glow-xs)] backdrop-blur-xl"
+          className="border-b border-[var(--omnix-border)] bg-[var(--omnix-rgba-5-12-23-0-96)] shadow-[0_16px_40px_var(--omnix-rgba-0-0-0-0-26),var(--omnix-glow-xs)] backdrop-blur-xl"
         >
           <div className="flex w-full flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex min-w-0 items-start gap-3">
@@ -156,7 +156,7 @@ export function InviteNotificationBar() {
                 onClick={() => {
                   setDismissedInviteIds((current) => new Set(current).add(getWorkspaceInviteId(invite)));
                 }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-cyan-300/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-500 transition hover:bg-cyan-300/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -203,7 +203,7 @@ export function InviteNotificationBell() {
       <Button
         type="button"
         variant="ghost"
-        size="icon"
+        size={"icon"}
         aria-label={
           pendingInvites.length === 1
             ? "Workspace invitations, 1 pending"
@@ -218,7 +218,7 @@ export function InviteNotificationBell() {
       >
         {pendingInvitesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
         {pendingInvites.length > 0 ? (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-cyan-300/25 bg-cyan-300/15 px-1 text-[10px] font-semibold leading-none text-cyan-50 shadow-[0_0_14px_var(--omnix-rgba-rgba-0-255-255-0-16)]">
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-cyan-300/25 bg-cyan-300/15 px-1 text-[10px] font-semibold leading-none text-cyan-50 shadow-[0_0_14px_var(--omnix-rgba-0-255-255-0-16)]">
             {pendingInvites.length > 9 ? "9+" : pendingInvites.length}
           </span>
         ) : null}

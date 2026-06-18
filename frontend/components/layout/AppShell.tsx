@@ -1,18 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { KeyboardShortcutsModal } from "@/components/layout/KeyboardShortcutsModal";
 import { MobileDock } from "@/components/layout/MobileDock";
 import { PageTransition } from "@/components/layout/PageTransition";
+import { AmbientParticles } from "@/components/layout/AmbientParticles";
 import { ConversationHistoryProvider } from "@/lib/conversation-history-context";
 import { ProfileProvider } from "@/lib/profile-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
 import { WorkspaceCollaborationProvider } from "@/lib/workspace-collaboration-context";
 import { WorkspaceContinuityProvider } from "@/lib/workspace-continuity-context";
 import { WorkspaceNotificationsProvider } from "@/lib/workspace-notifications-context";
-import { WorkspaceOnboardingGate } from "@/components/workspace/WorkspaceOnboardingGate";
 import { cn } from "@/lib/utils";
+
+const WorkspaceOnboardingGate = dynamic(
+  () => import("@/components/workspace/WorkspaceOnboardingGate").then((mod) => ({ default: mod.WorkspaceOnboardingGate })),
+  { ssr: false, loading: () => null },
+);
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -61,6 +68,7 @@ export function AppShell({ children }: AppShellProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
 
   useEffect(() => {
     setIsSidebarCollapsed(readSidebarCollapsedPreference());
@@ -75,6 +83,18 @@ export function AppShell({ children }: AppShellProps) {
     writeSidebarCollapsedPreference(isSidebarCollapsed);
   }, [isSidebarCollapsed, sidebarPreferenceLoaded]);
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "?" && !(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement)) {
+        event.preventDefault();
+        setIsShortcutsOpen(true);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <WorkspaceProvider>
       <WorkspaceCollaborationProvider>
@@ -84,10 +104,17 @@ export function AppShell({ children }: AppShellProps) {
               <ConversationHistoryProvider>
                 <WorkspaceOnboardingGate>
                   <div className="omnix-app-bg omnix-auth-shell relative h-[100dvh] overflow-hidden text-white sm:h-screen">
+                    <a
+                      href="#main-content"
+                      className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[9999] focus:rounded-lg focus:bg-[var(--omnix-cyan)] focus:px-4 focus:py-2 focus:font-bold focus:text-[var(--omnix-bg)] focus:shadow-[var(--omnix-glow-md)]"
+                    >
+                      Skip to main content
+                    </a>
                     <div className="omnix-ambient-layer" aria-hidden="true" />
+                    <AmbientParticles count={30} />
                     <div className="omnix-shell-scanline" aria-hidden="true" />
                     <div
-                      className="pointer-events-none fixed inset-x-0 top-0 z-[2] h-px bg-[linear-gradient(90deg,transparent_0%,var(--omnix-rgba-rgba-0-255-255-0-35)_30%,var(--omnix-rgba-rgba-0-255-255-0-6)_50%,var(--omnix-rgba-rgba-0-255-255-0-35)_70%,transparent_100%)]"
+                      className="pointer-events-none fixed inset-x-0 top-0 z-[2] h-px bg-[linear-gradient(90deg,transparent_0%,var(--omnix-rgba-0-255-255-0-35)_30%,var(--omnix-rgba-0-255-255-0-6)_50%,var(--omnix-rgba-0-255-255-0-35)_70%,transparent_100%)]"
                       aria-hidden="true"
                     />
                     <Sidebar
@@ -107,10 +134,17 @@ export function AppShell({ children }: AppShellProps) {
                         onMenuClick={() => setIsSidebarOpen(true)}
                         onExpandSidebar={() => setIsSidebarCollapsed(false)}
                       />
-                      <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4.25rem_+_env(safe-area-inset-bottom))] lg:pb-0">
+                      <main
+                        id="main-content"
+                        className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4.25rem_+_env(safe-area-inset-bottom))] lg:pb-0"
+                      >
                         <PageTransition className="flex min-h-0 flex-1 flex-col">{children}</PageTransition>
                       </main>
                       <MobileDock onMoreClick={() => setIsSidebarOpen(true)} />
+                      <KeyboardShortcutsModal
+                        isOpen={isShortcutsOpen}
+                        onClose={() => setIsShortcutsOpen(false)}
+                      />
                     </div>
                   </div>
                 </WorkspaceOnboardingGate>

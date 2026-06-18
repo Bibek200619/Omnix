@@ -145,8 +145,9 @@ function MemberActionsMenu({
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-label={`Open actions for ${workspaceMemberName(member)}`}
+        title={`Open actions for ${workspaceMemberName(member)}`}
         onClick={onToggle}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-slate-300 transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-slate-300 transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
       >
         <MoreHorizontal className="h-4 w-4" />
       </button>
@@ -155,7 +156,7 @@ function MemberActionsMenu({
         <FloatingMenuLayer anchorRef={triggerRef} contentRef={menuRef} placement="bottom-end" width={176} zIndex={145}>
           <div
             role="menu"
-            className="w-full overflow-hidden rounded-lg border border-[var(--omnix-border-2)] bg-[var(--omnix-color-07131f)] p-1.5 shadow-[0_18px_54px_var(--omnix-rgba-rgba-0-0-0-0-58),var(--omnix-glow-xs)] ring-1 ring-black/40"
+            className="w-full overflow-hidden rounded-lg border border-[var(--omnix-border-2)] bg-[var(--omnix-color-07131f)] p-1.5 shadow-[0_18px_54px_var(--omnix-rgba-0-0-0-0-58),var(--omnix-glow-xs)] ring-1 ring-black/40"
           >
             {canManageRoles && member.role !== (isSubspace ? "team_lead" : "co_owner") && member.role !== "sub_leader" ? (
               <button
@@ -253,7 +254,7 @@ export function WorkspaceAccessPanel() {
       setInviteOpen(false);
     } catch (err) {
       logClientError("Failed to invite teammate", err);
-      setInviteError("Unable to invite teammate.");
+      setInviteError("Unable to invite teammate. Check the email address and try again.");
     } finally {
       setInviteLoading(false);
     }
@@ -270,7 +271,7 @@ export function WorkspaceAccessPanel() {
       await revokeInvite(inviteId);
     } catch (err) {
       logClientError("Failed to revoke invite", err);
-      setActionError("Unable to revoke invite.");
+      setActionError("Unable to revoke invite. Your session may have expired; refresh and try again.");
     } finally {
       setBusyKey(null);
     }
@@ -297,7 +298,7 @@ export function WorkspaceAccessPanel() {
       setOpenMemberMenu(null);
     } catch (err) {
       logClientError("Failed to update team member", err);
-      setActionError("Unable to update team member.");
+      setActionError("Unable to update team member. Your session may have expired; refresh and try again.");
     } finally {
       setBusyKey(null);
     }
@@ -367,7 +368,7 @@ export function WorkspaceAccessPanel() {
             Awaiting assignment to collaborative spaces.
           </div>
         ) : (
-          <div className="relative z-10 mt-6 overflow-hidden rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-6-8-16-0-6)] backdrop-blur-xl">
+          <div className="relative z-10 mt-6 overflow-hidden rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-6-8-16-0-6)] backdrop-blur-xl">
             {membersLoading ? (
               <div className="grid gap-2.5 p-4">
                 {[0, 1, 2].map((item) => (
@@ -484,7 +485,7 @@ export function WorkspaceAccessPanel() {
             </p>
           </div>
           {canManageRoles ? (
-            <Button type="button" variant="ghost" size="sm" className="min-h-10 w-full sm:w-auto" leftIcon={<UserPlus className="h-4 w-4" />} onClick={() => setInviteOpen(true)}>
+            <Button type="button" variant="ghost" size="sm" className="min-h-11 w-full sm:w-auto" leftIcon={<UserPlus className="h-4 w-4" />} onClick={() => setInviteOpen(true)}>
               Invite
             </Button>
           ) : null}

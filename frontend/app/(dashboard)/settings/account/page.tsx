@@ -190,7 +190,7 @@ export default function AccountSettingsPage() {
     const { error: signOutError } = await signOut();
     if (signOutError) {
       logClientError("Unable to sign out", signOutError);
-      setError("Unable to sign out.");
+      setError("Unable to sign out. Check your connection and try again.");
       setSigningOut(false);
       return;
     }

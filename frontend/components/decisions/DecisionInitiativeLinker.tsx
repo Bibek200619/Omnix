@@ -135,7 +135,7 @@ export function DecisionInitiativeLinker({ decision, onUpdate }: DecisionInitiat
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 rounded-lg p-0 text-white/20 hover:bg-rose-500/10 hover:text-rose-400 transition-all"
+              className="h-11 w-11 rounded-lg p-0 text-white/20 hover:bg-rose-500/10 hover:text-rose-400 transition-all"
               onClick={() => updateInitiative(null)}
               disabled={linking}
             >
@@ -153,4 +153,3 @@ export function DecisionInitiativeLinker({ decision, onUpdate }: DecisionInitiat
     </div>
   );
 }
-
