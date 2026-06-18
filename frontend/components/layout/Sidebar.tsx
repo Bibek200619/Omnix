@@ -13,7 +13,6 @@ import { useAuth } from "@/lib/auth-context";
 import { useProfile } from "@/lib/profile-context";
 import { cn } from "@/lib/utils";
 import { SidebarNav } from "./sidebar/SidebarNav";
-import { WorkspaceHierarchyMini } from "./sidebar/SidebarPresence";
 import { WorkspaceSelector } from "./sidebar/WorkspaceSelector";
 
 type SidebarProps = {
@@ -109,10 +108,6 @@ export const Sidebar = memo(function Sidebar({ isOpen, collapsed, onClose, onTog
             </div>
             <PendingWorkspaceInvites compact maxVisible={2} />
           </div>
-        </div>
-
-        <div className="hidden">
-          <WorkspaceHierarchyMini onClose={onClose} />
         </div>
 
         <SidebarNav pathname={pathname} onNavigate={onClose} />
