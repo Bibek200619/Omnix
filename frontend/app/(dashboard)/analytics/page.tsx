@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Database, LayoutDashboard, MessageSquare, RefreshCw, Sparkles, Users, Zap, Construction, Activity, Server, Cpu, Globe } from "lucide-react";
+import { Activity, AlertCircle, Construction, Cpu, Database, LayoutDashboard, MessageSquare, RefreshCw, Server, Users } from "lucide-react";
 import { PageTitle } from "@/components/ui/Typography";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
@@ -81,12 +81,13 @@ export default function AnalyticsPage() {
 
 function AnalyticsPageContent() {
   const { conversations, loading: conversationsLoading, refreshConversations } = useConversationHistory();
-  const { activeWorkspace, activeMembers, activeInvites, workspaces } = useWorkspace();
+  const { activeWorkspace, activeMembers, workspaces } = useWorkspace();
   const [files, setFiles] = useState<FileData[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
   const [workers, setWorkers] = useState<WorkerStatus[]>([]);
   const [loadingRuntime, setLoadingRuntime] = useState(false);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
   const loadFiles = useCallback(async () => {
     setFilesLoading(true);
@@ -103,6 +104,7 @@ function AnalyticsPageContent() {
 
   const loadRuntimeInfo = useCallback(async () => {
     setLoadingRuntime(true);
+    setRuntimeError(null);
     try {
       const [runtime, workerList] = await Promise.all([
         apiClient.get<RuntimeInfo>("/admin/runtime/"),
@@ -111,6 +113,9 @@ function AnalyticsPageContent() {
       setRuntimeInfo(runtime);
       setWorkers(workerList || []);
     } catch (err) {
+      setRuntimeInfo(null);
+      setWorkers([]);
+      setRuntimeError("Runtime telemetry is unavailable.");
       logClientError("Failed to load runtime telemetry", err);
     } finally {
       setLoadingRuntime(false);
@@ -147,15 +152,15 @@ function AnalyticsPageContent() {
       },
       {
         label: "System Uptime",
-        value: runtimeInfo ? `${Math.floor(runtimeInfo.uptime_seconds / 3600)}h ${Math.floor((runtimeInfo.uptime_seconds % 3600) / 60)}m` : "...",
-        detail: `Omnix ${runtimeInfo?.version || "v1.0"} Node`,
+        value: loadingRuntime ? "..." : runtimeInfo ? `${Math.floor(runtimeInfo.uptime_seconds / 3600)}h ${Math.floor((runtimeInfo.uptime_seconds % 3600) / 60)}m` : "Unavailable",
+        detail: runtimeInfo?.version ? `Omnix ${runtimeInfo.version} node` : "Runtime version not reported.",
         icon: <Activity className="h-4 w-4" />,
         color: "#ffb800",
       },
       {
         label: "Active Workers",
-        value: workers.length || (runtimeInfo?.status === "healthy" ? "1" : "0"),
-        detail: "Operational background agents.",
+        value: loadingRuntime ? "..." : runtimeInfo ? workers.length : "Unavailable",
+        detail: runtimeInfo ? "Workers reported by runtime telemetry." : "Worker status not reported.",
         icon: <Cpu className="h-4 w-4" />,
         color: "#ff4df4",
       },
@@ -167,7 +172,7 @@ function AnalyticsPageContent() {
         color: "#3366ff",
       },
     ],
-    [conversations.length, conversationsLoading, activeWorkspace, activeMembers.length, files.length, filesLoading, runtimeInfo, workers.length, workspaces.length],
+    [conversations.length, conversationsLoading, activeWorkspace, activeMembers.length, files.length, filesLoading, loadingRuntime, runtimeInfo, workers.length, workspaces.length],
   );
 
   return (
@@ -203,6 +208,12 @@ function AnalyticsPageContent() {
         <div className="grid gap-6 lg:grid-cols-2">
           <StudioCard title="Runtime Environment" subtitle="Operational health of the underlying service infrastructure.">
             <div className="space-y-4">
+              {runtimeError ? (
+                <div className="flex items-start gap-3 rounded-lg border border-amber-300/20 bg-amber-300/10 p-3 text-xs leading-5 text-amber-100">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{runtimeError}</span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between rounded-lg bg-black/20 p-3">
                 <div className="flex items-center gap-3">
                   <Server className="h-4 w-4 text-cyan-300" />
@@ -212,27 +223,27 @@ function AnalyticsPageContent() {
                   "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
                   runtimeInfo?.status === "healthy" ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
                 )}>
-                  {runtimeInfo?.status || "Connecting..."}
+                  {loadingRuntime ? "Connecting..." : runtimeInfo?.status || "Unavailable"}
                 </span>
               </div>
               
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-black/20 p-3">
                   <p className="text-[10px] uppercase tracking-widest text-[var(--omnix-text-3)]">Environment</p>
-                  <p className="mt-1 text-sm font-bold text-white capitalize">{runtimeInfo?.environment || "Development"}</p>
+                  <p className="mt-1 text-sm font-bold text-white capitalize">{loadingRuntime ? "Loading..." : runtimeInfo?.environment || "Not reported"}</p>
                 </div>
                 <div className="rounded-lg bg-black/20 p-3">
-                  <p className="text-[10px] uppercase tracking-widest text-[var(--omnix-text-3)]">Platform Port</p>
-                  <p className="mt-1 text-sm font-bold text-white">8000</p>
+                  <p className="text-[10px] uppercase tracking-widest text-[var(--omnix-text-3)]">Version</p>
+                  <p className="mt-1 text-sm font-bold text-white">{loadingRuntime ? "Loading..." : runtimeInfo?.version || "Not reported"}</p>
                 </div>
               </div>
 
               <div className="rounded-lg bg-black/20 p-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] uppercase tracking-widest text-[var(--omnix-text-3)]">Data Residency</p>
-                  <Globe className="h-3 w-3 text-white/20" />
+                  <p className="text-[10px] uppercase tracking-widest text-[var(--omnix-text-3)]">Telemetry Source</p>
+                  <Server className="h-3 w-3 text-white/20" />
                 </div>
-                <p className="mt-1 text-sm font-bold text-white">Local / Supabase Federated</p>
+                <p className="mt-1 text-sm font-bold text-white">{runtimeInfo ? "Runtime API" : "Not reported"}</p>
               </div>
             </div>
           </StudioCard>
@@ -275,13 +286,11 @@ function AnalyticsPageContent() {
             </div>
             <h3 className="omnix-display mt-2 text-lg font-semibold text-white">Custom Intelligence Dashboards</h3>
             <p className="mt-2 max-w-2xl text-xs leading-5 text-[var(--omnix-text-2)]">
-              We are building a custom widget engine to allow you to pin specific conversation trends, source growth charts, and AI token utilization to this studio.
+              Planned dashboard widgets will appear here when the backend exposes conversation trends, source growth, and token utilization telemetry.
             </p>
             <div className="mt-5 flex gap-2">
-              <div className="h-1 flex-1 rounded-full bg-white/5 overflow-hidden">
-                <div className="h-full w-2/3 bg-cyan-300/40" />
-              </div>
-              <span className="text-[9px] font-bold text-cyan-300/60 uppercase tracking-widest">In Development</span>
+              <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/5" />
+              <span className="text-[9px] font-bold uppercase tracking-widest text-cyan-300/60">Awaiting telemetry</span>
             </div>
           </div>
         </section>
