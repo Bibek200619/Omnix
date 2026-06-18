@@ -605,7 +605,7 @@ function WorkspaceTasksSurfaceContent() {
                               <p className="truncate text-sm font-medium text-white">{task.title}</p>
                             </div>
                             {task.description ? (
-                              <p className="mt-1 line-clamp-1 break-words text-xs text-[var(--omnix-text-2)] transition-all group-hover:line-clamp-none">
+                              <p className="mt-1 line-clamp-2 break-words text-xs text-[var(--omnix-text-2)]">
                                 <MentionText content={task.description} mentions={task.mentions} />
                               </p>
                             ) : null}
