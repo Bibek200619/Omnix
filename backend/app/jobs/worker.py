@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import Iterable
+from typing import Any
 
 from .queue import get_redis
 from .ingestion_jobs import handle_ingest_file
@@ -15,6 +17,41 @@ from ..runtime.manager import RuntimeManager
 logger = logging.getLogger(__name__)
 
 _WORKER_ID = "ingestion_worker_main"
+_DEFAULT_WORKER_CONCURRENCY = 4
+_DEFAULT_JOB_TIMEOUT_SECONDS = 15 * 60
+_DEFAULT_POLL_TIMEOUT_SECONDS = 5.0
+_DEFAULT_REDIS_OPERATION_TIMEOUT_SECONDS = 7.0
+_DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 30.0
+
+
+def _env_int(name: str, default: int, *, minimum: int = 1) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("Invalid integer for %s=%r; using %d.", name, raw, default)
+        return default
+    return max(minimum, value)
+
+
+def _env_float(name: str, default: float, *, minimum: float = 0.1) -> float:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        logger.warning("Invalid float for %s=%r; using %.2f.", name, raw, default)
+        return default
+    return max(minimum, value)
+
+
+def _decode_job_id(raw_job_id: Any) -> str:
+    if isinstance(raw_job_id, bytes):
+        return raw_job_id.decode("utf-8")
+    return str(raw_job_id)
 
 
 async def _process_job(job_id: str):
@@ -66,6 +103,53 @@ async def _process_job(job_id: str):
         runtime.record_job_completed(_WORKER_ID, success=success)
 
 
+async def _process_job_with_timeout(job_id: str, *, timeout_seconds: float) -> None:
+    try:
+        await asyncio.wait_for(_process_job(job_id), timeout=timeout_seconds)
+    except asyncio.TimeoutError:
+        error = f"Job exceeded timeout of {timeout_seconds:g}s"
+        logger.error("Processing job %s timed out: %s", job_id, error)
+        try:
+            await update_one_trusted("jobs", {"id": job_id}, {"status": "failed", "error": error})
+        except Exception:
+            logger.exception("Failed to update timed-out job row for job %s", job_id)
+
+
+async def _run_limited_job(job_id: str, semaphore: asyncio.Semaphore, *, timeout_seconds: float) -> None:
+    async with semaphore:
+        await _process_job_with_timeout(job_id, timeout_seconds=timeout_seconds)
+
+
+def _consume_finished_tasks(tasks: set[asyncio.Task[None]], finished: Iterable[asyncio.Task[None]] | None = None) -> None:
+    done = set(finished) if finished is not None else {task for task in tasks if task.done()}
+    if not done:
+        return
+    tasks.difference_update(done)
+    for task in done:
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            logger.info("Worker job task was cancelled during shutdown.")
+        except Exception as exc:
+            logger.exception("Worker job task crashed: %s", exc)
+
+
+async def _drain_in_flight_jobs(tasks: set[asyncio.Task[None]], *, timeout_seconds: float) -> None:
+    if not tasks:
+        return
+    logger.info("Waiting for %d in-flight job(s) to finish before shutdown.", len(tasks))
+    done, pending = await asyncio.wait(tasks, timeout=timeout_seconds)
+    _consume_finished_tasks(tasks, done)
+    if not pending:
+        return
+
+    logger.warning("Cancelling %d in-flight job(s) after %.2fs shutdown timeout.", len(pending), timeout_seconds)
+    for task in pending:
+        task.cancel()
+    await asyncio.gather(*pending, return_exceptions=True)
+    _consume_finished_tasks(tasks, pending)
+
+
 async def _worker_loop(shutdown_event: asyncio.Event):
     """Main worker lifecycle: initialize infra, then poll Redis and process jobs."""
     runtime = RuntimeManager.get()
@@ -91,28 +175,71 @@ async def _worker_loop(shutdown_event: asyncio.Event):
     try:
         redis = get_redis()
         queue_name = os.environ.get("OMNIX_JOB_QUEUE", "omnix:jobs")
-        logger.info("Worker ready; listening on queue %s", queue_name)
+        concurrency = _env_int("OMNIX_WORKER_CONCURRENCY", _DEFAULT_WORKER_CONCURRENCY)
+        job_timeout_seconds = _env_float("OMNIX_JOB_TIMEOUT_SECONDS", _DEFAULT_JOB_TIMEOUT_SECONDS)
+        poll_timeout_seconds = _env_float("OMNIX_WORKER_POLL_TIMEOUT_SECONDS", _DEFAULT_POLL_TIMEOUT_SECONDS)
+        redis_operation_timeout_seconds = max(
+            poll_timeout_seconds + 1.0,
+            _env_float("OMNIX_REDIS_OPERATION_TIMEOUT_SECONDS", _DEFAULT_REDIS_OPERATION_TIMEOUT_SECONDS),
+        )
+        shutdown_timeout_seconds = _env_float(
+            "OMNIX_WORKER_SHUTDOWN_TIMEOUT_SECONDS",
+            _DEFAULT_SHUTDOWN_TIMEOUT_SECONDS,
+        )
+        logger.info(
+            "Worker ready; listening on queue %s with concurrency=%d job_timeout=%.2fs",
+            queue_name,
+            concurrency,
+            job_timeout_seconds,
+        )
     except Exception as exc:
         logger.exception("Failed to connect to Redis during worker startup: %s", exc)
         return
 
     # Register with RuntimeManager
-    runtime.register_worker(_WORKER_ID, capabilities=["ingest_file", "reembed_batch"], worker_type="ingestion")
+    runtime.register_worker(_WORKER_ID, capabilities=["ingest_file", "run_automation", "reembed_batch"], worker_type="ingestion")
     runtime.set_status("running")
 
-    # Poll loop
-    while not shutdown_event.is_set():
-        try:
-            item = await redis.brpop(queue_name, timeout=5)
-            if not item:
-                await asyncio.sleep(0.1)
+    semaphore = asyncio.Semaphore(concurrency)
+    in_flight: set[asyncio.Task[None]] = set()
+
+    try:
+        # Poll loop
+        while not shutdown_event.is_set():
+            _consume_finished_tasks(in_flight)
+
+            if len(in_flight) >= concurrency:
+                done, _ = await asyncio.wait(in_flight, timeout=0.25, return_when=asyncio.FIRST_COMPLETED)
+                _consume_finished_tasks(in_flight, done)
                 continue
-            _, job_id = item
-            logger.info("Dequeued job %s", job_id)
-            await _process_job(job_id)
-        except Exception as exc:
-            logger.exception("Worker loop error: %s", exc)
-            await asyncio.sleep(1)
+
+            try:
+                item = await asyncio.wait_for(
+                    redis.brpop(queue_name, timeout=int(poll_timeout_seconds)),
+                    timeout=redis_operation_timeout_seconds,
+                )
+                if not item:
+                    await asyncio.sleep(0.1)
+                    continue
+                _, raw_job_id = item
+                job_id = _decode_job_id(raw_job_id)
+                logger.info("Dequeued job %s", job_id)
+                task = asyncio.create_task(
+                    _run_limited_job(job_id, semaphore, timeout_seconds=job_timeout_seconds),
+                    name=f"omnix-job-{job_id}",
+                )
+                in_flight.add(task)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Redis poll for queue %s exceeded %.2fs operation timeout.",
+                    queue_name,
+                    redis_operation_timeout_seconds,
+                )
+            except Exception as exc:
+                logger.exception("Worker loop error: %s", exc)
+                await asyncio.sleep(1)
+    finally:
+        await _drain_in_flight_jobs(in_flight, timeout_seconds=shutdown_timeout_seconds)
 
     logger.info("Shutdown event set; cleaning up worker...")
     try:
