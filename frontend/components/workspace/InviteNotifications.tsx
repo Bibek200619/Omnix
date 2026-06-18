@@ -6,7 +6,7 @@ import { Check, ChevronDown, Loader2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { logClientError } from "@/lib/errors";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceMembership } from "@/lib/workspace-context";
 import { getWorkspaceInviteId, type WorkspaceInvite } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +36,7 @@ function InviteActionButtons({
   compact?: boolean;
   onSettled?: () => void;
 }) {
-  const { acceptInvite, declineInvite } = useWorkspace();
+  const { acceptInvite, declineInvite } = useWorkspaceMembership();
   const [state, setState] = useState<InviteActionState>({
     busyInviteId: null,
     error: null,
@@ -102,7 +102,7 @@ function InviteActionButtons({
 }
 
 export function InviteNotificationBar() {
-  const { pendingInvites, pendingInvitesLoading } = useWorkspace();
+  const { pendingInvites, pendingInvitesLoading } = useWorkspaceMembership();
   const [dismissedInviteIds, setDismissedInviteIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -169,7 +169,7 @@ export function InviteNotificationBar() {
 }
 
 export function InviteNotificationBell() {
-  const { pendingInvites, pendingInvitesLoading, refreshPendingInvites } = useWorkspace();
+  const { pendingInvites, pendingInvitesLoading, refreshPendingInvites } = useWorkspaceMembership();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const panelContentRef = useRef<HTMLDivElement | null>(null);

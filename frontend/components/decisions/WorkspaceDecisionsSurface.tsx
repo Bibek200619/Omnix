@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceTree } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { WorkspaceDecision, WorkspaceDecisionStatus } from "@/lib/workspace-types";
 import { DecisionContextPanel } from "./DecisionContextPanel";
@@ -43,7 +43,7 @@ export const WorkspaceDecisionsSurface = memo(function WorkspaceDecisionsSurface
 });
 
 function WorkspaceDecisionsSurfaceContent() {
-  const { activeWorkspace, activeWorkspaceId } = useWorkspace();
+  const { activeWorkspace, activeWorkspaceId } = useWorkspaceTree();
   const searchParams = useSearchParams();
   const routeCreateDecision = searchParams?.get("create") === "decision";
   const [decisions, setDecisions] = useState<WorkspaceDecision[]>([]);

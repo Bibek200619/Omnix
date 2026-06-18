@@ -5,7 +5,7 @@ import { API_BASE_URL, ApiError, apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
 import { realtimeRegistry } from "@/lib/realtime-registry";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceTree } from "@/lib/workspace-context";
 import type { WorkspaceMentionInboxItem } from "@/lib/workspace-types";
 
 type WorkspaceNotificationsContextType = {
@@ -56,7 +56,7 @@ function notificationLoadErrorMessage(error: unknown) {
 
 export function WorkspaceNotificationsProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId } = useWorkspaceTree();
   const userId = session?.user.id ?? null;
   const [mentions, setMentions] = useState<WorkspaceMentionInboxItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);

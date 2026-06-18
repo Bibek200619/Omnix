@@ -29,7 +29,7 @@ import { Portal } from "@/components/ui/Portal";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
 import { useFocusTrap } from "@/lib/use-focus-trap";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceTree } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { WorkspaceSearchResponse, WorkspaceSearchResult } from "@/lib/workspace-types";
 
@@ -232,7 +232,7 @@ function hrefWithFreshCreateToken(item: PaletteItem) {
 export function CommandPalette() {
   const router = useRouter();
   const pathname = usePathname();
-  const { activeWorkspace, activeWorkspaceId } = useWorkspace();
+  const { activeWorkspace, activeWorkspaceId } = useWorkspaceTree();
   const [commandShortcut, setCommandShortcut] = useState("Ctrl K");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");

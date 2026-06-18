@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceTree } from "@/lib/workspace-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import type { Workspace } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
@@ -89,7 +89,7 @@ export const Header = memo(function Header({ sidebarCollapsed = false, onMenuCli
   const pathname = usePathname();
   const router = useRouter();
   const { signOut, user } = useAuth();
-  const { activeWorkspace, activeWorkspaceId, workspaces } = useWorkspace();
+  const { activeWorkspace, activeWorkspaceId, workspaces } = useWorkspaceTree();
   const { realtimeStatus, retryRealtimeConnection } = useWorkspaceCollaboration();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);

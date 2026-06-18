@@ -21,7 +21,7 @@ import { invalidateQueries, queryGet } from "@/lib/query";
 import { realtimeRegistry } from "@/lib/realtime-registry";
 import { useToast } from "@/lib/toast-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceTree } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type {
   WorkspaceChannel,
@@ -81,7 +81,7 @@ export const WorkspaceInitiativesSurface = memo(function WorkspaceInitiativesSur
 function WorkspaceInitiativesSurfaceContent() {
   const { session } = useAuth();
   const { showToast } = useToast();
-  const { activeWorkspace, activeWorkspaceId } = useWorkspace();
+  const { activeWorkspace, activeWorkspaceId } = useWorkspaceTree();
   const { presence, realtimeStatus } = useWorkspaceCollaboration();
   const searchParams = useSearchParams();
   const routeInitiativeId = searchParams?.get("id") ?? null;

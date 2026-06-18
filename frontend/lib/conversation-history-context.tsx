@@ -14,7 +14,7 @@ import type { ConversationSummary } from "@/components/chat/types";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceTree } from "@/lib/workspace-context";
 
 type ConversationHistoryContextType = {
   conversations: ConversationSummary[];
@@ -55,7 +55,7 @@ export function ConversationHistoryProvider({
 }) {
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId } = useWorkspaceTree();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

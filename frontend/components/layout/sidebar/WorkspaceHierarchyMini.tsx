@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Globe2, Layers3, Network, Users } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceMembership, useWorkspaceTree } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import { workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { Workspace } from "@/lib/workspace-types";
@@ -58,7 +58,8 @@ export function SidebarHealthDot({ health }: { health?: string | null }) {
 
 export function WorkspaceHierarchyMini({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const { activeWorkspace, activeMembers } = useWorkspace();
+  const { activeWorkspace } = useWorkspaceTree();
+  const { activeMembers } = useWorkspaceMembership();
   const members = activeMembers.length || activeWorkspace?.member_count || 0;
   const spaces = [
     {
