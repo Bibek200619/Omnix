@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:ui-audit": "node scripts/verify-ui-audit.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.1",
