@@ -114,7 +114,7 @@ function AnalyticsPageContent() {
     } catch (err) {
       setRuntimeInfo(null);
       setWorkers([]);
-      setRuntimeError("Runtime telemetry is temporarily unavailable. Please try again in a moment.");
+      setRuntimeError("Runtime telemetry is unavailable. Please try again in a moment.");
       logClientError("Failed to load runtime telemetry", err);
     } finally {
       setLoadingRuntime(false);
