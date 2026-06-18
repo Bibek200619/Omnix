@@ -18,6 +18,7 @@ class RuntimeManager:
         self._jobs_processing: int = 0
         self._jobs_completed: int = 0
         self._jobs_failed: int = 0
+        self._worker_processing_counts: Dict[str, int] = {}
         
         # Register integrated worker by default for visibility
         self.register_worker(
@@ -38,7 +39,9 @@ class RuntimeManager:
             "capabilities": capabilities,
             "worker_type": worker_type,
             "status": "idle",
+            "processing_jobs": 0,
         }
+        self._worker_processing_counts[worker_id] = 0
         logger.info("Worker %s registered (type=%s, capabilities=%s)", worker_id, worker_type, capabilities)
 
     def update_worker_status(self, worker_id: str, status: str):
@@ -47,15 +50,23 @@ class RuntimeManager:
 
     def record_job_started(self, worker_id: str):
         self._jobs_processing += 1
-        self.update_worker_status(worker_id, "processing")
+        worker_processing = self._worker_processing_counts.get(worker_id, 0) + 1
+        self._worker_processing_counts[worker_id] = worker_processing
+        if worker_id in self.active_workers:
+            self.active_workers[worker_id]["processing_jobs"] = worker_processing
+            self.update_worker_status(worker_id, "processing")
 
     def record_job_completed(self, worker_id: str, success: bool):
         self._jobs_processing = max(0, self._jobs_processing - 1)
+        worker_processing = max(0, self._worker_processing_counts.get(worker_id, 0) - 1)
+        self._worker_processing_counts[worker_id] = worker_processing
         if success:
             self._jobs_completed += 1
         else:
             self._jobs_failed += 1
-        self.update_worker_status(worker_id, "idle")
+        if worker_id in self.active_workers:
+            self.active_workers[worker_id]["processing_jobs"] = worker_processing
+            self.update_worker_status(worker_id, "processing" if worker_processing else "idle")
 
     def register_provider(self, provider_name: str):
         if provider_name not in self.active_providers:
