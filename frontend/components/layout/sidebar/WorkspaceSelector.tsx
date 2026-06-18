@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { Workspace, WorkspaceRole } from "@/lib/workspace-types";
 import { SidebarModals, WorkspaceManagementActions } from "./SidebarModals";
-import { WorkspaceTypeBadge, workspaceIcon } from "./SidebarPresence";
+import { WorkspaceTypeBadge, workspaceIcon } from "./WorkspaceHierarchyMini";
 import { WorkspaceListState } from "./WorkspaceTreeNode";
 
 type WorkspaceSelectorProps = {

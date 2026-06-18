@@ -10,7 +10,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import { workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { Workspace } from "@/lib/workspace-types";
-import { SidebarHealthDot, WorkspaceTypeBadge, workspaceIcon } from "./SidebarPresence";
+import { SidebarHealthDot, WorkspaceTypeBadge, workspaceIcon } from "./WorkspaceHierarchyMini";
 
 type WorkspaceTreeNodeProps = {
   workspace: Workspace;
