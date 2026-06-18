@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import dynamic from "next/dynamic";
 import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,7 +21,6 @@ import {
   LayoutGrid,
   Link2,
   List,
-  Loader2,
   LockKeyhole,
   Plus,
   RefreshCw,
@@ -33,7 +34,9 @@ import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { CreateDecisionModal } from "@/components/decisions/CreateDecisionModal";
 import { DecisionCandidatePanel } from "@/components/decisions/DecisionCandidatePanel";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
@@ -78,6 +81,7 @@ interface FileData {
 
 type ConnectorType = "knowledge_link" | "file_repository" | "company_drive" | "external_database";
 type SourceType = "file" | ConnectorType;
+type SourceSection = "files" | "connectors";
 
 type ConnectorStatus =
   | "live"
@@ -327,6 +331,14 @@ function newestConnector(connectors: WorkspaceConnector[], type: ConnectorType) 
 }
 
 export default function FilesPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <FilesPageContent />
+    </Suspense>
+  );
+}
+
+function FilesPageContent() {
   const { activeWorkspace, activeMembers, activeWorkspaceId, activeWorkspaceIntelligence } = useWorkspace();
   const [files, setFiles] = useState<FileData[]>([]);
   const [connectors, setConnectors] = useState<WorkspaceConnector[]>([]);
@@ -336,6 +348,7 @@ export default function FilesPage() {
   const [connectorError, setConnectorError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
+  const [activeSection, setActiveSection] = useState<SourceSection>("files");
   const [activeType, setActiveType] = useState<SourceType>("file");
   const [setupType, setSetupType] = useState<ConnectorType | null>(null);
   const [setupForm, setSetupForm] = useState<ConnectorFormState>(emptyForm("knowledge_link"));
@@ -380,7 +393,7 @@ export default function FilesPage() {
       setFiles(data);
     } catch (err) {
       logClientError("Failed to load files", err, { endpoint: "/files" });
-      setError("Unable to load files.");
+      setError("Unable to load files. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -398,7 +411,7 @@ export default function FilesPage() {
       setConnectors(data);
     } catch (err) {
       logClientError("Failed to load connectors", err, { endpoint: "/connectors" });
-      setConnectorError("Unable to load connectors.");
+      setConnectorError("Unable to load connectors. Check your connection and try again.");
     } finally {
       setConnectorsLoading(false);
     }
@@ -428,6 +441,7 @@ export default function FilesPage() {
   }
 
   function scrollToUpload() {
+    setActiveSection("files");
     setActiveType("file");
     window.setTimeout(() => {
       document.getElementById("workspace-upload-dropzone")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -440,7 +454,7 @@ export default function FilesPage() {
       setFiles((s) => s.filter((f) => f.id !== id));
     } catch (err) {
       logClientError("Failed to delete file", err, { endpoint: `/files/${id}` });
-      setError("Unable to delete file.");
+      setError("Unable to delete file. Your session may have expired; refresh and try again.");
     }
   }
 
@@ -458,7 +472,7 @@ export default function FilesPage() {
       document.body.removeChild(a);
     } catch (err) {
       logClientError("Failed to download file", err, { endpoint: `/files/${id}/download` });
-      setError("Unable to download file.");
+      setError("Unable to download file. Check your connection and try again.");
     }
   }
 
@@ -479,7 +493,7 @@ export default function FilesPage() {
       setDecisionCandidates(result.candidates);
     } catch (err) {
       logClientError("Failed to extract document decision candidates", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/document/${file.id}` });
-      setDecisionCandidatesError("Unable to scan this document for decision candidates.");
+      setDecisionCandidatesError("Unable to scan this document for decision candidates. Please try again in a moment.");
     } finally {
       setDecisionCandidatesLoading(false);
     }
@@ -613,7 +627,7 @@ export default function FilesPage() {
       setSetupMessage(null);
     } catch (err) {
       logClientError("Failed to save connector", err, { endpoint: "/connectors" });
-      setSetupMessage("Unable to save connector.");
+      setSetupMessage("Unable to save connector. Check the configuration and try again.");
     } finally {
       setSavingConnector(false);
     }
@@ -627,7 +641,7 @@ export default function FilesPage() {
       upsertConnector(updated);
     } catch (err) {
       logClientError("Failed to retry connector", err, { endpoint: `/connectors/${connector.id}/retry` });
-      setConnectorError("Unable to retry connector.");
+      setConnectorError("Unable to retry connector. Please try again in a moment.");
     } finally {
       setActionConnectorId(null);
     }
@@ -644,7 +658,7 @@ export default function FilesPage() {
       }
     } catch (err) {
       logClientError("Failed to remove connector", err, { endpoint: `/connectors/${connector.id}` });
-      setConnectorError("Unable to delete connector.");
+      setConnectorError("Unable to delete connector. Your session may have expired; refresh and try again.");
     } finally {
       setActionConnectorId(null);
     }
@@ -659,13 +673,16 @@ export default function FilesPage() {
       window.location.assign(result.authorize_url);
     } catch (err) {
       logClientError("Failed to start connector authentication", err, { endpoint: "/integrations/google_drive/connect" });
-      setConnectorError("Unable to start connector authentication.");
+      setConnectorError("Unable to start connector authentication. Check your connection and try again.");
     } finally {
       setAuthConnectorId(null);
     }
   }
 
   const setupMeta = setupType ? sourceTypes.find((item) => item.id === setupType) : null;
+  const connectorSourceTypes = sourceTypes.filter(
+    (type): type is (typeof sourceTypes)[number] & { id: ConnectorType } => type.id !== "file",
+  );
 
   return (
     <section className="omnix-page-frame omnix-scrollbar">
@@ -693,6 +710,38 @@ export default function FilesPage() {
           ) : null}
         </div>
 
+        <div className="flex flex-col gap-3 rounded-[var(--omnix-radius)] border border-[var(--omnix-border)] bg-black/15 p-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-1 rounded-[10px] bg-black/20 p-1">
+            {([
+              { id: "files", label: "Files", count: files.length },
+              { id: "connectors", label: "Connectors", count: connectors.length },
+            ] as Array<{ id: SourceSection; label: string; count: number }>).map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => setActiveSection(section.id)}
+                className={cn(
+                  "inline-flex min-h-9 flex-1 items-center justify-center gap-2 rounded-lg px-3 text-xs font-bold uppercase tracking-[0.08em] transition sm:flex-none",
+                  activeSection === section.id
+                    ? "bg-cyan-300/12 text-cyan-100 shadow-[var(--omnix-glow-xs)]"
+                    : "text-[var(--omnix-text-3)] hover:bg-white/[0.035] hover:text-white",
+                )}
+              >
+                {section.label}
+                <span className="rounded-full border border-white/10 bg-black/20 px-1.5 py-px text-[10px] text-white/55">
+                  {section.count}
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="px-1 text-xs leading-5 text-[var(--omnix-text-3)]">
+            {activeSection === "files"
+              ? "Upload, search, and inspect retrievable workspace files."
+              : "Configure external knowledge systems and monitor connector status."}
+          </p>
+        </div>
+
+        {activeSection === "connectors" ? (
         <div className="omnix-cinematic-card p-5">
           <div className="relative z-10 mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -702,29 +751,22 @@ export default function FilesPage() {
               </p>
             </div>
             {connectorsLoading ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[11px] text-cyan-100">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Reconciling
-              </span>
+              <Skeleton className="h-8 w-28 rounded-full" />
             ) : null}
           </div>
-          <div className="relative z-10 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-            {sourceTypes.map((type) => {
+          <div className="relative z-10 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {connectorSourceTypes.map((type) => {
               const Icon = type.icon;
               const active = activeType === type.id;
-              const latest = type.id === "file" ? null : newestConnector(connectors, type.id);
-              const cardStatus = type.id === "file" ? "live" : latest?.status ?? "not_configured";
-              const count = type.id === "file" ? files.length : connectorCounts[type.id];
+              const latest = newestConnector(connectors, type.id);
+              const cardStatus = latest?.status ?? "not_configured";
+              const count = connectorCounts[type.id];
               return (
                 <button
                   key={type.id}
                   type="button"
                   onClick={() => {
-                    if (type.id === "file") {
-                      scrollToUpload();
-                    } else {
-                      openSetup(type.id, latest ?? undefined);
-                    }
+                    openSetup(type.id, latest ?? undefined);
                   }}
                   className={cn(
                     "group relative flex min-h-[154px] flex-col justify-between overflow-hidden rounded-xl border p-3 text-left transition",
@@ -757,6 +799,7 @@ export default function FilesPage() {
             })}
           </div>
         </div>
+        ) : null}
 
         <div className="grid gap-3 md:grid-cols-3">
           {[
@@ -781,6 +824,7 @@ export default function FilesPage() {
           })}
         </div>
 
+        {activeSection === "connectors" ? (
         <div className="omnix-cinematic-card p-5">
           <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
@@ -795,22 +839,24 @@ export default function FilesPage() {
             <OmnixErrorState
               compact
               className="relative z-10 mt-4"
-              title={connectorError === "Unable to load connectors." ? "Connectors are unavailable" : "Connector action needs attention"}
+              title={connectorError.startsWith("Unable to load connectors.") ? "Connectors are unavailable" : "Connector action needs attention"}
               message={connectorError}
-              onRetry={connectorError === "Unable to load connectors." ? () => void loadConnectors() : undefined}
+              onRetry={connectorError.startsWith("Unable to load connectors.") ? () => void loadConnectors() : undefined}
               isRetrying={connectorsLoading}
               onDismiss={() => setConnectorError(null)}
             />
           ) : null}
           {connectorsLoading && connectors.length === 0 ? (
             <div className="relative z-10 mt-4 grid gap-2">
-              {[0, 1].map((item) => <div key={item} className="shimmer h-16 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)]" />)}
+              {[0, 1].map((item) => <Skeleton key={item} className="h-16 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)]" />)}
             </div>
           ) : connectors.length === 0 ? (
-            <div className="relative z-10 mt-4 rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 p-6 text-center">
-              <p className="text-sm font-semibold text-white">No connector configuration saved yet.</p>
-              <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">Choose a connector above to save a real workspace-scoped setup.</p>
-            </div>
+            <EmptyState
+              icon={Unplug}
+              title="No connector configuration saved yet"
+              description="Choose a connector above to save a real workspace-scoped setup."
+              className="relative z-10 mt-4 min-h-[220px] border-dashed"
+            />
           ) : (
             <div className="relative z-10 mt-4 grid gap-3">
               {connectors.map((connector) => {
@@ -865,7 +911,10 @@ export default function FilesPage() {
             </div>
           )}
         </div>
+        ) : null}
 
+        {activeSection === "files" ? (
+        <>
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative w-full min-w-0 flex-1 sm:min-w-[220px]">
             <Search className="absolute left-[11px] top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-white/25" />
@@ -916,46 +965,35 @@ export default function FilesPage() {
           {loading ? (
             <div className="relative z-10 mt-4 grid gap-2">
               {[0, 1, 2].map((item) => (
-                <div key={item} className="shimmer h-16 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)]" />
+                <Skeleton key={item} className="h-16 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)]" />
               ))}
             </div>
           ) : error ? (
             <OmnixErrorState
               compact
               className="relative z-10 mt-4"
-              title={error === "Unable to load files." ? "Files are unavailable" : "File action needs attention"}
+              title={error.startsWith("Unable to load files.") ? "Files are unavailable" : "File action needs attention"}
               message={error}
-              onRetry={error === "Unable to load files." ? () => void loadFiles() : undefined}
+              onRetry={error.startsWith("Unable to load files.") ? () => void loadFiles() : undefined}
               isRetrying={loading}
               onDismiss={() => setError(null)}
             />
           ) : files.length === 0 ? (
-            <div className="relative z-10 mt-4 flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 p-6 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]">
-                <FileUp className="h-5 w-5" />
-              </div>
-              <p className="mt-4 text-sm font-semibold text-white">No files uploaded yet.</p>
-              <p className="mt-1 max-w-sm text-sm leading-6 text-[var(--omnix-text-2)]">
-                Upload a PDF, DOCX, TXT, or Markdown file above to make it available to Omnix retrieval.
-              </p>
-              <Button
-                type="button"
-                size="sm"
-                className="mt-4 min-h-10"
-                leftIcon={<Plus className="h-3.5 w-3.5" />}
-                onClick={scrollToUpload}
-              >
-                Upload first file
-              </Button>
-            </div>
+            <EmptyState
+              icon={FileUp}
+              title="No files uploaded yet"
+              description="Upload a PDF, DOCX, TXT, or Markdown file above to make it available to Omnix retrieval."
+              action={{ label: "Upload first file", onClick: scrollToUpload }}
+              className="relative z-10 mt-4 min-h-[220px] border-dashed"
+            />
           ) : filteredFiles.length === 0 ? (
-            <div className="relative z-10 mt-4 flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 p-6 text-center">
-              <Search className="h-7 w-7 text-cyan-200/35" />
-              <p className="mt-3 text-sm font-semibold text-white">No sources match this search.</p>
-              <p className="mt-1 max-w-sm text-sm leading-6 text-[var(--omnix-text-2)]">
-                Clear the search field to view all uploaded workspace files.
-              </p>
-            </div>
+            <EmptyState
+              icon={Search}
+              title="No sources match this search"
+              description="Clear the search field to view all uploaded workspace files."
+              action={{ label: "Clear search", onClick: () => setSearchQuery("") }}
+              className="relative z-10 mt-4 min-h-[180px] border-dashed"
+            />
           ) : (
             <div className={view === "grid" ? "relative z-10 mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3" : "relative z-10 mt-3 grid gap-2"}>
               {filteredFiles.map((f) => {
@@ -988,6 +1026,8 @@ export default function FilesPage() {
             </div>
           )}
         </div>
+        </>
+        ) : null}
       </div>
 
       {candidateFile ? (

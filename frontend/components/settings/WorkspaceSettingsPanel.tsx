@@ -3,25 +3,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { BrainCircuit, Check, GitBranch, Layers3, Loader2, Plus, Settings, ShieldCheck, Sparkles, Trash2, Users } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { Toggle } from "@/components/ui/Toggle";
 import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
+import { flattenWorkspaces } from "@/lib/workspace-utils";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { Workspace } from "@/lib/workspace-types";
 import type { WorkspaceFocus } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
-
-function flattenWorkspaces(workspaces: Workspace[]) {
-  const list: Workspace[] = [];
-  const visit = (workspace: Workspace) => {
-    list.push(workspace);
-    workspace.subspaces?.forEach(visit);
-  };
-  workspaces.forEach(visit);
-  return list;
-}
 
 function findWorkspace(workspaces: Workspace[], workspaceId?: string | null) {
   if (!workspaceId) return null;
@@ -119,7 +112,7 @@ export function WorkspaceSettingsPanel() {
       window.setTimeout(() => setSaved(false), 2200);
     } catch (err) {
       logClientError("Failed to update workspace", err, { endpoint: `/workspaces/${activeWorkspace.id}` });
-      setError("Unable to update workspace.");
+      setError("Unable to update workspace. Your session may have expired; refresh and try again.");
     } finally {
       setSaving(false);
     }
@@ -145,7 +138,7 @@ export function WorkspaceSettingsPanel() {
       setActiveWorkspace(created.id);
     } catch (err) {
       logClientError("Failed to create subworkspace", err);
-      setSubspaceError("Unable to create subworkspace.");
+      setSubspaceError("Unable to create subworkspace. Check your connection and try again.");
     } finally {
       setCreatingSubspace(false);
     }
@@ -159,7 +152,7 @@ export function WorkspaceSettingsPanel() {
       await deleteWorkspace(activeWorkspace.id);
     } catch (err) {
       logClientError("Failed to delete workspace", err, { endpoint: `/workspaces/${activeWorkspace.id}` });
-      setDeleteError("Unable to delete workspace.");
+      setDeleteError("Unable to delete workspace. Your session may have expired; refresh and try again.");
     } finally {
       setDeleting(false);
     }
@@ -186,7 +179,7 @@ export function WorkspaceSettingsPanel() {
       window.setTimeout(() => setIntelligenceSaved(false), 2200);
     } catch (err) {
       logClientError("Failed to update intelligence profile", err, { endpoint: `/workspaces/${activeWorkspace.id}/intelligence` });
-      setIntelligenceError("Unable to update intelligence profile.");
+      setIntelligenceError("Unable to update intelligence profile. Please try again in a moment.");
     } finally {
       setSavingIntelligence(false);
     }
@@ -220,12 +213,12 @@ export function WorkspaceSettingsPanel() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className={cn("rounded-full border px-3 py-1 text-xs font-semibold", workspaceRoleBadgeClass(activeWorkspace.current_user_role))}>
+            <Badge variant="role" className={workspaceRoleBadgeClass(activeWorkspace.current_user_role)}>
               {workspaceRoleLabel(activeWorkspace.current_user_role)}
-            </span>
-            <span className="rounded-full border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 py-1 text-xs text-[var(--omnix-text-2)]">
+            </Badge>
+            <Badge className="font-normal">
               {activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "member" : "members"}
-            </span>
+            </Badge>
           </div>
         </div>
       </section>
@@ -250,20 +243,18 @@ export function WorkspaceSettingsPanel() {
               }}
               disabled={!canEdit || saving}
             />
-            <label className="block">
-              <span className="text-sm font-medium text-slate-300">Description</span>
-              <textarea
-                value={description}
-                onChange={(event) => {
-                  setDescription(event.target.value);
-                  setSaved(false);
-                }}
-                disabled={!canEdit || saving}
-                rows={4}
-                className="omnix-input mt-2 w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                placeholder="What is this workspace for?"
-              />
-            </label>
+            <Textarea
+              label="Description"
+              value={description}
+              onChange={(event) => {
+                setDescription(event.target.value);
+                setSaved(false);
+              }}
+              disabled={!canEdit || saving}
+              rows={4}
+              className="bg-black/20"
+              placeholder="What is this workspace for?"
+            />
           </div>
 
           {!canEdit ? (
@@ -342,9 +333,9 @@ export function WorkspaceSettingsPanel() {
               Define the cognitive posture Omnix should use inside this workspace. It shapes chat, continuity, and retrieval-aware reasoning without changing Omnix identity.
             </p>
           </div>
-          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+          <Badge variant="info">
             {activeWorkspaceIntelligence?.source_count ?? 0} sources active
-          </span>
+          </Badge>
         </div>
 
         <div className="relative z-10 grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -372,35 +363,31 @@ export function WorkspaceSettingsPanel() {
               </div>
             </div>
 
-            <label className="block">
-              <span className="text-sm font-medium text-slate-300">Expertise area</span>
-              <textarea
-                value={expertiseArea}
-                onChange={(event) => {
-                  setExpertiseArea(event.target.value);
-                  setIntelligenceSaved(false);
-                }}
-                disabled={!canEdit || savingIntelligence}
-                rows={3}
-                className="omnix-input mt-2 w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                placeholder="UI systems, APIs, launch strategy, operations..."
-              />
-            </label>
+            <Textarea
+              label="Expertise area"
+              value={expertiseArea}
+              onChange={(event) => {
+                setExpertiseArea(event.target.value);
+                setIntelligenceSaved(false);
+              }}
+              disabled={!canEdit || savingIntelligence}
+              rows={3}
+              className="bg-black/20"
+              placeholder="UI systems, APIs, launch strategy, operations..."
+            />
 
-            <label className="block">
-              <span className="text-sm font-medium text-slate-300">Workspace instructions</span>
-              <textarea
-                value={aiInstructions}
-                onChange={(event) => {
-                  setAiInstructions(event.target.value);
-                  setIntelligenceSaved(false);
-                }}
-                disabled={!canEdit || savingIntelligence}
-                rows={5}
-                className="omnix-input mt-2 w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                placeholder="Tell Omnix how to answer for this workspace, what standards to follow, and what context matters."
-              />
-            </label>
+            <Textarea
+              label="Workspace instructions"
+              value={aiInstructions}
+              onChange={(event) => {
+                setAiInstructions(event.target.value);
+                setIntelligenceSaved(false);
+              }}
+              disabled={!canEdit || savingIntelligence}
+              rows={5}
+              className="bg-black/20"
+              placeholder="Tell Omnix how to answer for this workspace, what standards to follow, and what context matters."
+            />
           </div>
 
           <aside className="space-y-4">
@@ -461,9 +448,9 @@ export function WorkspaceSettingsPanel() {
               Create and review real child workspaces attached to this hierarchy.
             </p>
           </div>
-          <span className="rounded-full border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3 py-1 text-xs text-[var(--omnix-text-2)]">
+          <Badge className="font-normal">
             {visibleSubspaces.length} subworkspace{visibleSubspaces.length === 1 ? "" : "s"}
-          </span>
+          </Badge>
         </div>
 
         <div className="relative z-10 grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -511,12 +498,13 @@ export function WorkspaceSettingsPanel() {
                 }}
                 disabled={!canEdit || creatingSubspace}
               />
-              <textarea
+              <Textarea
+                aria-label="Subworkspace purpose or scope"
                 value={subspaceDescription}
                 onChange={(event) => setSubspaceDescription(event.target.value)}
                 disabled={!canEdit || creatingSubspace}
                 rows={3}
-                className="omnix-input w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                className="bg-black/20"
                 placeholder="Purpose or scope"
               />
               {subspaceError ? (

@@ -20,10 +20,13 @@ import {
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
+import { markOnboardingCompleted, readOnboardingCompleted } from "@/lib/onboarding";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import { useWorkspace } from "@/lib/workspace-context";
 import type { Workspace, WorkspaceFocus, WorkspaceInvite } from "@/lib/workspace-types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { UploadDropzone } from "@/components/upload/UploadDropzone";
 import type { MessageAttachment } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
@@ -96,8 +99,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
   } = useWorkspace();
   const { user, signOut } = useAuth();
 
-  const [onboardingStarted, setOnboardingStarted] = useState(false);
-  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState(readOnboardingCompleted);
   const [step, setStep] = useState<StepId>("account");
   const [onboardingWorkspaceId, setOnboardingWorkspaceId] = useState<string | null>(null);
 
@@ -130,16 +132,24 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
   const hasWorkspaceForFlow = Boolean(onboardingWorkspace);
 
   useEffect(() => {
+    if (loading) {
+      return;
+    }
     if (!loading && !hasWorkspaces && !error) {
-      setOnboardingStarted(true);
+      setStep("account");
     }
     if (workspaceLoadFailed) {
-      setOnboardingStarted(true);
       setStep("workspace");
+      return;
     }
-  }, [error, hasWorkspaces, loading, workspaceLoadFailed]);
+    if (hasWorkspaces && !onboardingComplete) {
+      setOnboardingWorkspaceId((current) => current ?? activeWorkspace?.id ?? activeWorkspaceId ?? workspaces[0]?.id ?? null);
+      setStep((current) => (current === "account" || current === "workspace" ? "team" : current));
+    }
+  }, [activeWorkspace?.id, activeWorkspaceId, error, hasWorkspaces, loading, onboardingComplete, workspaceLoadFailed, workspaces]);
 
-  const isBlocked = !loading && (workspaceLoadFailed || !hasWorkspaces || (onboardingStarted && !onboardingComplete));
+  const isBlocked = !loading && (workspaceLoadFailed || !hasWorkspaces || !onboardingComplete);
+  const onboardingTrapRef = useFocusTrap<HTMLElement>(isBlocked);
 
   if (!isBlocked) {
     return <>{children}</>;
@@ -180,7 +190,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       goTo("team", { allowPendingWorkspace: true });
     } catch (err) {
       logClientError("Failed to create onboarding workspace", err, { endpoint: "/workspaces" });
-      setCreateError("Unable to create workspace.");
+      setCreateError("Unable to create workspace. Check your connection and try again.");
     } finally {
       setCreating(false);
     }
@@ -194,7 +204,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       goTo("team", { allowPendingWorkspace: true });
     } catch (err) {
       logClientError("Failed to accept onboarding invite", err, { endpoint: `/workspace-invites/${inviteId}/accept` });
-      setCreateError("Unable to accept invite.");
+      setCreateError("Unable to accept invite. Your session may have expired; refresh and try again.");
     } finally {
       setAcceptingId(null);
     }
@@ -206,7 +216,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       await declineInvite(inviteId);
     } catch (err) {
       logClientError("Failed to decline onboarding invite", err, { endpoint: `/workspace-invites/${inviteId}/decline` });
-      setCreateError("Unable to decline invite.");
+      setCreateError("Unable to decline invite. Your session may have expired; refresh and try again.");
     } finally {
       setDecliningId(null);
     }
@@ -237,7 +247,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       await refreshActiveWorkspaceData({ force: true, silent: true });
     } catch (err) {
       logClientError("Failed to send onboarding invite", err, { endpoint: `/workspaces/${workspaceId}/invites` });
-      setInviteError("Unable to send invite.");
+      setInviteError("Unable to send invite. Check the email address and try again.");
     } finally {
       setInviting(false);
     }
@@ -254,16 +264,20 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       return;
     }
     setActiveWorkspace(onboardingWorkspace.id);
+    markOnboardingCompleted();
     setOnboardingComplete(true);
   }
 
   const StepIcon = steps[currentStepIndex]?.icon ?? UserCircle;
 
   return (
-    <main className="omnix-app-bg flex min-h-[100dvh] items-start justify-center overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] text-white sm:py-8">
+    <main
+      ref={onboardingTrapRef}
+      className="omnix-app-bg flex min-h-[100dvh] items-start justify-center overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] text-white sm:py-8"
+    >
       <div className="relative z-10 w-full max-w-5xl">
         <div className="mb-6 flex flex-col gap-4 text-center sm:mb-8">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 text-[var(--omnix-cyan)] shadow-[0_0_24px_var(--omnix-rgba-rgba-0-255-255-0-15)]">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 text-[var(--omnix-cyan)] shadow-[0_0_24px_var(--omnix-rgba-0-255-255-0-15)]">
             <Layers3 className="h-8 w-8" />
           </div>
           <div>
@@ -275,7 +289,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-          <aside className="rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-8-16-30-0-82)] p-4 shadow-[var(--omnix-glow-sm)] backdrop-blur-xl">
+          <aside className="rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-8-16-30-0-82)] p-4 shadow-[var(--omnix-glow-sm)] backdrop-blur-xl">
             <div className="space-y-2">
               {steps.map((item, index) => {
                 const Icon = item.icon;
@@ -331,7 +345,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
             </Button>
           </aside>
 
-          <section className="min-h-[560px] rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-8-16-30-0-9)] p-4 shadow-[var(--omnix-glow-sm)] backdrop-blur-xl sm:p-6">
+          <section className="min-h-[560px] rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-8-16-30-0-9)] p-4 shadow-[var(--omnix-glow-sm)] backdrop-blur-xl sm:p-6">
             <div className="mb-6 flex items-start justify-between gap-4 border-b border-white/5 pb-5">
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100">
@@ -469,18 +483,17 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
                       disabled={creating}
                       autoFocus
                       placeholder="Acme Operations"
+                      error={createError === "Workspace name is required." ? createError : undefined}
                     />
-                    <label className="block space-y-2">
-                      <span className="text-sm font-medium text-slate-200">Description</span>
-                      <textarea
-                        value={workspaceDescription}
-                        onChange={(event) => setWorkspaceDescription(event.target.value)}
-                        disabled={creating}
-                        rows={3}
-                        className="omnix-input w-full resize-none rounded-lg bg-black/20 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                        placeholder="What will this workspace help your team do?"
-                      />
-                    </label>
+                    <Textarea
+                      label="Description"
+                      value={workspaceDescription}
+                      onChange={(event) => setWorkspaceDescription(event.target.value)}
+                      disabled={creating}
+                      rows={3}
+                      className="bg-black/20"
+                      placeholder="What will this workspace help your team do?"
+                    />
                     <div className="space-y-2">
                       <span className="text-sm font-medium text-slate-200">Workspace focus</span>
                       <div className="grid gap-2 sm:grid-cols-2">
@@ -502,7 +515,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
                         ))}
                       </div>
                     </div>
-                    {createError ? (
+                    {createError && createError !== "Workspace name is required." ? (
                       <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
                         {createError}
                       </div>
@@ -542,8 +555,9 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
                     disabled={inviting}
                     icon={<Mail className="h-4 w-4" />}
                     placeholder="teammate@company.com"
+                    error={inviteError === "Enter an email address to invite." ? inviteError : undefined}
                   />
-                  {inviteError ? (
+                  {inviteError && inviteError !== "Enter an email address to invite." ? (
                     <div className="rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">
                       {inviteError}
                     </div>

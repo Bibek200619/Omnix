@@ -6,10 +6,12 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "lint": "eslint .",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:ui-audit": "node scripts/verify-ui-audit.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.1",
+    "@tanstack/react-virtual": "^3.14.3",
     "clsx": "^2.1.1",
     "framer-motion": "^12.0.0",
     "lucide-react": "^0.468.0",

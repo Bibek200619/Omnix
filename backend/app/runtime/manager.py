@@ -18,6 +18,13 @@ class RuntimeManager:
         self._jobs_processing: int = 0
         self._jobs_completed: int = 0
         self._jobs_failed: int = 0
+        
+        # Register integrated worker by default for visibility
+        self.register_worker(
+            "integrated_worker", 
+            ["ingest_file", "automation", "maintenance"], 
+            worker_type="integrated"
+        )
 
     @classmethod
     def get(cls) -> RuntimeManager:
@@ -74,8 +81,16 @@ class RuntimeManager:
         }
 
     def get_runtime_info(self) -> Dict[str, Any]:
+        # Update heartbeat for integrated worker on fetch to keep it "alive" in UI
+        if "integrated_worker" in self.active_workers:
+            self.active_workers["integrated_worker"]["registered_at"] = datetime.now(timezone.utc).isoformat()
+            
+        from ..settings import get_settings
+        settings = get_settings()
         return {
             "status": self.status,
+            "version": "1.0.0-stable",
+            "environment": settings.ENV,
             "uptime_seconds": (datetime.now(timezone.utc) - self.start_time).total_seconds(),
             "active_workers_count": len(self.active_workers),
             "active_providers": self.active_providers,

@@ -21,9 +21,10 @@ from .workspace_service import get_profiles, list_workspace_members, require_wor
 from .workspace_task_service import list_tasks, update_task
 
 INITIATIVE_COLUMNS = (
-    "id,workspace_id,title,description,status,owner_user_id,created_by,target_date,"
+    "id,workspace_id,name,title,description,status,owner_user_id,created_by,target_date,"
     "initiative_context,linked_resources,activity_metadata,completed_at,client_nonce,created_at,updated_at"
 )
+LEGACY_INITIATIVE_COLUMNS = "id,workspace_id,name,description,status,created_at,updated_at,metadata"
 CHANNEL_LINK_COLUMNS = "initiative_id,workspace_id,channel_id,attached_by,created_at"
 DECISION_PREVIEW_COLUMNS = "id,title,status,decision_reason,created_at"
 logger = logging.getLogger(__name__)
@@ -52,6 +53,102 @@ def _normalize_resources(resources: Any) -> list[dict[str, Any]]:
         if isinstance(resource, Mapping):
             normalized.append(dict(resource))
     return normalized[:24]
+
+
+def _normalize_initiative_status(value: Any) -> str:
+    status_value = str(value or "draft").strip().lower()
+    if status_value == "completed":
+        return "complete"
+    if status_value == "paused":
+        return "draft"
+    if status_value in {"draft", "active", "focused", "at_risk", "complete"}:
+        return status_value
+    return "draft"
+
+
+def _normalize_initiative_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    normalized = dict(row)
+    title = _clean_text(normalized.get("title") or normalized.get("name")) or "Untitled initiative"
+    normalized["title"] = title
+    normalized["status"] = _normalize_initiative_status(normalized.get("status"))
+    normalized["owner_user_id"] = _clean_text(normalized.get("owner_user_id"))
+    normalized["created_by"] = _clean_text(normalized.get("created_by"))
+    normalized["target_date"] = normalized.get("target_date")
+    normalized["initiative_context"] = _clean_text(normalized.get("initiative_context"))
+    normalized["linked_resources"] = _normalize_resources(normalized.get("linked_resources"))
+    normalized["activity_metadata"] = (
+        normalized.get("activity_metadata")
+        if isinstance(normalized.get("activity_metadata"), dict)
+        else {}
+    )
+    normalized["client_nonce"] = _clean_text(normalized.get("client_nonce"))
+    normalized["completed_at"] = normalized.get("completed_at")
+    return normalized
+
+
+async def _select_initiative_rows(
+    *,
+    workspace_id: str,
+    filters: Mapping[str, Any],
+    order_by: str | None = None,
+    desc: bool = False,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    try:
+        return await select_all_trusted(
+            "workspace_initiatives",
+            INITIATIVE_COLUMNS,
+            filters=filters,
+            order_by=order_by,
+            desc=desc,
+            limit=limit,
+        )
+    except SupabaseServiceError:
+        logger.warning(
+            "Initiative read using current schema failed; retrying legacy columns | workspace_id=%s",
+            workspace_id,
+            exc_info=True,
+        )
+
+    try:
+        return await select_all_trusted(
+            "workspace_initiatives",
+            LEGACY_INITIATIVE_COLUMNS,
+            filters=filters,
+            order_by=order_by,
+            desc=desc,
+            limit=limit,
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+
+async def _select_initiative_row(
+    *,
+    workspace_id: str,
+    filters: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    try:
+        return await select_one_trusted(
+            "workspace_initiatives",
+            INITIATIVE_COLUMNS,
+            filters,
+        )
+    except SupabaseServiceError:
+        logger.warning(
+            "Initiative detail read using current schema failed; retrying legacy columns | workspace_id=%s",
+            workspace_id,
+            exc_info=True,
+        )
+
+    try:
+        return await select_one_trusted(
+            "workspace_initiatives",
+            LEGACY_INITIATIVE_COLUMNS,
+            filters,
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
 
 
 def _as_datetime(value: Any) -> datetime | None:
@@ -203,7 +300,8 @@ async def _hydrate_initiatives(
         )
     )
     hydrated: list[dict[str, Any]] = []
-    for row in rows:
+    for raw_row in rows:
+        row = _normalize_initiative_row(raw_row)
         initiative_id = str(row["id"])
         linked_tasks = [task for task in tasks if str(task.get("initiative_id") or "") == initiative_id]
         linked_channels = [
@@ -229,8 +327,6 @@ async def _hydrate_initiatives(
         hydrated.append(
             {
                 **row,
-                "linked_resources": _normalize_resources(row.get("linked_resources")),
-                "activity_metadata": row.get("activity_metadata") if isinstance(row.get("activity_metadata"), dict) else {},
                 "owner_name": owner.get("full_name") or owner.get("handle"),
                 "owner_email": owner.get("email"),
                 "owner_avatar_label": owner.get("avatar_label"),
@@ -246,33 +342,25 @@ async def _hydrate_initiatives(
 
 async def list_initiatives(*, workspace_id: str, user_id: str) -> list[dict[str, Any]]:
     await require_workspace_access(workspace_id, user_id)
-    try:
-        rows = await select_all_trusted(
-            "workspace_initiatives",
-            INITIATIVE_COLUMNS,
-            filters={"workspace_id": workspace_id},
-            order_by="updated_at",
-            desc=True,
-            limit=200,
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
+    rows = await _select_initiative_rows(
+        workspace_id=workspace_id,
+        filters={"workspace_id": workspace_id},
+        order_by="updated_at",
+        desc=True,
+        limit=200,
+    )
     return await _hydrate_initiatives(rows, workspace_id=workspace_id, user_id=user_id)
 
 
 async def require_initiative(*, workspace_id: str, initiative_id: str, user_id: str) -> dict[str, Any]:
     await require_workspace_access(workspace_id, user_id)
-    try:
-        row = await select_one_trusted(
-            "workspace_initiatives",
-            INITIATIVE_COLUMNS,
-            {"id": initiative_id, "workspace_id": workspace_id},
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
+    row = await _select_initiative_row(
+        workspace_id=workspace_id,
+        filters={"id": initiative_id, "workspace_id": workspace_id},
+    )
     if row is None:
         raise _not_found()
-    return row
+    return _normalize_initiative_row(row)
 
 
 async def get_initiative(*, workspace_id: str, initiative_id: str, user_id: str) -> dict[str, Any]:

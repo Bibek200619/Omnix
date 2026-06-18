@@ -33,7 +33,7 @@ export function OmnixErrorState({
       role="alert"
       aria-live="polite"
       className={cn(
-        "relative overflow-hidden rounded-xl border border-amber-200/18 bg-[linear-gradient(145deg,var(--omnix-rgba-rgba-251-191-36-0-08),var(--omnix-rgba-rgba-34-211-238-0-035)_55%,var(--omnix-rgba-rgba-0-0-0-0-18))] shadow-[inset_0_1px_0_var(--omnix-rgba-rgba-255-255-255-0-045)]",
+        "relative overflow-hidden rounded-xl border border-amber-200/18 bg-[linear-gradient(145deg,var(--omnix-rgba-251-191-36-0-08),var(--omnix-rgba-34-211-238-0-035)_55%,var(--omnix-rgba-0-0-0-0-18))] shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-045)]",
         compact ? "p-3" : "p-4 sm:p-5",
         className,
       )}
@@ -67,7 +67,7 @@ export function OmnixErrorState({
             <button
               type="button"
               onClick={onDismiss}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.035] text-white/50 transition hover:bg-white/[0.07] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
+              className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-white/[0.035] text-white/50 transition hover:bg-white/[0.07] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
               aria-label="Dismiss error"
               title="Dismiss"
             >

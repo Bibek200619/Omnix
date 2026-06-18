@@ -686,6 +686,67 @@ async def leave_presence(
     return None
 
 
+
+
+@router.get("/{workspace_id}/telemetry")
+async def get_workspace_telemetry(
+    workspace_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    from datetime import datetime, timedelta, timezone
+    user_id = _user_id_from_claims(current_user)
+    access = await require_workspace_access(workspace_id, user_id)
+    
+    today = datetime.now(timezone.utc).date()
+    dates = [(today - timedelta(days=i)).isoformat() for i in range(6, -1, -1)]
+    start_date_str = (today - timedelta(days=6)).isoformat() + "T00:00:00Z"
+    
+    try:
+        conversations = await select_all_trusted(
+            "conversations", "id,created_at",
+            {"workspace_id": workspace_id, "created_at": {"gte": start_date_str}}
+        )
+        files = await select_all_trusted(
+            "files", "id,created_at",
+            {"workspace_id": workspace_id, "created_at": {"gte": start_date_str}}
+        )
+        
+        convo_ids = [c["id"] for c in conversations if "id" in c]
+        messages = []
+        if convo_ids:
+            messages = await select_all_trusted(
+                "messages", "id,content,created_at",
+                {"conversation_id": convo_ids}
+            )
+            
+    except Exception as exc:
+        logger.warning("Failed to load telemetry stats", exc_info=True)
+        conversations, files, messages = [], [], []
+
+    convo_counts = {d: 0 for d in dates}
+    file_counts = {d: 0 for d in dates}
+    token_counts = {d: 0 for d in dates}
+    
+    for c in conversations:
+        dt = c.get("created_at", "")[:10]
+        if dt in convo_counts: convo_counts[dt] += 1
+            
+    for f in files:
+        dt = f.get("created_at", "")[:10]
+        if dt in file_counts: file_counts[dt] += 1
+            
+    for m in messages:
+        dt = m.get("created_at", "")[:10]
+        if dt in token_counts:
+            token_counts[dt] += len(str(m.get("content") or "")) // 4
+
+    return {
+        "dates": [d[5:] for d in dates],
+        "conversations": [convo_counts[d] for d in dates],
+        "sources": [file_counts[d] for d in dates],
+        "tokens": [token_counts[d] for d in dates]
+    }
+
 @router.get("/{workspace_id}/activity", response_model=list[WorkspaceActivityRead])
 async def get_workspace_activity(
     workspace_id: str,

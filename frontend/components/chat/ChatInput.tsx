@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Database, FileText, Globe2, Layers3, Paperclip, Send, Square, Sparkles, X, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/Textarea";
 import { UploadDropzone } from "@/components/upload/UploadDropzone";
 import type { MessageAttachment, SearchMode } from "@/components/chat/types";
+import { logger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 
 type ChatInputProps = {
@@ -75,12 +77,12 @@ export function ChatInput({
   }
 
   function handleUploadSuccess(file: MessageAttachment) {
-    console.debug("[upload] composer received successful upload", { fileId: file.id, conversationId });
+    logger.debug("[upload] composer received successful upload", { fileId: file.id, conversationId });
     onUploadSuccess?.(file);
   }
 
   function handleUploadComplete(result: { hasSuccess: boolean }) {
-    console.debug("[upload] composer upload batch complete", { conversationId, hasSuccess: result.hasSuccess });
+    logger.debug("[upload] composer upload batch complete", { conversationId, hasSuccess: result.hasSuccess });
     if (result.hasSuccess) {
       setUploadOpen(false);
     }
@@ -107,16 +109,16 @@ export function ChatInput({
       </div>
     <motion.div
       animate={{
-        borderColor: focused ? "var(--omnix-rgba-rgba-0-255-255-0-45)" : "var(--omnix-rgba-rgba-0-255-255-0-12)",
+        borderColor: focused ? "var(--omnix-rgba-0-255-255-0-45)" : "var(--omnix-rgba-0-255-255-0-12)",
         boxShadow: focused
-          ? "0 0 0 3px var(--omnix-rgba-rgba-0-255-255-0-08), var(--omnix-glow-sm), 0 18px 70px var(--omnix-rgba-rgba-0-0-0-0-28)"
-          : "0 12px 38px var(--omnix-rgba-rgba-0-0-0-0-26)",
+          ? "0 0 0 3px var(--omnix-rgba-0-255-255-0-08), var(--omnix-glow-sm), 0 18px 70px var(--omnix-rgba-0-0-0-0-28)"
+          : "0 12px 38px var(--omnix-rgba-0-0-0-0-26)",
       }}
       transition={{ duration: 0.18, ease: "easeOut" }}
-      className="relative z-20 w-full overflow-hidden rounded-[15px] border bg-[var(--omnix-rgba-rgba-8-16-30-0-9)] shadow-[0_18px_70px_var(--omnix-rgba-rgba-0-0-0-0-34)] backdrop-blur-[22px]"
+      className="relative z-20 w-full overflow-hidden rounded-[15px] border bg-[var(--omnix-rgba-8-16-30-0-9)] shadow-[0_18px_70px_var(--omnix-rgba-0-0-0-0-34)] backdrop-blur-[22px]"
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-rgba-0-255-255-0-68),transparent)]" />
-      <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[radial-gradient(circle,var(--omnix-rgba-rgba-0-255-255-0-16),transparent_70%)] blur-2xl" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-0-255-255-0-68),transparent)]" />
+      <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[radial-gradient(circle,var(--omnix-rgba-0-255-255-0-16),transparent_70%)] blur-2xl" />
       {attachments.length > 0 ? (
         <div className="m-3 mb-0 flex flex-wrap gap-2 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-2">
           {attachments.map((file) => (
@@ -131,7 +133,7 @@ export function ChatInput({
               </div>
               <button
                 type="button"
-                className="ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-cyan-100/55 transition hover:bg-cyan-300/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                className="ml-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-cyan-100/55 transition hover:bg-cyan-300/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
                 aria-label={`Remove ${attachmentName(file)}`}
                 title="Remove attachment"
                 onClick={() => onRemoveAttachment?.(file.id)}
@@ -154,8 +156,9 @@ export function ChatInput({
         </div>
       ) : null}
 
-        <textarea
+        <Textarea
           ref={textareaRef}
+          aria-label="Message composer"
           value={value}
           onChange={(event) => {
             const nextValue = event.target.value;
@@ -179,18 +182,18 @@ export function ChatInput({
           rows={1}
           placeholder="Type a message or '/' for commands..."
           disabled={loading}
-          className="block max-h-40 min-h-[54px] w-full resize-none border border-transparent bg-transparent px-[15px] py-[13px] text-sm leading-[1.6] text-white outline-none transition placeholder:text-[var(--omnix-text-3)] disabled:cursor-not-allowed disabled:opacity-70 sm:text-base"
+          className="block max-h-40 !min-h-[54px] resize-none !rounded-none !border-transparent !bg-transparent px-[15px] py-[13px] text-sm leading-[1.6] text-white !shadow-none outline-none transition placeholder:text-[var(--omnix-text-3)] hover:!border-transparent focus:!border-transparent focus:!bg-transparent focus:!ring-0 disabled:cursor-not-allowed disabled:opacity-70 sm:text-base"
         />
-      <div className="flex flex-col gap-2 border-t border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-0-0-0-0-2)] px-2.5 py-2.5 transition focus-within:bg-[var(--omnix-surface)] min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between sm:px-3">
+      <div className="flex flex-col gap-2 border-t border-[var(--omnix-border)] bg-[var(--omnix-rgba-0-0-0-0-2)] px-2.5 py-2.5 transition focus-within:bg-[var(--omnix-surface)] min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between sm:px-3">
         <div className="omnix-scrollbar flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 min-[420px]:flex-wrap min-[420px]:overflow-visible min-[420px]:pb-0">
           <Button
             type="button"
             variant={uploadOpen ? "secondary" : "ghost"}
-            size="icon"
+            size={"icon"}
             aria-label={uploadOpen ? "Hide document upload" : "Attach document"}
             title={uploadOpen ? "Hide document upload" : "Attach document"}
             onClick={() => setUploadOpen((current) => !current)}
-            className={cn("h-8 w-8 rounded-[7px] border border-transparent text-[var(--omnix-text-3)] hover:bg-[var(--omnix-surface)] hover:text-white sm:h-7 sm:w-7", uploadOpen && "border-cyan-300/25 bg-cyan-300/10 text-cyan-100")}
+            className={cn("h-11 w-11 rounded-[7px] border border-transparent text-[var(--omnix-text-3)] hover:bg-[var(--omnix-surface)] hover:text-white", uploadOpen && "border-cyan-300/25 bg-cyan-300/10 text-cyan-100")}
           >
             <Paperclip className={cn("h-4 w-4 transition-transform sm:h-3.5 sm:w-3.5", uploadOpen && "rotate-45")} />
           </Button>
@@ -204,11 +207,12 @@ export function ChatInput({
                 type="button"
                 onClick={() => onSearchModeChange(mode.value)}
                 className={cn(
-                  "inline-flex h-8 min-w-0 items-center gap-1.5 rounded-[7px] border px-2.5 text-[11px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 sm:h-7",
+                  "inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-[7px] border px-3 text-[11px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70",
                   active
                     ? "border-cyan-300/35 bg-cyan-300/12 text-cyan-50 shadow-[var(--omnix-glow-xs)]"
                     : "border-transparent text-[var(--omnix-text-3)] hover:bg-[var(--omnix-surface)] hover:text-slate-100",
                 )}
+                aria-label={`${mode.label} search mode`}
                 aria-pressed={active}
                 title={`${mode.label} search mode`}
               >
@@ -225,7 +229,7 @@ export function ChatInput({
         {loading ? (
           <Button
             type="button"
-            size="icon"
+            size={"icon"}
             aria-label="Stop generating"
             title="Stop generating"
             onClick={() => onCancel?.()}
@@ -236,12 +240,12 @@ export function ChatInput({
         ) : (
           <Button
             type="button"
-            size="icon"
+            size={"icon"}
             aria-label="Send message"
             title="Send message"
             disabled={!value.trim()}
             onClick={submit}
-            className="h-11 w-11 rounded-lg border-0 bg-[var(--omnix-grad-primary)] text-[var(--omnix-color-050c17)] shadow-[var(--omnix-glow-sm)] hover:shadow-[var(--omnix-glow-md)] disabled:bg-[var(--omnix-surface)] disabled:text-[var(--omnix-text-3)] disabled:shadow-none"
+            className="h-11 w-11 rounded-lg border-0 bg-[var(--omnix-grad-primary)] text-[var(--omnix-bg)] shadow-[var(--omnix-glow-sm)] hover:shadow-[var(--omnix-glow-md)] disabled:bg-[var(--omnix-surface)] disabled:text-[var(--omnix-text-3)] disabled:shadow-none"
           >
             <Send className="h-4 w-4" />
           </Button>

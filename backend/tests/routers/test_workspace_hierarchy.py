@@ -38,6 +38,80 @@ def test_workspace_response_models_accept_team_lead_roles() -> None:
 
 
 @pytest.mark.asyncio
+async def test_workspace_access_falls_back_to_hierarchy_workspace_columns(monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace_column_calls: list[str] = []
+
+    async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
+        if table == "workspaces":
+            workspace_column_calls.append(columns)
+            if columns == workspace_service.WORKSPACE_COLUMNS:
+                raise workspace_service.SupabaseServiceError("Internal server error")
+            assert columns == workspace_service.HIERARCHY_WORKSPACE_COLUMNS
+            return {
+                "id": "workspace-1",
+                "user_id": "owner-1",
+                "name": "Legacy workspace",
+                "description": None,
+                "parent_workspace_id": None,
+                "workspace_type": "super_workspace",
+                "is_global": False,
+                "created_at": "2026-06-03T10:00:00+00:00",
+                "updated_at": "2026-06-03T10:00:00+00:00",
+            }
+        if table == "workspace_members":
+            assert filters == {"workspace_id": "workspace-1", "user_id": "member-1"}
+            return {"workspace_id": "workspace-1", "user_id": "member-1", "role": "member"}
+        raise AssertionError(table)
+
+    monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
+
+    access = await workspace_service.resolve_workspace_access("workspace-1", "member-1")
+
+    assert workspace_column_calls == [
+        workspace_service.WORKSPACE_COLUMNS,
+        workspace_service.HIERARCHY_WORKSPACE_COLUMNS,
+    ]
+    assert access is not None
+    assert access.workspace["workspace_type"] == "super_workspace"
+    assert access.role == "member"
+
+
+@pytest.mark.asyncio
+async def test_workspace_access_falls_back_to_baseline_workspace_columns(monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace_column_calls: list[str] = []
+
+    async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
+        if table == "workspaces":
+            workspace_column_calls.append(columns)
+            if columns != workspace_service.LEGACY_WORKSPACE_COLUMNS:
+                raise workspace_service.SupabaseServiceError("Internal server error")
+            return {
+                "id": "workspace-1",
+                "user_id": "owner-1",
+                "name": "Baseline workspace",
+                "description": None,
+                "created_at": "2026-06-03T10:00:00+00:00",
+                "updated_at": "2026-06-03T10:00:00+00:00",
+            }
+        if table == "workspace_members":
+            return {"workspace_id": "workspace-1", "user_id": "member-1", "role": "member"}
+        raise AssertionError(table)
+
+    monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
+
+    access = await workspace_service.resolve_workspace_access("workspace-1", "member-1")
+
+    assert workspace_column_calls == [
+        workspace_service.WORKSPACE_COLUMNS,
+        workspace_service.HIERARCHY_WORKSPACE_COLUMNS,
+        workspace_service.LEGACY_WORKSPACE_COLUMNS,
+    ]
+    assert access is not None
+    assert access.workspace["workspace_type"] == "super_workspace"
+    assert access.role == "member"
+
+
+@pytest.mark.asyncio
 async def test_super_workspace_creation_auto_creates_global_space(monkeypatch: pytest.MonkeyPatch) -> None:
     inserted_workspaces: list[dict[str, object]] = []
     inserted_memberships: list[dict[str, object]] = []

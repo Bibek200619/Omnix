@@ -161,3 +161,53 @@ async def test_hydration_aggregates_only_matching_task_and_visible_channel(monke
     assert [task["id"] for task in hydrated[0]["linked_tasks"]] == ["task-linked"]
     assert [channel["id"] for channel in hydrated[0]["linked_channels"]] == ["channel-visible"]
     assert hydrated[0]["momentum"]["channel_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_list_initiatives_falls_back_to_legacy_columns(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_base_records(workspace_id: str, user_id: str):
+        return [], [], []
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    async def fake_select_all(table: str, columns: str, filters: dict[str, object], **kwargs):
+        if table == "workspace_initiatives":
+            calls.append(columns)
+            if columns == initiatives.INITIATIVE_COLUMNS:
+                raise initiatives.SupabaseServiceError("Internal server error")
+            assert columns == initiatives.LEGACY_INITIATIVE_COLUMNS
+            return [
+                {
+                    "id": "initiative-1",
+                    "workspace_id": "workspace-1",
+                    "name": "Legacy rollout",
+                    "description": "Older continuity record",
+                    "status": "completed",
+                    "created_at": "2026-06-03T10:00:00+00:00",
+                    "updated_at": "2026-06-04T10:00:00+00:00",
+                    "metadata": {"legacy": True},
+                }
+            ]
+        if table == "workspace_decisions":
+            return []
+        raise AssertionError(table)
+
+    monkeypatch.setattr(initiatives, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(initiatives, "_base_records", fake_base_records)
+    monkeypatch.setattr(initiatives, "get_profiles", fake_profiles)
+    monkeypatch.setattr(initiatives, "select_all_trusted", fake_select_all)
+
+    result = await initiatives.list_initiatives(workspace_id="workspace-1", user_id="user-1")
+
+    assert calls == [initiatives.INITIATIVE_COLUMNS, initiatives.LEGACY_INITIATIVE_COLUMNS]
+    assert result[0]["title"] == "Legacy rollout"
+    assert result[0]["status"] == "complete"
+    assert result[0]["linked_resources"] == []
+    assert result[0]["activity_metadata"] == {}
+    assert result[0]["momentum"]["health"] == "completion_flow"

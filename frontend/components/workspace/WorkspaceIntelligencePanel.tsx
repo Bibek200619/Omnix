@@ -37,7 +37,7 @@ export function WorkspaceIntelligencePanel({
 
   return (
     <section className={cn(
-      "relative overflow-hidden rounded-[18px] border border-white/5 bg-[linear-gradient(135deg,var(--omnix-rgba-rgba-15-23-42-0-8),var(--omnix-rgba-rgba-8-12-24-0-85))] shadow-xl backdrop-blur-xl transition-all duration-500 hover:shadow-cyan-500/5",
+      "relative overflow-hidden rounded-[18px] border border-white/5 bg-[linear-gradient(135deg,var(--omnix-rgba-15-23-42-0-8),var(--omnix-rgba-8-12-24-0-85))] shadow-xl backdrop-blur-xl transition-all duration-500 hover:shadow-cyan-500/5",
       className
     )}>
       <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-500/5 blur-[90px]" />
@@ -51,10 +51,22 @@ export function WorkspaceIntelligencePanel({
       >
         <div className="flex min-w-0 gap-3 sm:gap-4">
           <div className="relative shrink-0">
-            <span className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/5 text-cyan-300/80 shadow-[0_0_10px_var(--omnix-rgba-rgba-34-211-238-0-1)] transition-transform duration-300 group-hover:scale-105">
-              {loading ? <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin opacity-50" /> : <BrainCircuit className="h-5 w-5 sm:h-6 sm:w-6 opacity-80" />}
+            <span className={cn(
+              "flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl border transition-all duration-500 group-hover:scale-105",
+              loading 
+                ? "border-cyan-400/20 bg-cyan-400/5 text-cyan-300/80" 
+                : "border-purple-400/30 bg-purple-400/10 text-purple-300 shadow-[0_0_15px_var(--omnix-rgba-168-85-247-0-2)]"
+            )}>
+              {loading ? (
+                <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin opacity-50" />
+              ) : (
+                <BrainCircuit className={cn("h-5 w-5 sm:h-6 sm:w-6", !loading && "animate-pulse")} />
+              )}
             </span>
-            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-emerald-500/80 shadow-[0_0_4px_var(--omnix-rgba-rgba-16-185-129-0-5)] border-2 border-slate-900" />
+            <div className={cn(
+              "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full border-2 border-slate-900 shadow-sm",
+              loading ? "bg-amber-500/80 animate-pulse" : "bg-emerald-500/80 shadow-[0_0_8px_var(--omnix-rgba-16-185-129-0-5)]"
+            )} />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">

@@ -12,6 +12,12 @@ export const API_BASE_URL =
 
 export type ApiStatus = "idle" | "loading" | "success" | "error";
 
+let _activeWorkspaceId: string | null = null;
+
+export function setApiWorkspaceId(id: string | null): void {
+  _activeWorkspaceId = id;
+}
+
 type ApiErrorPayload = {
   endpoint: string;
   url: string;
@@ -72,22 +78,9 @@ function logApiError(error: ApiError) {
 class ApiClient {
   private inFlightGets = new Map<string, Promise<unknown>>();
 
-  private getActiveWorkspaceId() {
-    try {
-      if (typeof window !== "undefined") {
-        return window.localStorage.getItem("omnix.activeWorkspaceId");
-      }
-    } catch {
-      // Ignore localStorage failures
-    }
-
-    return null;
-  }
-
   private applyWorkspaceHeader(headers: Headers) {
-    const activeWorkspace = this.getActiveWorkspaceId();
-    if (activeWorkspace) {
-      headers.set("X-Omnix-Workspace", activeWorkspace);
+    if (_activeWorkspaceId) {
+      headers.set("X-Omnix-Workspace", _activeWorkspaceId);
     }
   }
 
@@ -280,7 +273,7 @@ class ApiClient {
   }
 
   async get<T>(endpoint: string): Promise<T> {
-    const key = `${this.getActiveWorkspaceId() ?? "none"}::${endpoint}`;
+    const key = `${_activeWorkspaceId ?? "none"}::${endpoint}`;
     const inFlight = this.inFlightGets.get(key);
     if (inFlight) {
       return inFlight as Promise<T>;

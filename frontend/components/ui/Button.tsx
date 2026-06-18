@@ -20,7 +20,7 @@ const variants: Record<ButtonVariant, string> = {
   primary:
     "border-cyan-300/40 bg-cyan-300 text-slate-950 shadow-glow hover:bg-cyan-200 hover:shadow-cyan-300/20",
   secondary:
-    "border-white/10 bg-white/[0.06] text-white shadow-[inset_0_1px_0_var(--omnix-rgba-rgba-255-255-255-0-04)] hover:border-white/20 hover:bg-white/[0.1]",
+    "border-white/10 bg-white/[0.06] text-white shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-04)] hover:border-white/20 hover:bg-white/[0.1]",
   ghost:
     "border-transparent bg-transparent text-slate-300 hover:bg-white/[0.06] hover:text-white",
   danger:
@@ -28,10 +28,10 @@ const variants: Record<ButtonVariant, string> = {
 };
 
 const sizes: Record<ButtonSize, string> = {
-  sm: "h-9 gap-2 px-3 text-sm",
-  md: "h-10 gap-2 px-4 text-sm",
+  sm: "h-11 gap-2 px-3 text-sm",
+  md: "h-11 gap-2 px-4 text-sm",
   lg: "h-12 gap-2.5 px-5 text-base",
-  icon: "h-10 w-10 p-0",
+  icon: "h-11 w-11 p-0",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -55,9 +55,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          "inline-flex shrink-0 items-center justify-center rounded-lg border font-medium transition duration-200 active:scale-[0.98]",
+          "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg border font-medium transition-all duration-200 active:scale-[0.96]",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
-          "disabled:cursor-not-allowed disabled:opacity-55",
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          "group/btn",
           variants[variant],
           sizes[size],
           className,
@@ -65,9 +66,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={isDisabled}
         {...props}
       >
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : leftIcon}
-        {children}
-        {!isLoading ? rightIcon : null}
+        <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent opacity-0 transition-opacity duration-500 group-hover/btn:opacity-100" style={{ transform: 'skewX(-25deg) translateX(-100%)', animation: 'omnix-sheen-sweep 3s infinite' }} />
+        <span className="relative z-10 flex items-center gap-2">
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : leftIcon}
+          {children}
+          {!isLoading ? rightIcon : null}
+        </span>
       </button>
     );
   },

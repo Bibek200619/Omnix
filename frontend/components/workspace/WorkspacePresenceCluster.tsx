@@ -40,13 +40,13 @@ export function WorkspacePresenceCluster({
   return (
     <section
       className={cn(
-        "relative overflow-hidden rounded-[12px] border border-cyan-300/14 bg-[linear-gradient(135deg,var(--omnix-rgba-rgba-0-255-255-0-12),var(--omnix-rgba-rgba-10-18-32-0-85)_42%,var(--omnix-rgba-rgba-0-232-122-0-06))] shadow-[var(--omnix-glow-xs)] backdrop-blur-md",
+        "relative overflow-hidden rounded-[12px] border border-cyan-300/14 bg-[linear-gradient(135deg,var(--omnix-rgba-0-255-255-0-12),var(--omnix-rgba-10-18-32-0-85)_42%,var(--omnix-rgba-0-232-122-0-06))] shadow-[var(--omnix-glow-xs)] backdrop-blur-md",
         compact ? "px-3 py-2.5" : "p-4",
         className,
       )}
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-rgba-0-255-255-0-7),transparent)]" />
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-[linear-gradient(180deg,transparent,var(--omnix-rgba-rgba-0-255-255-0-2),transparent)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-0-255-255-0-7),transparent)]" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-[linear-gradient(180deg,transparent,var(--omnix-rgba-0-255-255-0-2),transparent)]" />
       
       <div className="relative z-10 flex items-center justify-between gap-3">
         <div className="min-w-0">
@@ -80,7 +80,7 @@ export function WorkspacePresenceCluster({
                 className={cn(
                   "h-8 w-8 rounded-lg border bg-black/40 text-xs font-medium transition-all duration-500",
                   member.is_online 
-                    ? "border-cyan-400/20 shadow-[0_0_8px_var(--omnix-rgba-rgba-34-211-238-0-15)] ring-1 ring-cyan-400/10" 
+                    ? "border-cyan-400/20 shadow-[0_0_8px_var(--omnix-rgba-34-211-238-0-15)] ring-1 ring-cyan-400/10" 
                     : "border-white/5"
                 )}
               />

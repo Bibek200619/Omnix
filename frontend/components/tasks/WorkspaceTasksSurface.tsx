@@ -1,28 +1,23 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
-  AlertTriangle,
-  CalendarDays,
   CircleDot,
   ClipboardCheck,
-  Compass,
-  Loader2,
   Plus,
-  Sparkles,
-  UserRound,
-  X,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
-import { MentionText } from "@/components/mentions/MentionText";
-import { MentionTextarea, mentionPayload } from "@/components/mentions/MentionTextarea";
+import { mentionPayload } from "@/components/mentions/MentionTextarea";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
+import { invalidateQueries, queryGet } from "@/lib/query";
 import { realtimeRegistry } from "@/lib/realtime-registry";
+import { useToast } from "@/lib/toast-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
@@ -36,7 +31,10 @@ import type {
   WorkspaceTaskMomentum,
   WorkspaceTaskStatus,
 } from "@/lib/workspace-types";
-import { DecisionTraceabilityList } from "../decisions/DecisionTraceabilityList";
+import { ExecutionOverview } from "./ExecutionOverview";
+import { TaskCreateForm } from "./TaskCreateForm";
+import { TaskList } from "./TaskList";
+import { TaskMomentumPanel } from "./TaskMomentumPanel";
 
 const flow: Array<{ value: WorkspaceTaskStatus; label: string }> = [
   { value: "idea", label: "Idea" },
@@ -46,19 +44,26 @@ const flow: Array<{ value: WorkspaceTaskStatus; label: string }> = [
   { value: "complete", label: "Complete" },
 ];
 
-const assistLabels: Record<WorkspaceTaskAssistanceMode, string> = {
-  blockers: "Surface blockers",
-  stalled: "Due attention",
-  next_actions: "Next actions",
-  workload: "Ownership view",
-};
-
 function mergeTask(current: WorkspaceTask[], incoming: WorkspaceTask) {
   return [incoming, ...current.filter((task) => task.id !== incoming.id && !(incoming.client_nonce && task.client_nonce === incoming.client_nonce))];
 }
 
-export function WorkspaceTasksSurface() {
+function invalidateTaskQueries(workspaceId: string) {
+  invalidateQueries(`/workspaces/${workspaceId}/tasks`);
+  invalidateQueries(`/workspaces/${workspaceId}/initiatives`);
+}
+
+export const WorkspaceTasksSurface = memo(function WorkspaceTasksSurface() {
+  return (
+    <SurfaceErrorBoundary surfaceName="Execution">
+      <WorkspaceTasksSurfaceContent />
+    </SurfaceErrorBoundary>
+  );
+});
+
+function WorkspaceTasksSurfaceContent() {
   const { session } = useAuth();
+  const { showToast } = useToast();
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const { presence, realtimeStatus } = useWorkspaceCollaboration();
   const searchParams = useSearchParams();
@@ -87,10 +92,30 @@ export function WorkspaceTasksSurface() {
   const [assisting, setAssisting] = useState<WorkspaceTaskAssistanceMode | null>(null);
   const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
   const taskRefs = useRef<Record<string, HTMLElement | null>>({});
+  const taskListRef = useRef<HTMLDivElement | null>(null);
+  const liveRegionRef = useRef<HTMLDivElement | null>(null);
+  const liveAnnouncementRef = useRef("");
   const workspaceRef = useRef(activeWorkspaceId);
   const requestRef = useRef(0);
+  const [liveAnnouncementVersion, setLiveAnnouncementVersion] = useState(0);
 
   workspaceRef.current = activeWorkspaceId;
+
+  const announceMutation = useCallback((message: string) => {
+    liveAnnouncementRef.current = message;
+    setLiveAnnouncementVersion((version) => version + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!liveRegionRef.current) return;
+    liveRegionRef.current.textContent = "";
+    const timer = window.setTimeout(() => {
+      if (liveRegionRef.current) {
+        liveRegionRef.current.textContent = liveAnnouncementRef.current;
+      }
+    }, 10);
+    return () => window.clearTimeout(timer);
+  }, [liveAnnouncementVersion]);
 
   const loadExecution = useCallback(async (withMembers = false) => {
     if (!activeWorkspaceId) {
@@ -110,9 +135,9 @@ export function WorkspaceTasksSurface() {
         Promise<WorkspaceInitiative[]>,
         Promise<WorkspaceMember[]> | null,
       ] = [
-        apiClient.get<WorkspaceTask[]>(`/workspaces/${activeWorkspaceId}/tasks`),
-        apiClient.get<WorkspaceTaskMomentum>(`/workspaces/${activeWorkspaceId}/tasks/momentum`),
-        apiClient.get<WorkspaceInitiative[]>(`/workspaces/${activeWorkspaceId}/initiatives`),
+        queryGet<WorkspaceTask[]>(`/workspaces/${activeWorkspaceId}/tasks`),
+        queryGet<WorkspaceTaskMomentum>(`/workspaces/${activeWorkspaceId}/tasks/momentum`),
+        queryGet<WorkspaceInitiative[]>(`/workspaces/${activeWorkspaceId}/initiatives`),
         withMembers ? apiClient.get<WorkspaceMember[]>(`/workspaces/${activeWorkspaceId}/members`) : null,
       ];
       const [incomingTasks, incomingMomentum, incomingInitiatives, incomingMembers] = await Promise.all([
@@ -141,7 +166,7 @@ export function WorkspaceTasksSurface() {
     } catch (err) {
       if (requestId === requestRef.current) {
         logClientError("Failed to load tasks", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks` });
-        setError("Unable to load tasks.");
+        setError("Unable to load tasks. Check your connection and try again.");
       }
     } finally {
       if (requestId === requestRef.current) setLoading(false);
@@ -177,7 +202,10 @@ export function WorkspaceTasksSurface() {
             table: "workspace_tasks",
             filter: `workspace_id=eq.${activeWorkspaceId}`,
           },
-          () => void loadExecution(),
+          () => {
+            invalidateTaskQueries(activeWorkspaceId);
+            void loadExecution();
+          },
         ),
     );
     return () => realtimeRegistry.unsubscribe({ type: "tasks", workspaceId: activeWorkspaceId });
@@ -226,13 +254,24 @@ export function WorkspaceTasksSurface() {
     });
   }, [filter, tasks, session?.user.id]);
 
+  const taskVirtualizer = useVirtualizer({
+    count: displayedTasks.length,
+    getScrollElement: () => taskListRef.current,
+    estimateSize: () => 88,
+    overscan: 6,
+  });
+
   useEffect(() => {
     if (!focusedTaskId || loading) return;
+    const focusedIndex = displayedTasks.findIndex((task) => task.id === focusedTaskId);
+    if (focusedIndex >= 0) {
+      taskVirtualizer.scrollToIndex(focusedIndex, { align: "center" });
+    }
     const timer = window.setTimeout(() => {
       taskRefs.current[focusedTaskId]?.scrollIntoView({ block: "center", behavior: "smooth" });
     }, 80);
     return () => window.clearTimeout(timer);
-  }, [displayedTasks, focusedTaskId, loading]);
+  }, [displayedTasks, focusedTaskId, loading, taskVirtualizer]);
 
   const executionOverview = useMemo(() => {
     if (!tasks.length) return null;
@@ -309,6 +348,7 @@ export function WorkspaceTasksSurface() {
         mentions: mentionPayload(descriptionMentions, description),
       });
       setTasks((current) => mergeTask(current, created));
+      invalidateTaskQueries(activeWorkspaceId);
       setTitle("");
       setDescription("");
       setDescriptionMentions([]);
@@ -318,11 +358,13 @@ export function WorkspaceTasksSurface() {
       setInitialBlocker("");
       setInitiativeId("");
       setCreateOpen(false);
+      announceMutation(`Task ${created.title} created.`);
+      showToast({ title: "Task created", message: created.title });
       void loadExecution();
     } catch (err) {
       setTasks((current) => current.filter((task) => task.client_nonce !== nonce));
       logClientError("Failed to open task", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks` });
-      setError("Unable to open task.");
+      setError("Unable to open task. Check your connection and try again.");
     } finally {
       setCreating(false);
     }
@@ -336,11 +378,15 @@ export function WorkspaceTasksSurface() {
     try {
       const updated = await apiClient.patch<WorkspaceTask>(`/workspaces/${activeWorkspaceId}/tasks/${task.id}`, payload);
       setTasks((current) => current.map((item) => (item.id === task.id ? updated : item)));
+      invalidateTaskQueries(activeWorkspaceId);
+      const blockerRemoved = Array.isArray(payload.blockers) && payload.blockers.length < task.blockers.length;
+      announceMutation(blockerRemoved ? `Blocker removed from ${updated.title}.` : `Task ${updated.title} updated.`);
+      showToast({ title: blockerRemoved ? "Blocker removed" : "Task updated", message: updated.title });
       void loadExecution();
     } catch (err) {
       setTasks((current) => current.map((item) => (item.id === task.id ? before : item)));
       logClientError("Failed to update task", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks/${task.id}` });
-      setError("Unable to update task.");
+      setError("Unable to update task. Your session may have expired; refresh and try again.");
     } finally {
       setUpdatingId(null);
     }
@@ -360,7 +406,7 @@ export function WorkspaceTasksSurface() {
       setAssistance(await apiClient.post<WorkspaceTaskAssistance>(`/workspaces/${activeWorkspaceId}/tasks/assist`, { mode }));
     } catch (err) {
       logClientError("Failed to load task assistance", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks/assist` });
-      setError("Execution assistance is unavailable.");
+      setError("Execution assistance is temporarily unavailable. Please try again in a moment.");
     } finally {
       setAssisting(null);
     }
@@ -375,8 +421,9 @@ export function WorkspaceTasksSurface() {
   }
 
   return (
-    <section className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
-      <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-0-255-255-0-025)] px-4 py-3 sm:px-5 sm:py-4">
+    <section className="omnix-container-responsive omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
+      <div ref={liveRegionRef} aria-live="polite" aria-atomic="true" className="sr-only" />
+      <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-0-255-255-0-025)] px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
             <ClipboardCheck className="h-3.5 w-3.5" /> Execution layer
@@ -394,25 +441,15 @@ export function WorkspaceTasksSurface() {
         </div>
       </header>
 
-      {/* Phase 2: Execution Overview */}
-      {executionOverview && (
-        <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {executionOverview.map((item) => (
-            <div key={item.label} className="rounded-xl border border-[var(--omnix-border)] bg-black/10 p-3 shadow-[var(--omnix-glow-xs)] transition hover:bg-white/[0.02]">
-              <p className={cn("text-xl font-bold sm:text-2xl", item.color)}>{item.count}</p>
-              <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--omnix-text-3)]">{item.label}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      <ExecutionOverview items={executionOverview} />
 
       {error ? (
         <OmnixErrorState
           compact
           className="mb-4"
-          title={error === "Unable to load tasks." ? "Tasks are unavailable" : "Task action needs attention"}
+          title={error.startsWith("Unable to load tasks.") ? "Tasks are unavailable" : "Task action needs attention"}
           message={error}
-          onRetry={error === "Unable to load tasks." ? () => void loadExecution(true) : undefined}
+          onRetry={error.startsWith("Unable to load tasks.") ? () => void loadExecution(true) : undefined}
           isRetrying={loading}
           onDismiss={() => setError(null)}
         />
@@ -435,7 +472,7 @@ export function WorkspaceTasksSurface() {
         ))}
       </div>
 
-      <div className="grid shrink-0 gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="omnix-task-workbench shrink-0">
         <main className="omnix-panel flex min-w-0 flex-col rounded-xl p-3 sm:p-4 xl:min-h-[28rem]">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--omnix-border)] pb-3">
             <div className="flex items-center gap-2">
@@ -448,249 +485,70 @@ export function WorkspaceTasksSurface() {
           </div>
           
           {createOpen ? (
-            <form onSubmit={createTask} className="mb-4 grid gap-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.035] p-3 sm:grid-cols-2">
-              <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Operational next step" className="h-10 text-sm sm:col-span-2" autoFocus />
-              <div className="sm:col-span-2">
-                <MentionTextarea
-                  value={description}
-                  onChange={setDescription}
-                  members={members}
-                  mentions={descriptionMentions}
-                  onMentionsChange={setDescriptionMentions}
-                  placeholder="Context, expected outcome, or handoff"
-                  className="omnix-input min-h-[68px] w-full resize-none rounded-lg p-2.5 text-sm"
-                />
-              </div>
-              <select value={status} onChange={(event) => setStatus(event.target.value as WorkspaceTaskStatus)} className="omnix-input h-10 rounded-lg px-2 text-sm">
-                {flow.map((phase) => <option key={phase.value} value={phase.value}>{phase.label}</option>)}
-              </select>
-              <select value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className="omnix-input h-10 rounded-lg px-2 text-sm">
-                <option value="">Unassigned</option>
-                {members.map((member) => <option key={member.user_id} value={member.user_id}>{member.full_name || member.email || member.handle || member.user_id}</option>)}
-              </select>
-              <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="omnix-input h-10 rounded-lg px-2 text-sm" />
-              <Input value={initialBlocker} onChange={(event) => setInitialBlocker(event.target.value)} placeholder="Recorded blocker, optional" className="h-10 text-sm" />
-              <select value={initiativeId} onChange={(event) => setInitiativeId(event.target.value)} className="omnix-input h-10 rounded-lg px-2 text-sm sm:col-span-2">
-                <option value="">No initiative link</option>
-                {initiatives.map((initiative) => <option key={initiative.id} value={initiative.id}>{initiative.title}</option>)}
-              </select>
-              <div className="flex justify-end gap-2 sm:col-span-2">
-                <Button type="button" size="sm" variant="ghost" onClick={() => { setCreateOpen(false); setDescriptionMentions([]); }}>Cancel</Button>
-                <Button type="submit" size="sm" isLoading={creating} disabled={!title.trim()}>Create record</Button>
-              </div>
-            </form>
+            <TaskCreateForm
+              title={title}
+              description={description}
+              descriptionMentions={descriptionMentions}
+              status={status}
+              ownerId={ownerId}
+              dueDate={dueDate}
+              initialBlocker={initialBlocker}
+              initiativeId={initiativeId}
+              members={members}
+              initiatives={initiatives}
+              phases={flow}
+              creating={creating}
+              onSubmit={createTask}
+              onCancel={() => {
+                setCreateOpen(false);
+                setDescriptionMentions([]);
+              }}
+              onTitleChange={setTitle}
+              onDescriptionChange={setDescription}
+              onDescriptionMentionsChange={setDescriptionMentions}
+              onStatusChange={setStatus}
+              onOwnerChange={setOwnerId}
+              onDueDateChange={setDueDate}
+              onInitialBlockerChange={setInitialBlocker}
+              onInitiativeChange={setInitiativeId}
+            />
           ) : null}
 
-          <div className="space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
-            {loading ? <Loader2 className="mx-auto mt-10 h-5 w-5 animate-spin text-cyan-100/50" /> : null}
-            {!loading && displayedTasks.length === 0 ? (
-              <div className="mx-auto mt-14 max-w-sm text-center">
-                <ClipboardCheck className="mx-auto h-7 w-7 text-cyan-100/35" />
-                <p className="mt-3 text-sm text-[var(--omnix-text-2)]">No tasks recorded in this view.</p>
-                <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">Capture only the next steps that require shared visibility, or change the phase filter above.</p>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="mt-4 min-h-10"
-                  leftIcon={<Plus className="h-3.5 w-3.5" />}
-                  onClick={() => setCreateOpen(true)}
-                >
-                  Record task
-                </Button>
-              </div>
-            ) : null}
-            {displayedTasks.map((task) => {
-              const isMyTask = task.owner_user_id === session?.user.id;
-              const isBlocked = task.blockers.length > 0;
-              const isActive = task.status === "active";
-              
-              const now = new Date();
-              const threeDaysFromNow = new Date();
-              threeDaysFromNow.setDate(now.getDate() + 3);
-              const isDueSoon = task.due_date && new Date(task.due_date) <= threeDaysFromNow;
-
-              return (
-                <article
-                  key={task.id}
-                  ref={(node) => {
-                    taskRefs.current[task.id] = node;
-                  }}
-                  className={cn(
-                  "group relative rounded-xl border p-3.5 transition",
-                  focusedTaskId === task.id
-                    ? "border-cyan-300/45 bg-cyan-300/[0.07] shadow-[var(--omnix-glow-xs)]"
-                    : isBlocked ? "border-amber-400/30 bg-amber-400/[0.03]" : "border-[var(--omnix-border)] bg-black/[0.12] hover:bg-white/[0.03]"
-                )}>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        {isBlocked && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-300" />}
-                        {isActive && <div className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-cyan-400 shadow-[0_0_8px_var(--omnix-rgba-rgba-34-211-238-0-8)]" />}
-                        <p className="truncate text-sm font-medium text-white">{task.title}</p>
-                      </div>
-                      {task.description ? (
-                        <p className="mt-1 line-clamp-1 text-xs text-[var(--omnix-text-2)] transition-all group-hover:line-clamp-none">
-                          <MentionText content={task.description} mentions={task.mentions} />
-                        </p>
-                      ) : null}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={task.status}
-                        disabled={updatingId === task.id}
-                        onChange={(event) => void patchTask(task, { status: event.target.value as WorkspaceTaskStatus })}
-                        className={cn(
-                          "omnix-input h-7 rounded-lg px-2 text-[11px] font-semibold transition",
-                          task.status === "active" ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-100" : "bg-black/20"
-                        )}
-                        aria-label={`Status for ${task.title}`}
-                      >
-                        {flow.map((phase) => <option key={phase.value} value={phase.value}>{phase.label}</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    {/* Simplified Metadata */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5 text-[11px] text-[var(--omnix-text-2)]">
-                        <UserRound className={cn("h-3 w-3", isMyTask ? "text-emerald-300" : "text-[var(--omnix-text-3)]")} />
-                        <select
-                          value={task.owner_user_id || ""}
-                          disabled={updatingId === task.id}
-                          onChange={(event) => void patchTask(task, { owner_user_id: event.target.value || null })}
-                          className="bg-transparent outline-none"
-                        >
-                          <option value="">Unassigned</option>
-                          {members.map((member) => <option key={member.user_id} value={member.user_id}>{member.full_name || member.email || "Teammate"}</option>)}
-                        </select>
-                      </div>
-
-                      <div className={cn("flex items-center gap-1.5 text-[11px]", isDueSoon ? "text-rose-300 font-medium" : "text-[var(--omnix-text-2)]")}>
-                        <CalendarDays className="h-3 w-3" />
-                        <input
-                          type="date"
-                          value={task.due_date || ""}
-                          disabled={updatingId === task.id}
-                          onChange={(event) => void patchTask(task, { due_date: event.target.value || null })}
-                          className="bg-transparent outline-none"
-                        />
-                        {!task.due_date && <span className="text-[var(--omnix-text-3)]">No date</span>}
-                      </div>
-                    </div>
-
-                    {/* Secondary metadata hidden until hover/focus */}
-                    <div className="flex items-center gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                      <div className="flex items-center gap-1.5 text-[11px] text-[var(--omnix-text-3)]">
-                        <Compass className="h-3 w-3" />
-                        <select
-                          value={task.initiative_id || ""}
-                          disabled={updatingId === task.id}
-                          onChange={(event) => void patchTask(task, { initiative_id: event.target.value || null })}
-                          className="bg-transparent outline-none max-w-[120px] truncate"
-                        >
-                          <option value="">No initiative</option>
-                          {initiatives.map((initiative) => <option key={initiative.id} value={initiative.id}>{initiative.title}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Blockers Area */}
-                  {task.blockers.length > 0 && (
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                      {task.blockers.map((blocker) => (
-                        <button
-                          type="button"
-                          key={blocker}
-                          onClick={() => void patchTask(task, { blockers: task.blockers.filter((entry) => entry !== blocker) })}
-                          className="inline-flex items-center gap-1 rounded-md border border-amber-300/20 bg-amber-300/[0.08] px-2 py-1 text-[10px] font-medium text-amber-100"
-                        >
-                          {blocker} <X className="h-2.5 w-2.5 opacity-60" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Phase 3: Linked Decisions */}
-                  <DecisionTraceabilityList decisions={task.linked_decisions} />
-                  
-                  {/* Inline Blocker Adder (Simplified) */}
-                  <div className="mt-2.5 border-t border-white/[0.04] pt-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                    <input
-                      value={blockerDrafts[task.id] || ""}
-                      onChange={(event) => setBlockerDrafts((current) => ({ ...current, [task.id]: event.target.value }))}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          addBlocker(task);
-                        }
-                      }}
-                      placeholder="Add blocker..."
-                      className="h-6 w-full bg-transparent px-1 text-[10px] text-[var(--omnix-text-3)] outline-none placeholder:text-white/10 focus:placeholder:text-white/20"
-                    />
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+          <TaskList
+            listRef={taskListRef}
+            loading={loading}
+            tasks={displayedTasks}
+            virtualItems={taskVirtualizer.getVirtualItems()}
+            totalSize={taskVirtualizer.getTotalSize()}
+            measureElement={taskVirtualizer.measureElement}
+            members={members}
+            initiatives={initiatives}
+            phases={flow}
+            currentUserId={session?.user.id}
+            focusedTaskId={focusedTaskId}
+            updatingId={updatingId}
+            blockerDrafts={blockerDrafts}
+            onCreateClick={() => setCreateOpen(true)}
+            onPatchTask={(task, payload) => void patchTask(task, payload)}
+            onBlockerDraftChange={(taskId, value) =>
+              setBlockerDrafts((current) => ({ ...current, [taskId]: value }))
+            }
+            onAddBlocker={addBlocker}
+            taskRef={(taskId, node) => {
+              taskRefs.current[taskId] = node;
+            }}
+          />
         </main>
 
-        <aside className="space-y-3">
-          {/* Phase 6: Momentum Refinement */}
-          <section className="omnix-panel rounded-xl p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Momentum</p>
-            {simplifiedMomentum && (
-              <div className="mt-3">
-                <div className="flex items-center gap-2">
-                  <div className={cn("h-2 w-2 rounded-full shadow-[0_0_8px_currentColor]", simplifiedMomentum.color)} />
-                  <p className={cn("text-lg font-bold", simplifiedMomentum.color)}>{simplifiedMomentum.label}</p>
-                </div>
-                <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-2)]">{simplifiedMomentum.description}</p>
-              </div>
-            )}
-            
-            <div className="mt-4 grid grid-cols-2 gap-2 text-center">
-              {[
-                ["Active", momentum?.flow_counts.active ?? 0],
-                ["Blocked", momentum?.blocked_count ?? 0],
-                ["Due soon", momentum?.due_soon_count ?? 0],
-                ["My tasks", tasks.filter(t => t.owner_user_id === session?.user.id && t.status !== "complete").length],
-              ].map(([label, count]) => (
-                <div key={String(label)} className="rounded-lg border border-[var(--omnix-border)] bg-black/10 px-2 py-2 transition hover:bg-white/[0.02]">
-                  <p className="text-lg font-bold text-white">{count}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-[var(--omnix-text-3)]">{label}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="omnix-panel rounded-xl p-4">
-            <p className="mb-3 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-purple-100/70">
-              <Sparkles className="h-3.5 w-3.5" /> Execution Assist
-            </p>
-            <div className="grid gap-1.5">
-              {Object.entries(assistLabels).map(([mode, label]) => (
-                <button
-                  key={mode}
-                  type="button"
-                  disabled={!tasks.length || Boolean(assisting)}
-                  onClick={() => void requestAssistance(mode as WorkspaceTaskAssistanceMode)}
-                  className="flex items-center justify-between rounded-lg border border-purple-300/12 bg-purple-300/[0.03] px-3 py-2 text-left text-xs text-purple-100/85 transition hover:bg-purple-300/[0.08] disabled:opacity-40"
-                >
-                  {label}
-                  {assisting === mode ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                </button>
-              ))}
-            </div>
-            {assistance ? (
-              <div className="mt-3 rounded-lg border border-purple-300/15 bg-purple-300/[0.045] p-3">
-                <p className="whitespace-pre-wrap text-xs leading-5 text-[var(--omnix-text)]">{assistance.content}</p>
-                <p className="mt-2 text-[10px] text-[var(--omnix-text-3)]">Advisory only. Read from {assistance.source_task_count} task records.</p>
-              </div>
-            ) : null}
-          </section>
-        </aside>
+        <TaskMomentumPanel
+          momentum={momentum}
+          simplifiedMomentum={simplifiedMomentum}
+          taskCount={tasks.length}
+          myOpenTaskCount={tasks.filter((task) => task.owner_user_id === session?.user.id && task.status !== "complete").length}
+          assistance={assistance}
+          assisting={assisting}
+          onRequestAssistance={(mode) => void requestAssistance(mode)}
+        />
       </div>
     </section>
   );

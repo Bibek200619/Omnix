@@ -83,7 +83,7 @@ export function WorkspaceOperationalTimeline({
               key={initiative.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="group relative overflow-hidden rounded-xl border border-white/5 bg-[var(--omnix-rgba-rgba-6-10-20-0-6)] p-4 transition-all hover:border-white/10 hover:bg-white/[0.02]"
+              className="group relative overflow-hidden rounded-xl border border-white/5 bg-[var(--omnix-rgba-6-10-20-0-6)] p-4 transition-all hover:border-white/10 hover:bg-white/[0.02]"
             >
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
