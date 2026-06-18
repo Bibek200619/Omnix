@@ -27,6 +27,7 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
 import { realtimeRegistry } from "@/lib/realtime-registry";
+import { useToast } from "@/lib/toast-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
@@ -71,6 +72,7 @@ export function WorkspaceTasksSurface() {
 
 function WorkspaceTasksSurfaceContent() {
   const { session } = useAuth();
+  const { showToast } = useToast();
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const { presence, realtimeStatus } = useWorkspaceCollaboration();
   const searchParams = useSearchParams();
@@ -362,6 +364,7 @@ function WorkspaceTasksSurfaceContent() {
       setInitiativeId("");
       setCreateOpen(false);
       announceMutation(`Task ${created.title} created.`);
+      showToast({ title: "Task created", message: created.title });
       void loadExecution();
     } catch (err) {
       setTasks((current) => current.filter((task) => task.client_nonce !== nonce));
@@ -382,6 +385,7 @@ function WorkspaceTasksSurfaceContent() {
       setTasks((current) => current.map((item) => (item.id === task.id ? updated : item)));
       const blockerRemoved = Array.isArray(payload.blockers) && payload.blockers.length < task.blockers.length;
       announceMutation(blockerRemoved ? `Blocker removed from ${updated.title}.` : `Task ${updated.title} updated.`);
+      showToast({ title: blockerRemoved ? "Blocker removed" : "Task updated", message: updated.title });
       void loadExecution();
     } catch (err) {
       setTasks((current) => current.map((item) => (item.id === task.id ? before : item)));

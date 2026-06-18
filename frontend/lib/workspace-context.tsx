@@ -7,6 +7,7 @@ import { apiClient, setApiWorkspaceId } from "./api";
 import { useAuth } from "./auth-context";
 import { logClientError } from "./errors";
 import { logger } from "./logger";
+import { useToast } from "./toast-context";
 import { isWorkspaceFounderRole } from "./workspace-roles";
 import { flattenWorkspaces } from "./workspace-utils";
 import {
@@ -377,6 +378,7 @@ function removeWorkspaceFromTree(workspaces: Workspace[], workspaceId: string): 
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const userId = user?.id ?? null;
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
@@ -859,6 +861,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         }
         logger.debug("[workspace] create success", { id: workspace.id, name: workspace.name });
         setWorkspaces((current) => [workspace, ...current.filter((item) => item.id !== workspace.id)]);
+        showToast({ title: "Workspace created", message: workspace.name });
         if (workspace.workspace_type === "super_workspace") {
           void refreshWorkspaceTree(workspace.id, { silent: true });
         }
@@ -870,7 +873,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     createWorkspaceInFlightRef.current.set(inFlightKey, request);
     return request;
-  }, [refreshWorkspaceTree]);
+  }, [refreshWorkspaceTree, showToast]);
 
   const createSubspace = useCallback(async (parentId: string, payload: WorkspaceSubspaceCreatePayload) => {
     const normalizedPayload = { ...payload, name: payload.name.trim() };
@@ -893,8 +896,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!refreshed) {
       await refreshWorkspaces({ force: true, silent: true });
     }
+    showToast({ title: "Subspace created", message: workspace.name });
     return workspace;
-  }, [refreshWorkspaceTree, refreshWorkspaces]);
+  }, [refreshWorkspaceTree, refreshWorkspaces, showToast]);
 
   const renameWorkspace = useCallback(async (workspaceId: string, payload: { name: string; description?: string | null }) => {
     const nextName = payload.name.trim();
@@ -919,6 +923,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         name: nextName,
       });
       logger.debug("[workspace] rename success", { workspaceId, name: updated.name });
+      showToast({ title: "Workspace renamed", message: updated.name });
       void refreshWorkspaces({ force: true, silent: true });
       return updated;
     } catch (err) {
@@ -926,7 +931,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setWorkspaces(previousWorkspaces);
       throw err;
     }
-  }, [workspaces, refreshWorkspaces]);
+  }, [workspaces, refreshWorkspaces, showToast]);
 
   const deleteWorkspace = useCallback(async (workspaceId: string) => {
     const workspace = findWorkspaceById(workspaces, workspaceId);
@@ -952,6 +957,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       await apiClient.delete(`/workspaces/${workspaceId}`);
       logger.debug("[workspace] delete success", { workspaceId });
       await refreshWorkspaces({ force: true });
+      showToast({ title: "Workspace deleted", message: workspace?.name || "Workspace removed" });
     } catch (err) {
       logger.debug("[workspace] delete failed; rolling back", { workspaceId, err });
       setWorkspaces(previousWorkspaces);
@@ -960,7 +966,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
       throw err;
     }
-  }, [activeWorkspaceId, confirmDestructiveAction, refreshWorkspaces, setActiveWorkspace, workspaces]);
+  }, [activeWorkspaceId, confirmDestructiveAction, refreshWorkspaces, setActiveWorkspace, showToast, workspaces]);
 
   const inviteToActiveWorkspace = useCallback(
     async (target: string, role: WorkspaceRole = "member") => {
@@ -1013,6 +1019,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         if (activeWorkspaceIdRef.current === requestWorkspaceId) {
           await refreshActiveWorkspaceData({ force: true, silent: true });
         }
+        showToast({ title: "Member removed", message: memberLabel });
       } catch (err) {
         if (activeWorkspaceIdRef.current === requestWorkspaceId) {
           setActiveMembers(previousMembers);
@@ -1021,7 +1028,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         throw err;
       }
     },
-    [activeMembers, activeWorkspace?.name, activeWorkspaceId, confirmDestructiveAction, refreshActiveWorkspaceData, refreshWorkspaces],
+    [activeMembers, activeWorkspace?.name, activeWorkspaceId, confirmDestructiveAction, refreshActiveWorkspaceData, refreshWorkspaces, showToast],
   );
 
   const updateWorkspaceMemberRole = useCallback(
@@ -1135,8 +1142,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
       await apiClient.delete(`/workspaces/${activeWorkspaceId}/invites/${inviteId}`);
       setActiveInvites((current) => current.filter((invite) => getWorkspaceInviteId(invite) !== inviteId));
+      showToast({ title: "Invite revoked", message: invite?.email || "Workspace invite revoked" });
     },
-    [activeInvites, activeWorkspaceId, confirmDestructiveAction],
+    [activeInvites, activeWorkspaceId, confirmDestructiveAction, showToast],
   );
 
   const acceptInvite = useCallback(

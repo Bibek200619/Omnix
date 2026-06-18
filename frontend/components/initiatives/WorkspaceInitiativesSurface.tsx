@@ -28,6 +28,7 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
 import { realtimeRegistry } from "@/lib/realtime-registry";
+import { useToast } from "@/lib/toast-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
@@ -104,6 +105,7 @@ export function WorkspaceInitiativesSurface() {
 
 function WorkspaceInitiativesSurfaceContent() {
   const { session } = useAuth();
+  const { showToast } = useToast();
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const { presence, realtimeStatus } = useWorkspaceCollaboration();
   const searchParams = useSearchParams();
@@ -335,6 +337,7 @@ function WorkspaceInitiativesSurfaceContent() {
       setContext("");
       setCreateOpen(false);
       announceMutation(`Initiative ${created.title} created.`);
+      showToast({ title: "Initiative created", message: created.title });
       void loadInitiatives(true);
     } catch (err) {
       setInitiatives((current) => current.filter((initiative) => initiative.client_nonce !== nonce));
@@ -357,6 +360,7 @@ function WorkspaceInitiativesSurfaceContent() {
       );
       setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
       announceMutation(`Initiative ${changed.title} updated.`);
+      showToast({ title: "Initiative updated", message: changed.title });
     } catch (err) {
       setInitiatives((current) => current.map((item) => (item.id === before.id ? before : item)));
       logClientError("Failed to update initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}` });
@@ -376,6 +380,7 @@ function WorkspaceInitiativesSurfaceContent() {
       setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
       setTaskToAttach("");
       announceMutation(`Task attached to ${changed.title}.`);
+      showToast({ title: "Task linked", message: changed.title });
       void loadInitiatives(true);
     } catch (err) {
       logClientError("Failed to attach task to initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/tasks/${taskToAttach}` });
@@ -391,6 +396,7 @@ function WorkspaceInitiativesSurfaceContent() {
     try {
       await apiClient.patch<WorkspaceTask>(`/workspaces/${activeWorkspaceId}/tasks/${task.id}`, { initiative_id: null });
       announceMutation(`Task ${task.title} detached from initiative.`);
+      showToast({ title: "Task unlinked", message: task.title });
       void loadInitiatives(true);
     } catch (err) {
       logClientError("Failed to detach task from initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks/${task.id}` });
@@ -411,6 +417,7 @@ function WorkspaceInitiativesSurfaceContent() {
       setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
       setChannelToAttach("");
       announceMutation(`Conversation attached to ${changed.title}.`);
+      showToast({ title: "Conversation linked", message: changed.title });
     } catch (err) {
       logClientError("Failed to attach conversation to initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels` });
       setError("Unable to attach conversation.");
@@ -425,6 +432,7 @@ function WorkspaceInitiativesSurfaceContent() {
     try {
       await apiClient.delete(`/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels/${channelId}`);
       announceMutation(`Conversation detached from ${selected.title}.`);
+      showToast({ title: "Conversation unlinked", message: selected.title });
       void loadInitiatives(true);
     } catch (err) {
       logClientError("Failed to detach conversation from initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels/${channelId}` });
