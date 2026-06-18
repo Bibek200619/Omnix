@@ -516,7 +516,7 @@ function WorkspaceInitiativesSurfaceContent() {
             <form onSubmit={createInitiative} className="mb-3 space-y-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.035] p-3">
               <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Investor demo" className="h-9 text-sm" autoFocus />
               <Textarea aria-label="Initiative shared outcome" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Shared outcome" className="h-16 !min-h-16 p-2 text-xs" />
-              <select value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className="omnix-input h-9 w-full rounded-lg px-2 text-xs">
+              <select value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className="omnix-input h-9 w-full rounded-lg px-2 text-xs focus-visible:ring-2 focus-visible:ring-cyan-300/70">
                 <option value="">No owner recorded</option>
                 {members.map((member) => <option key={member.user_id} value={member.user_id}>{member.full_name || member.email || member.user_id}</option>)}
               </select>
@@ -608,7 +608,7 @@ function WorkspaceInitiativesSurfaceContent() {
                 </div>
                 <div className="flex flex-col items-end gap-3">
                   <select value={selected.status} disabled={updating} onChange={(event) => void patchInitiative({ status: event.target.value as WorkspaceInitiativeStatus })} className={cn(
-                    "omnix-input h-9 rounded-lg px-3 text-xs font-bold transition",
+                    "omnix-input h-9 rounded-lg px-3 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-cyan-300/70",
                     selected.status === "focused" ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-50" : "bg-black/20"
                   )}>
                     {statuses.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
@@ -702,7 +702,7 @@ function WorkspaceInitiativesSurfaceContent() {
                   </summary>
                   <div className="border-t border-[var(--omnix-border)] p-4 space-y-4">
                     <div className="flex gap-2">
-                      <select value={taskToAttach} onChange={(event) => setTaskToAttach(event.target.value)} className="omnix-input h-9 min-w-0 flex-1 rounded-lg px-2 text-xs">
+                      <select value={taskToAttach} onChange={(event) => setTaskToAttach(event.target.value)} className="omnix-input h-9 min-w-0 flex-1 rounded-lg px-2 text-xs focus-visible:ring-2 focus-visible:ring-cyan-300/70">
                         <option value="">Attach existing task...</option>
                         {availableTasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
                       </select>
@@ -734,7 +734,7 @@ function WorkspaceInitiativesSurfaceContent() {
                   </summary>
                   <div className="border-t border-[var(--omnix-border)] p-4 space-y-4">
                     <div className="flex gap-2">
-                      <select value={channelToAttach} onChange={(event) => setChannelToAttach(event.target.value)} className="omnix-input h-9 min-w-0 flex-1 rounded-lg px-2 text-xs">
+                      <select value={channelToAttach} onChange={(event) => setChannelToAttach(event.target.value)} className="omnix-input h-9 min-w-0 flex-1 rounded-lg px-2 text-xs focus-visible:ring-2 focus-visible:ring-cyan-300/70">
                         <option value="">Attach operational channel...</option>
                         {availableChannels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
                       </select>
@@ -766,7 +766,7 @@ function WorkspaceInitiativesSurfaceContent() {
                   </summary>
                   <div className="border-t border-[var(--omnix-border)] p-4 space-y-4">
                     <form onSubmit={addResource} className="flex flex-wrap gap-2">
-                      <select value={resourceType} onChange={(event) => setResourceType(event.target.value as WorkspaceInitiativeResource["resource_type"])} className="omnix-input h-9 rounded-lg px-2 text-xs">
+                      <select value={resourceType} onChange={(event) => setResourceType(event.target.value as WorkspaceInitiativeResource["resource_type"])} className="omnix-input h-9 rounded-lg px-2 text-xs focus-visible:ring-2 focus-visible:ring-cyan-300/70">
                         <option value="decision">Decision</option><option value="file">File</option><option value="reference">Reference</option><option value="ai_session">AI context</option>
                       </select>
                       <Input value={resourceLabel} onChange={(event) => setResourceLabel(event.target.value)} placeholder="Label" className="h-9 min-w-[8rem] flex-1 text-xs" />

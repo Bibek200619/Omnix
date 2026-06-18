@@ -508,16 +508,16 @@ function WorkspaceTasksSurfaceContent() {
                   className="omnix-input min-h-[68px] w-full resize-none rounded-lg p-2.5 text-sm"
                 />
               </div>
-              <select value={status} onChange={(event) => setStatus(event.target.value as WorkspaceTaskStatus)} className="omnix-input h-10 rounded-lg px-2 text-sm">
+              <select value={status} onChange={(event) => setStatus(event.target.value as WorkspaceTaskStatus)} className="omnix-input h-10 rounded-lg px-2 text-sm focus-visible:ring-2 focus-visible:ring-cyan-300/70">
                 {flow.map((phase) => <option key={phase.value} value={phase.value}>{phase.label}</option>)}
               </select>
-              <select value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className="omnix-input h-10 rounded-lg px-2 text-sm">
+              <select value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className="omnix-input h-10 rounded-lg px-2 text-sm focus-visible:ring-2 focus-visible:ring-cyan-300/70">
                 <option value="">Unassigned</option>
                 {members.map((member) => <option key={member.user_id} value={member.user_id}>{member.full_name || member.email || member.handle || member.user_id}</option>)}
               </select>
               <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="omnix-input h-10 rounded-lg px-2 text-sm" />
               <Input value={initialBlocker} onChange={(event) => setInitialBlocker(event.target.value)} placeholder="Recorded blocker, optional" className="h-10 text-sm" />
-              <select value={initiativeId} onChange={(event) => setInitiativeId(event.target.value)} className="omnix-input h-10 rounded-lg px-2 text-sm sm:col-span-2">
+              <select value={initiativeId} onChange={(event) => setInitiativeId(event.target.value)} className="omnix-input h-10 rounded-lg px-2 text-sm focus-visible:ring-2 focus-visible:ring-cyan-300/70 sm:col-span-2">
                 <option value="">No initiative link</option>
                 {initiatives.map((initiative) => <option key={initiative.id} value={initiative.id}>{initiative.title}</option>)}
               </select>
@@ -612,7 +612,7 @@ function WorkspaceTasksSurfaceContent() {
                               disabled={updatingId === task.id}
                               onChange={(event) => void patchTask(task, { status: event.target.value as WorkspaceTaskStatus })}
                               className={cn(
-                                "omnix-input h-7 rounded-lg px-2 text-[11px] font-semibold transition",
+                                "omnix-input h-7 rounded-lg px-2 text-[11px] font-semibold transition focus-visible:ring-2 focus-visible:ring-cyan-300/70",
                                 task.status === "active" ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-100" : "bg-black/20"
                               )}
                               aria-label={`Status for ${task.title}`}

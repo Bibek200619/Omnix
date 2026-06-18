@@ -680,7 +680,7 @@ function WorkspacePageContent() {
                       setSubspaceError(null);
                     }}
                     disabled={creatingSubspace}
-                    className="omnix-input h-11 w-full rounded-lg bg-black/20 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    className="omnix-input h-11 w-full rounded-lg bg-black/20 px-3 text-sm focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <option value="">Choose parent</option>
                     {workspaces.map((workspace) => (
