@@ -19,13 +19,15 @@ from ..db.supabase_client import get_supabase_auth_client
 
 AUTH_EXEMPT_PATHS = {
     "/health",
+    "/health/live",
+    "/health/ready",
     "/docs",
     "/docs/oauth2-redirect",
     "/integrations/google_drive/callback",
     "/openapi.json",
     "/redoc",
 }
-AUTH_EXEMPT_PREFIXES = ("/health/",)
+AUTH_EXEMPT_PREFIXES: tuple[str, ...] = ()
 ALLOWED_JWT_ALGORITHMS = {"RS256", "ES256"}
 SUPABASE_LEGACY_JWT_ALGORITHMS = {"HS256"}
 REQUIRED_JWT_CLAIMS = ("iss", "aud", "exp", "iat", "sub", "role")

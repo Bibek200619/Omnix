@@ -11,11 +11,13 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from ..core.security import get_current_user
 from ..integrations.google_drive import (
     build_oauth_authorize_url,
+    build_oauth_state,
     exchange_code_for_tokens,
     store_token_for_user,
     get_token_for_user,
     list_drive_files_for_user,
     download_drive_file_bytes,
+    parse_oauth_state,
 )
 from ..services.supabase_service import SupabaseServiceError, insert_one
 from ..routers.upload import _save_bytes_to_path, _extract_text_from_bytes
@@ -33,8 +35,7 @@ async def connect_google_drive(request: Request, workspace_id: str | None = None
     user_id = str(user.get("sub"))
     base = os.environ.get("OMNIX_BASE_URL") or "http://localhost:8000"
     redirect_uri = f"{base.rstrip('/')}/integrations/google_drive/callback"
-    # encode state as user_id|workspace_id
-    state = f"{user_id}|{workspace_id or ''}"
+    state = build_oauth_state(user_id, workspace_id)
     url = build_oauth_authorize_url(redirect_uri, state=state)
     return JSONResponse({"authorize_url": url})
 
@@ -44,13 +45,11 @@ async def connect_google_drive(request: Request, workspace_id: str | None = None
 async def oauth_callback(code: str | None = None, state: str | None = None) -> Any:
     if not code:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing code in callback")
-    # parse state
-    user_id = None
-    workspace_id = None
-    if state:
-        parts = state.split("|", 1)
-        user_id = parts[0] if parts and parts[0] else None
-        workspace_id = parts[1] if len(parts) > 1 and parts[1] else None
+    try:
+        user_id, workspace_id = parse_oauth_state(state)
+    except ValueError as exc:
+        logger.warning("Rejected Google OAuth callback with invalid state: %s", exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state") from exc
 
     base = os.environ.get("OMNIX_BASE_URL") or "http://localhost:8000"
     redirect_uri = f"{base.rstrip('/')}/integrations/google_drive/callback"
@@ -60,10 +59,6 @@ async def oauth_callback(code: str | None = None, state: str | None = None) -> A
     except Exception as exc:
         logger.exception("Failed to exchange code for tokens: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Token exchange failed")
-
-    if not user_id:
-        # No user bound; return a simple success page
-        return JSONResponse({"status": "connected", "detail": "No user state provided; tokens not stored."})
 
     try:
         await store_token_for_user(user_id, workspace_id, tokens)
