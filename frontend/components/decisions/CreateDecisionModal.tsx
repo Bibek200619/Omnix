@@ -410,7 +410,7 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
               isLoading={creating}
               disabled={!title.trim() || !reason.trim()}
               leftIcon={<BadgeCheck className="h-3.5 w-3.5" />}
-              className="min-w-[140px] shadow-[0_0_20px_rgba(34,211,238,0.15)]"
+              className="min-w-[140px] shadow-[0_0_20px_var(--omnix-rgba-rgba-34-211-238-0-15)]"
             >
               Record Decision
             </Button>

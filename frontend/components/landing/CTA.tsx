@@ -8,7 +8,7 @@ export function CTA() {
   const router = useRouter();
 
   return (
-    <section className="border-t border-white/10 bg-[#07090d] px-4 py-20 sm:px-6 lg:px-8">
+    <section className="border-t border-white/10 bg-[var(--omnix-color-07090d)] px-4 py-20 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-8 lg:flex-row lg:items-center">
         <div className="max-w-2xl">
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-200/70">

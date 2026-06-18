@@ -155,7 +155,7 @@ function MemberActionsMenu({
         <FloatingMenuLayer anchorRef={triggerRef} contentRef={menuRef} placement="bottom-end" width={176} zIndex={145}>
           <div
             role="menu"
-            className="w-full overflow-hidden rounded-lg border border-[var(--omnix-border-2)] bg-[#07131f] p-1.5 shadow-[0_18px_54px_rgba(0,0,0,0.58),var(--omnix-glow-xs)] ring-1 ring-black/40"
+            className="w-full overflow-hidden rounded-lg border border-[var(--omnix-border-2)] bg-[var(--omnix-color-07131f)] p-1.5 shadow-[0_18px_54px_var(--omnix-rgba-rgba-0-0-0-0-58),var(--omnix-glow-xs)] ring-1 ring-black/40"
           >
             {canManageRoles && member.role !== (isSubspace ? "team_lead" : "co_owner") && member.role !== "sub_leader" ? (
               <button
@@ -367,7 +367,7 @@ export function WorkspaceAccessPanel() {
             Awaiting assignment to collaborative spaces.
           </div>
         ) : (
-          <div className="relative z-10 mt-6 overflow-hidden rounded-2xl border border-[var(--omnix-border)] bg-[rgba(6,8,16,0.6)] backdrop-blur-xl">
+          <div className="relative z-10 mt-6 overflow-hidden rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-6-8-16-0-6)] backdrop-blur-xl">
             {membersLoading ? (
               <div className="grid gap-2.5 p-4">
                 {[0, 1, 2].map((item) => (

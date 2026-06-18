@@ -107,16 +107,16 @@ export function ChatInput({
       </div>
     <motion.div
       animate={{
-        borderColor: focused ? "rgba(0, 255, 255, 0.45)" : "rgba(0,255,255,0.12)",
+        borderColor: focused ? "var(--omnix-rgba-rgba-0-255-255-0-45)" : "var(--omnix-rgba-rgba-0-255-255-0-12)",
         boxShadow: focused
-          ? "0 0 0 3px rgba(0,255,255,0.08), var(--omnix-glow-sm), 0 18px 70px rgba(0,0,0,0.28)"
-          : "0 12px 38px rgba(0, 0, 0, 0.26)",
+          ? "0 0 0 3px var(--omnix-rgba-rgba-0-255-255-0-08), var(--omnix-glow-sm), 0 18px 70px var(--omnix-rgba-rgba-0-0-0-0-28)"
+          : "0 12px 38px var(--omnix-rgba-rgba-0-0-0-0-26)",
       }}
       transition={{ duration: 0.18, ease: "easeOut" }}
-      className="relative z-20 w-full overflow-hidden rounded-[15px] border bg-[rgba(8,16,30,0.9)] shadow-[0_18px_70px_rgba(0,0,0,0.34)] backdrop-blur-[22px]"
+      className="relative z-20 w-full overflow-hidden rounded-[15px] border bg-[var(--omnix-rgba-rgba-8-16-30-0-9)] shadow-[0_18px_70px_var(--omnix-rgba-rgba-0-0-0-0-34)] backdrop-blur-[22px]"
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(0,255,255,0.68),transparent)]" />
-      <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(0,255,255,0.16),transparent_70%)] blur-2xl" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-rgba-0-255-255-0-68),transparent)]" />
+      <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[radial-gradient(circle,var(--omnix-rgba-rgba-0-255-255-0-16),transparent_70%)] blur-2xl" />
       {attachments.length > 0 ? (
         <div className="m-3 mb-0 flex flex-wrap gap-2 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-2">
           {attachments.map((file) => (
@@ -181,7 +181,7 @@ export function ChatInput({
           disabled={loading}
           className="block max-h-40 min-h-[54px] w-full resize-none border border-transparent bg-transparent px-[15px] py-[13px] text-sm leading-[1.6] text-white outline-none transition placeholder:text-[var(--omnix-text-3)] disabled:cursor-not-allowed disabled:opacity-70 sm:text-base"
         />
-      <div className="flex flex-col gap-2 border-t border-[var(--omnix-border)] bg-[rgba(0,0,0,0.2)] px-2.5 py-2.5 transition focus-within:bg-[var(--omnix-surface)] min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between sm:px-3">
+      <div className="flex flex-col gap-2 border-t border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-0-0-0-0-2)] px-2.5 py-2.5 transition focus-within:bg-[var(--omnix-surface)] min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between sm:px-3">
         <div className="omnix-scrollbar flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 min-[420px]:flex-wrap min-[420px]:overflow-visible min-[420px]:pb-0">
           <Button
             type="button"
@@ -229,7 +229,7 @@ export function ChatInput({
             aria-label="Stop generating"
             title="Stop generating"
             onClick={() => onCancel?.()}
-            className="h-9 w-9 rounded-lg border-0 bg-rose-500/20 text-rose-300 shadow-[var(--omnix-glow-sm)] hover:bg-rose-500/40 hover:text-white sm:h-[30px] sm:w-[30px]"
+            className="h-11 w-11 rounded-lg border-0 bg-rose-500/20 text-rose-300 shadow-[var(--omnix-glow-sm)] hover:bg-rose-500/40 hover:text-white"
           >
             <Square className="h-4 w-4 fill-current sm:h-3.5 sm:w-3.5" />
           </Button>
@@ -241,7 +241,7 @@ export function ChatInput({
             title="Send message"
             disabled={!value.trim()}
             onClick={submit}
-            className="h-9 w-9 rounded-lg border-0 bg-[var(--omnix-grad-primary)] text-[#050c17] shadow-[var(--omnix-glow-sm)] hover:shadow-[var(--omnix-glow-md)] disabled:bg-[var(--omnix-surface)] disabled:text-[var(--omnix-text-3)] disabled:shadow-none sm:h-[30px] sm:w-[30px]"
+            className="h-11 w-11 rounded-lg border-0 bg-[var(--omnix-grad-primary)] text-[var(--omnix-color-050c17)] shadow-[var(--omnix-glow-sm)] hover:shadow-[var(--omnix-glow-md)] disabled:bg-[var(--omnix-surface)] disabled:text-[var(--omnix-text-3)] disabled:shadow-none"
           >
             <Send className="h-4 w-4" />
           </Button>

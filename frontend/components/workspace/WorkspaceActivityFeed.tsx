@@ -67,11 +67,11 @@ export function WorkspaceActivityFeed({
 
   return (
     <section className={cn(
-      "relative overflow-hidden rounded-[16px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(0,0,0,0.4))] shadow-2xl backdrop-blur-xl", 
+      "relative overflow-hidden rounded-[16px] border border-white/10 bg-[linear-gradient(180deg,var(--omnix-rgba-rgba-255-255-255-0-03),var(--omnix-rgba-rgba-0-0-0-0-4))] shadow-2xl backdrop-blur-xl", 
       compact ? "p-4" : "p-5", 
       className
     )}>
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(155,92,255,0.4),rgba(0,255,255,0.3),transparent)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-rgba-155-92-255-0-4),var(--omnix-rgba-rgba-0-255-255-0-3),transparent)]" />
       <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-white/5 to-transparent" />
 
       <div className="relative z-10 mb-6 flex items-center justify-between gap-3">

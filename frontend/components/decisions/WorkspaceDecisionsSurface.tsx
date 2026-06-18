@@ -112,7 +112,7 @@ export function WorkspaceDecisionsSurface() {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
-      <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-4 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.015)] px-4 py-4 sm:px-6 sm:py-5">
+      <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-4 rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-0-255-255-0-015)] px-4 py-4 sm:px-6 sm:py-5">
         <div>
           <p className="mb-1.5 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400/70">
             <BadgeCheck className="h-4 w-4" />
@@ -129,7 +129,7 @@ export function WorkspaceDecisionsSurface() {
             size="sm"
             onClick={() => setCreateOpen(true)}
             leftIcon={<Plus className="h-3.5 w-3.5" />}
-            className="h-9 px-4 shadow-[0_0_15px_rgba(34,211,238,0.1)]"
+            className="h-9 px-4 shadow-[0_0_15px_var(--omnix-rgba-rgba-34-211-238-0-1)]"
           >
             New Decision
           </Button>
@@ -189,7 +189,7 @@ export function WorkspaceDecisionsSurface() {
         <div className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-dashed border-cyan-400/10 bg-cyan-400/[0.01] p-8 text-center sm:p-12">
           <div className="relative mb-8">
             <div className="absolute inset-0 -m-12 animate-pulse bg-cyan-400/5 blur-3xl rounded-full" />
-            <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-cyan-400/20 bg-black/40 shadow-[0_0_30px_rgba(34,211,238,0.1)]">
+            <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-cyan-400/20 bg-black/40 shadow-[0_0_30px_var(--omnix-rgba-rgba-34-211-238-0-1)]">
               <BadgeCheck className="h-10 w-10 text-cyan-400" />
             </div>
           </div>
@@ -217,7 +217,7 @@ export function WorkspaceDecisionsSurface() {
           </div>
 
           <div className="mt-10 flex flex-col items-center gap-4">
-            <Button size="lg" onClick={() => setCreateOpen(true)} leftIcon={<Plus className="h-5 w-5" />} className="h-12 px-8 text-base shadow-[0_0_25px_rgba(34,211,238,0.2)]">
+            <Button size="lg" onClick={() => setCreateOpen(true)} leftIcon={<Plus className="h-5 w-5" />} className="h-12 px-8 text-base shadow-[0_0_25px_var(--omnix-rgba-rgba-34-211-238-0-2)]">
               Create First Decision
             </Button>
             <p className="text-xs text-[var(--omnix-text-3)]">
@@ -275,7 +275,7 @@ export function WorkspaceDecisionsSurface() {
                     className={cn(
                       "flex-1 rounded-md py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all",
                       statusFilter === s 
-                        ? "bg-cyan-400/10 text-cyan-400 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]" 
+                        ? "bg-cyan-400/10 text-cyan-400 shadow-[inset_0_1px_1px_var(--omnix-rgba-rgba-255-255-255-0-05)]" 
                         : "text-[var(--omnix-text-3)] hover:text-[var(--omnix-text-2)]"
                     )}
                   >
@@ -312,7 +312,7 @@ export function WorkspaceDecisionsSurface() {
                     className={cn(
                       "group relative mb-2 flex flex-col rounded-xl border p-4 text-left transition-all duration-300",
                       active
-                        ? "border-cyan-400/30 bg-cyan-400/[0.07] shadow-[0_0_20px_rgba(34,211,238,0.05)]"
+                        ? "border-cyan-400/30 bg-cyan-400/[0.07] shadow-[0_0_20px_var(--omnix-rgba-rgba-34-211-238-0-05)]"
                         : "border-transparent hover:border-white/10 hover:bg-white/[0.03]",
                     )}
                   >
@@ -326,8 +326,8 @@ export function WorkspaceDecisionsSurface() {
                       </span>
                       <div className={cn(
                         "h-1.5 w-1.5 shrink-0 rounded-full mt-1.5",
-                        decision.status === "accepted" ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" :
-                        decision.status === "proposed" ? "bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]" :
+                        decision.status === "accepted" ? "bg-emerald-400 shadow-[0_0_8px_var(--omnix-rgba-rgba-52-211-153-0-5)]" :
+                        decision.status === "proposed" ? "bg-cyan-400 shadow-[0_0_8px_var(--omnix-rgba-rgba-34-211-238-0-5)]" :
                         "bg-amber-400"
                       )} />
                     </div>

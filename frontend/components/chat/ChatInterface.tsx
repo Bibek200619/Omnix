@@ -1070,15 +1070,15 @@ export function ChatInterface() {
 
   return (
     <section className="relative flex h-full w-full overflow-hidden bg-[var(--omnix-bg)] text-[var(--omnix-text)]">
-      <div className="pointer-events-none absolute left-[18%] top-[-18%] h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle,rgba(0,255,255,0.075),transparent_68%)] blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-20%] right-[4%] h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,rgba(0,51,255,0.085),transparent_70%)] blur-3xl" />
+      <div className="pointer-events-none absolute left-[18%] top-[-18%] h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle,var(--omnix-rgba-rgba-0-255-255-0-075),transparent_68%)] blur-3xl" />
+      <div className="pointer-events-none absolute bottom-[-20%] right-[4%] h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,var(--omnix-rgba-rgba-0-51-255-0-085),transparent_70%)] blur-3xl" />
       {historyOpen ? (
         <>
           <div
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity md:hidden"
             onClick={() => setHistoryOpen(false)}
           />
-          <aside className="fixed inset-y-0 left-0 z-50 flex w-[280px] shrink-0 flex-col border-r border-[var(--omnix-border)] bg-[rgba(5,12,23,0.98)] shadow-[18px_0_70px_rgba(0,0,0,0.24)] backdrop-blur-2xl md:relative md:z-10 md:w-[264px] md:flex md:bg-[rgba(5,12,23,0.6)]">
+          <aside className="fixed inset-y-0 left-0 z-50 flex w-[280px] shrink-0 flex-col border-r border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-5-12-23-0-98)] shadow-[18px_0_70px_var(--omnix-rgba-rgba-0-0-0-0-24)] backdrop-blur-2xl md:relative md:z-10 md:w-[264px] md:flex md:bg-[var(--omnix-rgba-rgba-5-12-23-0-6)]">
           <div className="flex items-center gap-2 border-b border-[var(--omnix-border)] px-3 py-2.5">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--omnix-text-3)]" />
@@ -1161,7 +1161,7 @@ export function ChatInterface() {
       ) : null}
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.85)] px-3 shadow-[0_12px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl sm:px-[18px]">
+        <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-5-12-23-0-85)] px-3 shadow-[0_12px_44px_var(--omnix-rgba-rgba-0-0-0-0-18)] backdrop-blur-xl sm:px-[18px]">
           <div className="flex min-w-0 items-center gap-2.5">
             {!historyOpen ? (
               <button
@@ -1211,14 +1211,14 @@ export function ChatInterface() {
           </div>
         </div>
 
-        <div className="hidden shrink-0 border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.48)] px-[18px] py-2 backdrop-blur-xl lg:block">
+        <div className="hidden shrink-0 border-b border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-5-12-23-0-48)] px-[18px] py-2 backdrop-blur-xl lg:block">
           <div className="grid grid-cols-5 gap-2">
             {statusItems.map((item) => {
               const Icon = item.icon;
               return (
                 <div
                   key={item.label}
-                  className="flex min-w-0 items-center gap-2 rounded-[8px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                  className="flex min-w-0 items-center gap-2 rounded-[8px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-2.5 py-2 shadow-[inset_0_1px_0_var(--omnix-rgba-rgba-255-255-255-0-03)]"
                 >
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-cyan-300/15 bg-cyan-300/10">
                     <Icon className={cn("h-3.5 w-3.5", item.color)} />
@@ -1237,7 +1237,7 @@ export function ChatInterface() {
           </div>
         </div>
 
-        <div className="hidden shrink-0 border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.34)] px-[18px] py-2 backdrop-blur-xl xl:block">
+        <div className="hidden shrink-0 border-b border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-5-12-23-0-34)] px-[18px] py-2 backdrop-blur-xl xl:block">
           <WorkspacePresenceCluster
             presence={presence}
             workspaceName={activeWorkspace?.name}
@@ -1271,7 +1271,7 @@ export function ChatInterface() {
           onRetry={handleRetry}
           onRegenerate={handleRegenerate}
         />
-        <div className="shrink-0 bg-gradient-to-t from-[var(--omnix-bg)] via-[rgba(5,12,23,0.94)] to-transparent px-2.5 pb-2.5 pt-3 sm:px-[22px] sm:pb-[18px] sm:pt-10">
+        <div className="shrink-0 bg-gradient-to-t from-[var(--omnix-bg)] via-[var(--omnix-rgba-rgba-5-12-23-0-94)] to-transparent px-2.5 pb-2.5 pt-3 sm:px-[22px] sm:pb-[18px] sm:pt-10">
           <ChatInput
             onSend={sendMessage}
             loading={responding}

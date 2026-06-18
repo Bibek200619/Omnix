@@ -6,16 +6,16 @@ import { OmnixMark } from "@/components/brand/OmnixMark";
 import { cn } from "@/lib/utils";
 
 export const AUTH_C = {
-  cyan: "#00FFFF",
-  blue: "#0033FF",
-  navy: "#0A192F",
-  navyDark: "#061020",
-  card: "rgba(255,255,255,0.03)",
-  border: "rgba(255,255,255,0.08)",
-  borderC: "rgba(0,255,255,0.22)",
-  white: "#FFFFFF",
-  muted: "rgba(255,255,255,0.55)",
-  faint: "rgba(255,255,255,0.3)",
+  cyan: "var(--omnix-color-00ffff)",
+  blue: "var(--omnix-color-0033ff)",
+  navy: "var(--omnix-color-0a192f)",
+  navyDark: "var(--omnix-color-061020)",
+  card: "var(--omnix-rgba-rgba-255-255-255-0-03)",
+  border: "var(--omnix-rgba-rgba-255-255-255-0-08)",
+  borderC: "var(--omnix-rgba-rgba-0-255-255-0-22)",
+  white: "var(--omnix-color-ffffff)",
+  muted: "var(--omnix-rgba-rgba-255-255-255-0-55)",
+  faint: "var(--omnix-rgba-rgba-255-255-255-0-3)",
 };
 
 export const AUTH_ICONS = {
@@ -108,7 +108,7 @@ export function AuthMovingGrid() {
       <div
         className="h-full w-full animate-[auth-grid_22s_linear_infinite]"
         style={{
-          backgroundImage: "linear-gradient(rgba(0,255,255,0.5) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,255,0.5) 1px,transparent 1px)",
+          backgroundImage: "linear-gradient(var(--omnix-rgba-rgba-0-255-255-0-5) 1px,transparent 1px),linear-gradient(90deg,var(--omnix-rgba-rgba-0-255-255-0-5) 1px,transparent 1px)",
           backgroundSize: "64px 64px",
         }}
       />

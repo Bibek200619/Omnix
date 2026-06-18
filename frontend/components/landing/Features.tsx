@@ -36,7 +36,7 @@ const features = [
 
 export function Features() {
   return (
-    <section id="features" className="bg-[#07090d] px-4 py-20 sm:px-6 lg:px-8">
+    <section id="features" className="bg-[var(--omnix-color-07090d)] px-4 py-20 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
         <div className="max-w-2xl">
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-200/70">

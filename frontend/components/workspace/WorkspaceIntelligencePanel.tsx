@@ -37,7 +37,7 @@ export function WorkspaceIntelligencePanel({
 
   return (
     <section className={cn(
-      "relative overflow-hidden rounded-[18px] border border-white/5 bg-[linear-gradient(135deg,rgba(15,23,42,0.8),rgba(8,12,24,0.85))] shadow-xl backdrop-blur-xl transition-all duration-500 hover:shadow-cyan-500/5",
+      "relative overflow-hidden rounded-[18px] border border-white/5 bg-[linear-gradient(135deg,var(--omnix-rgba-rgba-15-23-42-0-8),var(--omnix-rgba-rgba-8-12-24-0-85))] shadow-xl backdrop-blur-xl transition-all duration-500 hover:shadow-cyan-500/5",
       className
     )}>
       <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-500/5 blur-[90px]" />
@@ -51,10 +51,10 @@ export function WorkspaceIntelligencePanel({
       >
         <div className="flex min-w-0 gap-3 sm:gap-4">
           <div className="relative shrink-0">
-            <span className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/5 text-cyan-300/80 shadow-[0_0_10px_rgba(34,211,238,0.1)] transition-transform duration-300 group-hover:scale-105">
+            <span className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/5 text-cyan-300/80 shadow-[0_0_10px_var(--omnix-rgba-rgba-34-211-238-0-1)] transition-transform duration-300 group-hover:scale-105">
               {loading ? <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin opacity-50" /> : <BrainCircuit className="h-5 w-5 sm:h-6 sm:w-6 opacity-80" />}
             </span>
-            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-emerald-500/80 shadow-[0_0_4px_rgba(16,185,129,0.5)] border-2 border-slate-900" />
+            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-emerald-500/80 shadow-[0_0_4px_var(--omnix-rgba-rgba-16-185-129-0-5)] border-2 border-slate-900" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -106,10 +106,10 @@ export function WorkspaceIntelligencePanel({
         <div className="relative z-10 border-t border-white/5 px-4 pb-4 pt-2 animate-in fade-in slide-in-from-top-4 duration-300 sm:px-6 sm:pb-6">
           <div className={cn("grid gap-4", compact ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2 lg:grid-cols-4")}>
             {[
-              { label: "Connected Files", value: profile?.source_count ?? 0, icon: Database, color: "#22d3ee" },
-              { label: "Conversations", value: profile?.conversation_count ?? 0, icon: Layers3, color: "#c084fc" },
-              { label: "Team Members", value: profile?.member_count ?? 0, icon: Users, color: "#fbbf24" },
-              { label: "Topics", value: domains.length, icon: Globe2, color: "#10b981" },
+              { label: "Connected Files", value: profile?.source_count ?? 0, icon: Database, color: "var(--omnix-color-22d3ee)" },
+              { label: "Conversations", value: profile?.conversation_count ?? 0, icon: Layers3, color: "var(--omnix-color-c084fc)" },
+              { label: "Team Members", value: profile?.member_count ?? 0, icon: Users, color: "var(--omnix-color-fbbf24)" },
+              { label: "Topics", value: domains.length, icon: Globe2, color: "var(--omnix-color-10b981)" },
             ].slice(0, compact ? 4 : 4).map((item) => {
               const Icon = item.icon;
               return (
