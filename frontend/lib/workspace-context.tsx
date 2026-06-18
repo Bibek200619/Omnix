@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { apiClient, setApiWorkspaceId } from "./api";
 import { useAuth } from "./auth-context";
 import { logClientError } from "./errors";
@@ -68,6 +70,13 @@ type WorkspaceContextType = {
 };
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
+
+type DestructiveConfirmation = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  resolve: (confirmed: boolean) => void;
+};
 
 function workspaceStorageKey() {
   return "omnix.activeWorkspaceId";
@@ -385,6 +394,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [intelligenceLoading, setIntelligenceLoading] = useState(false);
   const [subspaceLoadingByParentId, setSubspaceLoadingByParentId] = useState<Record<string, boolean>>({});
   const [subspaceErrorByParentId, setSubspaceErrorByParentId] = useState<Record<string, string | null>>({});
+  const [destructiveConfirmation, setDestructiveConfirmation] = useState<DestructiveConfirmation | null>(null);
   
   const requestGenerationRef = useRef(0);
   const workspaceFetchIdRef = useRef(0);
@@ -408,6 +418,28 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const lastWorkspaceRefreshAtRef = useRef(0);
   const lastPendingInvitesRefreshAtRef = useRef(0);
   const lastActiveWorkspaceDataRefreshAtRef = useRef(0);
+
+  const confirmDestructiveAction = useCallback(
+    (confirmation: Omit<DestructiveConfirmation, "resolve">) =>
+      new Promise<boolean>((resolve) => {
+        setDestructiveConfirmation({ ...confirmation, resolve });
+      }),
+    [],
+  );
+
+  const cancelDestructiveConfirmation = useCallback(() => {
+    setDestructiveConfirmation((current) => {
+      current?.resolve(false);
+      return null;
+    });
+  }, []);
+
+  const approveDestructiveConfirmation = useCallback(() => {
+    setDestructiveConfirmation((current) => {
+      current?.resolve(true);
+      return null;
+    });
+  }, []);
 
   const activeWorkspace = useMemo(
     () => findWorkspaceById(workspaces, activeWorkspaceId),
@@ -897,6 +929,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [workspaces, refreshWorkspaces]);
 
   const deleteWorkspace = useCallback(async (workspaceId: string) => {
+    const workspace = findWorkspaceById(workspaces, workspaceId);
+    const confirmed = await confirmDestructiveAction({
+      title: "Delete workspace",
+      description: `Delete ${workspace?.name || "this workspace"}? This removes the workspace and its shared context for every member.`,
+      confirmLabel: "Delete workspace",
+    });
+    if (!confirmed) return;
+
     logger.debug("[workspace] delete requested", { workspaceId });
     const previousWorkspaces = workspaces;
     const remainingWorkspaces = removeWorkspaceFromTree(workspaces, workspaceId);
@@ -920,7 +960,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
       throw err;
     }
-  }, [activeWorkspaceId, refreshWorkspaces, setActiveWorkspace, workspaces]);
+  }, [activeWorkspaceId, confirmDestructiveAction, refreshWorkspaces, setActiveWorkspace, workspaces]);
 
   const inviteToActiveWorkspace = useCallback(
     async (target: string, role: WorkspaceRole = "member") => {
@@ -953,6 +993,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         throw new Error("Select a workspace first.");
       }
 
+      const member = activeMembers.find((item) => item.user_id === userId);
+      const memberLabel = member?.full_name || member?.email || "this member";
+      const confirmed = await confirmDestructiveAction({
+        title: "Remove member",
+        description: `Remove ${memberLabel} from ${activeWorkspace?.name || "this workspace"}? They will lose access to this workspace immediately.`,
+        confirmLabel: "Remove member",
+      });
+      if (!confirmed) return;
+
       const requestWorkspaceId = activeWorkspaceId;
       const previousMembers = activeMembers;
 
@@ -972,7 +1021,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         throw err;
       }
     },
-    [activeMembers, activeWorkspaceId, refreshActiveWorkspaceData, refreshWorkspaces],
+    [activeMembers, activeWorkspace?.name, activeWorkspaceId, confirmDestructiveAction, refreshActiveWorkspaceData, refreshWorkspaces],
   );
 
   const updateWorkspaceMemberRole = useCallback(
@@ -1076,10 +1125,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         throw new Error("Select a workspace first.");
       }
 
+      const invite = activeInvites.find((item) => getWorkspaceInviteId(item) === inviteId);
+      const confirmed = await confirmDestructiveAction({
+        title: "Revoke invite",
+        description: `Revoke the invite for ${invite?.email || "this teammate"}? The invite link will stop working immediately.`,
+        confirmLabel: "Revoke invite",
+      });
+      if (!confirmed) return;
+
       await apiClient.delete(`/workspaces/${activeWorkspaceId}/invites/${inviteId}`);
       setActiveInvites((current) => current.filter((invite) => getWorkspaceInviteId(invite) !== inviteId));
     },
-    [activeWorkspaceId],
+    [activeInvites, activeWorkspaceId, confirmDestructiveAction],
   );
 
   const acceptInvite = useCallback(
@@ -1288,7 +1345,36 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
+  return (
+    <WorkspaceContext.Provider value={value}>
+      {children}
+      <Modal
+        isOpen={Boolean(destructiveConfirmation)}
+        onClose={cancelDestructiveConfirmation}
+        title={destructiveConfirmation?.title || "Confirm destructive action"}
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={cancelDestructiveConfirmation}>
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" onClick={approveDestructiveConfirmation}>
+              {destructiveConfirmation?.confirmLabel || "Confirm"}
+            </Button>
+          </>
+        }
+      >
+        <Modal.Header>
+          <div>
+            <p className="text-base font-semibold text-white">{destructiveConfirmation?.title || "Confirm destructive action"}</p>
+            <p className="mt-1 text-sm text-[var(--omnix-text-2)]">This action needs confirmation before it runs.</p>
+          </div>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-sm leading-6 text-[var(--omnix-text)]">{destructiveConfirmation?.description}</p>
+        </Modal.Body>
+      </Modal>
+    </WorkspaceContext.Provider>
+  );
 }
 
 export function useWorkspace() {
