@@ -10,7 +10,9 @@ from typing import Any, AsyncIterator
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from starlette.responses import StreamingResponse
 
+from ..core.config import get_settings
 from ..core.security import get_current_user
+from ..rag.token_utils import count_tokens, tail_tokens
 from ..schemas.chat import AIGenerationRequest, AIGenerationResponse, ChatRequest, ChatResponse, MessageRead
 from ..services.chat_service import (
     AIMessage,
@@ -49,7 +51,6 @@ router = APIRouter(tags=["messages"])
 logger = logging.getLogger(__name__)
 
 RECENT_CONTEXT_LIMIT = 4
-MAX_CONTEXT_CHARS = 8000
 DEFAULT_MESSAGE_LIMIT = 50
 MAX_MESSAGE_LIMIT = 100
 MESSAGE_COLUMNS = "id,conversation_id,user_id,role,content,status,created_at,metadata,payload"
@@ -95,8 +96,10 @@ def _database_error() -> HTTPException:
 
 
 def _build_context(messages: list[dict[str, Any]]) -> list[dict[str, str]]:
+    settings = get_settings()
+    max_context_messages = max(1, min(int(settings.AI_MAX_CONTEXT_MESSAGES), RECENT_CONTEXT_LIMIT))
+    remaining_tokens = max(128, min(int(settings.AI_MAX_CONTEXT_TOKENS), 16_000))
     bounded_context: list[dict[str, str]] = []
-    total_chars = 0
 
     for item in messages:
         role = item.get("role")
@@ -112,13 +115,18 @@ def _build_context(messages: list[dict[str, Any]]) -> list[dict[str, str]]:
         if message_status not in (None, "completed"):
             continue
 
-        if total_chars + len(normalized_content) > MAX_CONTEXT_CHARS:
+        message_tokens = count_tokens(normalized_content, model=settings.ollama_model) + 4
+        if message_tokens > remaining_tokens:
+            if not bounded_context and remaining_tokens > 8:
+                trimmed_content = tail_tokens(normalized_content, remaining_tokens - 4)
+                if trimmed_content:
+                    bounded_context.append({"role": role, "content": trimmed_content})
             break
 
         bounded_context.append({"role": role, "content": normalized_content})
-        total_chars += len(normalized_content)
+        remaining_tokens -= message_tokens
 
-        if len(bounded_context) >= RECENT_CONTEXT_LIMIT:
+        if len(bounded_context) >= max_context_messages or remaining_tokens <= 8:
             break
 
     return list(reversed(bounded_context))
@@ -977,7 +985,7 @@ async def generate_ai(
     return AIGenerationResponse(
         response=generation.content,
         model=generation.model,
-        provider="ollama",
+        provider=generation.provider,
         usage=generation.usage,
     )
 

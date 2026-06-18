@@ -110,7 +110,7 @@ class AIGenerationRequest(BaseModel):
 class AIGenerationResponse(BaseModel):
     response: str
     model: str
-    provider: Literal["ollama"]
+    provider: Literal["ollama", "openai", "anthropic"]
     usage: dict[str, Any] = Field(default_factory=dict)
 
 
