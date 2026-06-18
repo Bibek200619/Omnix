@@ -1039,6 +1039,76 @@ textarea {
   }
 }
 
+@keyframes omnix-beam-sweep {
+  0% { transform: translateX(-100%) skewX(-45deg); opacity: 0; }
+  20% { opacity: 0.4; }
+  50% { opacity: 0.6; }
+  80% { opacity: 0.4; }
+  100% { transform: translateX(200%) skewX(-45deg); opacity: 0; }
+}
+
+.omnix-beam-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.omnix-beam-sweep {
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.08), transparent);
+  animation: omnix-beam-sweep 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes omnix-glitch-text {
+  0% { text-shadow: 0.05em 0 0 rgba(255, 0, 80, 0.75), -0.025em -0.05em 0 rgba(0, 255, 0, 0.75), 0.025em 0.05em 0 rgba(0, 0, 255, 0.75); }
+  14% { text-shadow: 0.05em 0 0 rgba(255, 0, 80, 0.75), -0.025em -0.05em 0 rgba(0, 255, 0, 0.75), 0.025em 0.05em 0 rgba(0, 0, 255, 0.75); }
+  15% { text-shadow: -0.05em -0.025em 0 rgba(255, 0, 80, 0.75), 0.025em 0.025em 0 rgba(0, 255, 0, 0.75), -0.05em -0.05em 0 rgba(0, 0, 255, 0.75); }
+  49% { text-shadow: -0.05em -0.025em 0 rgba(255, 0, 80, 0.75), 0.025em 0.025em 0 rgba(0, 255, 0, 0.75), -0.05em -0.05em 0 rgba(0, 0, 255, 0.75); }
+  50% { text-shadow: 0.025em 0.05em 0 rgba(255, 0, 80, 0.75), 0.05em 0 0 rgba(0, 255, 0, 0.75), 0 -0.05em 0 rgba(0, 0, 255, 0.75); }
+  99% { text-shadow: 0.025em 0.05em 0 rgba(255, 0, 80, 0.75), 0.05em 0 0 rgba(0, 255, 0, 0.75), 0 -0.05em 0 rgba(0, 0, 255, 0.75); }
+  100% { text-shadow: -0.025em 0 0 rgba(255, 0, 80, 0.75), -0.025em -0.025em 0 rgba(0, 255, 0, 0.75), -0.025em -0.05em 0 rgba(0, 0, 255, 0.75); }
+}
+
+.omnix-glitch-hover:hover {
+  animation: omnix-glitch-text 500ms infinite;
+}
+
+@keyframes omnix-float-subtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.omnix-float-subtle {
+  animation: omnix-float-subtle 3s ease-in-out infinite;
+}
+
+@keyframes omnix-border-beam {
+  0% { offset-distance: 0%; }
+  100% { offset-distance: 100%; }
+}
+
+.omnix-border-beam {
+  position: absolute;
+  inset: 0;
+  border: 1px solid transparent;
+  border-radius: inherit;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.omnix-border-beam::after {
+  content: "";
+  position: absolute;
+  aspect-ratio: 1;
+  width: 100px;
+  background: linear-gradient(to right, var(--omnix-cyan), transparent);
+  offset-path: rect(0 auto auto 0 round 12px);
+  animation: omnix-border-beam 3s linear infinite;
+}
+
 @keyframes omnix-fade-in {
   from {
     opacity: 0;

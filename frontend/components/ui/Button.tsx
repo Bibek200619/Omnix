@@ -55,9 +55,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          "inline-flex shrink-0 items-center justify-center rounded-lg border font-medium transition duration-200 active:scale-[0.98]",
+          "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg border font-medium transition-all duration-200 active:scale-[0.96]",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
-          "disabled:cursor-not-allowed disabled:opacity-55",
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          "group/btn",
           variants[variant],
           sizes[size],
           className,
@@ -65,9 +66,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={isDisabled}
         {...props}
       >
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : leftIcon}
-        {children}
-        {!isLoading ? rightIcon : null}
+        <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent opacity-0 transition-opacity duration-500 group-hover/btn:opacity-100" style={{ transform: 'skewX(-25deg) translateX(-100%)', animation: 'omnix-beam-sweep 3s infinite' }} />
+        <span className="relative z-10 flex items-center gap-2">
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : leftIcon}
+          {children}
+          {!isLoading ? rightIcon : null}
+        </span>
       </button>
     );
   },

@@ -7,6 +7,7 @@ import { Header } from "@/components/layout/Header";
 import { KeyboardShortcutsModal } from "@/components/layout/KeyboardShortcutsModal";
 import { MobileDock } from "@/components/layout/MobileDock";
 import { PageTransition } from "@/components/layout/PageTransition";
+import { AmbientParticles } from "@/components/layout/AmbientParticles";
 import { ConversationHistoryProvider } from "@/lib/conversation-history-context";
 import { ProfileProvider } from "@/lib/profile-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
@@ -110,6 +111,7 @@ export function AppShell({ children }: AppShellProps) {
                       Skip to main content
                     </a>
                     <div className="omnix-ambient-layer" aria-hidden="true" />
+                    <AmbientParticles count={30} />
                     <div className="omnix-shell-scanline" aria-hidden="true" />
                     <div
                       className="pointer-events-none fixed inset-x-0 top-0 z-[2] h-px bg-[linear-gradient(90deg,transparent_0%,rgba(0,255,255,0.35)_30%,rgba(0,255,255,0.6)_50%,rgba(0,255,255,0.35)_70%,transparent_100%)]"

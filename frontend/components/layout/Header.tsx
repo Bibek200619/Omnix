@@ -68,7 +68,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
   const pathname = usePathname();
   const router = useRouter();
   const { signOut, user } = useAuth();
-  const { activeWorkspace, workspaces } = useWorkspace();
+  const { activeWorkspace, activeWorkspaceId, workspaces } = useWorkspace();
   const { realtimeStatus, retryRealtimeConnection } = useWorkspaceCollaboration();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
@@ -80,7 +80,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
   // Dynamic Hierarchy Orientation
   const parentWorkspace = workspaces.find(w => w.id === activeWorkspace?.parent_workspace_id);
   const isSubspace = !!activeWorkspace?.parent_workspace_id;
-  const realtimeOffline = realtimeStatus === "disconnected" || realtimeStatus === "error";
+  const realtimeOffline = !!activeWorkspaceId && (realtimeStatus === "disconnected" || realtimeStatus === "error");
   const realtimeStatusLabel = realtimeOffline
     ? "offline"
     : realtimeStatus === "connecting"
