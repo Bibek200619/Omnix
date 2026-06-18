@@ -35,6 +35,7 @@ import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { CreateDecisionModal } from "@/components/decisions/CreateDecisionModal";
 import { DecisionCandidatePanel } from "@/components/decisions/DecisionCandidatePanel";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -853,10 +854,12 @@ function FilesPageContent() {
               {[0, 1].map((item) => <div key={item} className="shimmer h-16 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)]" />)}
             </div>
           ) : connectors.length === 0 ? (
-            <div className="relative z-10 mt-4 rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 p-6 text-center">
-              <p className="text-sm font-semibold text-white">No connector configuration saved yet.</p>
-              <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-2)]">Choose a connector above to save a real workspace-scoped setup.</p>
-            </div>
+            <EmptyState
+              icon={Unplug}
+              title="No connector configuration saved yet"
+              description="Choose a connector above to save a real workspace-scoped setup."
+              className="relative z-10 mt-4 min-h-[220px] border-dashed"
+            />
           ) : (
             <div className="relative z-10 mt-4 grid gap-3">
               {connectors.map((connector) => {
@@ -979,32 +982,21 @@ function FilesPageContent() {
               onDismiss={() => setError(null)}
             />
           ) : files.length === 0 ? (
-            <div className="relative z-10 mt-4 flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 p-6 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]">
-                <FileUp className="h-5 w-5" />
-              </div>
-              <p className="mt-4 text-sm font-semibold text-white">No files uploaded yet.</p>
-              <p className="mt-1 max-w-sm text-sm leading-6 text-[var(--omnix-text-2)]">
-                Upload a PDF, DOCX, TXT, or Markdown file above to make it available to Omnix retrieval.
-              </p>
-              <Button
-                type="button"
-                size="sm"
-                className="mt-4 min-h-10"
-                leftIcon={<Plus className="h-3.5 w-3.5" />}
-                onClick={scrollToUpload}
-              >
-                Upload first file
-              </Button>
-            </div>
+            <EmptyState
+              icon={FileUp}
+              title="No files uploaded yet"
+              description="Upload a PDF, DOCX, TXT, or Markdown file above to make it available to Omnix retrieval."
+              action={{ label: "Upload first file", onClick: scrollToUpload }}
+              className="relative z-10 mt-4 min-h-[220px] border-dashed"
+            />
           ) : filteredFiles.length === 0 ? (
-            <div className="relative z-10 mt-4 flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 p-6 text-center">
-              <Search className="h-7 w-7 text-cyan-200/35" />
-              <p className="mt-3 text-sm font-semibold text-white">No sources match this search.</p>
-              <p className="mt-1 max-w-sm text-sm leading-6 text-[var(--omnix-text-2)]">
-                Clear the search field to view all uploaded workspace files.
-              </p>
-            </div>
+            <EmptyState
+              icon={Search}
+              title="No sources match this search"
+              description="Clear the search field to view all uploaded workspace files."
+              action={{ label: "Clear search", onClick: () => setSearchQuery("") }}
+              className="relative z-10 mt-4 min-h-[180px] border-dashed"
+            />
           ) : (
             <div className={view === "grid" ? "relative z-10 mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3" : "relative z-10 mt-3 grid gap-2"}>
               {filteredFiles.map((f) => {

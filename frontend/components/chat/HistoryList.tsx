@@ -17,6 +17,7 @@ import {
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { useConversationHistory } from "@/lib/conversation-history-context";
@@ -319,29 +320,19 @@ export function HistoryList() {
           </AnimatePresence>
         </div>
       ) : (
-        <div className="omnix-cinematic-card flex min-h-[360px] flex-col items-center justify-center border-dashed p-8 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
-            <MessageSquareText className="h-5 w-5" />
-          </div>
-          <h2 className="mt-4 text-lg font-semibold text-white">
-            {query ? "No matching conversations" : "No conversations yet"}
-          </h2>
-          <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
-            {query
-              ? "Adjust the search term or open a new chat."
-              : "Your saved conversations will appear here after the API stores the first thread."}
-          </p>
-          <Button
-            type="button"
-            className="mt-5"
-            onClick={() => {
+        <EmptyState
+          icon={MessageSquareText}
+          title={query ? "No matching conversations" : "No conversations yet"}
+          description={query ? "Adjust the search term or open a new chat." : "Your saved conversations will appear here after the API stores the first thread."}
+          action={{
+            label: "Start chat",
+            onClick: () => {
               setActiveConversation(null);
               router.push("/chat");
-            }}
-          >
-            Start chat
-          </Button>
-        </div>
+            },
+          }}
+          className="min-h-[360px] border-dashed"
+        />
       )}
       </div>
     </section>
