@@ -80,6 +80,7 @@ interface FileData {
 
 type ConnectorType = "knowledge_link" | "file_repository" | "company_drive" | "external_database";
 type SourceType = "file" | ConnectorType;
+type SourceSection = "files" | "connectors";
 
 type ConnectorStatus =
   | "live"
@@ -346,6 +347,7 @@ function FilesPageContent() {
   const [connectorError, setConnectorError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
+  const [activeSection, setActiveSection] = useState<SourceSection>("files");
   const [activeType, setActiveType] = useState<SourceType>("file");
   const [setupType, setSetupType] = useState<ConnectorType | null>(null);
   const [setupForm, setSetupForm] = useState<ConnectorFormState>(emptyForm("knowledge_link"));
@@ -438,6 +440,7 @@ function FilesPageContent() {
   }
 
   function scrollToUpload() {
+    setActiveSection("files");
     setActiveType("file");
     window.setTimeout(() => {
       document.getElementById("workspace-upload-dropzone")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -676,6 +679,9 @@ function FilesPageContent() {
   }
 
   const setupMeta = setupType ? sourceTypes.find((item) => item.id === setupType) : null;
+  const connectorSourceTypes = sourceTypes.filter(
+    (type): type is (typeof sourceTypes)[number] & { id: ConnectorType } => type.id !== "file",
+  );
 
   return (
     <section className="omnix-page-frame omnix-scrollbar">
@@ -703,6 +709,38 @@ function FilesPageContent() {
           ) : null}
         </div>
 
+        <div className="flex flex-col gap-3 rounded-[var(--omnix-radius)] border border-[var(--omnix-border)] bg-black/15 p-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-1 rounded-[10px] bg-black/20 p-1">
+            {([
+              { id: "files", label: "Files", count: files.length },
+              { id: "connectors", label: "Connectors", count: connectors.length },
+            ] as Array<{ id: SourceSection; label: string; count: number }>).map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => setActiveSection(section.id)}
+                className={cn(
+                  "inline-flex min-h-9 flex-1 items-center justify-center gap-2 rounded-lg px-3 text-xs font-bold uppercase tracking-[0.08em] transition sm:flex-none",
+                  activeSection === section.id
+                    ? "bg-cyan-300/12 text-cyan-100 shadow-[var(--omnix-glow-xs)]"
+                    : "text-[var(--omnix-text-3)] hover:bg-white/[0.035] hover:text-white",
+                )}
+              >
+                {section.label}
+                <span className="rounded-full border border-white/10 bg-black/20 px-1.5 py-px text-[10px] text-white/55">
+                  {section.count}
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="px-1 text-xs leading-5 text-[var(--omnix-text-3)]">
+            {activeSection === "files"
+              ? "Upload, search, and inspect retrievable workspace files."
+              : "Configure external knowledge systems and monitor connector status."}
+          </p>
+        </div>
+
+        {activeSection === "connectors" ? (
         <div className="omnix-cinematic-card p-5">
           <div className="relative z-10 mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -718,23 +756,19 @@ function FilesPageContent() {
               </span>
             ) : null}
           </div>
-          <div className="relative z-10 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-            {sourceTypes.map((type) => {
+          <div className="relative z-10 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {connectorSourceTypes.map((type) => {
               const Icon = type.icon;
               const active = activeType === type.id;
-              const latest = type.id === "file" ? null : newestConnector(connectors, type.id);
-              const cardStatus = type.id === "file" ? "live" : latest?.status ?? "not_configured";
-              const count = type.id === "file" ? files.length : connectorCounts[type.id];
+              const latest = newestConnector(connectors, type.id);
+              const cardStatus = latest?.status ?? "not_configured";
+              const count = connectorCounts[type.id];
               return (
                 <button
                   key={type.id}
                   type="button"
                   onClick={() => {
-                    if (type.id === "file") {
-                      scrollToUpload();
-                    } else {
-                      openSetup(type.id, latest ?? undefined);
-                    }
+                    openSetup(type.id, latest ?? undefined);
                   }}
                   className={cn(
                     "group relative flex min-h-[154px] flex-col justify-between overflow-hidden rounded-xl border p-3 text-left transition",
@@ -767,6 +801,7 @@ function FilesPageContent() {
             })}
           </div>
         </div>
+        ) : null}
 
         <div className="grid gap-3 md:grid-cols-3">
           {[
@@ -791,6 +826,7 @@ function FilesPageContent() {
           })}
         </div>
 
+        {activeSection === "connectors" ? (
         <div className="omnix-cinematic-card p-5">
           <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
@@ -875,7 +911,10 @@ function FilesPageContent() {
             </div>
           )}
         </div>
+        ) : null}
 
+        {activeSection === "files" ? (
+        <>
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative w-full min-w-0 flex-1 sm:min-w-[220px]">
             <Search className="absolute left-[11px] top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-white/25" />
@@ -998,6 +1037,8 @@ function FilesPageContent() {
             </div>
           )}
         </div>
+        </>
+        ) : null}
       </div>
 
       {candidateFile ? (
