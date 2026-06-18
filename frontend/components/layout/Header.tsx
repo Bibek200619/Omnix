@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   AlertCircle,
@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
+import type { Workspace } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
 import { InviteNotificationBar, InviteNotificationBell } from "@/components/workspace/InviteNotifications";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -65,6 +66,25 @@ type HeaderProps = {
   onExpandSidebar?: () => void;
 };
 
+function findWorkspaceTrail(workspaces: Workspace[], workspaceId: string | null): Workspace[] {
+  if (!workspaceId) {
+    return [];
+  }
+
+  for (const workspace of workspaces) {
+    if (workspace.id === workspaceId) {
+      return [workspace];
+    }
+
+    const subspaceTrail = findWorkspaceTrail(workspace.subspaces ?? [], workspaceId);
+    if (subspaceTrail.length > 0) {
+      return [workspace, ...subspaceTrail];
+    }
+  }
+
+  return [];
+}
+
 export const Header = memo(function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -77,10 +97,19 @@ export const Header = memo(function Header({ sidebarCollapsed = false, onMenuCli
   const [offlineAlertDismissed, setOfflineAlertDismissed] = useState(false);
   
   const active = routeTitles.find((route) => pathname.startsWith(route.match)) ?? routeTitles[0];
+  const workspaceBreadcrumb = useMemo(() => {
+    const trail = findWorkspaceTrail(workspaces, activeWorkspaceId);
+
+    if (trail.length > 0) {
+      return trail;
+    }
+
+    return activeWorkspace ? [activeWorkspace] : [];
+  }, [activeWorkspace, activeWorkspaceId, workspaces]);
   
   // Dynamic Hierarchy Orientation
-  const parentWorkspace = workspaces.find(w => w.id === activeWorkspace?.parent_workspace_id);
-  const isSubspace = !!activeWorkspace?.parent_workspace_id;
+  const parentWorkspace = workspaceBreadcrumb.length > 1 ? workspaceBreadcrumb[workspaceBreadcrumb.length - 2] : null;
+  const isSubspace = workspaceBreadcrumb.length > 1 || !!activeWorkspace?.parent_workspace_id;
   const realtimeOffline = !!activeWorkspaceId && (realtimeStatus === "disconnected" || realtimeStatus === "error");
   const realtimeStatusLabel = realtimeOffline
     ? "offline"
@@ -180,9 +209,28 @@ export const Header = memo(function Header({ sidebarCollapsed = false, onMenuCli
                    {activeWorkspace?.current_user_role?.replace(/_/g, ' ') || "Member"}
                 </span>
               </div>
-              <p className="mt-px hidden truncate text-[10px] tracking-[0.03em] text-[var(--omnix-rgba-255-255-255-0-22)] min-[390px]:block">
-                 {activeWorkspace ? (isSubspace ? "Operational Subspace" : "Super Workspace") : active.subtitle}
-              </p>
+              {workspaceBreadcrumb.length > 0 ? (
+                <nav
+                  aria-label="Workspace breadcrumb"
+                  className="mt-px hidden min-w-0 text-[10px] tracking-[0.03em] text-[var(--omnix-rgba-255-255-255-0-35)] min-[390px]:block"
+                >
+                  <ol className="flex min-w-0 items-center gap-1 overflow-hidden">
+                    {workspaceBreadcrumb.map((workspace) => (
+                      <li key={workspace.id} className="flex min-w-0 items-center gap-1">
+                        <span className="truncate">{workspace.name}</span>
+                        <ChevronRight className="h-2.5 w-2.5 shrink-0 text-white/15" aria-hidden="true" />
+                      </li>
+                    ))}
+                    <li className="min-w-0 truncate text-[var(--omnix-rgba-255-255-255-0-5)]" aria-current="page">
+                      {active.title}
+                    </li>
+                  </ol>
+                </nav>
+              ) : (
+                <p className="mt-px hidden truncate text-[10px] tracking-[0.03em] text-[var(--omnix-rgba-255-255-255-0-22)] min-[390px]:block">
+                  {active.subtitle}
+                </p>
+              )}
             </div>
           </div>
 
