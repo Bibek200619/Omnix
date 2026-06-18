@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { formatRelativeTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import type { WorkspaceActivityEvent } from "@/lib/workspace-types";
 
@@ -41,20 +42,6 @@ function actorName(item: WorkspaceActivityEvent) {
   const name = item.actor_name || item.actor_email || "Omnix";
   if (name === "Omnix AI") return "Omnix";
   return name;
-}
-
-function formatRelativeTime(value?: string | null) {
-  if (!value) return "Just now";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Just now";
-  const deltaMs = Date.now() - date.getTime();
-  const minutes = Math.max(0, Math.round(deltaMs / 60000));
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
 }
 
 export function WorkspaceActivityFeed({
@@ -134,7 +121,12 @@ export function WorkspaceActivityFeed({
                         {item.summary}
                       </p>
                       <span className="shrink-0 text-[9px] sm:text-[10px] font-medium text-white/30">
-                        {formatRelativeTime(item.created_at)}
+                        {formatRelativeTime(item.created_at, {
+                          fallback: "Just now",
+                          includeAgo: true,
+                          localeAfterDays: false,
+                          rounding: "round",
+                        })}
                       </span>
                     </div>
                     <div className="mt-0.5 sm:mt-1 flex items-center gap-1.5 sm:gap-2">
