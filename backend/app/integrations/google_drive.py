@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
 import os
 import logging
 import time
@@ -20,6 +24,7 @@ GOOGLE_OAUTH_TOKEN = "https://oauth2.googleapis.com/token"
 GOOGLE_DRIVE_FILES = "https://www.googleapis.com/drive/v3/files"
 GOOGLE_DRIVE_EXPORT = "https://www.googleapis.com/drive/v3/files/{file_id}/export"
 GOOGLE_DRIVE_DOWNLOAD = "https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
+DEFAULT_OAUTH_STATE_TTL_SECONDS = 10 * 60
 
 SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly",
@@ -33,6 +38,82 @@ def _client_credentials() -> tuple[str, str]:
     if not client_id or not client_secret:
         raise RuntimeError("Google OAuth client_id/secret not configured in environment")
     return client_id, client_secret
+
+
+def _oauth_state_secret() -> str:
+    secret = (
+        os.environ.get("GOOGLE_OAUTH_STATE_SECRET")
+        or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        or os.environ.get("SUPABASE_SERVICE_ROLE")
+    )
+    if not secret:
+        raise RuntimeError("GOOGLE_OAUTH_STATE_SECRET or SUPABASE_SERVICE_ROLE_KEY must be configured")
+    return secret
+
+
+def _oauth_state_ttl_seconds() -> int:
+    try:
+        return max(60, int(os.environ.get("GOOGLE_OAUTH_STATE_TTL_SECONDS", DEFAULT_OAUTH_STATE_TTL_SECONDS)))
+    except ValueError:
+        logger.warning("Invalid GOOGLE_OAUTH_STATE_TTL_SECONDS; using default.")
+        return DEFAULT_OAUTH_STATE_TTL_SECONDS
+
+
+def _base64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
+
+
+def _base64url_decode(data: str) -> bytes:
+    padding = "=" * (-len(data) % 4)
+    return base64.urlsafe_b64decode(f"{data}{padding}")
+
+
+def _sign_oauth_state(payload_segment: str) -> str:
+    digest = hmac.new(
+        _oauth_state_secret().encode("utf-8"),
+        payload_segment.encode("ascii"),
+        hashlib.sha256,
+    ).digest()
+    return _base64url_encode(digest)
+
+
+def build_oauth_state(user_id: str, workspace_id: str | None) -> str:
+    if not user_id or not str(user_id).strip():
+        raise ValueError("user_id is required for OAuth state")
+    payload = {
+        "iat": int(time.time()),
+        "sub": str(user_id),
+        "workspace_id": str(workspace_id) if workspace_id else None,
+    }
+    payload_json = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    payload_segment = _base64url_encode(payload_json)
+    return f"{payload_segment}.{_sign_oauth_state(payload_segment)}"
+
+
+def parse_oauth_state(state: str | None) -> tuple[str, str | None]:
+    if not state or "." not in state:
+        raise ValueError("Missing OAuth state")
+    payload_segment, signature = state.rsplit(".", 1)
+    expected_signature = _sign_oauth_state(payload_segment)
+    if not hmac.compare_digest(signature, expected_signature):
+        raise ValueError("Invalid OAuth state signature")
+
+    try:
+        payload = json.loads(_base64url_decode(payload_segment))
+    except Exception as exc:
+        raise ValueError("Invalid OAuth state payload") from exc
+
+    issued_at = int(payload.get("iat") or 0)
+    now = int(time.time())
+    ttl_seconds = _oauth_state_ttl_seconds()
+    if issued_at <= 0 or issued_at < now - ttl_seconds or issued_at > now + 60:
+        raise ValueError("Expired OAuth state")
+
+    user_id = str(payload.get("sub") or "").strip()
+    if not user_id:
+        raise ValueError("OAuth state is missing user")
+    workspace_id = payload.get("workspace_id")
+    return user_id, str(workspace_id) if workspace_id else None
 
 
 def build_oauth_authorize_url(redirect_uri: str, state: str | None = None) -> str:
