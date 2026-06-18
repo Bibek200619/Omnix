@@ -66,7 +66,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={isDisabled}
         {...props}
       >
-        <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent opacity-0 transition-opacity duration-500 group-hover/btn:opacity-100" style={{ transform: 'skewX(-25deg) translateX(-100%)', animation: 'omnix-beam-sweep 3s infinite' }} />
+        <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent opacity-0 transition-opacity duration-500 group-hover/btn:opacity-100" style={{ transform: 'skewX(-25deg) translateX(-100%)', animation: 'omnix-sheen-sweep 3s infinite' }} />
         <span className="relative z-10 flex items-center gap-2">
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : leftIcon}
           {children}

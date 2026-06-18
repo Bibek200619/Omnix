@@ -108,8 +108,11 @@ function DashboardPageContent() {
     <section className="omnix-page-frame omnix-scrollbar">
       <div className="omnix-content-max flex flex-col gap-4 sm:gap-6">
 
-        <div className="omnix-beam-container relative overflow-hidden rounded-[18px] border border-[rgba(0,255,255,0.12)] bg-[radial-gradient(circle_at_12%_0%,rgba(0,255,255,0.16),transparent_32%),linear-gradient(145deg,rgba(8,20,36,0.94),rgba(6,9,18,0.86))] p-4 shadow-[0_30px_110px_rgba(0,0,0,0.38),var(--omnix-glow-xs)] sm:rounded-[28px] sm:p-7">
-          <div className="omnix-beam-sweep" />
+        <div className="relative overflow-hidden rounded-[18px] border border-[rgba(0,255,255,0.12)] bg-[radial-gradient(circle_at_12%_0%,rgba(0,255,255,0.16),transparent_32%),linear-gradient(145deg,rgba(8,20,36,0.94),rgba(6,9,18,0.86))] p-4 shadow-[0_30px_110px_rgba(0,0,0,0.38),var(--omnix-glow-xs)] sm:rounded-[28px] sm:p-7">
+          <div
+            className="pointer-events-none absolute inset-0 w-2/5 bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-0-255-255-0-08),transparent)]"
+            style={{ animation: "omnix-sheen-sweep 4s cubic-bezier(0.4, 0, 0.2, 1) infinite" }}
+          />
           <div className="pointer-events-none absolute right-[-7rem] top-[-8rem] h-80 w-80 rounded-full bg-purple-400/10 blur-[95px]" />
           <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
@@ -204,12 +207,15 @@ function DashboardPageContent() {
                       key={action.label}
                       type="button"
                       onClick={() => router.push(action.href)}
-                      className={cn("omnix-command-button omnix-beam-container omnix-page-enter group relative z-10 flex items-center gap-4 p-4 text-left", pageEnterDelay(i + 3))}
+                      className={cn("omnix-command-button omnix-page-enter group relative z-10 flex items-center gap-4 p-4 text-left", pageEnterDelay(i + 3))}
                       style={{
                         "--command-color": action.color,
                       } as CSSProperties}
                     >
-                      <div className="omnix-beam-sweep opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+                      <div
+                        className="pointer-events-none absolute inset-0 w-2/5 bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-0-255-255-0-08),transparent)] opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                        style={{ animation: "omnix-sheen-sweep 4s cubic-bezier(0.4, 0, 0.2, 1) infinite" }}
+                      />
                       <span
                         className="rounded-xl p-2.5 transition-all duration-200 group-hover:scale-110"
                         style={{
