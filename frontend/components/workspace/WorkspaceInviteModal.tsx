@@ -84,7 +84,7 @@ export function WorkspaceInviteModal({
         </div>
         <button
           type="button"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white"
           aria-label="Close invite modal"
           title="Close invite modal"
           onClick={onClose}

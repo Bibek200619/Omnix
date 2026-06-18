@@ -314,7 +314,7 @@ function WorkspaceConversationSurfaceContent() {
         </div>
         <div className={cn("omnix-conversation-messages min-h-0 min-w-0 flex-col gap-3", mobileConversationView !== "messages" ? "hidden" : "flex")}>
           <div className="omnix-conversation-mobile-back">
-            <Button type="button" variant="ghost" size="sm" className="h-9 border-white/10 text-xs text-[var(--omnix-text-2)]" leftIcon={<ArrowLeft className="h-3.5 w-3.5" />} onClick={handleBackToChannels}>
+            <Button type="button" variant="ghost" size="sm" className="h-11 border-white/10 text-xs text-[var(--omnix-text-2)]" leftIcon={<ArrowLeft className="h-3.5 w-3.5" />} onClick={handleBackToChannels}>
               Channels
             </Button>
           </div>

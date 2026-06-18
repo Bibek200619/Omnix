@@ -147,7 +147,7 @@ function MemberActionsMenu({
         aria-label={`Open actions for ${workspaceMemberName(member)}`}
         title={`Open actions for ${workspaceMemberName(member)}`}
         onClick={onToggle}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-slate-300 transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-slate-300 transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
       >
         <MoreHorizontal className="h-4 w-4" />
       </button>
@@ -485,7 +485,7 @@ export function WorkspaceAccessPanel() {
             </p>
           </div>
           {canManageRoles ? (
-            <Button type="button" variant="ghost" size="sm" className="min-h-10 w-full sm:w-auto" leftIcon={<UserPlus className="h-4 w-4" />} onClick={() => setInviteOpen(true)}>
+            <Button type="button" variant="ghost" size="sm" className="min-h-11 w-full sm:w-auto" leftIcon={<UserPlus className="h-4 w-4" />} onClick={() => setInviteOpen(true)}>
               Invite
             </Button>
           ) : null}

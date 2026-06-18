@@ -37,7 +37,7 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
         <button
           type="button"
           onClick={handleCopy}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-[var(--omnix-surface)] hover:text-white"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-400 transition hover:bg-[var(--omnix-surface)] hover:text-white"
           aria-label="Copy code"
           title="Copy code"
         >

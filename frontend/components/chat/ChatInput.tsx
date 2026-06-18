@@ -133,7 +133,7 @@ export function ChatInput({
               </div>
               <button
                 type="button"
-                className="ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-cyan-100/55 transition hover:bg-cyan-300/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                className="ml-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-cyan-100/55 transition hover:bg-cyan-300/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
                 aria-label={`Remove ${attachmentName(file)}`}
                 title="Remove attachment"
                 onClick={() => onRemoveAttachment?.(file.id)}
@@ -193,7 +193,7 @@ export function ChatInput({
             aria-label={uploadOpen ? "Hide document upload" : "Attach document"}
             title={uploadOpen ? "Hide document upload" : "Attach document"}
             onClick={() => setUploadOpen((current) => !current)}
-            className={cn("h-8 w-8 rounded-[7px] border border-transparent text-[var(--omnix-text-3)] hover:bg-[var(--omnix-surface)] hover:text-white sm:h-7 sm:w-7", uploadOpen && "border-cyan-300/25 bg-cyan-300/10 text-cyan-100")}
+            className={cn("h-11 w-11 rounded-[7px] border border-transparent text-[var(--omnix-text-3)] hover:bg-[var(--omnix-surface)] hover:text-white", uploadOpen && "border-cyan-300/25 bg-cyan-300/10 text-cyan-100")}
           >
             <Paperclip className={cn("h-4 w-4 transition-transform sm:h-3.5 sm:w-3.5", uploadOpen && "rotate-45")} />
           </Button>
@@ -207,7 +207,7 @@ export function ChatInput({
                 type="button"
                 onClick={() => onSearchModeChange(mode.value)}
                 className={cn(
-                  "inline-flex h-8 min-w-0 items-center gap-1.5 rounded-[7px] border px-2.5 text-[11px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 sm:h-7",
+                  "inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-[7px] border px-3 text-[11px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70",
                   active
                     ? "border-cyan-300/35 bg-cyan-300/12 text-cyan-50 shadow-[var(--omnix-glow-xs)]"
                     : "border-transparent text-[var(--omnix-text-3)] hover:bg-[var(--omnix-surface)] hover:text-slate-100",
@@ -233,7 +233,7 @@ export function ChatInput({
             aria-label="Stop generating"
             title="Stop generating"
             onClick={() => onCancel?.()}
-            className="h-9 w-9 rounded-lg border-0 bg-rose-500/20 text-rose-300 shadow-[var(--omnix-glow-sm)] hover:bg-rose-500/40 hover:text-white sm:h-[30px] sm:w-[30px]"
+            className="h-11 w-11 rounded-lg border-0 bg-rose-500/20 text-rose-300 shadow-[var(--omnix-glow-sm)] hover:bg-rose-500/40 hover:text-white"
           >
             <Square className="h-4 w-4 fill-current sm:h-3.5 sm:w-3.5" />
           </Button>
@@ -245,7 +245,7 @@ export function ChatInput({
             title="Send message"
             disabled={!value.trim()}
             onClick={submit}
-            className="h-9 w-9 rounded-lg border-0 bg-[var(--omnix-grad-primary)] text-[#050c17] shadow-[var(--omnix-glow-sm)] hover:shadow-[var(--omnix-glow-md)] disabled:bg-[var(--omnix-surface)] disabled:text-[var(--omnix-text-3)] disabled:shadow-none sm:h-[30px] sm:w-[30px]"
+            className="h-11 w-11 rounded-lg border-0 bg-[var(--omnix-grad-primary)] text-[#050c17] shadow-[var(--omnix-glow-sm)] hover:shadow-[var(--omnix-glow-md)] disabled:bg-[var(--omnix-surface)] disabled:text-[var(--omnix-text-3)] disabled:shadow-none"
           >
             <Send className="h-4 w-4" />
           </Button>

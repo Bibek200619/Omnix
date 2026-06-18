@@ -27,7 +27,7 @@ export function EmptyState({
       <h2 className="mt-4 text-base font-semibold text-white">{title}</h2>
       <p className="mt-1 max-w-sm text-sm leading-6 text-[var(--omnix-text-2)]">{description}</p>
       {action ? (
-        <Button type="button" variant="primary" size="sm" className="mt-5 min-h-10" onClick={action.onClick}>
+        <Button type="button" variant="primary" size="sm" className="mt-5 min-h-11" onClick={action.onClick}>
           {action.label}
         </Button>
       ) : null}

@@ -111,7 +111,7 @@ export function ChatWorkspaceChrome({
             <button
               type="button"
               onClick={onOpenHistory}
-              className="omnix-ghost-action flex h-7 w-7 items-center justify-center rounded-[7px]"
+              className="omnix-ghost-action flex h-11 w-11 items-center justify-center rounded-[7px]"
               aria-label="Open history"
               title="Open history"
             >

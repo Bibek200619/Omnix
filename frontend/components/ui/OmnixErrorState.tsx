@@ -67,7 +67,7 @@ export function OmnixErrorState({
             <button
               type="button"
               onClick={onDismiss}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.035] text-white/50 transition hover:bg-white/[0.07] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
+              className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-white/[0.035] text-white/50 transition hover:bg-white/[0.07] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
               aria-label="Dismiss error"
               title="Dismiss"
             >

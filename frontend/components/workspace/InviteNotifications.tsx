@@ -156,7 +156,7 @@ export function InviteNotificationBar() {
                 onClick={() => {
                   setDismissedInviteIds((current) => new Set(current).add(getWorkspaceInviteId(invite)));
                 }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-cyan-300/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-500 transition hover:bg-cyan-300/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
               >
                 <X className="h-4 w-4" />
               </button>

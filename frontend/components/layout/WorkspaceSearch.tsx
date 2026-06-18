@@ -251,7 +251,7 @@ export function WorkspaceSearch() {
                 <button
                   type="button"
                   onClick={clearSearch}
-                  className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-white/35 hover:bg-white/5 hover:text-white/70"
+                  className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-white/35 hover:bg-white/5 hover:text-white/70"
                   aria-label="Clear workspace search"
                 >
                   <X className="h-4 w-4" />

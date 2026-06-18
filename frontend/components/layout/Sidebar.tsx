@@ -77,7 +77,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                     type="button"
                     variant="ghost"
                     size={"icon"}
-                    className="h-[26px] w-[26px] rounded-[7px] border border-[var(--omnix-border)] bg-transparent text-[var(--omnix-text-3)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white"
+                    className="h-11 w-11 rounded-[7px] border border-[var(--omnix-border)] bg-transparent text-[var(--omnix-text-3)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white"
                     aria-label="Collapse workspace sidebar"
                     title="Collapse workspace sidebar"
                     onClick={onToggleCollapse}

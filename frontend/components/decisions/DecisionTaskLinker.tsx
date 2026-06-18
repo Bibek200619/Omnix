@@ -154,7 +154,7 @@ export function DecisionTaskLinker({ decision, onUpdate }: DecisionTaskLinkerPro
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-8 w-8 rounded-lg p-0 text-white/10 hover:bg-rose-500/10 hover:text-rose-400 transition-all opacity-0 group-hover:opacity-100"
+                className="h-11 w-11 rounded-lg p-0 text-white/10 hover:bg-rose-500/10 hover:text-rose-400 transition-all opacity-0 group-hover:opacity-100"
                 onClick={() => toggleLink(task.id, true)}
                 disabled={linking === task.id}
               >
@@ -167,4 +167,3 @@ export function DecisionTaskLinker({ decision, onUpdate }: DecisionTaskLinkerPro
     </div>
   );
 }
-

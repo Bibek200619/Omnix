@@ -216,7 +216,7 @@ export function HistoryList() {
                           type="submit"
                           size={"icon"}
                           variant="secondary"
-                          className="h-9 w-9"
+                          className="h-11 w-11"
                           disabled={isBusy}
                           aria-label="Save title"
                           title="Save title"
@@ -227,7 +227,7 @@ export function HistoryList() {
                           type="button"
                           size={"icon"}
                           variant="ghost"
-                          className="h-9 w-9"
+                          className="h-11 w-11"
                           disabled={isBusy}
                           onClick={() => setEditingId(null)}
                           aria-label="Cancel rename"
@@ -276,7 +276,7 @@ export function HistoryList() {
                             type="button"
                             size={"icon"}
                             variant="ghost"
-                            className="h-8 w-8"
+                            className="h-11 w-11"
                             onClick={() => startRename(chat.id, chat.title)}
                             disabled={isBusy}
                             aria-label="Rename chat"
@@ -288,7 +288,7 @@ export function HistoryList() {
                             type="button"
                             size={"icon"}
                             variant="ghost"
-                            className="h-8 w-8 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
+                            className="h-11 w-11 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100"
                             onClick={() => deleteChat(chat.id)}
                             disabled={isBusy}
                             aria-label="Delete chat"

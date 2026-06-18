@@ -43,7 +43,7 @@ export function ChatHistoryPanel({
           <button
             type="button"
             onClick={onClose}
-            className="omnix-ghost-action flex h-[26px] w-[26px] items-center justify-center rounded-[7px]"
+            className="omnix-ghost-action flex h-11 w-11 items-center justify-center rounded-[7px]"
             aria-label="Close history"
             title="Close history"
           >

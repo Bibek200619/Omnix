@@ -541,7 +541,7 @@ export function CommandPalette() {
                     type="button"
                     onClick={closePalette}
                     title="Close command palette"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03] text-white/55 hover:bg-white/[0.06] hover:text-white/80"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03] text-white/55 hover:bg-white/[0.06] hover:text-white/80"
                     aria-label="Close command palette"
                   >
                     <X className="h-4 w-4" />
@@ -562,7 +562,7 @@ export function CommandPalette() {
                     <button
                       type="button"
                       onClick={() => setQuery("")}
-                      className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-white/35 hover:bg-white/5 hover:text-white/70"
+                      className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-white/35 hover:bg-white/5 hover:text-white/70"
                       aria-label="Clear command palette query"
                     >
                       <X className="h-4 w-4" />

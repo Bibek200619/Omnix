@@ -227,13 +227,13 @@ export function WorkspaceManagementActions({
 
           {canManageActive ? (
             <div className="grid grid-cols-2 gap-1.5 px-1">
-              <Button type="button" variant="ghost" size="sm" className="h-8 justify-start text-[9px] uppercase tracking-wider text-white/40 hover:text-white" leftIcon={<Edit3 className="h-3 w-3" />} onClick={onOpenRename}>
+              <Button type="button" variant="ghost" size="sm" className="h-11 justify-start text-[9px] uppercase tracking-wider text-white/40 hover:text-white" leftIcon={<Edit3 className="h-3 w-3" />} onClick={onOpenRename}>
                 Rename
               </Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 justify-start text-[9px] uppercase tracking-wider text-rose-400/50 hover:text-rose-400" leftIcon={<Trash2 className="h-3 w-3" />} onClick={onOpenDelete}>
+              <Button type="button" variant="ghost" size="sm" className="h-11 justify-start text-[9px] uppercase tracking-wider text-rose-400/50 hover:text-rose-400" leftIcon={<Trash2 className="h-3 w-3" />} onClick={onOpenDelete}>
                 Delete
               </Button>
-              <Button type="button" variant="ghost" size="sm" className="col-span-2 h-8 justify-start text-[9px] uppercase tracking-wider text-white/40 hover:text-white" leftIcon={<UserPlus className="h-3 w-3" />} onClick={onOpenInvite}>
+              <Button type="button" variant="ghost" size="sm" className="col-span-2 h-11 justify-start text-[9px] uppercase tracking-wider text-white/40 hover:text-white" leftIcon={<UserPlus className="h-3 w-3" />} onClick={onOpenInvite}>
                 Manage Members
               </Button>
             </div>
@@ -250,10 +250,10 @@ export function WorkspaceManagementActions({
               >
                 <Input value={newWorkspaceName} onChange={(event) => onNewWorkspaceNameChange(event.target.value)} placeholder="Workspace name" autoFocus disabled={creatingWorkspace} className="h-7 rounded-md text-[11px]" />
                 <div className="flex gap-1.5">
-                  <Button type="submit" size="sm" disabled={!newWorkspaceName.trim() || creatingWorkspace} className="h-7 flex-1 text-[10px]">
+                  <Button type="submit" size="sm" disabled={!newWorkspaceName.trim() || creatingWorkspace} className="h-11 flex-1 text-[10px]">
                     {creatingWorkspace ? "..." : "Create"}
                   </Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={onCancelCreate} disabled={creatingWorkspace} className="h-7 flex-1 text-[10px]">
+                  <Button type="button" variant="ghost" size="sm" onClick={onCancelCreate} disabled={creatingWorkspace} className="h-11 flex-1 text-[10px]">
                     Cancel
                   </Button>
                 </div>
@@ -321,7 +321,7 @@ function WorkspaceModalHeader({
           type="button"
           variant="ghost"
           size={"icon"}
-          className="h-9 w-9"
+          className="h-11 w-11"
           aria-label={closeLabel}
           title={closeLabel}
           onClick={onClose}

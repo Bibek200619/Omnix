@@ -67,10 +67,10 @@ export function ChannelList({
             className="h-16 !min-h-16 p-2 text-xs"
           />
           <div className="flex gap-2">
-            <Button type="submit" size="sm" disabled={!channelName.trim()} isLoading={creatingChannel} className="h-8 flex-1 text-xs">
+            <Button type="submit" size="sm" disabled={!channelName.trim()} isLoading={creatingChannel} className="h-11 flex-1 text-xs">
               Open
             </Button>
-            <Button type="button" size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setCreateOpen(false)}>
+            <Button type="button" size="sm" variant="ghost" className="h-11 text-xs" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
           </div>

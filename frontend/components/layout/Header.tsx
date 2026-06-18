@@ -138,7 +138,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
                 type="button"
                 variant="ghost"
                 size={"icon"}
-                className="h-10 w-10 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)]"
+                className="h-11 w-11 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)]"
                 aria-label="Open navigation"
                 title="Open navigation"
                 onClick={onMenuClick}
@@ -152,7 +152,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
                   type="button"
                   variant="ghost"
                   size={"icon"}
-                  className="h-9 w-9 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)]"
+                  className="h-11 w-11 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)]"
                   aria-label="Expand workspace sidebar"
                   title="Expand workspace sidebar"
                   onClick={onExpandSidebar}
@@ -237,7 +237,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
                 variant="secondary"
                 size={"icon"}
                 onClick={() => router.push("/chat")}
-                className="h-9 w-9 rounded-[10px] border-[var(--omnix-cyan)] bg-transparent text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] sm:w-auto sm:px-4"
+                className="h-11 w-11 rounded-[10px] border-[var(--omnix-cyan)] bg-transparent text-[var(--omnix-cyan)] shadow-[var(--omnix-glow-xs)] hover:bg-cyan-300/10 hover:shadow-[var(--omnix-glow-sm)] sm:w-auto sm:px-4"
                 aria-label="Start new chat"
                 title="Start new chat"
               >
@@ -279,7 +279,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 rounded-md border-amber-300/20 text-amber-50 hover:bg-amber-300/10 hover:text-white"
+                  className="h-11 w-11 rounded-md border-amber-300/20 text-amber-50 hover:bg-amber-300/10 hover:text-white"
                   aria-label="Dismiss realtime offline alert"
                   title="Dismiss"
                   onClick={() => setOfflineAlertDismissed(true)}

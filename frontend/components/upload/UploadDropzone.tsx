@@ -280,10 +280,10 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
                 ) : it.status === "error" ? (
                   <span className="text-xs font-medium text-rose-400">Failed</span>
                 ) : (
-                  <Button type="button" size="sm" variant="ghost" className="min-h-10" onClick={() => upload(it)}>Upload</Button>
+                  <Button type="button" size="sm" variant="ghost" className="min-h-11" onClick={() => upload(it)}>Upload</Button>
                 )}
                 
-                <button type="button" onClick={() => setItems((s) => s.filter((_i) => _i.id !== it.id))} className="flex min-h-10 min-w-10 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-cyan-300/10 hover:text-slate-100" aria-label={`Remove ${it.file.name}`}>
+                <button type="button" onClick={() => setItems((s) => s.filter((_i) => _i.id !== it.id))} className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-cyan-300/10 hover:text-slate-100" aria-label={`Remove ${it.file.name}`}>
                   <X className="h-4 w-4" />
                 </button>
               </div>
