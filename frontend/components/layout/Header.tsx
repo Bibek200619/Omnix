@@ -31,6 +31,7 @@ const CommandPalette = dynamic(
 
 const routeTitles = [
   { match: "/dashboard", title: "Dashboard", subtitle: "Welcome back" },
+  { match: "/analytics", title: "Analytics", subtitle: "Usage metrics and performance insights" },
   { match: "/chat", title: "AI Chat", subtitle: "Omnix Intelligence" },
   { match: "/conversations", title: "Conversations", subtitle: "Operational discussion" },
   { match: "/decisions", title: "Decisions", subtitle: "Organizational memory" },

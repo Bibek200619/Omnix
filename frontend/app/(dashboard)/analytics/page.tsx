@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, AlertCircle, Construction, Cpu, Database, LayoutDashboard, MessageSquare, RefreshCw, Server, Users, Sparkles, Globe } from "lucide-react";
+import { Activity, AlertCircle, Cpu, Database, LayoutDashboard, MessageSquare, RefreshCw, Server, Users, Sparkles, Globe } from "lucide-react";
 import { PageTitle } from "@/components/ui/Typography";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
