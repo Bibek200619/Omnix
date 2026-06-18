@@ -212,6 +212,7 @@ export function ChatInput({
                     ? "border-cyan-300/35 bg-cyan-300/12 text-cyan-50 shadow-[var(--omnix-glow-xs)]"
                     : "border-transparent text-[var(--omnix-text-3)] hover:bg-[var(--omnix-surface)] hover:text-slate-100",
                 )}
+                aria-label={`${mode.label} search mode`}
                 aria-pressed={active}
                 title={`${mode.label} search mode`}
               >
