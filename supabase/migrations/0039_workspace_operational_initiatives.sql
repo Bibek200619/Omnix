@@ -29,6 +29,7 @@ ALTER TABLE public.workspace_initiatives
   ALTER COLUMN status SET DEFAULT 'draft';
 
 ALTER TABLE public.workspace_initiatives
+  DROP CONSTRAINT IF EXISTS workspace_initiatives_title_check,
   DROP CONSTRAINT IF EXISTS workspace_initiatives_status_check;
 
 ALTER TABLE public.workspace_initiatives

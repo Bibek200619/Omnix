@@ -13,7 +13,7 @@ BEGIN
 
   ALTER TABLE workspace_members
   ADD CONSTRAINT workspace_members_role_check
-  CHECK (role IN ('owner', 'founder', 'co_owner', 'team_lead', 'member'));
+  CHECK (role IN ('owner', 'founder', 'super_founder', 'co_owner', 'team_lead', 'sub_leader', 'sub_member', 'member'));
 
   IF EXISTS (
     SELECT 1
@@ -26,5 +26,5 @@ BEGIN
 
   ALTER TABLE workspace_invites
   ADD CONSTRAINT workspace_invites_role_check
-  CHECK (role IN ('co_owner', 'team_lead', 'member'));
+  CHECK (role IN ('owner', 'founder', 'super_founder', 'co_owner', 'team_lead', 'sub_leader', 'sub_member', 'member'));
 END$$;
