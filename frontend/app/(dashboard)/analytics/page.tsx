@@ -10,7 +10,7 @@ import { PageTitle } from "@/components/ui/Typography";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
 import { useConversationHistory } from "@/lib/conversation-history-context";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceMembership, useWorkspaceTree } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import { IntelligenceDashboard } from "@/components/workspace/IntelligenceDashboard";
 
@@ -80,7 +80,8 @@ export default function AnalyticsPage() {
 
 function AnalyticsPageContent() {
   const { conversations, loading: conversationsLoading, refreshConversations } = useConversationHistory();
-  const { activeWorkspace, activeMembers, workspaces } = useWorkspace();
+  const { activeWorkspace, workspaces } = useWorkspaceTree();
+  const { activeMembers } = useWorkspaceMembership();
   const [files, setFiles] = useState<FileData[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceTree } from "@/lib/workspace-context";
 import { useWorkspaceNotifications } from "@/lib/workspace-notifications-context";
 import { cn } from "@/lib/utils";
 import type { WorkspaceMentionInboxItem, WorkspaceMentionSourceType } from "@/lib/workspace-types";
@@ -58,7 +58,7 @@ export const NotificationCenterSurface = memo(function NotificationCenterSurface
 
 function NotificationCenterSurfaceContent() {
   const router = useRouter();
-  const { activeWorkspace, activeWorkspaceId } = useWorkspace();
+  const { activeWorkspace, activeWorkspaceId } = useWorkspaceTree();
   const {
     mentions,
     unreadCount,

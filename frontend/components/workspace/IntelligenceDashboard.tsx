@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Activity, BarChart3, Database, MessageSquare } from "lucide-react";
 import { apiClient } from "@/lib/api";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceTree } from "@/lib/workspace-context";
 
 type TelemetryData = {
   dates: string[];
@@ -52,7 +52,7 @@ function MiniBarChart({ data, labels, color, label }: { data: number[], labels: 
 }
 
 export function IntelligenceDashboard() {
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId } = useWorkspaceTree();
   const [data, setData] = useState<TelemetryData | null>(null);
   const [loading, setLoading] = useState(true);
 
