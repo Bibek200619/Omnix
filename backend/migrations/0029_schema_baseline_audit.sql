@@ -1045,7 +1045,7 @@ CREATE INDEX IF NOT EXISTS idx_workspaces_type ON public.workspaces (workspace_t
 CREATE INDEX IF NOT EXISTS idx_workspaces_global_parent ON public.workspaces (parent_workspace_id, is_global);
 CREATE INDEX IF NOT EXISTS idx_workspaces_workspace_focus ON public.workspaces (workspace_focus);
 CREATE INDEX IF NOT EXISTS idx_workspaces_ai_specialization ON public.workspaces (ai_specialization);
-CREATE INDEX IF NOT EXISTS idx_workspaces_intelligence_preferences ON public.workspaces USING gin (intelligence_preferences);
+CREATE INDEX IF NOT EXISTS idx_workspaces_intelligence_preferences ON public.workspaces USING gin (intelligence_preferences) WITH (fastupdate = on, gin_pending_list_limit = 16384);
 
 CREATE INDEX IF NOT EXISTS idx_workspace_members_user_id ON public.workspace_members (user_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_members_role ON public.workspace_members (role);
@@ -1059,15 +1059,15 @@ CREATE INDEX IF NOT EXISTS idx_conversations_archived ON public.conversations (i
 
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_created_at ON public.messages (conversation_id, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_messages_user_created_at ON public.messages (user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_messages_metadata_gin ON public.messages USING gin (metadata);
-CREATE INDEX IF NOT EXISTS idx_messages_payload_gin ON public.messages USING gin (payload);
+CREATE INDEX IF NOT EXISTS idx_messages_metadata_gin ON public.messages USING gin (metadata) WITH (fastupdate = on, gin_pending_list_limit = 16384);
+CREATE INDEX IF NOT EXISTS idx_messages_payload_gin ON public.messages USING gin (payload) WITH (fastupdate = on, gin_pending_list_limit = 16384);
 
 CREATE INDEX IF NOT EXISTS idx_files_user_id ON public.files (user_id);
 CREATE INDEX IF NOT EXISTS idx_files_workspace_id ON public.files (workspace_id);
 CREATE INDEX IF NOT EXISTS idx_files_conversation_id ON public.files (conversation_id);
 CREATE INDEX IF NOT EXISTS idx_files_created_at ON public.files (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_files_metadata_gin ON public.files USING gin (metadata);
-CREATE INDEX IF NOT EXISTS idx_files_file_name_fts ON public.files USING gin (to_tsvector('simple', coalesce(file_name, '')));
+CREATE INDEX IF NOT EXISTS idx_files_metadata_gin ON public.files USING gin (metadata) WITH (fastupdate = on, gin_pending_list_limit = 16384);
+CREATE INDEX IF NOT EXISTS idx_files_file_name_fts ON public.files USING gin (to_tsvector('simple', coalesce(file_name, ''))) WITH (fastupdate = on, gin_pending_list_limit = 16384);
 
 CREATE INDEX IF NOT EXISTS idx_documents_user_id ON public.documents (user_id);
 CREATE INDEX IF NOT EXISTS idx_documents_workspace_id ON public.documents (workspace_id);
@@ -1075,15 +1075,15 @@ CREATE INDEX IF NOT EXISTS idx_documents_file_id ON public.documents (file_id);
 CREATE INDEX IF NOT EXISTS idx_documents_file_chunk ON public.documents (file_id, chunk_index);
 CREATE INDEX IF NOT EXISTS idx_documents_workspace_created_at ON public.documents (workspace_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_documents_user_workspace ON public.documents (user_id, workspace_id);
-CREATE INDEX IF NOT EXISTS idx_documents_content_fts ON public.documents USING gin (to_tsvector('simple', coalesce(content, '')));
-CREATE INDEX IF NOT EXISTS idx_documents_metadata_gin ON public.documents USING gin (metadata);
+CREATE INDEX IF NOT EXISTS idx_documents_content_fts ON public.documents USING gin (to_tsvector('simple', coalesce(content, ''))) WITH (fastupdate = on, gin_pending_list_limit = 16384);
+CREATE INDEX IF NOT EXISTS idx_documents_metadata_gin ON public.documents USING gin (metadata) WITH (fastupdate = on, gin_pending_list_limit = 16384);
 CREATE INDEX IF NOT EXISTS idx_documents_embedding_cosine ON public.documents USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100) WHERE embedding IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_artifacts_workspace_id ON public.artifacts (workspace_id);
 CREATE INDEX IF NOT EXISTS idx_artifacts_user_id ON public.artifacts (user_id);
 CREATE INDEX IF NOT EXISTS idx_artifacts_workspace_created_at ON public.artifacts (workspace_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_artifacts_pinned ON public.artifacts (workspace_id, pinned, updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_artifacts_metadata_gin ON public.artifacts USING gin (metadata);
+CREATE INDEX IF NOT EXISTS idx_artifacts_metadata_gin ON public.artifacts USING gin (metadata) WITH (fastupdate = on, gin_pending_list_limit = 16384);
 
 CREATE INDEX IF NOT EXISTS idx_api_logs_created_at ON public.api_logs (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_api_logs_endpoint_status ON public.api_logs (endpoint, status);
@@ -1122,7 +1122,20 @@ CREATE INDEX IF NOT EXISTS idx_workspace_intelligence_memory_importance ON publi
 CREATE INDEX IF NOT EXISTS idx_workspace_intelligence_memory_initiative ON public.workspace_intelligence_memory (initiative_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_intelligence_memory_resolution ON public.workspace_intelligence_memory (workspace_id, resolution_status);
 CREATE INDEX IF NOT EXISTS idx_workspace_intelligence_memory_valid_until ON public.workspace_intelligence_memory (valid_until);
-CREATE INDEX IF NOT EXISTS idx_workspace_intelligence_memory_structured_data ON public.workspace_intelligence_memory USING gin (structured_data);
+CREATE INDEX IF NOT EXISTS idx_workspace_intelligence_memory_structured_data ON public.workspace_intelligence_memory USING gin (structured_data) WITH (fastupdate = on, gin_pending_list_limit = 16384);
+
+-- GIN indexes receive bursty writes during chat, upload ingestion, and memory extraction.
+-- Keep fastupdate enabled and raise the per-index pending-list limit so cleanup is more
+-- likely to run through autovacuum instead of foreground write paths.
+ALTER INDEX IF EXISTS public.idx_workspaces_intelligence_preferences SET (fastupdate = on, gin_pending_list_limit = 16384);
+ALTER INDEX IF EXISTS public.idx_messages_metadata_gin SET (fastupdate = on, gin_pending_list_limit = 16384);
+ALTER INDEX IF EXISTS public.idx_messages_payload_gin SET (fastupdate = on, gin_pending_list_limit = 16384);
+ALTER INDEX IF EXISTS public.idx_files_metadata_gin SET (fastupdate = on, gin_pending_list_limit = 16384);
+ALTER INDEX IF EXISTS public.idx_files_file_name_fts SET (fastupdate = on, gin_pending_list_limit = 16384);
+ALTER INDEX IF EXISTS public.idx_documents_content_fts SET (fastupdate = on, gin_pending_list_limit = 16384);
+ALTER INDEX IF EXISTS public.idx_documents_metadata_gin SET (fastupdate = on, gin_pending_list_limit = 16384);
+ALTER INDEX IF EXISTS public.idx_artifacts_metadata_gin SET (fastupdate = on, gin_pending_list_limit = 16384);
+ALTER INDEX IF EXISTS public.idx_workspace_intelligence_memory_structured_data SET (fastupdate = on, gin_pending_list_limit = 16384);
 
 CREATE INDEX IF NOT EXISTS idx_workspace_momentum_snapshots_workspace_time ON public.workspace_momentum_snapshots (workspace_id, snapshot_timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_workspace_momentum_snapshots_initiative_time ON public.workspace_momentum_snapshots (initiative_id, snapshot_timestamp DESC);

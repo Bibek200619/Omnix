@@ -14,6 +14,7 @@ in conftest.py before any test module is collected.
 """
 from __future__ import annotations
 
+import asyncio
 import sys
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -107,6 +108,23 @@ class TestRuntimeManager:
         assert self.rm._jobs_processing == 0
         assert self.rm._jobs_completed == 1
         assert self.rm._jobs_failed == 1
+
+    def test_concurrent_worker_status_stays_processing_until_all_jobs_finish(self):
+        self.rm.register_worker("w1", [], worker_type="ingestion")
+        self.rm.record_job_started("w1")
+        self.rm.record_job_started("w1")
+
+        self.rm.record_job_completed("w1", success=True)
+
+        assert self.rm._jobs_processing == 1
+        assert self.rm.active_workers["w1"]["status"] == "processing"
+        assert self.rm.active_workers["w1"]["processing_jobs"] == 1
+
+        self.rm.record_job_completed("w1", success=True)
+
+        assert self.rm._jobs_processing == 0
+        assert self.rm.active_workers["w1"]["status"] == "idle"
+        assert self.rm.active_workers["w1"]["processing_jobs"] == 0
 
 
 # ===========================================================================
@@ -339,7 +357,166 @@ class TestProcessJob:
 
 
 # ===========================================================================
-# Section 4: Health checks
+# Section 4: Worker loop concurrency
+# ===========================================================================
+
+class TestWorkerLoopConcurrency:
+    def setup_method(self):
+        self.rm = _reset_runtime()
+
+    def _configure_worker_env(self, monkeypatch: pytest.MonkeyPatch, *, concurrency: int = 2) -> None:
+        monkeypatch.setenv("OMNIX_WORKER_CONCURRENCY", str(concurrency))
+        monkeypatch.setenv("OMNIX_JOB_TIMEOUT_SECONDS", "2")
+        monkeypatch.setenv("OMNIX_WORKER_POLL_TIMEOUT_SECONDS", "1")
+        monkeypatch.setenv("OMNIX_REDIS_OPERATION_TIMEOUT_SECONDS", "2")
+        monkeypatch.setenv("OMNIX_WORKER_SHUTDOWN_TIMEOUT_SECONDS", "1")
+
+    @pytest.mark.asyncio
+    async def test_worker_loop_processes_jobs_concurrently(self, monkeypatch: pytest.MonkeyPatch):
+        import app.jobs.worker as w
+
+        self._configure_worker_env(monkeypatch, concurrency=2)
+        shutdown_event = asyncio.Event()
+        release_jobs = asyncio.Event()
+        started: list[str] = []
+        finished: list[str] = []
+        active = 0
+        max_active = 0
+
+        class FakeRedis:
+            def __init__(self) -> None:
+                self.items = [("omnix:jobs", "job-1"), ("omnix:jobs", "job-2")]
+
+            async def brpop(self, queue: str, timeout: int):
+                if self.items:
+                    return self.items.pop(0)
+                await asyncio.sleep(0)
+                return None
+
+        async def fake_process_job(job_id: str):
+            nonlocal active, max_active
+            active += 1
+            max_active = max(max_active, active)
+            started.append(job_id)
+            if len(started) == 2:
+                release_jobs.set()
+            await release_jobs.wait()
+            await asyncio.sleep(0)
+            active -= 1
+            finished.append(job_id)
+            if len(finished) == 2:
+                shutdown_event.set()
+
+        with (
+            patch("app.jobs.worker.initialize_vector_store", AsyncMock(return_value=None)),
+            patch("app.jobs.worker.warm_up_default_provider", AsyncMock(return_value=object())),
+            patch("app.jobs.worker.get_redis", return_value=FakeRedis()),
+            patch("app.jobs.worker.shutdown_vector_store", AsyncMock(return_value=None)),
+            patch("app.jobs.worker._process_job", fake_process_job),
+        ):
+            await asyncio.wait_for(w._worker_loop(shutdown_event), timeout=2)
+
+        assert started == ["job-1", "job-2"]
+        assert sorted(finished) == ["job-1", "job-2"]
+        assert max_active == 2
+
+    @pytest.mark.asyncio
+    async def test_worker_loop_respects_concurrency_limit(self, monkeypatch: pytest.MonkeyPatch):
+        import app.jobs.worker as w
+
+        self._configure_worker_env(monkeypatch, concurrency=2)
+        shutdown_event = asyncio.Event()
+        first_two_started = asyncio.Event()
+        release_jobs = asyncio.Event()
+        started: list[str] = []
+        finished: list[str] = []
+        active = 0
+        max_active = 0
+
+        class FakeRedis:
+            def __init__(self) -> None:
+                self.items = [
+                    ("omnix:jobs", "job-1"),
+                    ("omnix:jobs", "job-2"),
+                    ("omnix:jobs", "job-3"),
+                ]
+
+            async def brpop(self, queue: str, timeout: int):
+                if self.items:
+                    return self.items.pop(0)
+                await asyncio.sleep(0)
+                return None
+
+        async def fake_process_job(job_id: str):
+            nonlocal active, max_active
+            active += 1
+            max_active = max(max_active, active)
+            started.append(job_id)
+            if len(started) == 2:
+                first_two_started.set()
+            await release_jobs.wait()
+            await asyncio.sleep(0)
+            active -= 1
+            finished.append(job_id)
+            if len(finished) == 3:
+                shutdown_event.set()
+
+        with (
+            patch("app.jobs.worker.initialize_vector_store", AsyncMock(return_value=None)),
+            patch("app.jobs.worker.warm_up_default_provider", AsyncMock(return_value=object())),
+            patch("app.jobs.worker.get_redis", return_value=FakeRedis()),
+            patch("app.jobs.worker.shutdown_vector_store", AsyncMock(return_value=None)),
+            patch("app.jobs.worker._process_job", fake_process_job),
+        ):
+            loop_task = asyncio.create_task(w._worker_loop(shutdown_event))
+            await asyncio.wait_for(first_two_started.wait(), timeout=1)
+            await asyncio.sleep(0.05)
+
+            assert started == ["job-1", "job-2"]
+
+            release_jobs.set()
+            await asyncio.wait_for(loop_task, timeout=2)
+
+        assert started == ["job-1", "job-2", "job-3"]
+        assert sorted(finished) == ["job-1", "job-2", "job-3"]
+        assert max_active == 2
+
+    @pytest.mark.asyncio
+    async def test_process_job_timeout_marks_job_failed(self):
+        import app.jobs.worker as w
+
+        cancelled = asyncio.Event()
+        update_calls: list[dict[str, object]] = []
+
+        async def slow_process_job(job_id: str):
+            try:
+                await asyncio.sleep(10)
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+
+        async def fake_update_one(table: str, filters: dict[str, object], payload: dict[str, object]):
+            update_calls.append({"table": table, "filters": filters, "payload": payload})
+            return {"id": filters["id"], **payload}
+
+        with (
+            patch("app.jobs.worker._process_job", slow_process_job),
+            patch("app.jobs.worker.update_one_trusted", fake_update_one),
+        ):
+            await w._process_job_with_timeout("job-slow", timeout_seconds=0.01)
+
+        assert cancelled.is_set()
+        assert update_calls == [
+            {
+                "table": "jobs",
+                "filters": {"id": "job-slow"},
+                "payload": {"status": "failed", "error": "Job exceeded timeout of 0.01s"},
+            }
+        ]
+
+
+# ===========================================================================
+# Section 5: Health checks
 # ===========================================================================
 
 class TestHealthChecks:
