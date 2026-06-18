@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { MentionTextarea, mentionPayload } from "@/components/mentions/MentionTextarea";
 import { apiClient } from "@/lib/api";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceMembership } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { 
   WorkspaceDecision, 
@@ -36,7 +36,7 @@ const statusOptions: { value: WorkspaceDecisionStatus; label: string }[] = [
 
 export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialValues }: CreateDecisionModalProps) {
   const formId = useId();
-  const { activeMembers } = useWorkspace();
+  const { activeMembers } = useWorkspaceMembership();
   const [title, setTitle] = useState(initialValues?.title ?? "");
   const [reason, setReason] = useState(initialValues?.reason ?? "");
   const [description, setDescription] = useState(initialValues?.description ?? "");

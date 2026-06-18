@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceTree } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import { workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { Workspace } from "@/lib/workspace-types";
@@ -27,7 +27,7 @@ type SubspaceRowProps = {
 };
 
 function SubspaceRow({ subspace, index, onSelectWorkspace }: SubspaceRowProps) {
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId } = useWorkspaceTree();
   const { statusForWorkspace } = useWorkspaceCollaboration();
   const Icon = workspaceIcon(subspace);
   const isActive = subspace.id === activeWorkspaceId;
@@ -99,7 +99,7 @@ export function WorkspaceTreeNode({
     refreshWorkspaceSubspaces,
     subspaceLoadingByParentId,
     subspaceErrorByParentId,
-  } = useWorkspace();
+  } = useWorkspaceTree();
   const { statusForWorkspace } = useWorkspaceCollaboration();
   const Icon = workspaceIcon(workspace);
   const isActive = workspace.id === activeWorkspaceId;

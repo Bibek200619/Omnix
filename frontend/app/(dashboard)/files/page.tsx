@@ -38,7 +38,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { logClientError } from "@/lib/errors";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceIntelligence, useWorkspaceMembership, useWorkspaceTree } from "@/lib/workspace-context";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 import { workspaceRoleLabel } from "@/lib/workspace-roles";
 import { cn } from "@/lib/utils";
@@ -339,7 +339,9 @@ export default function FilesPage() {
 }
 
 function FilesPageContent() {
-  const { activeWorkspace, activeMembers, activeWorkspaceId, activeWorkspaceIntelligence } = useWorkspace();
+  const { activeWorkspace, activeWorkspaceId } = useWorkspaceTree();
+  const { activeMembers } = useWorkspaceMembership();
+  const { activeWorkspaceIntelligence } = useWorkspaceIntelligence();
   const [files, setFiles] = useState<FileData[]>([]);
   const [connectors, setConnectors] = useState<WorkspaceConnector[]>([]);
   const [loading, setLoading] = useState(false);

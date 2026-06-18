@@ -25,7 +25,7 @@ import { logClientError } from "@/lib/errors";
 import { realtimeRegistry } from "@/lib/realtime-registry";
 import { cn } from "@/lib/utils";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceMembership, useWorkspaceTree } from "@/lib/workspace-context";
 import type {
   WorkspaceActivityEvent,
   WorkspaceChannel,
@@ -42,7 +42,8 @@ export const WorkspaceConversationSurface = memo(function WorkspaceConversationS
 
 function WorkspaceConversationSurfaceContent() {
   const { session } = useAuth();
-  const { activeMembers, activeWorkspace, activeWorkspaceId } = useWorkspace();
+  const { activeWorkspace, activeWorkspaceId } = useWorkspaceTree();
+  const { activeMembers } = useWorkspaceMembership();
   const { activity, presence, realtimeStatus, sendTypingSignal, typingUsers } = useWorkspaceCollaboration();
   const routeChannelId = useSearchParams()?.get("channel") ?? null;
   const [channels, setChannels] = useState<WorkspaceChannel[]>([]);

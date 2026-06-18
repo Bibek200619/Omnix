@@ -15,7 +15,7 @@ import {
 import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceTree } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { WorkspaceSearchResponse, WorkspaceSearchResult } from "@/lib/workspace-types";
 
@@ -44,7 +44,7 @@ function resultTypeLabel(result: WorkspaceSearchResult) {
 
 export function WorkspaceSearch() {
   const router = useRouter();
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId } = useWorkspaceTree();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<WorkspaceSearchResponse>(emptyResults);
   const [open, setOpen] = useState(false);

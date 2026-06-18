@@ -4,7 +4,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import { apiClient } from "./api";
 import { logClientError } from "./errors";
 import { invalidateQueries, queryGet } from "./query";
-import { useWorkspace } from "./workspace-context";
+import { useWorkspaceTree } from "./workspace-context";
 import type { 
   WorkspaceInitiative, 
   WorkspaceOperationalTimelineEvent,
@@ -24,7 +24,7 @@ type ContinuityContextType = {
 const ContinuityContext = createContext<ContinuityContextType | undefined>(undefined);
 
 export function WorkspaceContinuityProvider({ children }: { children: ReactNode }) {
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId } = useWorkspaceTree();
   const [initiatives, setInitiatives] = useState<WorkspaceInitiative[]>([]);
   const [timeline, setTimeline] = useState<WorkspaceOperationalTimelineEvent[]>([]);
   const [unresolvedContinuity, setUnresolvedContinuity] = useState<WorkspaceContinuityMemory[]>([]);

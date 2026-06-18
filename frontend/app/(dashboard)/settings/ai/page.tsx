@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { BrainCircuit, CheckCircle2, Database, Server, ShieldCheck } from "lucide-react";
 import { SettingsShell } from "@/components/settings/SettingsShell";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceIntelligence, useWorkspaceTree } from "@/lib/workspace-context";
 import type { WorkspaceFocus } from "@/lib/workspace-types";
 
 const focusLabels: Record<WorkspaceFocus, string> = {
@@ -24,7 +24,8 @@ function StatRow({ label, value }: { label: string; value: string }) {
 }
 
 export default function AISettingsPage() {
-  const { activeWorkspace, activeWorkspaceIntelligence } = useWorkspace();
+  const { activeWorkspace } = useWorkspaceTree();
+  const { activeWorkspaceIntelligence } = useWorkspaceIntelligence();
   const focus = activeWorkspace?.workspace_focus ?? activeWorkspace?.ai_specialization ?? "general";
   const preferences = activeWorkspace?.intelligence_preferences ?? {};
   const memoryEnabled = preferences.memory_enabled !== false;

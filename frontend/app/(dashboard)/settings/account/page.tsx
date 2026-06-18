@@ -22,7 +22,7 @@ import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
 import { useProfile } from "@/lib/profile-context";
 import { cn } from "@/lib/utils";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceTree } from "@/lib/workspace-context";
 import { workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 
 type ProviderIdentityRecord = {
@@ -151,7 +151,7 @@ function StatusRow({
 export default function AccountSettingsPage() {
   const router = useRouter();
   const { session, signOut, user } = useAuth();
-  const { activeWorkspace } = useWorkspace();
+  const { activeWorkspace } = useWorkspaceTree();
   const { error: profileError, loading: profileLoading, profile } = useProfile();
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);

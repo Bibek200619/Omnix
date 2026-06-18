@@ -19,7 +19,7 @@ import { invalidateQueries, queryGet } from "@/lib/query";
 import { realtimeRegistry } from "@/lib/realtime-registry";
 import { useToast } from "@/lib/toast-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceTree } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type {
   WorkspaceMember,
@@ -64,7 +64,7 @@ export const WorkspaceTasksSurface = memo(function WorkspaceTasksSurface() {
 function WorkspaceTasksSurfaceContent() {
   const { session } = useAuth();
   const { showToast } = useToast();
-  const { activeWorkspace, activeWorkspaceId } = useWorkspace();
+  const { activeWorkspace, activeWorkspaceId } = useWorkspaceTree();
   const { presence, realtimeStatus } = useWorkspaceCollaboration();
   const searchParams = useSearchParams();
   const routeTaskId = searchParams?.get("id") ?? null;
