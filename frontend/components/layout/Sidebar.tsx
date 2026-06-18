@@ -131,7 +131,9 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                 avatarUrl={profile?.avatar_url}
                 className="h-8 w-8 border-cyan-300/35 bg-cyan-300/12 text-xs text-cyan-50 shadow-[0_0_12px_rgba(0,255,255,0.25)]"
               />
-              <span className="omnix-online-dot absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 border-[2px] border-[rgba(5,12,23,0.98)]" />
+              <span className="omnix-online-dot absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 border-[2px] border-[rgba(5,12,23,0.98)]">
+                <span className="sr-only">Online</span>
+              </span>
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-semibold text-white">{displayName}</div>
