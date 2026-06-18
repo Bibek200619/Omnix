@@ -8,9 +8,13 @@ the real packages.
 """
 from __future__ import annotations
 
+import os
 import sys
 import importlib
 from unittest.mock import AsyncMock, MagicMock
+
+os.environ.setdefault("SUPABASE_URL", "http://localhost:8001")
+os.environ.setdefault("SUPABASE_ANON_KEY", "anon")
 
 
 def _pkg(name: str) -> MagicMock:

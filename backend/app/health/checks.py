@@ -85,7 +85,7 @@ async def check_ollama() -> Dict[str, Any]:
     }
 
 
-async def check_ingestion_worker() -> Dict[str, Any]:
+async def check_ingestion_worker(*, include_stuck_jobs: bool = True) -> Dict[str, Any]:
     """
     Report ingestion worker health from RuntimeManager (in-process counters)
     plus real Redis queue depth and DB-derived stuck job counts.
@@ -107,10 +107,13 @@ async def check_ingestion_worker() -> Dict[str, Any]:
     except Exception as exc:
         logger.warning("Could not read queue depth from Redis: %s", exc)
 
-    # Stuck job detection from Supabase (detection only, no auto-repair)
-    stuck_10m = await _count_stuck_jobs(minutes=10)
-    stuck_30m = await _count_stuck_jobs(minutes=30)
-    stuck_60m = await _count_stuck_jobs(minutes=60)
+    # Stuck job detection uses trusted DB access and is reserved for authenticated
+    # internal diagnostics. Public readiness checks skip it.
+    stuck_10m = stuck_30m = stuck_60m = None
+    if include_stuck_jobs:
+        stuck_10m = await _count_stuck_jobs(minutes=10)
+        stuck_30m = await _count_stuck_jobs(minutes=30)
+        stuck_60m = await _count_stuck_jobs(minutes=60)
 
     worker_status = "healthy" if metrics["active_workers"] > 0 else "no_worker"
     if metrics["active_workers"] == 0:
@@ -155,14 +158,14 @@ async def _count_stuck_jobs(minutes: int) -> int | None:
         return None
 
 
-async def run_all_checks() -> Dict[str, Any]:
+async def run_all_checks(*, include_internal: bool = True) -> Dict[str, Any]:
     results = await asyncio.gather(
         check_supabase(),
         check_workspace_schema_health(),
         check_vector_store(),
         check_redis(),
         check_ollama(),
-        check_ingestion_worker(),
+        check_ingestion_worker(include_stuck_jobs=include_internal),
         return_exceptions=True,
     )
 
