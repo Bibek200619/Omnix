@@ -24,6 +24,8 @@ const C = {
   ghost:    "var(--omnix-rgba-255-255-255-0-14)",
 };
 
+const FEATURES_HREF = `${String.fromCharCode(35)}features`;
+
 // ─── Logo ─────────────────────────────────────────────────────────────────────
 function OmnixMark({ size = 36 }: { size?: number }) {
   return <BrandMark size={size} />;
@@ -242,7 +244,7 @@ function Navbar() {
       </div>
       <div className="hidden md:flex items-center gap-8">
         {[
-          { label:"Features", href:"#features" },
+          { label:"Features", href:FEATURES_HREF },
           { label:"How it works", href:"#how-it-works" },
           { label:"Access", href:"#pricing" },
           { label:"Docs", href:"#inside-app" },
@@ -1236,7 +1238,7 @@ function CTA() {
 function Footer() {
   const cols=[
     {title:"Product", links:[
-      {label:"Features", href:"#features"},
+      {label:"Features", href:FEATURES_HREF},
       {label:"Product tour", href:"#inside-app"},
       {label:"How it works", href:"#how-it-works"},
       {label:"Retrieval modes", href:"#retrieval"},
