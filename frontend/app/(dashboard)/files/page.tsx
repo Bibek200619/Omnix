@@ -21,7 +21,6 @@ import {
   LayoutGrid,
   Link2,
   List,
-  Loader2,
   LockKeyhole,
   Plus,
   RefreshCw,
@@ -37,6 +36,7 @@ import { CreateDecisionModal } from "@/components/decisions/CreateDecisionModal"
 import { DecisionCandidatePanel } from "@/components/decisions/DecisionCandidatePanel";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { logClientError } from "@/lib/errors";
 import { useWorkspace } from "@/lib/workspace-context";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
@@ -751,10 +751,7 @@ function FilesPageContent() {
               </p>
             </div>
             {connectorsLoading ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[11px] text-cyan-100">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Reconciling
-              </span>
+              <Skeleton className="h-8 w-28 rounded-full" />
             ) : null}
           </div>
           <div className="relative z-10 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -851,7 +848,7 @@ function FilesPageContent() {
           ) : null}
           {connectorsLoading && connectors.length === 0 ? (
             <div className="relative z-10 mt-4 grid gap-2">
-              {[0, 1].map((item) => <div key={item} className="shimmer h-16 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)]" />)}
+              {[0, 1].map((item) => <Skeleton key={item} className="h-16 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)]" />)}
             </div>
           ) : connectors.length === 0 ? (
             <EmptyState
@@ -968,7 +965,7 @@ function FilesPageContent() {
           {loading ? (
             <div className="relative z-10 mt-4 grid gap-2">
               {[0, 1, 2].map((item) => (
-                <div key={item} className="shimmer h-16 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)]" />
+                <Skeleton key={item} className="h-16 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)]" />
               ))}
             </div>
           ) : error ? (

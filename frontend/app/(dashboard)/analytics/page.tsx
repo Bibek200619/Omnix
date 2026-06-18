@@ -5,6 +5,7 @@ import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, AlertCircle, Cpu, Database, LayoutDashboard, MessageSquare, RefreshCw, Server, Users, Sparkles, Globe } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { PageTitle } from "@/components/ui/Typography";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
@@ -33,7 +34,7 @@ type WorkerStatus = {
 
 type Metric = {
   label: string;
-  value: string | number;
+  value: ReactNode;
   detail: string;
   icon: ReactNode;
   color: string;
@@ -129,7 +130,7 @@ function AnalyticsPageContent() {
     () => [
       {
         label: "Conversations",
-        value: conversationsLoading ? "..." : conversations.length,
+        value: conversationsLoading ? <Skeleton className="h-8 w-16 rounded-full" /> : conversations.length,
         detail: "Active sessions in workspace.",
         icon: <MessageSquare className="h-4 w-4" />,
         color: "#00FFFF",
@@ -143,21 +144,21 @@ function AnalyticsPageContent() {
       },
       {
         label: "Data Sources",
-        value: filesLoading ? "..." : files.length,
+        value: filesLoading ? <Skeleton className="h-8 w-16 rounded-full" /> : files.length,
         detail: "Indexed knowledge assets.",
         icon: <Database className="h-4 w-4" />,
         color: "#00e87a",
       },
       {
         label: "System Uptime",
-        value: loadingRuntime ? "..." : runtimeInfo ? `${Math.floor(runtimeInfo.uptime_seconds / 3600)}h ${Math.floor((runtimeInfo.uptime_seconds % 3600) / 60)}m` : "Unavailable",
+        value: loadingRuntime ? <Skeleton className="h-8 w-24 rounded-full" /> : runtimeInfo ? `${Math.floor(runtimeInfo.uptime_seconds / 3600)}h ${Math.floor((runtimeInfo.uptime_seconds % 3600) / 60)}m` : "Unavailable",
         detail: runtimeInfo?.version ? `Omnix ${runtimeInfo.version} node` : "Runtime version not reported.",
         icon: <Activity className="h-4 w-4" />,
         color: "#ffb800",
       },
       {
         label: "Active Workers",
-        value: loadingRuntime ? "..." : runtimeInfo ? workers.length : "Unavailable",
+        value: loadingRuntime ? <Skeleton className="h-8 w-16 rounded-full" /> : runtimeInfo ? workers.length : "Unavailable",
         detail: runtimeInfo ? "Workers reported by runtime telemetry." : "Worker status not reported.",
         icon: <Cpu className="h-4 w-4" />,
         color: "#ff4df4",
@@ -217,22 +218,26 @@ function AnalyticsPageContent() {
                   <Server className="h-4 w-4 text-cyan-400" />
                   <span className="text-xs font-semibold text-white">Service Status</span>
                 </div>
-                <span className={cn(
-                  "flex h-6 items-center rounded-full px-2.5 text-[10px] font-bold uppercase tracking-wider",
-                  runtimeInfo?.status === "healthy" ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"
-                )}>
-                  {loadingRuntime ? "Connecting..." : runtimeInfo?.status || "Unavailable"}
-                </span>
+                {loadingRuntime ? (
+                  <Skeleton className="h-6 w-24 rounded-full" />
+                ) : (
+                  <span className={cn(
+                    "flex h-6 items-center rounded-full px-2.5 text-[10px] font-bold uppercase tracking-wider",
+                    runtimeInfo?.status === "healthy" ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"
+                  )}>
+                    {runtimeInfo?.status || "Unavailable"}
+                  </span>
+                )}
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-lg border border-white/5 bg-black/40 p-4">
                   <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--omnix-text-3)]">Environment</p>
-                  <p className="mt-1.5 text-sm font-semibold text-white capitalize">{loadingRuntime ? "..." : runtimeInfo?.environment || "Not reported"}</p>
+                  {loadingRuntime ? <Skeleton className="mt-2 h-4 w-24 rounded-full" /> : <p className="mt-1.5 text-sm font-semibold text-white capitalize">{runtimeInfo?.environment || "Not reported"}</p>}
                 </div>
                 <div className="rounded-lg border border-white/5 bg-black/40 p-4">
                   <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--omnix-text-3)]">Version</p>
-                  <p className="mt-1.5 text-sm font-semibold text-white">{loadingRuntime ? "..." : runtimeInfo?.version || "Not reported"}</p>
+                  {loadingRuntime ? <Skeleton className="mt-2 h-4 w-20 rounded-full" /> : <p className="mt-1.5 text-sm font-semibold text-white">{runtimeInfo?.version || "Not reported"}</p>}
                 </div>
               </div>
 
