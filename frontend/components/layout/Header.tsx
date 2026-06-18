@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   AlertCircle,
@@ -65,7 +65,7 @@ type HeaderProps = {
   onExpandSidebar?: () => void;
 };
 
-export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar }: HeaderProps) {
+export const Header = memo(function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { signOut, user } = useAuth();
@@ -293,4 +293,4 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
       ) : null}
     </>
   );
-}
+});

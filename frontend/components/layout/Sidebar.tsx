@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, X } from "lucide-react";
@@ -31,7 +32,7 @@ function profileDisplayName(userEmail?: string | null, metadata?: Record<string,
   return userEmail || "Omnix user";
 }
 
-export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: SidebarProps) {
+export const Sidebar = memo(function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
   const { user } = useAuth();
   const { profile } = useProfile();
@@ -147,4 +148,4 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
       </aside>
     </>
   );
-}
+});

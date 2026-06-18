@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   CircleDot,
@@ -70,13 +70,13 @@ function quietMomentum() {
   };
 }
 
-export function WorkspaceInitiativesSurface() {
+export const WorkspaceInitiativesSurface = memo(function WorkspaceInitiativesSurface() {
   return (
     <SurfaceErrorBoundary surfaceName="Initiatives">
       <WorkspaceInitiativesSurfaceContent />
     </SurfaceErrorBoundary>
   );
-}
+});
 
 function WorkspaceInitiativesSurfaceContent() {
   const { session } = useAuth();

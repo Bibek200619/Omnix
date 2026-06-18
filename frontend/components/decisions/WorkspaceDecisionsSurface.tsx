@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { BadgeCheck, Loader2, Plus, RefreshCw, Target, ListTodo } from "lucide-react";
@@ -34,13 +34,13 @@ function statusClass(status: WorkspaceDecisionStatus) {
   return "border-cyan-300/20 bg-cyan-300/[0.07] text-cyan-100";
 }
 
-export function WorkspaceDecisionsSurface() {
+export const WorkspaceDecisionsSurface = memo(function WorkspaceDecisionsSurface() {
   return (
     <SurfaceErrorBoundary surfaceName="Workspace decisions">
       <WorkspaceDecisionsSurfaceContent />
     </SurfaceErrorBoundary>
   );
-}
+});
 
 function WorkspaceDecisionsSurfaceContent() {
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();

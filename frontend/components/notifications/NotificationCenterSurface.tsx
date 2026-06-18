@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowUpRight, AtSign, BadgeCheck, Check, ClipboardCheck, Loader2, MessagesSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -48,13 +48,13 @@ function mentionSentence(item: WorkspaceMentionInboxItem) {
   return `${actorLabel(item)} mentioned you in ${config.phrasePrefix}${item.source_title}`;
 }
 
-export function NotificationCenterSurface() {
+export const NotificationCenterSurface = memo(function NotificationCenterSurface() {
   return (
     <SurfaceErrorBoundary surfaceName="Notifications">
       <NotificationCenterSurfaceContent />
     </SurfaceErrorBoundary>
   );
-}
+});
 
 function NotificationCenterSurfaceContent() {
   const router = useRouter();

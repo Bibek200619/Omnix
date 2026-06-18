@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { AtSign, Bell, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
@@ -11,7 +12,7 @@ function countLabel(count: number) {
   return String(count);
 }
 
-export function NotificationBell() {
+export const NotificationBell = memo(function NotificationBell() {
   const router = useRouter();
   const { unreadCount, loading, refreshNotifications } = useWorkspaceNotifications();
   const hasUnread = unreadCount > 0;
@@ -53,4 +54,4 @@ export function NotificationBell() {
       </span>
     </Button>
   );
-}
+});

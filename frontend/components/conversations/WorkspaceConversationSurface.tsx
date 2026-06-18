@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { ChannelList } from "@/components/conversations/ChannelList";
@@ -32,13 +32,13 @@ import type {
   WorkspaceChannelMessage,
 } from "@/lib/workspace-types";
 
-export function WorkspaceConversationSurface() {
+export const WorkspaceConversationSurface = memo(function WorkspaceConversationSurface() {
   return (
     <SurfaceErrorBoundary surfaceName="Workspace conversations">
       <WorkspaceConversationSurfaceContent />
     </SurfaceErrorBoundary>
   );
-}
+});
 
 function WorkspaceConversationSurfaceContent() {
   const { session } = useAuth();

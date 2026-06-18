@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   CircleDot,
@@ -53,13 +53,13 @@ function invalidateTaskQueries(workspaceId: string) {
   invalidateQueries(`/workspaces/${workspaceId}/initiatives`);
 }
 
-export function WorkspaceTasksSurface() {
+export const WorkspaceTasksSurface = memo(function WorkspaceTasksSurface() {
   return (
     <SurfaceErrorBoundary surfaceName="Execution">
       <WorkspaceTasksSurfaceContent />
     </SurfaceErrorBoundary>
   );
-}
+});
 
 function WorkspaceTasksSurfaceContent() {
   const { session } = useAuth();
