@@ -126,7 +126,7 @@ function WorkspaceDecisionsSurfaceContent() {
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
+    <section className="omnix-container-responsive flex min-h-0 flex-1 flex-col overflow-x-hidden px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
       <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-4 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.015)] px-4 py-4 sm:px-6 sm:py-5">
         <div>
           <p className="mb-1.5 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400/70">
@@ -138,13 +138,13 @@ function WorkspaceDecisionsSurfaceContent() {
             Architectural and operational choices for <span className="text-cyan-100/90 font-medium">{activeWorkspace?.name}</span>.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
           <Button
             type="button"
             size="sm"
             onClick={() => setCreateOpen(true)}
             leftIcon={<Plus className="h-3.5 w-3.5" />}
-            className="h-9 px-4 shadow-[0_0_15px_rgba(34,211,238,0.1)]"
+            className="h-9 flex-1 px-4 shadow-[0_0_15px_rgba(34,211,238,0.1)] sm:flex-none"
           >
             New Decision
           </Button>
@@ -154,7 +154,7 @@ function WorkspaceDecisionsSurfaceContent() {
             variant="ghost"
             onClick={() => void loadDecisions()}
             disabled={loading}
-            className="h-9 px-4 border border-cyan-300/10 hover:bg-cyan-300/5"
+            className="h-9 flex-1 border border-cyan-300/10 px-4 hover:bg-cyan-300/5 sm:flex-none"
             leftIcon={loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           >
             Refresh Memory
@@ -175,7 +175,7 @@ function WorkspaceDecisionsSurfaceContent() {
       )}
 
       {/* Decision Overview Strip */}
-      <div className={cn("mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4", selectedId && "hidden lg:grid")}>
+      <div className={cn("mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4", selectedId && "hidden xl:grid")}>
         {[
           { label: "Accepted", value: stats.accepted, color: "text-emerald-400", bg: "bg-emerald-400/5" },
           { label: "Proposed", value: stats.proposed, color: "text-cyan-400", bg: "bg-cyan-400/5" },
@@ -209,10 +209,9 @@ function WorkspaceDecisionsSurfaceContent() {
           className="flex-1"
         />
       ) : (
-        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:grid-rows-1">
+        <div className="omnix-decisions-workbench" data-selection={selectedId ? "active" : "empty"}>
           <aside className={cn(
-            "omnix-panel flex min-h-0 flex-col rounded-2xl p-4 shadow-xl",
-            selectedId && "hidden lg:flex"
+            "omnix-panel omnix-decisions-list flex min-h-0 flex-col rounded-2xl p-4 shadow-xl",
           )}>
             <div className="mb-4">
               <div className="mb-3 flex items-center justify-between px-1">
@@ -303,8 +302,7 @@ function WorkspaceDecisionsSurfaceContent() {
           </aside>
 
           <main className={cn(
-            "omnix-panel min-h-0 min-w-0 overflow-hidden rounded-2xl border-[var(--omnix-border)] shadow-2xl",
-            !selectedId && "hidden lg:flex"
+            "omnix-panel omnix-decisions-detail flex min-h-0 min-w-0 overflow-hidden rounded-2xl border-[var(--omnix-border)] shadow-2xl",
           )}>
             {selected ? (
               <div className="flex h-full min-h-0 flex-col">
@@ -315,7 +313,7 @@ function WorkspaceDecisionsSurfaceContent() {
                         <button
                           type="button"
                           onClick={() => setSelectedId(null)}
-                          className="flex items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-200 lg:hidden"
+                          className="omnix-decisions-back flex items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-200"
                         >
                           ‹ Back
                         </button>

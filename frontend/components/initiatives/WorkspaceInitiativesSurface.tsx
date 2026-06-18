@@ -450,7 +450,7 @@ function WorkspaceInitiativesSurfaceContent() {
   }
 
   return (
-    <section className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
+    <section className="omnix-container-responsive omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
       <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
@@ -477,10 +477,10 @@ function WorkspaceInitiativesSurfaceContent() {
         />
       ) : null}
 
-      <div className="grid shrink-0 gap-3 lg:grid-cols-[19rem_minmax(0,1fr)] xl:min-h-0 xl:flex-1 xl:grid-cols-[20rem_minmax(0,1fr)_19rem]">
+      <div className="omnix-initiative-workbench shrink-0">
         <aside className={cn(
           "omnix-panel order-1 flex shrink-0 flex-col rounded-xl p-3 lg:order-none lg:min-h-[16rem]",
-          selectedId && "hidden lg:flex"
+          selectedId && "hidden xl:flex"
         )}>
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Direction</p>
@@ -534,7 +534,7 @@ function WorkspaceInitiativesSurfaceContent() {
 
         <main className={cn(
           "omnix-panel order-3 min-w-0 rounded-xl p-4 sm:p-6 lg:order-none xl:min-h-[30rem] xl:overflow-y-auto",
-          !selectedId && "hidden lg:block"
+          !selectedId && "hidden xl:block"
         )}>
           {!selected ? (
             <div className="flex h-full min-h-[24rem] items-center justify-center text-sm text-[var(--omnix-text-2)]">Select or open an initiative.</div>
@@ -786,8 +786,8 @@ function WorkspaceInitiativesSurfaceContent() {
         </main>
 
         <aside className={cn(
-          "order-2 space-y-3 lg:order-none lg:col-span-2 xl:col-span-1",
-          selectedId && "hidden lg:block"
+          "order-2 space-y-3 lg:order-none xl:col-span-1",
+          selectedId && "hidden xl:block"
         )}>
           <section className="omnix-panel rounded-xl p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Movement</p>

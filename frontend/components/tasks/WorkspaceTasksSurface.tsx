@@ -399,7 +399,7 @@ function WorkspaceTasksSurfaceContent() {
   }
 
   return (
-    <section className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
+    <section className="omnix-container-responsive omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
       <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
@@ -459,7 +459,7 @@ function WorkspaceTasksSurfaceContent() {
         ))}
       </div>
 
-      <div className="grid shrink-0 gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="omnix-task-workbench shrink-0">
         <main className="omnix-panel flex min-w-0 flex-col rounded-xl p-3 sm:p-4 xl:min-h-[28rem]">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--omnix-border)] pb-3">
             <div className="flex items-center gap-2">
