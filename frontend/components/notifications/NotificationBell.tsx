@@ -45,7 +45,7 @@ export function NotificationBell() {
         className={cn(
           "absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border px-1 text-[10px] font-semibold leading-none",
           hasUnread
-            ? "border-cyan-300/25 bg-cyan-300/15 text-cyan-50 shadow-[0_0_14px_rgba(0,255,255,0.16)]"
+            ? "border-cyan-300/25 bg-cyan-300/15 text-cyan-50 shadow-[0_0_14px_var(--omnix-rgba-0-255-255-0-16)]"
             : "border-white/10 bg-white/[0.04] text-white/40",
         )}
       >

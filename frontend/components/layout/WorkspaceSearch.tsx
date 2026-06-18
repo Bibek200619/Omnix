@@ -205,7 +205,7 @@ export function WorkspaceSearch() {
         type="button"
         disabled={disabled}
         onClick={openSearch}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] transition hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] active:scale-[0.97] disabled:opacity-40 md:hidden"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--omnix-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-0-255-255-0-04)] text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-rgba-0-255-255-0-3)] hover:bg-[var(--omnix-rgba-0-255-255-0-08)] active:scale-[0.97] disabled:opacity-40 md:hidden"
         aria-label="Search Omnix"
         title="Search Omnix"
       >
@@ -234,7 +234,7 @@ export function WorkspaceSearch() {
       </div>
 
       {open ? (
-        <div className="fixed inset-x-0 bottom-0 z-50 max-h-[min(86dvh,42rem)] overflow-hidden rounded-t-2xl border border-cyan-300/15 bg-[rgba(3,8,18,0.96)] shadow-[0_-24px_80px_rgba(0,0,0,0.55),var(--omnix-glow-sm)] backdrop-blur-2xl md:absolute md:inset-x-auto md:bottom-auto md:right-0 md:top-[calc(100%+0.6rem)] md:w-[min(34rem,calc(100vw-2rem))] md:max-h-[min(34rem,calc(100dvh-8rem))] md:rounded-2xl">
+        <div className="fixed inset-x-0 bottom-0 z-50 max-h-[min(86dvh,42rem)] overflow-hidden rounded-t-2xl border border-cyan-300/15 bg-[var(--omnix-rgba-3-8-18-0-96)] shadow-[0_-24px_80px_var(--omnix-rgba-0-0-0-0-55),var(--omnix-glow-sm)] backdrop-blur-2xl md:absolute md:inset-x-auto md:bottom-auto md:right-0 md:top-[calc(100%+0.6rem)] md:w-[min(34rem,calc(100vw-2rem))] md:max-h-[min(34rem,calc(100dvh-8rem))] md:rounded-2xl">
           <div className="border-b border-white/5 p-2 md:hidden">
             <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/15" />
             <div className="flex items-center gap-2">

@@ -128,8 +128,8 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
 
   return (
     <>
-      <header className="relative z-30 shrink-0 select-none border-b border-[rgba(0,255,255,0.08)] bg-[var(--omnix-header-glass)] pt-safe backdrop-blur-[24px]">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent_0%,rgba(0,255,255,0.25)_40%,rgba(0,255,255,0.5)_55%,rgba(0,255,255,0.25)_70%,transparent_100%)]" />
+      <header className="relative z-30 shrink-0 select-none border-b border-[var(--omnix-rgba-0-255-255-0-08)] bg-[var(--omnix-header-glass)] pt-safe backdrop-blur-[24px]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent_0%,var(--omnix-rgba-0-255-255-0-25)_40%,var(--omnix-rgba-0-255-255-0-5)_55%,var(--omnix-rgba-0-255-255-0-25)_70%,transparent_100%)]" />
         <InviteNotificationBar />
         <div className="relative flex h-[var(--omnix-header-h)] w-full items-center gap-1.5 px-3 sm:gap-3 sm:px-[22px]">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
@@ -138,7 +138,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
                 type="button"
                 variant="ghost"
                 size={"icon"}
-                className="h-11 w-11 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)]"
+                className="h-11 w-11 rounded-[10px] border border-[var(--omnix-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-0-255-255-0-04)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-rgba-0-255-255-0-3)] hover:bg-[var(--omnix-rgba-0-255-255-0-08)] hover:shadow-[var(--omnix-glow-xs)]"
                 aria-label="Open navigation"
                 title="Open navigation"
                 onClick={onMenuClick}
@@ -152,7 +152,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
                   type="button"
                   variant="ghost"
                   size={"icon"}
-                  className="h-11 w-11 rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] hover:shadow-[var(--omnix-glow-xs)]"
+                  className="h-11 w-11 rounded-[10px] border border-[var(--omnix-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-0-255-255-0-04)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-rgba-0-255-255-0-3)] hover:bg-[var(--omnix-rgba-0-255-255-0-08)] hover:shadow-[var(--omnix-glow-xs)]"
                   aria-label="Expand workspace sidebar"
                   title="Expand workspace sidebar"
                   onClick={onExpandSidebar}
@@ -165,13 +165,13 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
               <div className="flex items-center gap-1.5 overflow-hidden">
                 {isSubspace && parentWorkspace ? (
                   <>
-                    <span className="truncate text-xs font-medium text-[rgba(255,255,255,0.35)]">
+                    <span className="truncate text-xs font-medium text-[var(--omnix-rgba-255-255-255-0-35)]">
                       {parentWorkspace.name}
                     </span>
                     <ChevronRight className="h-3 w-3 shrink-0 text-white/10" />
                   </>
                 ) : null}
-                <span className="omnix-display truncate text-sm font-bold tracking-[0.01em] text-[rgba(255,255,255,0.92)]">
+                <span className="omnix-display truncate text-sm font-bold tracking-[0.01em] text-[var(--omnix-rgba-255-255-255-0-92)]">
                   {activeWorkspace?.name || active.title}
                 </span>
                 <span className={cn(
@@ -180,7 +180,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
                    {activeWorkspace?.current_user_role?.replace(/_/g, ' ') || "Member"}
                 </span>
               </div>
-              <p className="mt-px hidden truncate text-[10px] tracking-[0.03em] text-[rgba(255,255,255,0.22)] min-[390px]:block">
+              <p className="mt-px hidden truncate text-[10px] tracking-[0.03em] text-[var(--omnix-rgba-255-255-255-0-22)] min-[390px]:block">
                  {activeWorkspace ? (isSubspace ? "Operational Subspace" : "Super Workspace") : active.subtitle}
               </p>
             </div>
@@ -195,7 +195,7 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
                 title={realtimeTitle}
                 className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-rose-400/20 bg-rose-400/10 px-2 text-rose-100"
               >
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.75)]" />
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400 shadow-[0_0_8px_var(--omnix-rgba-251-113-133-0-75)]" />
                 <span className="text-[10px] font-semibold leading-none">Offline</span>
                 <Button
                   type="button"
@@ -222,15 +222,15 @@ export function Header({ sidebarCollapsed = false, onMenuClick, onExpandSidebar 
                   className={cn(
                     "h-1.5 w-1.5 rounded-full",
                     realtimeStatus === "connecting"
-                      ? "animate-pulse bg-amber-300 shadow-[0_0_8px_rgba(252,211,77,0.75)]"
-                      : "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.75)]",
+                      ? "animate-pulse bg-amber-300 shadow-[0_0_8px_var(--omnix-rgba-252-211-77-0-75)]"
+                      : "bg-emerald-400 shadow-[0_0_8px_var(--omnix-rgba-52-211-153-0-75)]",
                   )}
                 />
               </span>
             )}
             <NotificationBell />
             <InviteNotificationBell />
-            <div className="hidden h-[22px] w-px bg-[rgba(0,255,255,0.1)] sm:block" />
+            <div className="hidden h-[22px] w-px bg-[var(--omnix-rgba-0-255-255-0-1)] sm:block" />
             <Tooltip content="Start new chat" className="hidden sm:inline-flex">
               <Button
                 type="button"

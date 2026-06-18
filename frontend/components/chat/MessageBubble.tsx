@@ -145,11 +145,11 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
           email={message.senderEmail}
           handle={message.senderHandle}
           avatarUrl={message.senderAvatarUrl}
-          className={cn("mt-1 h-8 w-8 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:h-9 sm:w-9", workspaceRoleAvatarClass(senderRole))}
+          className={cn("mt-1 h-8 w-8 text-xs shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-05)] sm:h-9 sm:w-9", workspaceRoleAvatarClass(senderRole))}
         />
       ) : (
         <div
-          className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-cyan-300/20 bg-[linear-gradient(135deg,rgba(0,255,255,0.1),rgba(0,100,255,0.15))] text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:h-9 sm:w-9 sm:rounded-[12px]"
+          className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-cyan-300/20 bg-[linear-gradient(135deg,var(--omnix-rgba-0-255-255-0-1),var(--omnix-rgba-0-100-255-0-15))] text-cyan-100 shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-05)] sm:h-9 sm:w-9 sm:rounded-[12px]"
           title={senderName}
         >
           <Sparkles className="h-4 w-4 drop-shadow-sm opacity-80" />

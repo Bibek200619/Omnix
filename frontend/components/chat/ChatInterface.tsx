@@ -158,8 +158,8 @@ export function ChatInterface() {
       <div aria-live="polite" aria-atomic="false" className="sr-only" id="ai-stream-announcer">
         {chatStream.streamingContent}
       </div>
-      <div className="pointer-events-none absolute left-[18%] top-[-18%] h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle,rgba(0,255,255,0.075),transparent_68%)] blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-20%] right-[4%] h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,rgba(0,51,255,0.085),transparent_70%)] blur-3xl" />
+      <div className="pointer-events-none absolute left-[18%] top-[-18%] h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle,var(--omnix-rgba-0-255-255-0-075),transparent_68%)] blur-3xl" />
+      <div className="pointer-events-none absolute bottom-[-20%] right-[4%] h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,var(--omnix-rgba-0-51-255-0-085),transparent_70%)] blur-3xl" />
       <ChatHistoryPanel
         activeHistoryItem={activeHistoryItem}
         historyOpen={historyOpen}
@@ -207,7 +207,7 @@ export function ChatInterface() {
             onRetry={chatStream.handleRetry}
             onRegenerate={chatStream.handleRegenerate}
           />
-          <div className="shrink-0 bg-gradient-to-t from-[var(--omnix-bg)] via-[rgba(5,12,23,0.94)] to-transparent px-2.5 pb-2.5 pt-3 sm:px-[22px] sm:pb-[18px] sm:pt-10">
+          <div className="shrink-0 bg-gradient-to-t from-[var(--omnix-bg)] via-[var(--omnix-rgba-5-12-23-0-94)] to-transparent px-2.5 pb-2.5 pt-3 sm:px-[22px] sm:pb-[18px] sm:pt-10">
             <ChatInput
               onSend={chatStream.sendMessage}
               loading={chatStream.responding}

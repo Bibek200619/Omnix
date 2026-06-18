@@ -231,7 +231,7 @@ function NotificationCenterSurfaceContent() {
                     className={cn(
                       "relative flex flex-col gap-3 overflow-hidden rounded-xl border px-3 py-3 transition active:scale-[0.995] sm:flex-row sm:items-start sm:px-4",
                       unread
-                        ? "border-cyan-300/18 bg-cyan-300/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]"
+                        ? "border-cyan-300/18 bg-cyan-300/[0.045] shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-035)]"
                         : "border-[var(--omnix-border)] bg-black/[0.12]",
                     )}
                   >

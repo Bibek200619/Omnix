@@ -29,7 +29,7 @@ export function ChatHistoryPanel({
         className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity md:hidden"
         onClick={onClose}
       />
-      <aside className="fixed inset-y-0 left-0 z-50 flex w-[280px] shrink-0 flex-col border-r border-[var(--omnix-border)] bg-[rgba(5,12,23,0.98)] shadow-[18px_0_70px_rgba(0,0,0,0.24)] backdrop-blur-2xl md:relative md:z-10 md:w-[264px] md:flex md:bg-[rgba(5,12,23,0.6)]">
+      <aside className="fixed inset-y-0 left-0 z-50 flex w-[280px] shrink-0 flex-col border-r border-[var(--omnix-border)] bg-[var(--omnix-rgba-5-12-23-0-98)] shadow-[18px_0_70px_var(--omnix-rgba-0-0-0-0-24)] backdrop-blur-2xl md:relative md:z-10 md:w-[264px] md:flex md:bg-[var(--omnix-rgba-5-12-23-0-6)]">
         <div className="flex items-center gap-2 border-b border-[var(--omnix-border)] px-3 py-2.5">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--omnix-text-3)]" />

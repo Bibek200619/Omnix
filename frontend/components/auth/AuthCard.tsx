@@ -75,8 +75,8 @@ function LeftPanel({ mode }: { mode: "login" | "register" }) {
     <aside
       className="auth-left-panel relative hidden min-h-[760px] w-[420px] flex-shrink-0 flex-col justify-between overflow-hidden px-10 py-10 lg:flex"
     >
-      <AuthDriftOrb x="30%" y="25%" size={400} color="rgba(0,255,255,0.1)" />
-      <AuthDriftOrb x="80%" y="65%" size={320} color="rgba(0,51,255,0.09)" />
+      <AuthDriftOrb x="30%" y="25%" size={400} color="var(--omnix-rgba-0-255-255-0-1)" />
+      <AuthDriftOrb x="80%" y="65%" size={320} color="var(--omnix-rgba-0-51-255-0-09)" />
       <AuthMovingGrid />
 
       <div className="relative z-10">
@@ -97,9 +97,9 @@ function LeftPanel({ mode }: { mode: "login" | "register" }) {
                   )}
                 >
                   {done ? (
-                    <AuthIcon d={AUTH_ICONS.check} size={14} stroke="#00FFFF" sw={2.5} />
+                    <AuthIcon d={AUTH_ICONS.check} size={14} stroke="var(--omnix-cyan)" sw={2.5} />
                   ) : (
-                    <AuthIcon d={step.icon} size={14} stroke={active ? "#00FFFF" : "rgba(255,255,255,0.25)"} sw={1.8} />
+                    <AuthIcon d={step.icon} size={14} stroke={active ? "var(--omnix-cyan)" : "var(--omnix-rgba-255-255-255-0-25)"} sw={1.8} />
                   )}
                 </div>
                 <span
@@ -128,7 +128,7 @@ function LeftPanel({ mode }: { mode: "login" | "register" }) {
               <div
                 className="auth-benefit-icon mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full"
               >
-                <AuthIcon d={AUTH_ICONS.check} size={9} stroke="#00FFFF" sw={2.5} />
+                <AuthIcon d={AUTH_ICONS.check} size={9} stroke="var(--omnix-cyan)" sw={2.5} />
               </div>
               <span className="auth-text-faint text-sm leading-relaxed">{benefit}</span>
             </div>
@@ -192,8 +192,8 @@ export function AuthCard({
 
   if (isConfigured && (loading || session)) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#061020] text-slate-300">
-        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+      <main className="flex min-h-screen items-center justify-center bg-[var(--omnix-color-061020)] text-slate-300">
+        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm shadow-[0_24px_80px_var(--omnix-rgba-0-0-0-0-45)]">
           <Loader2 className="h-4 w-4 animate-spin text-cyan-200" aria-hidden="true" />
           Restoring session...
         </div>
@@ -206,8 +206,8 @@ export function AuthCard({
       className="auth-page-shell relative flex min-h-[100dvh] items-stretch justify-center overflow-hidden text-white sm:items-center sm:px-6 sm:py-6 lg:px-8"
     >
       <div className="absolute inset-0">
-        <AuthDriftOrb x="70%" y="20%" size={500} color="rgba(0,255,255,0.055)" />
-        <AuthDriftOrb x="20%" y="75%" size={380} color="rgba(0,51,255,0.06)" />
+        <AuthDriftOrb x="70%" y="20%" size={500} color="var(--omnix-rgba-0-255-255-0-055)" />
+        <AuthDriftOrb x="20%" y="75%" size={380} color="var(--omnix-rgba-0-51-255-0-06)" />
         <AuthMovingGrid />
       </div>
 
@@ -215,13 +215,13 @@ export function AuthCard({
         initial={{ opacity: 0, y: 18, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.42, ease: authEase }}
-        className="relative z-10 flex w-full max-w-6xl overflow-hidden bg-[#061020]/95 shadow-[0_60px_160px_rgba(0,0,0,0.7),0_0_80px_rgba(0,255,255,0.08)] sm:rounded-[28px] sm:border sm:border-white/[0.07]"
+        className="relative z-10 flex w-full max-w-6xl overflow-hidden bg-[var(--omnix-color-061020)]/95 shadow-[0_60px_160px_var(--omnix-rgba-0-0-0-0-7),0_0_80px_var(--omnix-rgba-0-255-255-0-08)] sm:rounded-[28px] sm:border sm:border-white/[0.07]"
       >
         <LeftPanel mode={mode} />
 
         <section className="relative flex min-h-[100dvh] flex-1 flex-col overflow-hidden sm:min-h-[680px]">
           <div className="absolute inset-0">
-            <AuthDriftOrb x="76%" y="10%" size={420} color="rgba(0,255,255,0.045)" />
+            <AuthDriftOrb x="76%" y="10%" size={420} color="var(--omnix-rgba-0-255-255-0-045)" />
             <AuthMovingGrid />
           </div>
 
@@ -230,7 +230,7 @@ export function AuthCard({
             <div
               className="auth-mobile-icon-tile flex h-9 w-9 items-center justify-center rounded-xl"
             >
-              <AuthIcon d={AUTH_ICONS.sparkle} size={17} stroke="#00FFFF" />
+              <AuthIcon d={AUTH_ICONS.sparkle} size={17} stroke="var(--omnix-cyan)" />
             </div>
           </div>
 

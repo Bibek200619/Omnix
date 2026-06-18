@@ -128,7 +128,7 @@ export function MessageList({
       >
         <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-md)]">
           <span className="absolute inset-0 rounded-xl bg-cyan-300/10 blur-xl" />
-          <span className="absolute -inset-4 rounded-full bg-[radial-gradient(circle,rgba(0,255,255,0.2),transparent_70%)] opacity-70 [animation:auth-drift_12s_ease-in-out_infinite]" />
+          <span className="absolute -inset-4 rounded-full bg-[radial-gradient(circle,var(--omnix-rgba-0-255-255-0-2),transparent_70%)] opacity-70 [animation:auth-drift_12s_ease-in-out_infinite]" />
           <MessageSquare className="h-5 w-5" />
         </div>
         <h2 className="omnix-display mt-5 text-lg font-semibold text-white sm:text-xl">
@@ -163,7 +163,7 @@ export function MessageList({
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
             >
-              <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/10 text-xs font-bold text-emerald-100 shadow-[0_0_18px_rgba(0,232,122,0.16)]">
+              <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/10 text-xs font-bold text-emerald-100 shadow-[0_0_18px_var(--omnix-rgba-0-232-122-0-16)]">
                 {typingMembers[0]?.avatar_label || "U"}
               </div>
               <TypingIndicator
@@ -216,7 +216,7 @@ export function MessageList({
               title="Jump to latest messages"
             >
               {newMessagesCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-cyan-500 px-1 text-[9px] font-bold text-[#050c17] shadow-[0_0_10px_rgba(6,182,212,0.6)] animate-in zoom-in duration-300">
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-cyan-500 px-1 text-[9px] font-bold text-[var(--omnix-bg)] shadow-[0_0_10px_var(--omnix-rgba-6-182-212-0-6)] animate-in zoom-in duration-300">
                   {newMessagesCount}
                 </span>
               )}

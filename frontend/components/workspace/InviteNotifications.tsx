@@ -130,7 +130,7 @@ export function InviteNotificationBar() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
           transition={{ duration: 0.18, ease: "easeOut" }}
-          className="border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.96)] shadow-[0_16px_40px_rgba(0,0,0,0.26),var(--omnix-glow-xs)] backdrop-blur-xl"
+          className="border-b border-[var(--omnix-border)] bg-[var(--omnix-rgba-5-12-23-0-96)] shadow-[0_16px_40px_var(--omnix-rgba-0-0-0-0-26),var(--omnix-glow-xs)] backdrop-blur-xl"
         >
           <div className="flex w-full flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex min-w-0 items-start gap-3">
@@ -218,7 +218,7 @@ export function InviteNotificationBell() {
       >
         {pendingInvitesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
         {pendingInvites.length > 0 ? (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-cyan-300/25 bg-cyan-300/15 px-1 text-[10px] font-semibold leading-none text-cyan-50 shadow-[0_0_14px_rgba(0,255,255,0.16)]">
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-cyan-300/25 bg-cyan-300/15 px-1 text-[10px] font-semibold leading-none text-cyan-50 shadow-[0_0_14px_var(--omnix-rgba-0-255-255-0-16)]">
             {pendingInvites.length > 9 ? "9+" : pendingInvites.length}
           </span>
         ) : null}

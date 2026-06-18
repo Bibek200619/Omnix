@@ -54,7 +54,7 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsMod
             {shortcuts.map((item) => (
               <tr key={item.shortcut} className="text-[var(--omnix-text-2)]">
                 <td className="w-32 px-4 py-3 sm:px-6">
-                  <kbd className="inline-flex min-h-7 items-center rounded-md border border-white/10 bg-white/[0.06] px-2 text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                  <kbd className="inline-flex min-h-7 items-center rounded-md border border-white/10 bg-white/[0.06] px-2 text-xs font-semibold text-white shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-05)]">
                     {item.shortcut}
                   </kbd>
                 </td>

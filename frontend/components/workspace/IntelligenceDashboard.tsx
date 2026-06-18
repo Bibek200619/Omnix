@@ -91,7 +91,7 @@ export function IntelligenceDashboard() {
           <MessageSquare className="h-4 w-4 text-cyan-400" />
           <h4 className="text-xs font-semibold text-white">Conversation Volume</h4>
         </div>
-        <MiniBarChart data={data.conversations} labels={data.dates} color="#00FFFF" label="7-Day Trend" />
+        <MiniBarChart data={data.conversations} labels={data.dates} color="var(--omnix-cyan)" label="7-Day Trend" />
       </div>
       
       <div className="rounded-xl border border-white/5 bg-black/20 p-4 shadow-inner">
@@ -99,7 +99,7 @@ export function IntelligenceDashboard() {
           <Database className="h-4 w-4 text-emerald-400" />
           <h4 className="text-xs font-semibold text-white">Source Growth</h4>
         </div>
-        <MiniBarChart data={data.sources} labels={data.dates} color="#10b981" label="7-Day Trend" />
+        <MiniBarChart data={data.sources} labels={data.dates} color="var(--omnix-color-10b981)" label="7-Day Trend" />
       </div>
 
       <div className="rounded-xl border border-white/5 bg-black/20 p-4 shadow-inner">
@@ -107,7 +107,7 @@ export function IntelligenceDashboard() {
           <BarChart3 className="h-4 w-4 text-purple-400" />
           <h4 className="text-xs font-semibold text-white">Token Utilization</h4>
         </div>
-        <MiniBarChart data={data.tokens} labels={data.dates} color="#a855f7" label="7-Day Trend" />
+        <MiniBarChart data={data.tokens} labels={data.dates} color="var(--omnix-color-a855f7)" label="7-Day Trend" />
       </div>
     </div>
   );

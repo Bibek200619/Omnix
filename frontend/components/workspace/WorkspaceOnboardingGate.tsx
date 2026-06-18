@@ -277,7 +277,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
     >
       <div className="relative z-10 w-full max-w-5xl">
         <div className="mb-6 flex flex-col gap-4 text-center sm:mb-8">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 text-[var(--omnix-cyan)] shadow-[0_0_24px_rgba(0,255,255,0.15)]">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 text-[var(--omnix-cyan)] shadow-[0_0_24px_var(--omnix-rgba-0-255-255-0-15)]">
             <Layers3 className="h-8 w-8" />
           </div>
           <div>
@@ -289,7 +289,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-          <aside className="rounded-2xl border border-[var(--omnix-border)] bg-[rgba(8,16,30,0.82)] p-4 shadow-[var(--omnix-glow-sm)] backdrop-blur-xl">
+          <aside className="rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-8-16-30-0-82)] p-4 shadow-[var(--omnix-glow-sm)] backdrop-blur-xl">
             <div className="space-y-2">
               {steps.map((item, index) => {
                 const Icon = item.icon;
@@ -345,7 +345,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
             </Button>
           </aside>
 
-          <section className="min-h-[560px] rounded-2xl border border-[var(--omnix-border)] bg-[rgba(8,16,30,0.9)] p-4 shadow-[var(--omnix-glow-sm)] backdrop-blur-xl sm:p-6">
+          <section className="min-h-[560px] rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-8-16-30-0-9)] p-4 shadow-[var(--omnix-glow-sm)] backdrop-blur-xl sm:p-6">
             <div className="mb-6 flex items-start justify-between gap-4 border-b border-white/5 pb-5">
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100">

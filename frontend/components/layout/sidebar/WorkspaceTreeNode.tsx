@@ -46,7 +46,7 @@ function SubspaceRow({ subspace, index, onSelectWorkspace }: SubspaceRowProps) {
       className={cn(
         "relative my-0.5 flex min-h-[44px] w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-left transition-all duration-300 sm:min-h-[44px]",
         isActive
-          ? "bg-cyan-300/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+          ? "bg-cyan-300/[0.08] text-white shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-04)]"
           : "text-[var(--omnix-text-2)] hover:bg-[var(--omnix-surface)] hover:text-white",
       )}
     >
@@ -142,7 +142,7 @@ export function WorkspaceTreeNode({
           className={cn(
             "relative flex min-h-[48px] min-w-0 flex-1 items-center gap-2.5 rounded-[9px] px-3 py-2 text-left transition-all duration-300",
             isActive
-              ? "bg-cyan-300/[0.1] shadow-[var(--omnix-glow-xs),inset_0_1px_0_rgba(255,255,255,0.06)]"
+              ? "bg-cyan-300/[0.1] shadow-[var(--omnix-glow-xs),inset_0_1px_0_var(--omnix-rgba-255-255-255-0-06)]"
               : "hover:bg-white/[0.04]",
             isActive && aiState === "active" && "omnix-intel-glow",
           )}

@@ -37,7 +37,7 @@ export function WorkspaceIntelligencePanel({
 
   return (
     <section className={cn(
-      "relative overflow-hidden rounded-[18px] border border-white/5 bg-[linear-gradient(135deg,rgba(15,23,42,0.8),rgba(8,12,24,0.85))] shadow-xl backdrop-blur-xl transition-all duration-500 hover:shadow-cyan-500/5",
+      "relative overflow-hidden rounded-[18px] border border-white/5 bg-[linear-gradient(135deg,var(--omnix-rgba-15-23-42-0-8),var(--omnix-rgba-8-12-24-0-85))] shadow-xl backdrop-blur-xl transition-all duration-500 hover:shadow-cyan-500/5",
       className
     )}>
       <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-500/5 blur-[90px]" />
@@ -55,7 +55,7 @@ export function WorkspaceIntelligencePanel({
               "flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl border transition-all duration-500 group-hover:scale-105",
               loading 
                 ? "border-cyan-400/20 bg-cyan-400/5 text-cyan-300/80" 
-                : "border-purple-400/30 bg-purple-400/10 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.2)]"
+                : "border-purple-400/30 bg-purple-400/10 text-purple-300 shadow-[0_0_15px_var(--omnix-rgba-168-85-247-0-2)]"
             )}>
               {loading ? (
                 <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin opacity-50" />
@@ -65,7 +65,7 @@ export function WorkspaceIntelligencePanel({
             </span>
             <div className={cn(
               "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full border-2 border-slate-900 shadow-sm",
-              loading ? "bg-amber-500/80 animate-pulse" : "bg-emerald-500/80 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+              loading ? "bg-amber-500/80 animate-pulse" : "bg-emerald-500/80 shadow-[0_0_8px_var(--omnix-rgba-16-185-129-0-5)]"
             )} />
           </div>
           <div className="min-w-0">
@@ -118,10 +118,10 @@ export function WorkspaceIntelligencePanel({
         <div className="relative z-10 border-t border-white/5 px-4 pb-4 pt-2 animate-in fade-in slide-in-from-top-4 duration-300 sm:px-6 sm:pb-6">
           <div className={cn("grid gap-4", compact ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2 lg:grid-cols-4")}>
             {[
-              { label: "Connected Files", value: profile?.source_count ?? 0, icon: Database, color: "#22d3ee" },
-              { label: "Conversations", value: profile?.conversation_count ?? 0, icon: Layers3, color: "#c084fc" },
-              { label: "Team Members", value: profile?.member_count ?? 0, icon: Users, color: "#fbbf24" },
-              { label: "Topics", value: domains.length, icon: Globe2, color: "#10b981" },
+              { label: "Connected Files", value: profile?.source_count ?? 0, icon: Database, color: "var(--omnix-color-22d3ee)" },
+              { label: "Conversations", value: profile?.conversation_count ?? 0, icon: Layers3, color: "var(--omnix-color-c084fc)" },
+              { label: "Team Members", value: profile?.member_count ?? 0, icon: Users, color: "var(--omnix-color-fbbf24)" },
+              { label: "Topics", value: domains.length, icon: Globe2, color: "var(--omnix-color-10b981)" },
             ].slice(0, compact ? 4 : 4).map((item) => {
               const Icon = item.icon;
               return (

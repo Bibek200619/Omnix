@@ -48,7 +48,7 @@ export function ConversationMessageRow({
   return (
     <article
       className={cn(
-        "group rounded-xl border border-transparent px-3 py-3 transition hover:border-[var(--omnix-border)] hover:bg-[rgba(0,255,255,0.025)]",
+        "group rounded-xl border border-transparent px-3 py-3 transition hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-rgba-0-255-255-0-025)]",
         message.delivery === "failed" && "border-rose-400/20",
       )}
     >

@@ -106,7 +106,7 @@ export function AppShell({ children }: AppShellProps) {
                   <div className="omnix-app-bg omnix-auth-shell relative h-[100dvh] overflow-hidden text-white sm:h-screen">
                     <a
                       href="#main-content"
-                      className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[9999] focus:rounded-lg focus:bg-[var(--omnix-cyan)] focus:px-4 focus:py-2 focus:font-bold focus:text-[#050c17] focus:shadow-[var(--omnix-glow-md)]"
+                      className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[9999] focus:rounded-lg focus:bg-[var(--omnix-cyan)] focus:px-4 focus:py-2 focus:font-bold focus:text-[var(--omnix-bg)] focus:shadow-[var(--omnix-glow-md)]"
                     >
                       Skip to main content
                     </a>
@@ -114,7 +114,7 @@ export function AppShell({ children }: AppShellProps) {
                     <AmbientParticles count={30} />
                     <div className="omnix-shell-scanline" aria-hidden="true" />
                     <div
-                      className="pointer-events-none fixed inset-x-0 top-0 z-[2] h-px bg-[linear-gradient(90deg,transparent_0%,rgba(0,255,255,0.35)_30%,rgba(0,255,255,0.6)_50%,rgba(0,255,255,0.35)_70%,transparent_100%)]"
+                      className="pointer-events-none fixed inset-x-0 top-0 z-[2] h-px bg-[linear-gradient(90deg,transparent_0%,var(--omnix-rgba-0-255-255-0-35)_30%,var(--omnix-rgba-0-255-255-0-6)_50%,var(--omnix-rgba-0-255-255-0-35)_70%,transparent_100%)]"
                       aria-hidden="true"
                     />
                     <Sidebar

@@ -50,14 +50,14 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[min(21rem,calc(100vw_-_2.75rem))] flex-col overflow-hidden border-r border-[var(--omnix-border)] bg-[linear-gradient(180deg,rgba(5,12,23,0.98),rgba(4,10,20,0.985))] shadow-[24px_0_120px_rgba(0,0,0,0.6),4px_0_40px_rgba(0,255,255,0.05)] backdrop-blur-[28px] transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] lg:w-[var(--omnix-sidebar-w)]",
+          "fixed inset-y-0 left-0 z-50 flex w-[min(21rem,calc(100vw_-_2.75rem))] flex-col overflow-hidden border-r border-[var(--omnix-border)] bg-[linear-gradient(180deg,var(--omnix-rgba-5-12-23-0-98),var(--omnix-rgba-4-10-20-0-985))] shadow-[24px_0_120px_var(--omnix-rgba-0-0-0-0-6),4px_0_40px_var(--omnix-rgba-0-255-255-0-05)] backdrop-blur-[28px] transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] lg:w-[var(--omnix-sidebar-w)]",
           isOpen ? "translate-x-0" : "-translate-x-full",
           collapsed ? "lg:-translate-x-full" : "lg:translate-x-0",
         )}
       >
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[260px] bg-[radial-gradient(ellipse_at_50%_-10%,rgba(0,255,255,0.11)_0%,transparent_70%)]" />
-        <div className="pointer-events-none absolute inset-0 opacity-[0.025] [animation:auth-grid_22s_linear_infinite] [background-image:linear-gradient(rgba(0,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,255,0.55)_1px,transparent_1px)] [background-size:64px_64px]" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-[linear-gradient(180deg,transparent,rgba(0,255,255,0.15),rgba(0,255,255,0.08),transparent)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[260px] bg-[radial-gradient(ellipse_at_50%_-10%,var(--omnix-rgba-0-255-255-0-11)_0%,transparent_70%)]" />
+        <div className="pointer-events-none absolute inset-0 opacity-[0.025] [animation:auth-grid_22s_linear_infinite] [background-image:linear-gradient(var(--omnix-rgba-0-255-255-0-55)_1px,transparent_1px),linear-gradient(90deg,var(--omnix-rgba-0-255-255-0-55)_1px,transparent_1px)] [background-size:64px_64px]" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-[linear-gradient(180deg,transparent,var(--omnix-rgba-0-255-255-0-15),var(--omnix-rgba-0-255-255-0-08),transparent)]" />
 
         <div className="relative flex h-auto items-start justify-between border-b border-[var(--omnix-border)] px-[18px] pb-3.5 pt-[18px]">
           <div className="flex w-full flex-col gap-3">
@@ -116,12 +116,12 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
 
         <SidebarNav pathname={pathname} onNavigate={onClose} />
 
-        <div className="relative border-t border-[rgba(0,255,255,0.07)] p-2.5 pb-[calc(env(safe-area-inset-bottom)_+_0.625rem)]">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(0,255,255,0.2),transparent)]" />
+        <div className="relative border-t border-[var(--omnix-rgba-0-255-255-0-07)] p-2.5 pb-[calc(env(safe-area-inset-bottom)_+_0.625rem)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-0-255-255-0-2),transparent)]" />
           <Link
             href="/settings/profile"
             onClick={onClose}
-            className="group/profile flex items-center gap-2.5 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.03)] px-2.5 py-2.5 transition duration-200 hover:border-[rgba(0,255,255,0.2)] hover:bg-[rgba(0,255,255,0.06)] hover:shadow-[var(--omnix-glow-xs)]"
+            className="group/profile flex items-center gap-2.5 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-border)] bg-[var(--omnix-rgba-0-255-255-0-03)] px-2.5 py-2.5 transition duration-200 hover:border-[var(--omnix-rgba-0-255-255-0-2)] hover:bg-[var(--omnix-rgba-0-255-255-0-06)] hover:shadow-[var(--omnix-glow-xs)]"
           >
             <div className="relative shrink-0">
               <ProfileAvatar
@@ -129,9 +129,9 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                 email={displayEmail}
                 handle={displayHandle}
                 avatarUrl={profile?.avatar_url}
-                className="h-8 w-8 border-cyan-300/35 bg-cyan-300/12 text-xs text-cyan-50 shadow-[0_0_12px_rgba(0,255,255,0.25)]"
+                className="h-8 w-8 border-cyan-300/35 bg-cyan-300/12 text-xs text-cyan-50 shadow-[0_0_12px_var(--omnix-rgba-0-255-255-0-25)]"
               />
-              <span className="omnix-online-dot absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 border-[2px] border-[rgba(5,12,23,0.98)]">
+              <span className="omnix-online-dot absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 border-[2px] border-[var(--omnix-rgba-5-12-23-0-98)]">
                 <span className="sr-only">Online</span>
               </span>
             </div>

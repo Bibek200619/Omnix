@@ -225,7 +225,7 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
             <div className={cn("flex h-9 w-9 items-center justify-center rounded-lg border transition-all duration-300 sm:h-8 sm:w-8", open ? "border-cyan-300/40 bg-cyan-300/20 text-cyan-200" : "border-white/10 bg-white/5 text-white/40")}>
               <ActiveWorkspaceIcon className="h-4.5 w-4.5 sm:h-4 sm:w-4" />
             </div>
-            {realtimeStatus === "connected" ? <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#060a14] bg-[var(--omnix-green)] opacity-80" /> : null}
+            {realtimeStatus === "connected" ? <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--omnix-color-060a14)] bg-[var(--omnix-green)] opacity-80" /> : null}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">

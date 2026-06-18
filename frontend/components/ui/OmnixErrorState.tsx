@@ -33,7 +33,7 @@ export function OmnixErrorState({
       role="alert"
       aria-live="polite"
       className={cn(
-        "relative overflow-hidden rounded-xl border border-amber-200/18 bg-[linear-gradient(145deg,rgba(251,191,36,0.08),rgba(34,211,238,0.035)_55%,rgba(0,0,0,0.18))] shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]",
+        "relative overflow-hidden rounded-xl border border-amber-200/18 bg-[linear-gradient(145deg,var(--omnix-rgba-251-191-36-0-08),var(--omnix-rgba-34-211-238-0-035)_55%,var(--omnix-rgba-0-0-0-0-18))] shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-045)]",
         compact ? "p-3" : "p-4 sm:p-5",
         className,
       )}

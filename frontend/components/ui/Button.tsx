@@ -20,7 +20,7 @@ const variants: Record<ButtonVariant, string> = {
   primary:
     "border-cyan-300/40 bg-cyan-300 text-slate-950 shadow-glow hover:bg-cyan-200 hover:shadow-cyan-300/20",
   secondary:
-    "border-white/10 bg-white/[0.06] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] hover:border-white/20 hover:bg-white/[0.1]",
+    "border-white/10 bg-white/[0.06] text-white shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-04)] hover:border-white/20 hover:bg-white/[0.1]",
   ghost:
     "border-transparent bg-transparent text-slate-300 hover:bg-white/[0.06] hover:text-white",
   danger:

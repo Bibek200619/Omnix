@@ -111,7 +111,7 @@ export function WorkspaceAssignmentModal({
       isOpen={open}
       onClose={onClose}
       title="Add Collaborator"
-      className="max-w-xl rounded-3xl border-[var(--omnix-border-2)] bg-[#0a0d14]/90 shadow-[0_32px_128px_rgba(0,0,0,0.6)] ring-1 ring-white/10"
+      className="max-w-xl rounded-3xl border-[var(--omnix-border-2)] bg-[var(--omnix-color-0a0d14)]/90 shadow-[0_32px_128px_var(--omnix-rgba-0-0-0-0-6)] ring-1 ring-white/10"
       footerClassName="gap-3 px-4 py-4 sm:justify-end sm:px-6"
       footer={(
         <>

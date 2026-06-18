@@ -148,7 +148,7 @@ function WorkspaceDecisionsSurfaceContent() {
   return (
     <section className="omnix-container-responsive flex min-h-0 flex-1 flex-col overflow-x-hidden px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
       <div ref={liveRegionRef} aria-live="polite" aria-atomic="true" className="sr-only" />
-      <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-4 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.015)] px-4 py-4 sm:px-6 sm:py-5">
+      <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-4 rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-0-255-255-0-015)] px-4 py-4 sm:px-6 sm:py-5">
         <div>
           <p className="mb-1.5 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400/70">
             <BadgeCheck className="h-4 w-4" />
@@ -165,7 +165,7 @@ function WorkspaceDecisionsSurfaceContent() {
             size="sm"
             onClick={() => setCreateOpen(true)}
             leftIcon={<Plus className="h-3.5 w-3.5" />}
-            className="h-9 flex-1 px-4 shadow-[0_0_15px_rgba(34,211,238,0.1)] sm:flex-none"
+            className="h-9 flex-1 px-4 shadow-[0_0_15px_var(--omnix-rgba-34-211-238-0-1)] sm:flex-none"
           >
             New Decision
           </Button>
@@ -252,7 +252,7 @@ function WorkspaceDecisionsSurfaceContent() {
                     className={cn(
                       "flex-1 rounded-md py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all",
                       statusFilter === s 
-                        ? "bg-cyan-400/10 text-cyan-400 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]" 
+                        ? "bg-cyan-400/10 text-cyan-400 shadow-[inset_0_1px_1px_var(--omnix-rgba-255-255-255-0-05)]" 
                         : "text-[var(--omnix-text-3)] hover:text-[var(--omnix-text-2)]"
                     )}
                   >
@@ -289,7 +289,7 @@ function WorkspaceDecisionsSurfaceContent() {
                     className={cn(
                       "group relative mb-2 flex flex-col rounded-xl border p-4 text-left transition-all duration-300",
                       active
-                        ? "border-cyan-400/30 bg-cyan-400/[0.07] shadow-[0_0_20px_rgba(34,211,238,0.05)]"
+                        ? "border-cyan-400/30 bg-cyan-400/[0.07] shadow-[0_0_20px_var(--omnix-rgba-34-211-238-0-05)]"
                         : "border-transparent hover:border-white/10 hover:bg-white/[0.03]",
                     )}
                   >
@@ -303,8 +303,8 @@ function WorkspaceDecisionsSurfaceContent() {
                       </span>
                       <div className={cn(
                         "h-1.5 w-1.5 shrink-0 rounded-full mt-1.5",
-                        decision.status === "accepted" ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" :
-                        decision.status === "proposed" ? "bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]" :
+                        decision.status === "accepted" ? "bg-emerald-400 shadow-[0_0_8px_var(--omnix-rgba-52-211-153-0-5)]" :
+                        decision.status === "proposed" ? "bg-cyan-400 shadow-[0_0_8px_var(--omnix-rgba-34-211-238-0-5)]" :
                         "bg-amber-400"
                       )} />
                     </div>

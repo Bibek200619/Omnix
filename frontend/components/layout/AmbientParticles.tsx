@@ -23,9 +23,9 @@ export function AmbientParticles({ count = 25 }: { count?: number }) {
   const [particles, setParticles] = useState<Particle[]>([]);
 
   useEffect(() => {
-    const cyan = "#00FFFF";
-    const blue = "#3366ff";
-    const white = "#ffffff";
+    const cyan = "var(--omnix-cyan)";
+    const blue = "var(--omnix-blue)";
+    const white = "var(--omnix-color-ffffff)";
     
     setParticles(
       Array.from({ length: count }, (_, i) => {

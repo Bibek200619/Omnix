@@ -49,16 +49,16 @@ export function WorkspaceMemberStack({
                 handle={member.handle}
                 avatarUrl={member.avatar_url}
                 className={cn(
-                  "rounded-lg font-semibold shadow-[0_8px_18px_rgba(0,0,0,0.22)]",
+                  "rounded-lg font-semibold shadow-[0_8px_18px_var(--omnix-rgba-0-0-0-0-22)]",
                   workspaceRoleAvatarClass(member.role),
                   sizeClasses[size],
-                  showPresence && presence?.is_online && "ring-1 ring-emerald-300/55 shadow-[0_0_18px_rgba(0,232,122,0.22)]",
+                  showPresence && presence?.is_online && "ring-1 ring-emerald-300/55 shadow-[0_0_18px_var(--omnix-rgba-0-232-122-0-22)]",
                 )}
               />
               {showPresence && presence ? (
                 <span
                   className={cn(
-                    "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-[#07111f]",
+                    "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-[var(--omnix-color-07111f)]",
                     presence.is_online
                       ? "bg-[var(--omnix-green)] shadow-[0_0_8px_var(--omnix-green)]"
                       : "bg-[var(--omnix-amber)]",

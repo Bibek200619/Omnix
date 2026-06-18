@@ -33,7 +33,7 @@ export function WorkspaceConversationChrome({
 }: WorkspaceConversationChromeProps) {
   return (
     <>
-      <header className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-3 sm:px-5 sm:py-4">
+      <header className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-0-255-255-0-025)] px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
             <MessagesSquare className="h-3.5 w-3.5" />

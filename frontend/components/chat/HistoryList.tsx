@@ -191,7 +191,7 @@ export function HistoryList() {
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.18, ease: "easeOut" }}
                   className={cn(
-                    "group relative overflow-hidden rounded-xl border p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)]",
+                    "group relative overflow-hidden rounded-xl border p-4 text-left shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-03)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)]",
                     isActive
                       ? "border-cyan-300/35 bg-cyan-300/10 shadow-[var(--omnix-glow-xs)]"
                       : "border-[var(--omnix-border)] bg-[var(--omnix-surface)]",

@@ -187,12 +187,12 @@ export function RegisterForm() {
       <LoadingButton
         type="submit"
         size="lg"
-        className="w-full rounded-xl border-0 bg-[#00FFFF] py-3.5 text-sm font-black text-[#061020] shadow-[0_0_32px_rgba(0,255,255,0.3)] hover:-translate-y-0.5 hover:bg-[#00FFFF] hover:shadow-[0_0_50px_rgba(0,255,255,0.55)]"
+        className="w-full rounded-xl border-0 bg-[var(--omnix-cyan)] py-3.5 text-sm font-black text-[var(--omnix-color-061020)] shadow-[0_0_32px_var(--omnix-rgba-0-255-255-0-3)] hover:-translate-y-0.5 hover:bg-[var(--omnix-cyan)] hover:shadow-[0_0_50px_var(--omnix-rgba-0-255-255-0-55)]"
         isLoading={loading}
         loadingText="Creating account"
         disabled={!isConfigured}
-        leftIcon={<AuthIcon d={AUTH_ICONS.user} size={16} stroke="#061020" sw={2.1} />}
-        rightIcon={<AuthIcon d={AUTH_ICONS.arrow} size={16} stroke="#061020" sw={2.5} />}
+        leftIcon={<AuthIcon d={AUTH_ICONS.user} size={16} stroke="var(--omnix-color-061020)" sw={2.1} />}
+        rightIcon={<AuthIcon d={AUTH_ICONS.arrow} size={16} stroke="var(--omnix-color-061020)" sw={2.5} />}
       >
         Create account
       </LoadingButton>

@@ -81,7 +81,7 @@ export function PendingWorkspaceInvites({
   return (
     <section
       className={cn(
-        "rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]",
+        "rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-035)]",
         compact ? "p-2.5" : "p-4 sm:p-5",
         className,
       )}
@@ -154,7 +154,7 @@ export function PendingWorkspaceInvites({
               <article
                 key={inviteId}
                 className={cn(
-                  "rounded-md border border-[var(--omnix-border)] bg-[#09131b]/85 transition hover:border-cyan-300/25 hover:bg-[var(--omnix-surface)]",
+                  "rounded-md border border-[var(--omnix-border)] bg-[var(--omnix-color-09131b)]/85 transition hover:border-cyan-300/25 hover:bg-[var(--omnix-surface)]",
                   compact ? "p-2.5" : "p-4",
                 )}
               >

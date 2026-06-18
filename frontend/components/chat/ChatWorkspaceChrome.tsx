@@ -105,7 +105,7 @@ export function ChatWorkspaceChrome({
 
   return (
     <>
-      <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.85)] px-3 shadow-[0_12px_44px_rgba(0,0,0,0.18)] backdrop-blur-xl sm:px-[18px]">
+      <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-[var(--omnix-border)] bg-[var(--omnix-rgba-5-12-23-0-85)] px-3 shadow-[0_12px_44px_var(--omnix-rgba-0-0-0-0-18)] backdrop-blur-xl sm:px-[18px]">
         <div className="flex min-w-0 items-center gap-2.5">
           {!historyOpen ? (
             <button
@@ -160,14 +160,14 @@ export function ChatWorkspaceChrome({
         </div>
       </div>
 
-      <div className="hidden shrink-0 border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.48)] px-[18px] py-2 backdrop-blur-xl lg:block">
+      <div className="hidden shrink-0 border-b border-[var(--omnix-border)] bg-[var(--omnix-rgba-5-12-23-0-48)] px-[18px] py-2 backdrop-blur-xl lg:block">
         <div className="grid grid-cols-5 gap-2">
           {statusItems.map((item) => {
             const Icon = item.icon;
             return (
               <div
                 key={item.label}
-                className="flex min-w-0 items-center gap-2 rounded-[8px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                className="flex min-w-0 items-center gap-2 rounded-[8px] border border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-2.5 py-2 shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-03)]"
               >
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-cyan-300/15 bg-cyan-300/10">
                   <Icon className={cn("h-3.5 w-3.5", item.color)} />
@@ -186,7 +186,7 @@ export function ChatWorkspaceChrome({
         </div>
       </div>
 
-      <div className="hidden shrink-0 border-b border-[var(--omnix-border)] bg-[rgba(5,12,23,0.34)] px-[18px] py-2 backdrop-blur-xl xl:block">
+      <div className="hidden shrink-0 border-b border-[var(--omnix-border)] bg-[var(--omnix-rgba-5-12-23-0-34)] px-[18px] py-2 backdrop-blur-xl xl:block">
         <WorkspacePresenceCluster
           presence={presence}
           workspaceName={activeWorkspace?.name}

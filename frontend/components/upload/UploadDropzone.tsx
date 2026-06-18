@@ -177,8 +177,8 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         animate={{
-          borderColor: isDragActive ? "rgba(0, 255, 255, 0.5)" : "rgba(0, 255, 255, 0.12)",
-          backgroundColor: isDragActive ? "rgba(0, 255, 255, 0.06)" : "rgba(0, 255, 255, 0.035)",
+          borderColor: isDragActive ? "var(--omnix-rgba-0-255-255-0-5)" : "var(--omnix-rgba-0-255-255-0-12)",
+          backgroundColor: isDragActive ? "var(--omnix-rgba-0-255-255-0-06)" : "var(--omnix-rgba-0-255-255-0-035)",
           scale: isDragActive ? 1.01 : 1,
         }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -193,8 +193,8 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
               animate={{ 
                 scale: isDragActive ? 1.1 : 1,
                 rotate: isDragActive ? 10 : 0,
-                color: isDragActive ? "#22d3ee" : "#67e8f9",
-                backgroundColor: isDragActive ? "rgba(34, 211, 238, 0.1)" : "rgba(255, 255, 255, 0.03)"
+                color: isDragActive ? "var(--omnix-color-22d3ee)" : "var(--omnix-color-67e8f9)",
+                backgroundColor: isDragActive ? "var(--omnix-rgba-34-211-238-0-1)" : "var(--omnix-rgba-255-255-255-0-03)"
               }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
               className={cn("flex shrink-0 items-center justify-center rounded-xl", compact ? "h-10 w-10" : "h-14 w-14")}
@@ -203,7 +203,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
             </motion.div>
             <div className={cn("min-w-0", compact ? "text-left" : "text-center sm:text-left")}>
               <motion.p 
-                animate={{ color: isDragActive ? "#fff" : "#f8fafc" }}
+                animate={{ color: isDragActive ? "var(--omnix-color-fff)" : "var(--omnix-color-f8fafc)" }}
                 className={cn("font-medium", compact ? "text-sm" : "text-base")}
               >
                 {isDragActive ? "Drop files to upload" : "Upload documents"}

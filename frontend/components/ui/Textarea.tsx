@@ -29,7 +29,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           aria-describedby={describedBy}
           aria-invalid={error ? true : ariaInvalid}
           className={cn(
-            "min-h-24 w-full rounded-lg border border-white/10 bg-white/[0.045] px-3 py-2 text-sm leading-6 text-white outline-none shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition",
+            "min-h-24 w-full rounded-lg border border-white/10 bg-white/[0.045] px-3 py-2 text-sm leading-6 text-white outline-none shadow-[inset_0_1px_0_var(--omnix-rgba-255-255-255-0-03)] transition",
             "placeholder:text-slate-500 hover:border-white/15 focus:border-cyan-300/70 focus:bg-white/[0.07] focus:ring-2 focus:ring-cyan-300/15",
             "disabled:cursor-not-allowed disabled:opacity-60",
             className,

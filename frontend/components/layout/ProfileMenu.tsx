@@ -71,10 +71,10 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
         title="Profile menu"
         onClick={() => setOpen((current) => !current)}
         className={cn(
-          "flex h-[34px] w-[34px] items-center justify-center rounded-full border text-sm font-semibold shadow-[0_10px_30px_rgba(0,0,0,0.24)] transition",
+          "flex h-[34px] w-[34px] items-center justify-center rounded-full border text-sm font-semibold shadow-[0_10px_30px_var(--omnix-rgba-0-0-0-0-24)] transition",
           open
-            ? "border-cyan-300/45 bg-[linear-gradient(135deg,#00FFFF,#0088ff)] text-[#050c17] shadow-[var(--omnix-glow-sm)] ring-2 ring-cyan-300/20"
-            : "border-cyan-300/40 bg-[linear-gradient(135deg,#00FFFF,#0088ff)] text-[#050c17] hover:shadow-[var(--omnix-glow-sm)]",
+            ? "border-cyan-300/45 bg-[linear-gradient(135deg,var(--omnix-cyan),var(--omnix-color-0088ff))] text-[var(--omnix-bg)] shadow-[var(--omnix-glow-sm)] ring-2 ring-cyan-300/20"
+            : "border-cyan-300/40 bg-[linear-gradient(135deg,var(--omnix-cyan),var(--omnix-color-0088ff))] text-[var(--omnix-bg)] hover:shadow-[var(--omnix-glow-sm)]",
         )}
       >
         <ProfileAvatar
@@ -82,7 +82,7 @@ export function ProfileMenu({ user, signingOut = false, onSignOut }: ProfileMenu
           email={email}
           handle={username}
           avatarUrl={profile?.avatar_url}
-          className="h-full w-full border-0 bg-transparent text-[#050c17]"
+          className="h-full w-full border-0 bg-transparent text-[var(--omnix-bg)]"
         />
       </button>
 

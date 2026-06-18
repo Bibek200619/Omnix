@@ -26,7 +26,7 @@ export function MobileDock({ onMoreClick }: MobileDockProps) {
   return (
     <nav
       aria-label="Primary mobile navigation"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-cyan-300/10 bg-[rgba(5,12,23,0.92)] px-2 pb-[max(env(safe-area-inset-bottom),0.45rem)] pt-2 backdrop-blur-2xl lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-cyan-300/10 bg-[var(--omnix-rgba-5-12-23-0-92)] px-2 pb-[max(env(safe-area-inset-bottom),0.45rem)] pt-2 backdrop-blur-2xl lg:hidden"
     >
       <div className="mx-auto grid max-w-lg grid-cols-6 gap-1">
         {items.map((item) => {
@@ -51,7 +51,7 @@ export function MobileDock({ onMoreClick }: MobileDockProps) {
               <span>{item.label}</span>
               {showUnreadBadge ? (
                 <span
-                  className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.8)]"
+                  className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-400 shadow-[0_0_8px_var(--omnix-rgba-251-113-133-0-8)]"
                   aria-hidden="true"
                 />
               ) : null}
@@ -71,7 +71,7 @@ export function MobileDock({ onMoreClick }: MobileDockProps) {
           <span>More</span>
           {hasUnreadNotifications ? (
             <span
-              className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.8)]"
+              className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-400 shadow-[0_0_8px_var(--omnix-rgba-251-113-133-0-8)]"
               aria-hidden="true"
             />
           ) : null}
