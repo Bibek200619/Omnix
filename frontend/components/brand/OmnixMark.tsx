@@ -19,26 +19,26 @@ export function OmnixMark({ size = 36, className }: OmnixMarkProps) {
       height={size}
       viewBox="0 0 64 64"
       fill="none"
-      className={cn("drop-shadow-[0_0_14px_rgba(44,132,255,0.28)]", className)}
+      className={cn("drop-shadow-[0_0_14px_var(--omnix-rgba-rgba-44-132-255-0-28)]", className)}
       aria-hidden="true"
     >
       <defs>
         <linearGradient id={baseGradient} x1="13" y1="8" x2="52" y2="57" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#F9FCFF" />
-          <stop offset="0.38" stopColor="#ADC5EA" />
-          <stop offset="0.63" stopColor="#3068D2" />
-          <stop offset="1" stopColor="#29C7FF" />
+          <stop stopColor="var(--omnix-color-f9fcff)" />
+          <stop offset="0.38" stopColor="var(--omnix-color-adc5ea)" />
+          <stop offset="0.63" stopColor="var(--omnix-color-3068d2)" />
+          <stop offset="1" stopColor="var(--omnix-color-29c7ff)" />
         </linearGradient>
         <linearGradient id={silverGradient} x1="13" y1="8" x2="45" y2="37" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#FBFDFF" />
-          <stop offset="0.42" stopColor="#E4EEF9" />
-          <stop offset="0.75" stopColor="#A9C3E8" />
-          <stop offset="1" stopColor="#547DC8" />
+          <stop stopColor="var(--omnix-color-fbfdff)" />
+          <stop offset="0.42" stopColor="var(--omnix-color-e4eef9)" />
+          <stop offset="0.75" stopColor="var(--omnix-color-a9c3e8)" />
+          <stop offset="1" stopColor="var(--omnix-color-547dc8)" />
         </linearGradient>
         <linearGradient id={blueGradient} x1="13" y1="46" x2="53" y2="29" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#33CCFF" />
-          <stop offset="0.43" stopColor="#197EF0" />
-          <stop offset="1" stopColor="#214DB9" />
+          <stop stopColor="var(--omnix-color-33ccff)" />
+          <stop offset="0.43" stopColor="var(--omnix-color-197ef0)" />
+          <stop offset="1" stopColor="var(--omnix-color-214db9)" />
         </linearGradient>
         <linearGradient id={highlightGradient} x1="17" y1="14" x2="32" y2="31" gradientUnits="userSpaceOnUse">
           <stop stopColor="white" stopOpacity="0.72" />

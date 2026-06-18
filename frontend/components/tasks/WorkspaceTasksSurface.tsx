@@ -376,7 +376,7 @@ export function WorkspaceTasksSurface() {
 
   return (
     <section className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
-      <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-3 sm:px-5 sm:py-4">
+      <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-0-255-255-0-025)] px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
             <ClipboardCheck className="h-3.5 w-3.5" /> Execution layer
@@ -525,7 +525,7 @@ export function WorkspaceTasksSurface() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         {isBlocked && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-300" />}
-                        {isActive && <div className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />}
+                        {isActive && <div className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-cyan-400 shadow-[0_0_8px_var(--omnix-rgba-rgba-34-211-238-0-8)]" />}
                         <p className="truncate text-sm font-medium text-white">{task.title}</p>
                       </div>
                       {task.description ? (

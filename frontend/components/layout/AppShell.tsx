@@ -87,7 +87,7 @@ export function AppShell({ children }: AppShellProps) {
                     <div className="omnix-ambient-layer" aria-hidden="true" />
                     <div className="omnix-shell-scanline" aria-hidden="true" />
                     <div
-                      className="pointer-events-none fixed inset-x-0 top-0 z-[2] h-px bg-[linear-gradient(90deg,transparent_0%,rgba(0,255,255,0.35)_30%,rgba(0,255,255,0.6)_50%,rgba(0,255,255,0.35)_70%,transparent_100%)]"
+                      className="pointer-events-none fixed inset-x-0 top-0 z-[2] h-px bg-[linear-gradient(90deg,transparent_0%,var(--omnix-rgba-rgba-0-255-255-0-35)_30%,var(--omnix-rgba-rgba-0-255-255-0-6)_50%,var(--omnix-rgba-rgba-0-255-255-0-35)_70%,transparent_100%)]"
                       aria-hidden="true"
                     />
                     <Sidebar

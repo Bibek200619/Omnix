@@ -486,7 +486,7 @@ export function CommandPalette() {
           setOpen(true);
           setQuery("");
         }}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.04)] text-[var(--omnix-text-2)] transition hover:border-[rgba(0,255,255,0.3)] hover:bg-[rgba(0,255,255,0.08)] active:scale-[0.97] md:hidden"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--omnix-rgba-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-rgba-0-255-255-0-04)] text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-rgba-rgba-0-255-255-0-3)] hover:bg-[var(--omnix-rgba-rgba-0-255-255-0-08)] active:scale-[0.97] md:hidden"
         aria-label="Open command palette"
         title="Open command palette"
       >
@@ -521,7 +521,7 @@ export function CommandPalette() {
               aria-modal="true"
               aria-label="Omnix command palette"
               onKeyDown={handleKeyDown}
-              className="fixed inset-x-0 bottom-0 flex max-h-[min(86dvh,44rem)] flex-col overflow-hidden rounded-t-[20px] border border-cyan-300/15 bg-[rgba(3,8,18,0.97)] shadow-[0_-24px_80px_rgba(0,0,0,0.55),var(--omnix-glow-sm)] backdrop-blur-2xl md:bottom-auto md:left-1/2 md:right-auto md:top-[12vh] md:max-h-[min(42rem,calc(100dvh-8rem))] md:w-[min(42rem,calc(100vw-2rem))] md:-translate-x-1/2 md:rounded-2xl"
+              className="fixed inset-x-0 bottom-0 flex max-h-[min(86dvh,44rem)] flex-col overflow-hidden rounded-t-[20px] border border-cyan-300/15 bg-[var(--omnix-rgba-rgba-3-8-18-0-97)] shadow-[0_-24px_80px_var(--omnix-rgba-rgba-0-0-0-0-55),var(--omnix-glow-sm)] backdrop-blur-2xl md:bottom-auto md:left-1/2 md:right-auto md:top-[12vh] md:max-h-[min(42rem,calc(100dvh-8rem))] md:w-[min(42rem,calc(100vw-2rem))] md:-translate-x-1/2 md:rounded-2xl"
             >
               <div className="border-b border-white/5 p-3 sm:p-4">
                 <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/15 md:hidden" />

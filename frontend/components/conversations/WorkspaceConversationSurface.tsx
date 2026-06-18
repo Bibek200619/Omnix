@@ -686,7 +686,7 @@ export function WorkspaceConversationSurface() {
     return (
       <article
         className={cn(
-          "group rounded-xl border border-transparent px-3 py-3 transition hover:border-[var(--omnix-border)] hover:bg-[rgba(0,255,255,0.025)]",
+          "group rounded-xl border border-transparent px-3 py-3 transition hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-rgba-rgba-0-255-255-0-025)]",
           message.delivery === "failed" && "border-rose-400/20",
         )}
       >
@@ -765,7 +765,7 @@ export function WorkspaceConversationSurface() {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
-      <header className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-3 sm:px-5 sm:py-4">
+      <header className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-0-255-255-0-025)] px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
             <MessagesSquare className="h-3.5 w-3.5" />

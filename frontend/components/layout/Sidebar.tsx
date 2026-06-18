@@ -360,7 +360,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
         className={cn(
           "relative my-0.5 flex min-h-[42px] w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-left transition-all duration-300 sm:min-h-9",
           isActive
-            ? "bg-cyan-300/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+            ? "bg-cyan-300/[0.08] text-white shadow-[inset_0_1px_0_var(--omnix-rgba-rgba-255-255-255-0-04)]"
             : "text-[var(--omnix-text-2)] hover:bg-[var(--omnix-surface)] hover:text-white",
         )}
       >
@@ -388,7 +388,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
               {health !== "quiet" && (
                 <span className={cn(
                   "h-1.5 w-1.5 rounded-full animate-pulse",
-                  health === "alive" ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" : "bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]"
+                  health === "alive" ? "bg-emerald-400 shadow-[0_0_8px_var(--omnix-rgba-rgba-52-211-153-0-8)]" : "bg-cyan-400 shadow-[0_0_6px_var(--omnix-rgba-rgba-34-211-238-0-6)]"
                 )} />
               )}
               <WorkspaceTypeBadge workspace={subspace} />
@@ -447,7 +447,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
             className={cn(
               "relative flex min-h-[48px] min-w-0 flex-1 items-center gap-2.5 rounded-[9px] px-3 py-2 text-left transition-all duration-300",
               isActive
-                ? "bg-cyan-300/[0.1] shadow-[var(--omnix-glow-xs),inset_0_1px_0_rgba(255,255,255,0.06)]"
+                ? "bg-cyan-300/[0.1] shadow-[var(--omnix-glow-xs),inset_0_1px_0_var(--omnix-rgba-rgba-255-255-255-0-06)]"
                 : "hover:bg-white/[0.04]",
               isActive && aiState === "active" && "omnix-intel-glow"
             )}
@@ -554,7 +554,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
               <ActiveWorkspaceIcon className="h-4.5 w-4.5 sm:h-4 sm:w-4" />
             </div>
             {realtimeStatus === "connected" && (
-              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#060a14] bg-[var(--omnix-green)] opacity-80" />
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--omnix-color-060a14)] bg-[var(--omnix-green)] opacity-80" />
             )}
           </div>
           <div className="min-w-0 flex-1">
@@ -923,7 +923,7 @@ function WorkspaceSelector({ onWorkspaceSelect }: { onWorkspaceSelect?: () => vo
           {deleteOpen ? (
             <Portal>
               <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
-                <div className="omnix-modal-card w-full max-w-md border-rose-400/25 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.5),0_0_24px_rgba(244,63,94,0.14)]">
+                <div className="omnix-modal-card w-full max-w-md border-rose-400/25 p-5 shadow-[0_24px_80px_var(--omnix-rgba-rgba-0-0-0-0-5),0_0_24px_var(--omnix-rgba-rgba-244-63-94-0-14)]">
                   <div className="relative z-10 flex items-start justify-between gap-4">
                     <div>
                       <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-rose-300/30 bg-rose-400/10 text-rose-100">
@@ -1192,17 +1192,17 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[min(21rem,calc(100vw_-_2.75rem))] flex-col overflow-hidden border-r border-[var(--omnix-border)] bg-[linear-gradient(180deg,rgba(5,12,23,0.98),rgba(4,10,20,0.985))] shadow-[24px_0_120px_rgba(0,0,0,0.6),4px_0_40px_rgba(0,255,255,0.05)] backdrop-blur-[28px] transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] lg:w-[var(--omnix-sidebar-w)]",
+          "fixed inset-y-0 left-0 z-50 flex w-[min(21rem,calc(100vw_-_2.75rem))] flex-col overflow-hidden border-r border-[var(--omnix-border)] bg-[linear-gradient(180deg,var(--omnix-rgba-rgba-5-12-23-0-98),var(--omnix-rgba-rgba-4-10-20-0-985))] shadow-[24px_0_120px_var(--omnix-rgba-rgba-0-0-0-0-6),4px_0_40px_var(--omnix-rgba-rgba-0-255-255-0-05)] backdrop-blur-[28px] transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] lg:w-[var(--omnix-sidebar-w)]",
           isOpen ? "translate-x-0" : "-translate-x-full",
           collapsed ? "lg:-translate-x-full" : "lg:translate-x-0",
         )}
       >
         {/* Top ambient glow */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[260px] bg-[radial-gradient(ellipse_at_50%_-10%,rgba(0,255,255,0.11)_0%,transparent_70%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[260px] bg-[radial-gradient(ellipse_at_50%_-10%,var(--omnix-rgba-rgba-0-255-255-0-11)_0%,transparent_70%)]" />
         {/* Grid overlay */}
-        <div className="pointer-events-none absolute inset-0 opacity-[0.025] [background-image:linear-gradient(rgba(0,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,255,0.55)_1px,transparent_1px)] [background-size:64px_64px] [animation:auth-grid_22s_linear_infinite]" />
+        <div className="pointer-events-none absolute inset-0 opacity-[0.025] [background-image:linear-gradient(var(--omnix-rgba-rgba-0-255-255-0-55)_1px,transparent_1px),linear-gradient(90deg,var(--omnix-rgba-rgba-0-255-255-0-55)_1px,transparent_1px)] [background-size:64px_64px] [animation:auth-grid_22s_linear_infinite]" />
         {/* Right edge glow */}
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-[linear-gradient(180deg,transparent,rgba(0,255,255,0.15),rgba(0,255,255,0.08),transparent)]" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-[linear-gradient(180deg,transparent,var(--omnix-rgba-rgba-0-255-255-0-15),var(--omnix-rgba-rgba-0-255-255-0-08),transparent)]" />
         <div className="relative flex h-auto items-start justify-between border-b border-[var(--omnix-border)] px-[18px] pb-3.5 pt-[18px]">
           <div className="flex w-full flex-col gap-3">
             <div className="flex items-center justify-between">
@@ -1262,9 +1262,9 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
 
         <nav className="omnix-scrollbar relative min-h-0 flex-1 space-y-1 overflow-y-auto px-2.5 py-3">
           <div className="mb-2 flex items-center gap-2 px-2">
-            <div className="h-px flex-1 bg-[linear-gradient(90deg,transparent,rgba(0,255,255,0.12),transparent)]" />
+            <div className="h-px flex-1 bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-rgba-0-255-255-0-12),transparent)]" />
             <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Navigation</p>
-            <div className="h-px flex-1 bg-[linear-gradient(90deg,transparent,rgba(0,255,255,0.12),transparent)]" />
+            <div className="h-px flex-1 bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-rgba-0-255-255-0-12),transparent)]" />
           </div>
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -1281,7 +1281,7 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                 className={cn(
                   "omnix-sidebar-link group/nav relative mb-px flex min-h-11 items-center gap-2.5 rounded-[var(--omnix-radius-sm)] border px-2.5 py-[9px] text-[13px] transition duration-150 lg:min-h-0",
                   isActive
-                    ? "border-cyan-300/20 bg-[radial-gradient(ellipse_at_0%_50%,rgba(0,255,255,0.1),transparent_60%),rgba(0,255,255,0.06)] font-semibold text-white shadow-[var(--omnix-glow-xs),inset_0_1px_0_rgba(255,255,255,0.04)]"
+                    ? "border-cyan-300/20 bg-[radial-gradient(ellipse_at_0%_50%,var(--omnix-rgba-rgba-0-255-255-0-1),transparent_60%),var(--omnix-rgba-rgba-0-255-255-0-06)] font-semibold text-white shadow-[var(--omnix-glow-xs),inset_0_1px_0_var(--omnix-rgba-rgba-255-255-255-0-04)]"
                     : "border-transparent font-normal text-[var(--omnix-text-2)] hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface)] hover:text-white hover:shadow-[var(--omnix-glow-xs)]",
                 )}
               >
@@ -1290,13 +1290,13 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                   className={cn(
                     "h-[18px] w-[18px] transition-all duration-150",
                     isActive
-                      ? "text-[var(--omnix-cyan)] drop-shadow-[0_0_6px_rgba(0,255,255,0.7)]"
+                      ? "text-[var(--omnix-cyan)] drop-shadow-[0_0_6px_var(--omnix-rgba-rgba-0-255-255-0-7)]"
                       : "text-[var(--omnix-text-3)] group-hover/nav:text-[var(--omnix-text-2)]",
                   )}
                 />
                 <span className={cn(isActive && "text-white")}>{item.label}</span>
                 {isActive && (
-                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--omnix-cyan)] shadow-[0_0_6px_rgba(0,255,255,0.9)]" />
+                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--omnix-cyan)] shadow-[0_0_6px_var(--omnix-rgba-rgba-0-255-255-0-9)]" />
                 )}
               </Link>
             );
@@ -1517,13 +1517,13 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
           )}
         </section>
 
-        <div className="relative border-t border-[rgba(0,255,255,0.07)] p-2.5 pb-[calc(env(safe-area-inset-bottom)_+_0.625rem)]">
+        <div className="relative border-t border-[var(--omnix-rgba-rgba-0-255-255-0-07)] p-2.5 pb-[calc(env(safe-area-inset-bottom)_+_0.625rem)]">
           {/* Top beam on profile section */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(0,255,255,0.2),transparent)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-rgba-0-255-255-0-2),transparent)]" />
           <Link
             href="/settings/profile"
             onClick={onClose}
-            className="group/profile flex items-center gap-2.5 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.03)] px-2.5 py-2.5 transition duration-200 hover:border-[rgba(0,255,255,0.2)] hover:bg-[rgba(0,255,255,0.06)] hover:shadow-[var(--omnix-glow-xs)]"
+            className="group/profile flex items-center gap-2.5 rounded-[var(--omnix-radius-sm)] border border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-0-255-255-0-03)] px-2.5 py-2.5 transition duration-200 hover:border-[var(--omnix-rgba-rgba-0-255-255-0-2)] hover:bg-[var(--omnix-rgba-rgba-0-255-255-0-06)] hover:shadow-[var(--omnix-glow-xs)]"
           >
             <div className="relative shrink-0">
               <ProfileAvatar
@@ -1531,10 +1531,10 @@ export function Sidebar({ isOpen, collapsed, onClose, onToggleCollapse }: Sideba
                 email={displayEmail}
                 handle={displayHandle}
                 avatarUrl={profile?.avatar_url}
-                className="h-8 w-8 border-cyan-300/35 bg-cyan-300/12 text-xs text-cyan-50 shadow-[0_0_12px_rgba(0,255,255,0.25)]"
+                className="h-8 w-8 border-cyan-300/35 bg-cyan-300/12 text-xs text-cyan-50 shadow-[0_0_12px_var(--omnix-rgba-rgba-0-255-255-0-25)]"
               />
               {/* Pulsing online dot */}
-              <span className="omnix-online-dot absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 border-[2px] border-[rgba(5,12,23,0.98)]" />
+              <span className="omnix-online-dot absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 border-[2px] border-[var(--omnix-rgba-rgba-5-12-23-0-98)]" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-semibold text-white">{displayName}</div>

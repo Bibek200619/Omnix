@@ -31,7 +31,7 @@ export function DecisionLifecycleControls({ decision, onUpdate }: DecisionLifecy
 
   if (decision.status === "rejected") {
     return (
-      <div className="flex items-center gap-2 rounded-full border border-rose-400/20 bg-rose-400/[0.05] px-4 py-1.5 shadow-[0_0_15px_rgba(251,113,133,0.05)]">
+      <div className="flex items-center gap-2 rounded-full border border-rose-400/20 bg-rose-400/[0.05] px-4 py-1.5 shadow-[0_0_15px_var(--omnix-rgba-rgba-251-113-133-0-05)]">
         <XCircle className="h-3.5 w-3.5 text-rose-400" />
         <span className="text-[10px] font-bold uppercase tracking-widest text-rose-400/90">Decision Rejected</span>
       </div>
@@ -45,7 +45,7 @@ export function DecisionLifecycleControls({ decision, onUpdate }: DecisionLifecy
           <Button
             size="sm"
             variant="ghost"
-            className="h-8 rounded-full border border-emerald-400/30 bg-emerald-400/[0.08] px-4 text-[10px] font-bold uppercase tracking-widest text-emerald-400 hover:bg-emerald-400/[0.15] hover:text-emerald-300 shadow-[0_2px_10px_rgba(52,211,153,0.05)]"
+            className="h-8 rounded-full border border-emerald-400/30 bg-emerald-400/[0.08] px-4 text-[10px] font-bold uppercase tracking-widest text-emerald-400 hover:bg-emerald-400/[0.15] hover:text-emerald-300 shadow-[0_2px_10px_var(--omnix-rgba-rgba-52-211-153-0-05)]"
             onClick={() => updateStatus("accepted")}
             disabled={!!loading}
             leftIcon={loading === "accepted" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
@@ -69,7 +69,7 @@ export function DecisionLifecycleControls({ decision, onUpdate }: DecisionLifecy
         <Button
           size="sm"
           variant="ghost"
-          className="h-8 rounded-full border border-amber-400/30 bg-amber-400/[0.08] px-4 text-[10px] font-bold uppercase tracking-widest text-amber-400 hover:bg-amber-400/[0.15] hover:text-amber-300 shadow-[0_2px_10px_rgba(251,191,36,0.05)]"
+          className="h-8 rounded-full border border-amber-400/30 bg-amber-400/[0.08] px-4 text-[10px] font-bold uppercase tracking-widest text-amber-400 hover:bg-amber-400/[0.15] hover:text-amber-300 shadow-[0_2px_10px_var(--omnix-rgba-rgba-251-191-36-0-05)]"
           onClick={() => updateStatus("superseded")}
           disabled={!!loading}
           leftIcon={loading === "superseded" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <History className="h-3.5 w-3.5" />}
@@ -79,7 +79,7 @@ export function DecisionLifecycleControls({ decision, onUpdate }: DecisionLifecy
       )}
 
       {decision.status === "superseded" && (
-        <div className="flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/[0.05] px-4 py-1.5 shadow-[0_0_15px_rgba(251,191,36,0.05)]">
+        <div className="flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/[0.05] px-4 py-1.5 shadow-[0_0_15px_var(--omnix-rgba-rgba-251-191-36-0-05)]">
           <History className="h-3.5 w-3.5 text-amber-400" />
           <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400/90">Superseded</span>
         </div>

@@ -105,7 +105,7 @@ export function RegisterForm() {
           <div className="h-px w-full" style={{ background: AUTH_C.border }} />
         </div>
         <div className="relative flex justify-center">
-          <span className="bg-[#061020] px-3 text-xs" style={{ color: AUTH_C.faint }}>
+          <span className="bg-[var(--omnix-color-061020)] px-3 text-xs" style={{ color: AUTH_C.faint }}>
             or create with email
           </span>
         </div>
@@ -160,7 +160,7 @@ export function RegisterForm() {
       />
       <div
         className="rounded-2xl p-3 text-xs leading-5"
-        style={{ background: "rgba(0,255,255,0.04)", border: "1px solid rgba(0,255,255,0.14)", color: AUTH_C.faint }}
+        style={{ background: "var(--omnix-rgba-rgba-0-255-255-0-04)", border: "1px solid var(--omnix-rgba-rgba-0-255-255-0-14)", color: AUTH_C.faint }}
       >
         Your Omnix handle is the identity teammates use for workspace invites
         and shared research.
@@ -168,7 +168,7 @@ export function RegisterForm() {
       <LoadingButton
         type="submit"
         size="lg"
-        className="w-full rounded-xl border-0 bg-[#00FFFF] py-3.5 text-sm font-black text-[#061020] shadow-[0_0_32px_rgba(0,255,255,0.3)] hover:-translate-y-0.5 hover:bg-[#00FFFF] hover:shadow-[0_0_50px_rgba(0,255,255,0.55)]"
+        className="w-full rounded-xl border-0 bg-[var(--omnix-color-00ffff)] py-3.5 text-sm font-black text-[var(--omnix-color-061020)] shadow-[0_0_32px_var(--omnix-rgba-rgba-0-255-255-0-3)] hover:-translate-y-0.5 hover:bg-[var(--omnix-color-00ffff)] hover:shadow-[0_0_50px_var(--omnix-rgba-rgba-0-255-255-0-55)]"
         isLoading={loading}
         loadingText="Creating account"
         disabled={!isConfigured}

@@ -83,7 +83,7 @@ export function WorkspaceOperationalTimeline({
               key={initiative.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="group relative overflow-hidden rounded-xl border border-white/5 bg-[rgba(6,10,20,0.6)] p-4 transition-all hover:border-white/10 hover:bg-white/[0.02]"
+              className="group relative overflow-hidden rounded-xl border border-white/5 bg-[var(--omnix-rgba-rgba-6-10-20-0-6)] p-4 transition-all hover:border-white/10 hover:bg-white/[0.02]"
             >
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
@@ -127,10 +127,10 @@ export function WorkspaceOperationalTimeline({
                 transition={{ delay: index * 0.05 }}
                 className="relative pl-10 sm:pl-12"
               >
-                <div className="absolute left-0 top-0 flex h-[34px] w-[34px] items-center justify-center rounded-xl border border-white/10 bg-[#060a14] sm:h-10 sm:w-10">
+                <div className="absolute left-0 top-0 flex h-[34px] w-[34px] items-center justify-center rounded-xl border border-white/10 bg-[var(--omnix-color-060a14)] sm:h-10 sm:w-10">
                   <Icon className="h-3.5 w-3.5 text-cyan-400/80 sm:h-4 sm:w-4" />
                   {index === 0 && (
-                    <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-cyan-500/80 border-2 border-[#060a14] sm:h-3 sm:w-3" />
+                    <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-cyan-500/80 border-2 border-[var(--omnix-color-060a14)] sm:h-3 sm:w-3" />
                   )}
                 </div>
                 
