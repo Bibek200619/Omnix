@@ -41,13 +41,10 @@ type Metric = {
 
 function StudioCard({ title, subtitle, children, className }: { title: string; subtitle: string; children: ReactNode; className?: string }) {
   return (
-    <section className={cn("relative overflow-hidden rounded-[var(--omnix-radius)] border border-[rgba(0,255,255,0.1)] bg-[linear-gradient(145deg,rgba(0,255,255,0.055),rgba(155,92,255,0.028)_52%,rgba(0,0,0,0.16))] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.035)]", className)}>
-      <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-cyan-300/10 blur-[70px]" />
-      <div className="relative z-10 mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="omnix-display text-sm font-bold text-white">{title}</h2>
-          <p className="mt-1 text-[11px] leading-5 text-[var(--omnix-text-3)]">{subtitle}</p>
-        </div>
+    <section className={cn("relative overflow-hidden rounded-[var(--omnix-radius)] border border-white/5 bg-black/20 p-5 shadow-inner", className)}>
+      <div className="relative z-10 mb-6 flex flex-col gap-1">
+        <h2 className="text-[13px] font-bold tracking-wide text-white">{title}</h2>
+        <p className="text-[11px] leading-relaxed text-[var(--omnix-text-3)]">{subtitle}</p>
       </div>
       <div className="relative z-10">{children}</div>
     </section>
@@ -215,64 +212,67 @@ function AnalyticsPageContent() {
                   <span>{runtimeError}</span>
                 </div>
               ) : null}
-              <div className="flex items-center justify-between rounded-lg bg-black/20 p-3">
+              <div className="flex items-center justify-between rounded-lg border border-white/5 bg-black/40 p-4">
                 <div className="flex items-center gap-3">
-                  <Server className="h-4 w-4 text-cyan-300" />
-                  <span className="text-xs font-medium text-white">Service Status</span>
+                  <Server className="h-4 w-4 text-cyan-400" />
+                  <span className="text-xs font-semibold text-white">Service Status</span>
                 </div>
                 <span className={cn(
-                  "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-                  runtimeInfo?.status === "healthy" ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
+                  "flex h-6 items-center rounded-full px-2.5 text-[10px] font-bold uppercase tracking-wider",
+                  runtimeInfo?.status === "healthy" ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"
                 )}>
                   {loadingRuntime ? "Connecting..." : runtimeInfo?.status || "Unavailable"}
                 </span>
               </div>
               
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg bg-black/20 p-3">
-                  <p className="text-[10px] uppercase tracking-widest text-[var(--omnix-text-3)]">Environment</p>
-                  <p className="mt-1 text-sm font-bold text-white capitalize">{loadingRuntime ? "Loading..." : runtimeInfo?.environment || "Not reported"}</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg border border-white/5 bg-black/40 p-4">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--omnix-text-3)]">Environment</p>
+                  <p className="mt-1.5 text-sm font-semibold text-white capitalize">{loadingRuntime ? "..." : runtimeInfo?.environment || "Not reported"}</p>
                 </div>
-                <div className="rounded-lg bg-black/20 p-3">
-                  <p className="text-[10px] uppercase tracking-widest text-[var(--omnix-text-3)]">Version</p>
-                  <p className="mt-1 text-sm font-bold text-white">{loadingRuntime ? "Loading..." : runtimeInfo?.version || "Not reported"}</p>
+                <div className="rounded-lg border border-white/5 bg-black/40 p-4">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--omnix-text-3)]">Version</p>
+                  <p className="mt-1.5 text-sm font-semibold text-white">{loadingRuntime ? "..." : runtimeInfo?.version || "Not reported"}</p>
                 </div>
               </div>
 
-              <div className="rounded-lg bg-black/20 p-3">
+              <div className="rounded-lg border border-white/5 bg-black/40 p-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] uppercase tracking-widest text-[var(--omnix-text-3)]">Telemetry Source</p>
-                  <Server className="h-3 w-3 text-white/20" />
+                  <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--omnix-text-3)]">Telemetry Source</p>
+                  <Globe className="h-3.5 w-3.5 text-white/20" />
                 </div>
-                <p className="mt-1 text-sm font-bold text-white">{runtimeInfo ? "Runtime API" : "Not reported"}</p>
+                <p className="mt-1.5 text-sm font-semibold text-white">{runtimeInfo ? "Runtime API" : "Not reported"}</p>
               </div>
             </div>
           </StudioCard>
 
           <StudioCard title="Background Workers" subtitle="Status of ingestion and automation workers.">
-            <div className="space-y-3">
+            <div className="space-y-4">
               {workers.length > 0 ? (
                 workers.map(worker => (
-                  <div key={worker.id} className="flex items-center justify-between rounded-lg border border-white/5 bg-black/10 p-3">
+                  <div key={worker.id} className="flex items-center justify-between rounded-lg border border-white/5 bg-black/40 p-4 transition-colors hover:bg-black/60">
                     <div className="flex items-center gap-3">
-                      <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
-                      <span className="text-xs font-medium text-white">{worker.name}</span>
+                      <div className="relative flex h-2.5 w-2.5 items-center justify-center">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40"></span>
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                      </div>
+                      <span className="text-xs font-semibold text-white">{worker.name}</span>
                     </div>
-                    <span className="text-[10px] text-[var(--omnix-text-3)]">
-                      Last pulse: {new Date(worker.last_heartbeat).toLocaleTimeString()}
+                    <span className="text-[10px] text-[var(--omnix-text-3)] font-medium">
+                      Pulse: {new Date(worker.last_heartbeat).toLocaleTimeString()}
                     </span>
                   </div>
                 ))
               ) : (
-                <div className="flex flex-col items-center justify-center py-6 text-center">
-                  <Activity className="h-8 w-8 text-white/5" />
+                <div className="flex flex-col items-center justify-center rounded-lg border border-white/5 bg-black/40 py-8 text-center">
+                  <Activity className="h-6 w-6 text-white/10" />
                   <p className="mt-3 text-xs text-[var(--omnix-text-3)]">
                     Standalone workers not detected.<br/>Using integrated runtime execution.
                   </p>
                 </div>
               )}
-              <div className="mt-2 rounded-lg bg-cyan-300/5 p-3 text-[10px] leading-relaxed text-cyan-200/60">
-                <strong>Note:</strong> Distributed workers require a Redis instance for coordination. Integrated workers handle standard ingestion.
+              <div className="mt-2 rounded-lg border border-cyan-500/10 bg-cyan-500/5 p-4 text-[10px] leading-relaxed text-cyan-200/70">
+                <strong className="text-cyan-400">Note:</strong> Distributed workers require a Redis instance for coordination. Integrated workers handle standard ingestion.
               </div>
             </div>
           </StudioCard>
