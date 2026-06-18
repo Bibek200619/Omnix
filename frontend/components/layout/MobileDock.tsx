@@ -22,7 +22,7 @@ export function MobileDock({ onMoreClick }: MobileDockProps) {
   return (
     <nav
       aria-label="Primary mobile navigation"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-cyan-300/10 bg-[rgba(5,12,23,0.92)] px-2 pb-[max(env(safe-area-inset-bottom),0.45rem)] pt-2 backdrop-blur-2xl lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-cyan-300/10 bg-[var(--omnix-rgba-rgba-5-12-23-0-92)] px-2 pb-[max(env(safe-area-inset-bottom),0.45rem)] pt-2 backdrop-blur-2xl lg:hidden"
     >
       <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
         {items.map((item) => {

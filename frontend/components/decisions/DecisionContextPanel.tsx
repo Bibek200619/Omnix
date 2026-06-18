@@ -78,7 +78,7 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
               </p>
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="flex items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-400/10 shadow-[0_0_15px_rgba(34,211,238,0.1)]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-400/10 shadow-[0_0_15px_var(--omnix-rgba-rgba-34-211-238-0-1)]">
                     <User className="h-4 w-4 text-cyan-400" />
                   </div>
                   <div>
@@ -87,7 +87,7 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
                   </div>
                 </div>
                 <div className="flex items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-400/10 shadow-[0_0_15px_rgba(34,211,238,0.1)]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-400/10 shadow-[0_0_15px_var(--omnix-rgba-rgba-34-211-238-0-1)]">
                     <Calendar className="h-4 w-4 text-cyan-400" />
                   </div>
                   <div>
@@ -97,7 +97,7 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
                 </div>
                 {decision.source_message_id && (
                   <div className="flex items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-4 sm:col-span-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400/10 shadow-[0_0_15px_rgba(52,211,153,0.1)]">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400/10 shadow-[0_0_15px_var(--omnix-rgba-rgba-52-211-153-0-1)]">
                       <MessageSquare className="h-4 w-4 text-emerald-400" />
                     </div>
                     <div>

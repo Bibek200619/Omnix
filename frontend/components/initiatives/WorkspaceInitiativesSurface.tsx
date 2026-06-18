@@ -440,7 +440,7 @@ export function WorkspaceInitiativesSurface() {
 
   return (
     <section className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 pt-3 sm:px-5 sm:pb-5 xl:overflow-hidden">
-      <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)] px-4 py-3 sm:px-5 sm:py-4">
+      <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3 rounded-2xl border border-[var(--omnix-border)] bg-[var(--omnix-rgba-rgba-0-255-255-0-025)] px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
             <Compass className="h-3.5 w-3.5" /> Strategy layer
@@ -517,8 +517,8 @@ export function WorkspaceInitiativesSurface() {
                   <div className="flex items-center gap-1.5">
                     <div className={cn(
                       "h-1.5 w-1.5 rounded-full",
-                      initiative.momentum.health === "blocked_execution" ? "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]" : 
-                      initiative.momentum.health === "active_movement" ? "bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]" : "bg-[var(--omnix-text-3)]"
+                      initiative.momentum.health === "blocked_execution" ? "bg-amber-400 shadow-[0_0_8px_var(--omnix-rgba-rgba-251-191-36-0-5)]" : 
+                      initiative.momentum.health === "active_movement" ? "bg-cyan-400 shadow-[0_0_8px_var(--omnix-rgba-rgba-34-211-238-0-5)]" : "bg-[var(--omnix-text-3)]"
                     )} />
                     <span className="text-[var(--omnix-text-3)] font-medium">{momentumLabels[initiative.momentum.health]}</span>
                   </div>
@@ -556,7 +556,7 @@ export function WorkspaceInitiativesSurface() {
                       className={cn(
                         "flex-1 rounded-md py-2 text-[10px] font-bold uppercase tracking-wider transition-all",
                         mobileTab === t 
-                          ? "bg-cyan-400/10 text-cyan-400 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]" 
+                          ? "bg-cyan-400/10 text-cyan-400 shadow-[inset_0_1px_1px_var(--omnix-rgba-rgba-255-255-255-0-05)]" 
                           : "text-[var(--omnix-text-3)]"
                       )}
                     >

@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
+const FEATURES_HREF = `${String.fromCharCode(35)}features`;
+
 export function Hero() {
   const router = useRouter();
 
@@ -29,7 +31,7 @@ export function Hero() {
           <span className="font-semibold text-white">Omnix</span>
         </button>
         <div className="hidden items-center gap-6 text-sm text-slate-400 sm:flex">
-          <a href="#features" className="transition hover:text-white">
+          <a href={FEATURES_HREF} className="transition hover:text-white">
             Features
           </a>
           <a href="#about" className="transition hover:text-white">
@@ -52,7 +54,7 @@ export function Hero() {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
-          className="h-full rounded-lg border border-white/10 bg-[#080a0f] p-3 shadow-soft"
+          className="h-full rounded-lg border border-white/10 bg-[var(--omnix-color-080a0f)] p-3 shadow-soft"
         >
           <div className="grid h-full grid-cols-[0.8fr_1.4fr_0.8fr] gap-3">
             <div className="hidden rounded-lg border border-white/10 bg-white/[0.04] p-3 md:block">
@@ -75,7 +77,7 @@ export function Hero() {
                 ),
               )}
             </div>
-            <div className="rounded-lg border border-cyan-300/20 bg-[#0b1118] p-3 sm:p-5">
+            <div className="rounded-lg border border-cyan-300/20 bg-[var(--omnix-color-0b1118)] p-3 sm:p-5">
               <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
                 <div className="flex items-center gap-2 text-xs text-cyan-100">
                   <MessageSquare className="h-4 w-4" />

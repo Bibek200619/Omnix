@@ -81,7 +81,7 @@ export function LoginForm() {
           <div className="h-px w-full" style={{ background: AUTH_C.border }} />
         </div>
         <div className="relative flex justify-center">
-          <span className="bg-[#061020] px-3 text-xs" style={{ color: AUTH_C.faint }}>
+          <span className="bg-[var(--omnix-color-061020)] px-3 text-xs" style={{ color: AUTH_C.faint }}>
             or continue with email
           </span>
         </div>
@@ -112,7 +112,7 @@ export function LoginForm() {
       <LoadingButton
         type="submit"
         size="lg"
-        className="w-full rounded-xl border-0 bg-[#00FFFF] py-3.5 text-sm font-black text-[#061020] shadow-[0_0_32px_rgba(0,255,255,0.3)] hover:-translate-y-0.5 hover:bg-[#00FFFF] hover:shadow-[0_0_50px_rgba(0,255,255,0.55)]"
+        className="w-full rounded-xl border-0 bg-[var(--omnix-color-00ffff)] py-3.5 text-sm font-black text-[var(--omnix-color-061020)] shadow-[0_0_32px_var(--omnix-rgba-rgba-0-255-255-0-3)] hover:-translate-y-0.5 hover:bg-[var(--omnix-color-00ffff)] hover:shadow-[0_0_50px_var(--omnix-rgba-rgba-0-255-255-0-55)]"
         isLoading={loading}
         loadingText="Signing in"
         disabled={!isConfigured}
@@ -122,7 +122,7 @@ export function LoginForm() {
       </LoadingButton>
       <div
         className="flex items-start gap-3 rounded-2xl p-3 text-xs leading-5"
-        style={{ background: "rgba(0,255,255,0.04)", border: "1px solid rgba(0,255,255,0.12)", color: AUTH_C.faint }}
+        style={{ background: "var(--omnix-rgba-rgba-0-255-255-0-04)", border: "1px solid var(--omnix-rgba-rgba-0-255-255-0-12)", color: AUTH_C.faint }}
       >
         <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full" style={{ color: AUTH_C.cyan }}>
           <AuthIcon d={AUTH_ICONS.check} size={10} stroke="currentColor" sw={2.5} />

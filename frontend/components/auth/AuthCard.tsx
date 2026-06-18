@@ -75,12 +75,12 @@ function LeftPanel({ mode }: { mode: "login" | "register" }) {
     <aside
       className="relative hidden min-h-[760px] w-[420px] flex-shrink-0 flex-col justify-between overflow-hidden px-10 py-10 lg:flex"
       style={{
-        background: "linear-gradient(145deg,rgba(0,255,255,0.04) 0%,rgba(0,51,255,0.05) 100%)",
-        borderRight: "1px solid rgba(255,255,255,0.06)",
+        background: "linear-gradient(145deg,var(--omnix-rgba-rgba-0-255-255-0-04) 0%,var(--omnix-rgba-rgba-0-51-255-0-05) 100%)",
+        borderRight: "1px solid var(--omnix-rgba-rgba-255-255-255-0-06)",
       }}
     >
-      <AuthDriftOrb x="30%" y="25%" size={400} color="rgba(0,255,255,0.1)" />
-      <AuthDriftOrb x="80%" y="65%" size={320} color="rgba(0,51,255,0.09)" />
+      <AuthDriftOrb x="30%" y="25%" size={400} color="var(--omnix-rgba-rgba-0-255-255-0-1)" />
+      <AuthDriftOrb x="80%" y="65%" size={320} color="var(--omnix-rgba-rgba-0-51-255-0-09)" />
       <AuthMovingGrid />
 
       <div className="relative z-10">
@@ -97,15 +97,15 @@ function LeftPanel({ mode }: { mode: "login" | "register" }) {
                 <div
                   className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-all duration-300"
                   style={{
-                    background: done ? "rgba(0,255,255,0.2)" : active ? "rgba(0,255,255,0.1)" : "rgba(255,255,255,0.04)",
-                    border: `1px solid ${done ? AUTH_C.cyan : active ? "rgba(0,255,255,0.35)" : AUTH_C.border}`,
-                    boxShadow: active ? "0 0 18px rgba(0,255,255,0.25)" : done ? "0 0 10px rgba(0,255,255,0.15)" : "none",
+                    background: done ? "var(--omnix-rgba-rgba-0-255-255-0-2)" : active ? "var(--omnix-rgba-rgba-0-255-255-0-1)" : "var(--omnix-rgba-rgba-255-255-255-0-04)",
+                    border: `1px solid ${done ? AUTH_C.cyan : active ? "var(--omnix-rgba-rgba-0-255-255-0-35)" : AUTH_C.border}`,
+                    boxShadow: active ? "0 0 18px var(--omnix-rgba-rgba-0-255-255-0-25)" : done ? "0 0 10px var(--omnix-rgba-rgba-0-255-255-0-15)" : "none",
                   }}
                 >
                   {done ? (
                     <AuthIcon d={AUTH_ICONS.check} size={14} stroke={AUTH_C.cyan} sw={2.5} />
                   ) : (
-                    <AuthIcon d={step.icon} size={14} stroke={active ? AUTH_C.cyan : "rgba(255,255,255,0.25)"} sw={1.8} />
+                    <AuthIcon d={step.icon} size={14} stroke={active ? AUTH_C.cyan : "var(--omnix-rgba-rgba-255-255-255-0-25)"} sw={1.8} />
                   )}
                 </div>
                 <span
@@ -132,7 +132,7 @@ function LeftPanel({ mode }: { mode: "login" | "register" }) {
             <div key={benefit} className="flex items-start gap-3">
               <div
                 className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full"
-                style={{ background: "rgba(0,255,255,0.1)", border: "1px solid rgba(0,255,255,0.22)" }}
+                style={{ background: "var(--omnix-rgba-rgba-0-255-255-0-1)", border: "1px solid var(--omnix-rgba-rgba-0-255-255-0-22)" }}
               >
                 <AuthIcon d={AUTH_ICONS.check} size={9} stroke={AUTH_C.cyan} sw={2.5} />
               </div>
@@ -143,7 +143,7 @@ function LeftPanel({ mode }: { mode: "login" | "register" }) {
       </div>
 
       <div className="relative z-10">
-        <div className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <div className="rounded-2xl p-5" style={{ background: "var(--omnix-rgba-rgba-255-255-255-0-03)", border: "1px solid var(--omnix-rgba-rgba-255-255-255-0-07)" }}>
           <div className="mb-3 flex gap-0.5">
             {[...Array(5)].map((_, index) => (
               <svg key={index} width="13" height="13" viewBox="0 0 24 24" fill={AUTH_C.cyan} aria-hidden="true">
@@ -159,13 +159,13 @@ function LeftPanel({ mode }: { mode: "login" | "register" }) {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.35 }}
             >
-              <p className="mb-4 text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.52)" }}>
+              <p className="mb-4 text-sm leading-relaxed" style={{ color: "var(--omnix-rgba-rgba-255-255-255-0-52)" }}>
                 &quot;{testimonial.text}&quot;
               </p>
               <div className="flex items-center gap-3">
                 <div
                   className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-black"
-                  style={{ background: "rgba(0,255,255,0.14)", color: AUTH_C.cyan }}
+                  style={{ background: "var(--omnix-rgba-rgba-0-255-255-0-14)", color: AUTH_C.cyan }}
                 >
                   {testimonial.author.split(" ").map((part) => part[0]).join("")}
                 </div>
@@ -199,8 +199,8 @@ export function AuthCard({
 
   if (isConfigured && (loading || session)) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#061020] text-slate-300">
-        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+      <main className="flex min-h-screen items-center justify-center bg-[var(--omnix-color-061020)] text-slate-300">
+        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm shadow-[0_24px_80px_var(--omnix-rgba-rgba-0-0-0-0-45)]">
           <Loader2 className="h-4 w-4 animate-spin text-cyan-200" aria-hidden="true" />
           Restoring session...
         </div>
@@ -218,8 +218,8 @@ export function AuthCard({
       }}
     >
       <div className="absolute inset-0">
-        <AuthDriftOrb x="70%" y="20%" size={500} color="rgba(0,255,255,0.055)" />
-        <AuthDriftOrb x="20%" y="75%" size={380} color="rgba(0,51,255,0.06)" />
+        <AuthDriftOrb x="70%" y="20%" size={500} color="var(--omnix-rgba-rgba-0-255-255-0-055)" />
+        <AuthDriftOrb x="20%" y="75%" size={380} color="var(--omnix-rgba-rgba-0-51-255-0-06)" />
         <AuthMovingGrid />
       </div>
 
@@ -227,13 +227,13 @@ export function AuthCard({
         initial={{ opacity: 0, y: 18, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.42, ease: authEase }}
-        className="relative z-10 flex w-full max-w-6xl overflow-hidden bg-[#061020]/95 shadow-[0_60px_160px_rgba(0,0,0,0.7),0_0_80px_rgba(0,255,255,0.08)] sm:rounded-[28px] sm:border sm:border-white/[0.07]"
+        className="relative z-10 flex w-full max-w-6xl overflow-hidden bg-[var(--omnix-color-061020)]/95 shadow-[0_60px_160px_var(--omnix-rgba-rgba-0-0-0-0-7),0_0_80px_var(--omnix-rgba-rgba-0-255-255-0-08)] sm:rounded-[28px] sm:border sm:border-white/[0.07]"
       >
         <LeftPanel mode={mode} />
 
         <section className="relative flex min-h-[100dvh] flex-1 flex-col overflow-hidden sm:min-h-[680px]">
           <div className="absolute inset-0">
-            <AuthDriftOrb x="76%" y="10%" size={420} color="rgba(0,255,255,0.045)" />
+            <AuthDriftOrb x="76%" y="10%" size={420} color="var(--omnix-rgba-rgba-0-255-255-0-045)" />
             <AuthMovingGrid />
           </div>
 
@@ -241,7 +241,7 @@ export function AuthCard({
             <AuthBrand compact />
             <div
               className="flex h-9 w-9 items-center justify-center rounded-xl"
-              style={{ background: "rgba(0,255,255,0.08)", border: "1px solid rgba(0,255,255,0.2)" }}
+              style={{ background: "var(--omnix-rgba-rgba-0-255-255-0-08)", border: "1px solid var(--omnix-rgba-rgba-0-255-255-0-2)" }}
             >
               <AuthIcon d={AUTH_ICONS.sparkle} size={17} stroke={AUTH_C.cyan} />
             </div>
@@ -253,16 +253,16 @@ export function AuthCard({
                 <div
                   className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl sm:mb-5 sm:h-14 sm:w-14"
                   style={{
-                    background: "rgba(0,255,255,0.1)",
-                    border: "1px solid rgba(0,255,255,0.24)",
-                    boxShadow: "0 0 28px rgba(0,255,255,0.16)",
+                    background: "var(--omnix-rgba-rgba-0-255-255-0-1)",
+                    border: "1px solid var(--omnix-rgba-rgba-0-255-255-0-24)",
+                    boxShadow: "0 0 28px var(--omnix-rgba-rgba-0-255-255-0-16)",
                   }}
                 >
                   <AuthOmnixMark size={30} />
                 </div>
                 <div
                   className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em]"
-                  style={{ background: "rgba(0,255,255,0.07)", border: "1px solid rgba(0,255,255,0.22)", color: AUTH_C.cyan }}
+                  style={{ background: "var(--omnix-rgba-rgba-0-255-255-0-07)", border: "1px solid var(--omnix-rgba-rgba-0-255-255-0-22)", color: AUTH_C.cyan }}
                 >
                   <span className="h-1.5 w-1.5 rounded-full" style={{ background: AUTH_C.cyan }} />
                   {mode === "register" ? "Start your workspace" : "Welcome back"}

@@ -29,7 +29,7 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
   }
 
   return (
-    <div className="my-3 overflow-hidden rounded-lg border border-[var(--omnix-border)] bg-[#05070b] shadow-[0_16px_50px_rgba(0,0,0,0.28)]">
+    <div className="my-3 overflow-hidden rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-color-05070b)] shadow-[0_16px_50px_var(--omnix-rgba-rgba-0-0-0-0-28)]">
       <div className="flex h-10 items-center justify-between border-b border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3">
         <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
           {language || "code"}
