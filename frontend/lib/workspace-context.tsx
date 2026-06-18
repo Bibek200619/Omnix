@@ -245,7 +245,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         if (!options?.silent) {
           setLoading(true);
         }
-        const data = await fetchWorkspaceHierarchy();
+        const data = await fetchWorkspaceHierarchy({ force: options?.force });
         if (workspaceFetchIdRef.current !== requestId) {
           return;
         }
@@ -283,7 +283,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     const request = (async () => {
       try {
-        const tree = await fetchWorkspaceTree(normalizedWorkspaceId);
+        const tree = await fetchWorkspaceTree(normalizedWorkspaceId, { force: options?.force });
         if (tree) {
           setWorkspaces((current) => upsertWorkspaceTree(current, tree));
         }
@@ -320,7 +320,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           setSubspaceLoadingByParentId((current) => ({ ...current, [normalizedWorkspaceId]: true }));
         }
         setSubspaceErrorByParentId((current) => ({ ...current, [normalizedWorkspaceId]: null }));
-        const subspaces = await fetchWorkspaceSubspaces(normalizedWorkspaceId);
+        const subspaces = await fetchWorkspaceSubspaces(normalizedWorkspaceId, { force: options?.force });
         setWorkspaces((current) => updateWorkspaceSubspaces(current, normalizedWorkspaceId, subspaces));
         return subspaces;
       } catch (err) {

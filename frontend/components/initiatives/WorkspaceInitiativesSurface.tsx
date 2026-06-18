@@ -17,6 +17,7 @@ import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
+import { invalidateQueries, queryGet } from "@/lib/query";
 import { realtimeRegistry } from "@/lib/realtime-registry";
 import { useToast } from "@/lib/toast-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
@@ -46,6 +47,11 @@ function mergeInitiative(current: WorkspaceInitiative[], incoming: WorkspaceInit
         !(incoming.client_nonce && item.client_nonce === incoming.client_nonce),
     ),
   ];
+}
+
+function invalidateInitiativeQueries(workspaceId: string) {
+  invalidateQueries(`/workspaces/${workspaceId}/initiatives`);
+  invalidateQueries(`/workspaces/${workspaceId}/tasks`);
 }
 
 function quietMomentum() {
@@ -161,8 +167,8 @@ function WorkspaceInitiativesSurfaceContent() {
     setLoading(true);
     try {
       const [incoming, taskOptions, channelOptions, memberOptions] = await Promise.all([
-        apiClient.get<WorkspaceInitiative[]>(`/workspaces/${activeWorkspaceId}/initiatives`),
-        includeOptions ? apiClient.get<WorkspaceTask[]>(`/workspaces/${activeWorkspaceId}/tasks`) : Promise.resolve(null),
+        queryGet<WorkspaceInitiative[]>(`/workspaces/${activeWorkspaceId}/initiatives`),
+        includeOptions ? queryGet<WorkspaceTask[]>(`/workspaces/${activeWorkspaceId}/tasks`) : Promise.resolve(null),
         includeOptions ? apiClient.get<WorkspaceChannel[]>(`/workspaces/${activeWorkspaceId}/channels`) : Promise.resolve(null),
         includeOptions ? apiClient.get<WorkspaceMember[]>(`/workspaces/${activeWorkspaceId}/members`) : Promise.resolve(null),
       ]);
@@ -192,9 +198,12 @@ function WorkspaceInitiativesSurfaceContent() {
     if (refreshTimerRef.current !== null) return;
     refreshTimerRef.current = window.setTimeout(() => {
       refreshTimerRef.current = null;
+      if (activeWorkspaceId) {
+        invalidateInitiativeQueries(activeWorkspaceId);
+      }
       void loadInitiatives(true);
     }, 120);
-  }, [loadInitiatives]);
+  }, [activeWorkspaceId, loadInitiatives]);
 
   useEffect(() => {
     setInitiatives([]);
@@ -298,6 +307,7 @@ function WorkspaceInitiativesSurfaceContent() {
         client_nonce: nonce,
       });
       setInitiatives((current) => mergeInitiative(current, created));
+      invalidateInitiativeQueries(activeWorkspaceId);
       setSelectedId(created.id);
       setTitle("");
       setDescription("");
@@ -328,6 +338,7 @@ function WorkspaceInitiativesSurfaceContent() {
         payload,
       );
       setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
+      invalidateInitiativeQueries(activeWorkspaceId);
       announceMutation(`Initiative ${changed.title} updated.`);
       showToast({ title: "Initiative updated", message: changed.title });
     } catch (err) {
@@ -347,6 +358,7 @@ function WorkspaceInitiativesSurfaceContent() {
         `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/tasks/${taskToAttach}`,
       );
       setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
+      invalidateInitiativeQueries(activeWorkspaceId);
       setTaskToAttach("");
       announceMutation(`Task attached to ${changed.title}.`);
       showToast({ title: "Task linked", message: changed.title });
@@ -364,6 +376,7 @@ function WorkspaceInitiativesSurfaceContent() {
     setUpdating(true);
     try {
       await apiClient.patch<WorkspaceTask>(`/workspaces/${activeWorkspaceId}/tasks/${task.id}`, { initiative_id: null });
+      invalidateInitiativeQueries(activeWorkspaceId);
       announceMutation(`Task ${task.title} detached from initiative.`);
       showToast({ title: "Task unlinked", message: task.title });
       void loadInitiatives(true);
@@ -384,6 +397,7 @@ function WorkspaceInitiativesSurfaceContent() {
         { channel_id: channelToAttach },
       );
       setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
+      invalidateInitiativeQueries(activeWorkspaceId);
       setChannelToAttach("");
       announceMutation(`Conversation attached to ${changed.title}.`);
       showToast({ title: "Conversation linked", message: changed.title });
@@ -400,6 +414,7 @@ function WorkspaceInitiativesSurfaceContent() {
     setUpdating(true);
     try {
       await apiClient.delete(`/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels/${channelId}`);
+      invalidateInitiativeQueries(activeWorkspaceId);
       announceMutation(`Conversation detached from ${selected.title}.`);
       showToast({ title: "Conversation unlinked", message: selected.title });
       void loadInitiatives(true);

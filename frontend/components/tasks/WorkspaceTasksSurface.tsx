@@ -15,6 +15,7 @@ import { mentionPayload } from "@/components/mentions/MentionTextarea";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
+import { invalidateQueries, queryGet } from "@/lib/query";
 import { realtimeRegistry } from "@/lib/realtime-registry";
 import { useToast } from "@/lib/toast-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
@@ -45,6 +46,11 @@ const flow: Array<{ value: WorkspaceTaskStatus; label: string }> = [
 
 function mergeTask(current: WorkspaceTask[], incoming: WorkspaceTask) {
   return [incoming, ...current.filter((task) => task.id !== incoming.id && !(incoming.client_nonce && task.client_nonce === incoming.client_nonce))];
+}
+
+function invalidateTaskQueries(workspaceId: string) {
+  invalidateQueries(`/workspaces/${workspaceId}/tasks`);
+  invalidateQueries(`/workspaces/${workspaceId}/initiatives`);
 }
 
 export function WorkspaceTasksSurface() {
@@ -129,9 +135,9 @@ function WorkspaceTasksSurfaceContent() {
         Promise<WorkspaceInitiative[]>,
         Promise<WorkspaceMember[]> | null,
       ] = [
-        apiClient.get<WorkspaceTask[]>(`/workspaces/${activeWorkspaceId}/tasks`),
-        apiClient.get<WorkspaceTaskMomentum>(`/workspaces/${activeWorkspaceId}/tasks/momentum`),
-        apiClient.get<WorkspaceInitiative[]>(`/workspaces/${activeWorkspaceId}/initiatives`),
+        queryGet<WorkspaceTask[]>(`/workspaces/${activeWorkspaceId}/tasks`),
+        queryGet<WorkspaceTaskMomentum>(`/workspaces/${activeWorkspaceId}/tasks/momentum`),
+        queryGet<WorkspaceInitiative[]>(`/workspaces/${activeWorkspaceId}/initiatives`),
         withMembers ? apiClient.get<WorkspaceMember[]>(`/workspaces/${activeWorkspaceId}/members`) : null,
       ];
       const [incomingTasks, incomingMomentum, incomingInitiatives, incomingMembers] = await Promise.all([
@@ -196,7 +202,10 @@ function WorkspaceTasksSurfaceContent() {
             table: "workspace_tasks",
             filter: `workspace_id=eq.${activeWorkspaceId}`,
           },
-          () => void loadExecution(),
+          () => {
+            invalidateTaskQueries(activeWorkspaceId);
+            void loadExecution();
+          },
         ),
     );
     return () => realtimeRegistry.unsubscribe({ type: "tasks", workspaceId: activeWorkspaceId });
@@ -339,6 +348,7 @@ function WorkspaceTasksSurfaceContent() {
         mentions: mentionPayload(descriptionMentions, description),
       });
       setTasks((current) => mergeTask(current, created));
+      invalidateTaskQueries(activeWorkspaceId);
       setTitle("");
       setDescription("");
       setDescriptionMentions([]);
@@ -368,6 +378,7 @@ function WorkspaceTasksSurfaceContent() {
     try {
       const updated = await apiClient.patch<WorkspaceTask>(`/workspaces/${activeWorkspaceId}/tasks/${task.id}`, payload);
       setTasks((current) => current.map((item) => (item.id === task.id ? updated : item)));
+      invalidateTaskQueries(activeWorkspaceId);
       const blockerRemoved = Array.isArray(payload.blockers) && payload.blockers.length < task.blockers.length;
       announceMutation(blockerRemoved ? `Blocker removed from ${updated.title}.` : `Task ${updated.title} updated.`);
       showToast({ title: blockerRemoved ? "Blocker removed" : "Task updated", message: updated.title });

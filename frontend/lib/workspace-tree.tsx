@@ -1,4 +1,5 @@
 import { apiClient } from "./api";
+import { invalidateQueries, queryGet } from "./query";
 import type {
   Workspace,
   WorkspaceCreatePayload,
@@ -260,19 +261,23 @@ export function removeWorkspaceFromTree(workspaces: Workspace[], workspaceId: st
     }));
 }
 
-export async function fetchWorkspaceHierarchy() {
-  const data = await apiClient.get<WorkspaceApiRecord[]>("/workspaces/hierarchy");
+type WorkspaceTreeQueryOptions = {
+  force?: boolean;
+};
+
+export async function fetchWorkspaceHierarchy(options?: WorkspaceTreeQueryOptions) {
+  const data = await queryGet<WorkspaceApiRecord[]>("/workspaces/hierarchy", { force: options?.force });
   return normalizeWorkspaceForest(data);
 }
 
-export async function fetchWorkspaceTree(workspaceId: string) {
-  const data = await apiClient.get<WorkspaceApiRecord>(`/workspaces/${workspaceId}/hierarchy`);
+export async function fetchWorkspaceTree(workspaceId: string, options?: WorkspaceTreeQueryOptions) {
+  const data = await queryGet<WorkspaceApiRecord>(`/workspaces/${workspaceId}/hierarchy`, { force: options?.force });
   const [tree] = normalizeWorkspaceForest([data]);
   return tree ?? null;
 }
 
-export async function fetchWorkspaceSubspaces(workspaceId: string) {
-  const data = await apiClient.get<WorkspaceApiRecord[]>(`/workspaces/${workspaceId}/subspaces`);
+export async function fetchWorkspaceSubspaces(workspaceId: string, options?: WorkspaceTreeQueryOptions) {
+  const data = await queryGet<WorkspaceApiRecord[]>(`/workspaces/${workspaceId}/subspaces`, { force: options?.force });
   return sortSubspaces(
     (data || []).map((record) => normalizeWorkspaceRecord(record, workspaceId)),
   );
@@ -280,6 +285,7 @@ export async function fetchWorkspaceSubspaces(workspaceId: string) {
 
 export async function createWorkspaceRequest(payload: WorkspaceCreatePayload) {
   const created = await apiClient.post<WorkspaceApiRecord>("/workspaces", payload);
+  invalidateWorkspaceTreeQueries();
   const [workspace] = normalizeWorkspaceForest([created]);
   if (!workspace) {
     throw new Error("Workspace could not be created.");
@@ -290,6 +296,7 @@ export async function createWorkspaceRequest(payload: WorkspaceCreatePayload) {
 export async function createSubspaceRequest(parentId: string, payload: WorkspaceSubspaceCreatePayload) {
   const endpoint = `/workspaces/${parentId}/subspaces`;
   const created = await apiClient.post<WorkspaceApiRecord>(endpoint, payload);
+  invalidateWorkspaceTreeQueries(parentId);
   return normalizeWorkspaceRecord(created, parentId);
 }
 
@@ -297,9 +304,20 @@ export function renameWorkspaceRequest(
   workspaceId: string,
   payload: { name: string; description?: string | null },
 ) {
-  return apiClient.patch<Workspace>(`/workspaces/${workspaceId}`, payload);
+  return apiClient.patch<Workspace>(`/workspaces/${workspaceId}`, payload).finally(() => {
+    invalidateWorkspaceTreeQueries(workspaceId);
+  });
 }
 
 export function deleteWorkspaceRequest(workspaceId: string) {
-  return apiClient.delete(`/workspaces/${workspaceId}`);
+  return apiClient.delete(`/workspaces/${workspaceId}`).finally(() => {
+    invalidateWorkspaceTreeQueries(workspaceId);
+  });
+}
+
+export function invalidateWorkspaceTreeQueries(workspaceId?: string) {
+  invalidateQueries("/workspaces/hierarchy");
+  if (workspaceId) {
+    invalidateQueries(`/workspaces/${workspaceId}`);
+  }
 }
