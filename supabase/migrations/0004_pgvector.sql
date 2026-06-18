@@ -35,7 +35,7 @@ BEGIN
   -- Create a SQL function to perform embedding-based search via RPC
   -- Accepts a float8[] representing the query vector and returns top-k documents
   CREATE OR REPLACE FUNCTION search_documents_vector(q float8[], p_top_k int, p_user uuid, p_workspace uuid)
-  RETURNS TABLE(id uuid, content text, file_id uuid, created_at timestamptz, distance double precision) AS $$
+  RETURNS TABLE(id uuid, content text, file_id uuid, created_at timestamptz, distance double precision) AS $function$
   BEGIN
     RETURN QUERY
     SELECT d.id, d.content, d.file_id, d.created_at, (d.embedding <-> q::vector) as distance
@@ -46,6 +46,6 @@ BEGIN
     ORDER BY distance
     LIMIT p_top_k;
   END;
-  $$ LANGUAGE plpgsql STABLE;
+  $function$ LANGUAGE plpgsql STABLE;
 
 END$$;

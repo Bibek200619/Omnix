@@ -14,20 +14,34 @@ CREATE TABLE IF NOT EXISTS public.authority_revocations (
 ALTER TABLE public.authority_revocations ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can only see their own revocations
+DROP POLICY IF EXISTS "Users can view their own authority revocations" ON public.authority_revocations;
 CREATE POLICY "Users can view their own authority revocations"
     ON public.authority_revocations
     FOR SELECT
     USING (auth.uid() = user_id);
 
 -- Policy: Only service role can insert (handled by backend)
+DROP POLICY IF EXISTS "Service role can insert authority revocations" ON public.authority_revocations;
 CREATE POLICY "Service role can insert authority revocations"
     ON public.authority_revocations
     FOR INSERT
     WITH CHECK (true);
 
 -- Enable Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE authority_revocations;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'authority_revocations'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.authority_revocations;
+  END IF;
+END$$;
 
 -- Index for performance
-CREATE INDEX idx_authority_revocations_user_id ON public.authority_revocations(user_id);
-CREATE INDEX idx_authority_revocations_workspace_id ON public.authority_revocations(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_authority_revocations_user_id ON public.authority_revocations(user_id);
+CREATE INDEX IF NOT EXISTS idx_authority_revocations_workspace_id ON public.authority_revocations(workspace_id);
