@@ -666,7 +666,7 @@ function WorkspaceTasksSurfaceContent() {
                         <DecisionTraceabilityList decisions={task.linked_decisions} />
 
                         {/* Inline Blocker Adder (Simplified) */}
-                        <div className="mt-2.5 border-t border-white/[0.04] pt-2.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                        <div className="mt-2.5 border-t border-white/[0.04] pt-2.5 opacity-100 transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover:opacity-100">
                           <input
                             value={blockerDrafts[task.id] || ""}
                             onChange={(event) => setBlockerDrafts((current) => ({ ...current, [task.id]: event.target.value }))}
