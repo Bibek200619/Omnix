@@ -41,7 +41,7 @@ export function ChannelList({
   setCreateOpen,
 }: ChannelListProps) {
   return (
-    <aside className="omnix-panel flex min-w-0 shrink-0 flex-col overflow-hidden rounded-xl p-3 lg:min-h-0">
+    <aside className="omnix-panel flex min-w-0 shrink-0 flex-col overflow-hidden rounded-xl p-3">
       <div className="mb-3 flex items-center justify-between px-1">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Channels</p>
         {mayCreateChannel ? (
@@ -77,11 +77,11 @@ export function ChannelList({
         </form>
       ) : null}
 
-      <div className="omnix-scrollbar flex min-h-0 gap-2 overflow-x-auto pb-1 lg:block lg:flex-1 lg:space-y-1 lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0">
+      <div className="omnix-scrollbar omnix-conversation-channel-list-items flex min-h-0 gap-2 overflow-x-auto pb-1">
         {channelsLoading ? (
           <>
             {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="w-[min(12rem,76vw)] shrink-0 rounded-lg border border-transparent px-3 py-2.5 lg:w-full">
+              <div key={index} className="omnix-conversation-channel-item w-[min(12rem,76vw)] shrink-0 rounded-lg border border-transparent px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <Skeleton variant="line" className="h-3.5 w-24" />
                   <Skeleton className="h-4 w-9 rounded" />
@@ -98,7 +98,7 @@ export function ChannelList({
             key={channel.id}
             onClick={() => onSelectChannel(channel.id)}
             className={cn(
-              "w-[min(12rem,76vw)] min-w-0 shrink-0 rounded-lg border px-3 py-2.5 text-left transition lg:w-full",
+              "omnix-conversation-channel-item w-[min(12rem,76vw)] min-w-0 shrink-0 rounded-lg border px-3 py-2.5 text-left transition",
               selectedChannelId === channel.id
                 ? "border-cyan-300/25 bg-cyan-300/[0.08]"
                 : "border-transparent hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface)]",
@@ -116,7 +116,7 @@ export function ChannelList({
           </button>
         ))}
       </div>
-      <p className="mt-3 hidden border-t border-[var(--omnix-border)] px-1 pt-3 text-[11px] leading-5 text-[var(--omnix-text-3)] lg:block">
+      <p className="omnix-conversation-channel-note mt-3 hidden border-t border-[var(--omnix-border)] px-1 pt-3 text-[11px] leading-5 text-[var(--omnix-text-3)]">
         Messages stay scoped to this workspace. Attention signals remain intentionally quiet.
       </p>
     </aside>

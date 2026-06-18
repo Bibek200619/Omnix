@@ -301,22 +301,26 @@ function WorkspaceConversationSurfaceContent() {
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-x-hidden px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
+    <section className="omnix-container-responsive flex min-h-0 flex-1 flex-col overflow-x-hidden px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
       <WorkspaceConversationChrome activeCount={presence?.active_count ?? 0} channelsLoading={channelsLoading} decisionConfirmation={decisionConfirmation} error={error} onDismissDecision={() => setDecisionConfirmation(null)} onDismissError={() => setError(null)} onDismissTask={() => setTaskConfirmation(null)} onRetryConversations={() => void loadChannels()} realtimeStatus={realtimeStatus} taskConfirmation={taskConfirmation} workspaceName={activeWorkspace?.name} />
 
-      <div className={cn("grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] gap-3 overflow-x-hidden md:grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-1", threadRoot ? "lg:grid-cols-[15.5rem_minmax(0,1fr)_22rem]" : "lg:grid-cols-[15.5rem_minmax(0,1fr)]")}>
-        <div className={cn("min-h-0 md:contents", mobileConversationView !== "channels" && "hidden md:contents")}>
+      <div
+        className="omnix-conversation-workbench"
+        data-thread={threadRoot ? "open" : "closed"}
+        data-view={mobileConversationView}
+      >
+        <div className={cn("omnix-conversation-channels min-h-0", mobileConversationView !== "channels" && "hidden")}>
           <ChannelList channelName={channelName} channelPurpose={channelPurpose} channels={channels} channelsLoading={channelsLoading} createOpen={createOpen} creatingChannel={creatingChannel} mayCreateChannel={mayCreateChannel} onCreateChannel={handleCreateChannel} onSelectChannel={handleSelectChannel} selectedChannelId={selectedChannelId} setChannelName={setChannelName} setChannelPurpose={setChannelPurpose} setCreateOpen={setCreateOpen} />
         </div>
-        <div className={cn("min-h-0 min-w-0 flex-col gap-3 md:contents", mobileConversationView !== "messages" ? "hidden md:contents" : "flex md:contents")}>
-          <div className="md:hidden">
+        <div className={cn("omnix-conversation-messages min-h-0 min-w-0 flex-col gap-3", mobileConversationView !== "messages" ? "hidden" : "flex")}>
+          <div className="omnix-conversation-mobile-back">
             <Button type="button" variant="ghost" size="sm" className="h-9 border-white/10 text-xs text-[var(--omnix-text-2)]" leftIcon={<ArrowLeft className="h-3.5 w-3.5" />} onClick={handleBackToChannels}>
               Channels
             </Button>
           </div>
-          <MessageThread activeMembers={activeMembers} aiPanel={<ConversationAIPanel activeWorkspaceId={activeWorkspaceId} messagesCount={messages.length} onError={setError} onOpenDecision={setDecisionSource} onOpenTask={setTaskSource} selectedChannelId={selectedChannelId} threadRoot={threadRoot} />} channelTyping={channelTyping} draft={sender.draft} draftMentions={sender.draftMentions} mayPost={mayPost} messages={messages} messagesLoading={messagesLoading} onDraftChange={sender.setDraft} onDraftMentionsChange={sender.setDraftMentions} onOpenDecision={(message) => setDecisionSource({ kind: "message", message })} onOpenTask={(message) => setTaskSource({ kind: "message", message })} onOpenThread={openThread} onSend={(content, parent, mentions) => void sender.sendMessage(content, parent, mentions)} onTypingChange={(isTyping) => void sendTypingSignal(selectedChannelId, isTyping)} selectedChannel={selectedChannel} sending={sender.sending} threadOpen={Boolean(threadRoot)} />
+          <MessageThread activeMembers={activeMembers} aiPanel={<ConversationAIPanel activeWorkspaceId={activeWorkspaceId} messagesCount={messages.length} onError={setError} onOpenDecision={setDecisionSource} onOpenTask={setTaskSource} selectedChannelId={selectedChannelId} threadRoot={threadRoot} />} channelTyping={channelTyping} draft={sender.draft} draftMentions={sender.draftMentions} mayPost={mayPost} messages={messages} messagesLoading={messagesLoading} onDraftChange={sender.setDraft} onDraftMentionsChange={sender.setDraftMentions} onOpenDecision={(message) => setDecisionSource({ kind: "message", message })} onOpenTask={(message) => setTaskSource({ kind: "message", message })} onOpenThread={openThread} onSend={(content, parent, mentions) => void sender.sendMessage(content, parent, mentions)} onTypingChange={(isTyping) => void sendTypingSignal(selectedChannelId, isTyping)} selectedChannel={selectedChannel} sending={sender.sending} />
         </div>
-        <div className="hidden min-h-0 min-w-0 md:contents">
+        <div className="omnix-conversation-thread min-h-0 min-w-0">
           <ThreadPanel activeMembers={activeMembers} mayPost={mayPost} onClose={() => setThreadRoot(null)} onOpenDecision={(message) => setDecisionSource({ kind: "message", message })} onOpenTask={(message) => setTaskSource({ kind: "message", message })} onSend={(content, parent, mentions) => void sender.sendMessage(content, parent, mentions)} onThreadDraftChange={sender.setThreadDraft} onThreadDraftMentionsChange={sender.setThreadDraftMentions} onTypingChange={(isTyping) => void sendTypingSignal(selectedChannelId, isTyping)} threadDraft={sender.threadDraft} threadDraftMentions={sender.threadDraftMentions} threadLoading={threadLoading} threadMessages={threadMessages} threadRoot={threadRoot} threadSending={sender.threadSending} />
         </div>
       </div>

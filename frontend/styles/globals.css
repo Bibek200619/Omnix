@@ -682,10 +682,77 @@ textarea {
   gap: 0.75rem;
 }
 
+.omnix-conversation-workbench {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0.75rem;
+  overflow-x: hidden;
+}
+
+.omnix-conversation-channels,
+.omnix-conversation-messages,
+.omnix-conversation-thread {
+  min-width: 0;
+}
+
+.omnix-conversation-thread {
+  display: none;
+}
+
+.omnix-conversation-channels > *,
+.omnix-conversation-thread > * {
+  height: 100%;
+  min-height: 0;
+}
+
 @container (min-width: 64rem) {
   .omnix-decision-context-grid {
     grid-template-columns: minmax(0, 1fr) minmax(17rem, 22rem);
     gap: 2rem;
+  }
+}
+
+@container (min-width: 48rem) {
+  .omnix-conversation-workbench {
+    grid-template-columns: minmax(14rem, 15.5rem) minmax(0, 1fr);
+  }
+
+  .omnix-conversation-workbench[data-view] .omnix-conversation-channels {
+    display: block;
+  }
+
+  .omnix-conversation-workbench[data-view] .omnix-conversation-messages {
+    display: flex;
+  }
+
+  .omnix-conversation-workbench[data-thread="open"] .omnix-conversation-messages {
+    display: none;
+  }
+
+  .omnix-conversation-workbench[data-thread="open"] .omnix-conversation-thread {
+    display: flex;
+  }
+
+  .omnix-conversation-mobile-back {
+    display: none;
+  }
+
+  .omnix-conversation-channel-list-items {
+    display: block;
+    flex: 1 1 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-bottom: 0;
+  }
+
+  .omnix-conversation-channel-list-items .omnix-conversation-channel-item {
+    width: 100%;
+  }
+
+  .omnix-conversation-channel-note {
+    display: block;
   }
 }
 
@@ -710,6 +777,18 @@ textarea {
 
   .omnix-decisions-back {
     display: none;
+  }
+
+  .omnix-conversation-workbench[data-thread="open"] {
+    grid-template-columns: minmax(14rem, 15.5rem) minmax(0, 1fr) minmax(18rem, 22rem);
+  }
+
+  .omnix-conversation-workbench[data-thread="open"] .omnix-conversation-messages {
+    display: flex;
+  }
+
+  .omnix-conversation-workbench[data-thread="open"] .omnix-conversation-thread {
+    display: flex;
   }
 
   .omnix-initiative-workbench {

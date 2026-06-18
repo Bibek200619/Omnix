@@ -135,7 +135,6 @@ type MessageThreadProps = {
   onTypingChange: (isTyping: boolean) => void;
   selectedChannel: WorkspaceChannel | null;
   sending: boolean;
-  threadOpen: boolean;
 };
 
 export function MessageThread({
@@ -156,7 +155,6 @@ export function MessageThread({
   onTypingChange,
   selectedChannel,
   sending,
-  threadOpen,
 }: MessageThreadProps) {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -164,7 +162,7 @@ export function MessageThread({
   }
 
   return (
-    <main className={cn("omnix-panel min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl lg:min-h-[26rem]", threadOpen ? "flex md:hidden lg:flex" : "flex")}>
+    <main className="omnix-panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--omnix-border)] px-4 py-3">
         <div className="min-w-0">
           <h2 className="truncate text-base font-semibold text-white">{selectedChannel?.name || "Conversation"}</h2>
