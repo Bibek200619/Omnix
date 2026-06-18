@@ -137,6 +137,38 @@ async def test_mentions_inbox_hides_private_conversation_without_channel_access(
 
 
 @pytest.mark.asyncio
+async def test_mentions_inbox_degrades_when_storage_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_access(workspace_id: str, user_id: str):
+        return SimpleNamespace(workspace={"id": workspace_id})
+
+    async def broken_select_all(*args, **kwargs):
+        raise mentions.SupabaseServiceError("Internal server error")
+
+    monkeypatch.setattr(mentions, "require_workspace_access", fake_access)
+    monkeypatch.setattr(mentions, "select_all_trusted", broken_select_all)
+
+    result = await mentions.list_mentions_for_user(workspace_id="workspace-1", user_id="user-2")
+
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_mention_metadata_degrades_when_storage_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def broken_select_all(*args, **kwargs):
+        raise mentions.SupabaseServiceError("Internal server error")
+
+    monkeypatch.setattr(mentions, "select_all_trusted", broken_select_all)
+
+    result = await mentions.mention_metadata_for_sources(
+        workspace_id="workspace-1",
+        source_type="task",
+        source_ids=["task-1", "task-2"],
+    )
+
+    assert result == {"task-1": [], "task-2": []}
+
+
+@pytest.mark.asyncio
 async def test_count_unread_mentions_uses_visible_unread_mentions(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
 
