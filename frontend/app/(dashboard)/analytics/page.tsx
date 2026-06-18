@@ -11,6 +11,7 @@ import { logClientError } from "@/lib/errors";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
+import { IntelligenceDashboard } from "@/components/workspace/IntelligenceDashboard";
 
 type FileData = {
   id: string;
@@ -280,18 +281,11 @@ function AnalyticsPageContent() {
         <section className="omnix-cinematic-card p-5 sm:p-6 overflow-hidden">
           <div className="pointer-events-none absolute right-[-6rem] top-[-6rem] h-72 w-72 rounded-full bg-cyan-400/5 blur-[88px]" />
           <div className="relative z-10">
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/50">
-              <Construction className="h-3.5 w-3.5" />
-              Intelligence Roadmap
+            <div className="mb-6 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/50">
+              <Sparkles className="h-3.5 w-3.5" />
+              Custom Intelligence Dashboards
             </div>
-            <h3 className="omnix-display mt-2 text-lg font-semibold text-white">Custom Intelligence Dashboards</h3>
-            <p className="mt-2 max-w-2xl text-xs leading-5 text-[var(--omnix-text-2)]">
-              Planned dashboard widgets will appear here when the backend exposes conversation trends, source growth, and token utilization telemetry.
-            </p>
-            <div className="mt-5 flex gap-2">
-              <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/5" />
-              <span className="text-[9px] font-bold uppercase tracking-widest text-cyan-300/60">Awaiting telemetry</span>
-            </div>
+            <IntelligenceDashboard />
           </div>
         </section>
       </div>
