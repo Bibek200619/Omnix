@@ -687,6 +687,7 @@ async def leave_presence(
 
 
 
+
 @router.get("/{workspace_id}/telemetry")
 async def get_workspace_telemetry(
     workspace_id: str,
@@ -709,10 +710,15 @@ async def get_workspace_telemetry(
             "files", "id,created_at",
             {"workspace_id": workspace_id, "created_at": {"gte": start_date_str}}
         )
-        messages = await select_all_trusted(
-            "messages", "id,content,created_at",
-            {"workspace_id": workspace_id, "created_at": {"gte": start_date_str}}
-        )
+        
+        convo_ids = [c["id"] for c in conversations if "id" in c]
+        messages = []
+        if convo_ids:
+            messages = await select_all_trusted(
+                "messages", "id,content,created_at",
+                {"conversation_id": convo_ids}
+            )
+            
     except Exception as exc:
         logger.warning("Failed to load telemetry stats", exc_info=True)
         conversations, files, messages = [], [], []
@@ -735,12 +741,11 @@ async def get_workspace_telemetry(
             token_counts[dt] += len(str(m.get("content") or "")) // 4
 
     return {
-        "dates": [d[5:] for d in dates], # MM-DD format
+        "dates": [d[5:] for d in dates],
         "conversations": [convo_counts[d] for d in dates],
         "sources": [file_counts[d] for d in dates],
         "tokens": [token_counts[d] for d in dates]
     }
-
 
 @router.get("/{workspace_id}/activity", response_model=list[WorkspaceActivityRead])
 async def get_workspace_activity(
