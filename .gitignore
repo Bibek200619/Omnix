@@ -95,3 +95,7 @@ patch_*.py
 patch_*.js
 fix_*.py
 fix_*.js
+
+# Local agent tooling
+.agents/
+skills-lock.json

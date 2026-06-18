@@ -17,4 +17,16 @@ CREATE INDEX IF NOT EXISTS idx_ws_intel_memory_workspace_type ON workspace_intel
 CREATE INDEX IF NOT EXISTS idx_ws_intel_memory_importance ON workspace_intelligence_memory(importance_score DESC);
 
 -- Enable realtime for this table
-ALTER PUBLICATION supabase_realtime ADD TABLE workspace_intelligence_memory;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'workspace_intelligence_memory'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.workspace_intelligence_memory;
+  END IF;
+END$$;
