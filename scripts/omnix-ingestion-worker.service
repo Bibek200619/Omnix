@@ -1,0 +1,20 @@
+[Unit]
+Description=Omnix Ingestion Worker
+After=network.target
+Requires=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Omnix/backend
+Environment=OMNIX_ROLE=ingestion_worker
+EnvironmentFile=/home/ubuntu/Omnix/.env.production
+ExecStart=/home/ubuntu/Omnix/backend/venv/bin/python -m app.jobs.worker
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=omnix-ingestion-worker
+
+[Install]
+WantedBy=multi-user.target

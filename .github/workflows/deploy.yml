@@ -1,0 +1,44 @@
+name: Deploy Omnix Backend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+
+          script: |
+            cd ~/Omnix
+
+            git fetch origin
+            git reset --hard origin/main
+
+            cd backend
+
+            source venv/bin/activate
+
+            pip install -r requirements.txt --quiet
+
+            # Restart API process
+            sudo systemctl restart omnix
+
+            # Restart ingestion worker (consumes ingest_file jobs from Redis)
+            sudo systemctl restart omnix-ingestion-worker
+
+            # Restart automation scheduler (periodic workspace automations)
+            sudo systemctl restart omnix-automation-scheduler
+
+            sleep 5
+
+            echo "Deployment completed successfully"
