@@ -63,7 +63,7 @@ export default function InvitePage() {
 
   return (
     <main className="omnix-app-bg relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10 text-white">
-      <section className="relative z-[1] w-full max-w-lg rounded-2xl border border-[var(--omnix-border-2)] bg-[rgba(6,16,32,0.94)] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.58),var(--omnix-glow-xs)] backdrop-blur-2xl">
+      <section className="relative z-[1] w-full max-w-lg rounded-2xl border border-[var(--omnix-border-2)] bg-[var(--omnix-rgba-6-16-32-0-94)] p-6 shadow-[0_40px_120px_var(--omnix-rgba-0-0-0-0-58),var(--omnix-glow-xs)] backdrop-blur-2xl">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]">
           {acceptedWorkspace ? <Check className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
         </div>
