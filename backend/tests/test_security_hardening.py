@@ -62,6 +62,42 @@ def test_production_cors_uses_explicit_allowed_origins(monkeypatch: pytest.Monke
     assert "access-control-allow-origin" not in blocked.headers
 
 
+def test_production_cors_allows_project_frontend_origins(monkeypatch: pytest.MonkeyPatch) -> None:
+    _configure_app_env(monkeypatch, origins="")
+
+    from app.bootstrap.app import create_app
+
+    client = TestClient(create_app())
+    response = client.options(
+        "/files",
+        headers={
+            "Origin": "https://omni-x.co.in",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    www_response = client.options(
+        "/workspaces/hierarchy",
+        headers={
+            "Origin": "https://www.omni-x.co.in",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    blocked = client.options(
+        "/files",
+        headers={
+            "Origin": "https://evil.example",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "https://omni-x.co.in"
+    assert www_response.status_code == 200
+    assert www_response.headers["access-control-allow-origin"] == "https://www.omni-x.co.in"
+    assert blocked.status_code == 400
+    assert "access-control-allow-origin" not in blocked.headers
+
+
 def test_detailed_health_and_admin_routes_require_auth(monkeypatch: pytest.MonkeyPatch) -> None:
     _configure_app_env(monkeypatch)
 
