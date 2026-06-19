@@ -99,7 +99,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
   } = useWorkspace();
   const { user, signOut } = useAuth();
 
-  const [onboardingComplete, setOnboardingComplete] = useState(readOnboardingCompleted);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [step, setStep] = useState<StepId>("account");
   const [onboardingWorkspaceId, setOnboardingWorkspaceId] = useState<string | null>(null);
 
@@ -132,6 +132,10 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
   const hasWorkspaceForFlow = Boolean(onboardingWorkspace);
 
   useEffect(() => {
+    setOnboardingComplete(readOnboardingCompleted(user?.id));
+  }, [user?.id]);
+
+  useEffect(() => {
     if (loading) {
       return;
     }
@@ -142,11 +146,16 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       setStep("workspace");
       return;
     }
+    if (hasWorkspaces && !onboardingComplete && !onboardingWorkspaceId && step === "account") {
+      markOnboardingCompleted(user?.id);
+      setOnboardingComplete(true);
+      return;
+    }
     if (hasWorkspaces && !onboardingComplete) {
       setOnboardingWorkspaceId((current) => current ?? activeWorkspace?.id ?? activeWorkspaceId ?? workspaces[0]?.id ?? null);
       setStep((current) => (current === "account" || current === "workspace" ? "team" : current));
     }
-  }, [activeWorkspace?.id, activeWorkspaceId, error, hasWorkspaces, loading, onboardingComplete, workspaceLoadFailed, workspaces]);
+  }, [activeWorkspace?.id, activeWorkspaceId, error, hasWorkspaces, loading, onboardingComplete, onboardingWorkspaceId, step, user?.id, workspaceLoadFailed, workspaces]);
 
   const isBlocked = !loading && (workspaceLoadFailed || !hasWorkspaces || !onboardingComplete);
   const onboardingTrapRef = useFocusTrap<HTMLElement>(isBlocked);
@@ -264,7 +273,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       return;
     }
     setActiveWorkspace(onboardingWorkspace.id);
-    markOnboardingCompleted();
+    markOnboardingCompleted(user?.id);
     setOnboardingComplete(true);
   }
 

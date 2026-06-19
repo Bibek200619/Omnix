@@ -22,7 +22,7 @@ export function RegisterForm() {
   const { authError, isConfigured, refreshSession } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<{ handle?: string; email?: string; password?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{ handle?: string; email?: string; phone?: string; password?: string }>({});
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,14 +35,21 @@ export function RegisterForm() {
     const name = String(formData.get("name") ?? "").trim();
     const handle = String(formData.get("handle") ?? "").trim().replace(/^@/, "").toLowerCase();
     const email = String(formData.get("email") ?? "").trim();
+    const phone = String(formData.get("phone") ?? "").trim();
     const password = String(formData.get("password") ?? "");
-    const nextFieldErrors: { handle?: string; email?: string; password?: string } = {};
+    const normalizedPhone = phone.replace(/[\s().-]+/g, "");
+    const nextFieldErrors: { handle?: string; email?: string; phone?: string; password?: string } = {};
 
     if (!/^[a-z0-9][a-z0-9_-]{2,29}$/.test(handle)) {
       nextFieldErrors.handle = "Use 3-30 lowercase letters, numbers, hyphens, or underscores.";
     }
     if (!email) {
       nextFieldErrors.email = "Enter your email address.";
+    }
+    if (!normalizedPhone) {
+      nextFieldErrors.phone = "Enter your phone number.";
+    } else if (!/^\+?[1-9]\d{6,19}$/.test(normalizedPhone)) {
+      nextFieldErrors.phone = "Use 7-20 digits, with + allowed at the start.";
     }
     if (!password) {
       nextFieldErrors.password = "Create a password.";
@@ -68,6 +75,7 @@ export function RegisterForm() {
           data: {
             full_name: name || undefined,
             username: handle,
+            phone_number: normalizedPhone,
           },
         },
       });
@@ -87,6 +95,7 @@ export function RegisterForm() {
         await apiClient.patch("/profile", {
           display_name: name || undefined,
           username: handle,
+          phone_number: normalizedPhone,
         });
         await refreshSession();
         router.replace(redirectFromWindow());
@@ -163,6 +172,19 @@ export function RegisterForm() {
         icon={<AuthIcon d={AUTH_ICONS.mail} size={16} stroke="currentColor" sw={1.8} />}
         disabled={loading || !isConfigured}
         error={fieldErrors.email}
+      />
+      <AuthInput
+        id="phone"
+        name="phone"
+        label="Phone number"
+        type="tel"
+        autoComplete="tel"
+        placeholder="+1 555 123 4567"
+        required
+        icon={<AuthIcon d={AUTH_ICONS.phone} size={16} stroke="currentColor" sw={1.8} />}
+        hint="Used to complete your account profile."
+        disabled={loading || !isConfigured}
+        error={fieldErrors.phone}
       />
       <AuthInput
         id="password"
