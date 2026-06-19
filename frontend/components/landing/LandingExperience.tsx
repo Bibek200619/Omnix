@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { motion, useInView, AnimatePresence, useReducedMotion, type Variants } from "framer-motion";
 import { OmnixMark as BrandMark } from "@/components/brand/OmnixMark";
+import { useDecorativeMotionEnabled } from "@/lib/use-decorative-motion";
 
 // ─── Brand ───────────────────────────────────────────────────────────────────
 const C = {
@@ -77,11 +78,11 @@ function seeded(index: number, salt: number) {
 }
 
 function ParticleField({ count = 34 }: { count?: number }) {
-  const reduceMotion = useReducedMotion();
-  const particleCount = reduceMotion ? Math.min(count, 12) : count;
+  const motionEnabled = useDecorativeMotionEnabled();
+  const particleCount = motionEnabled ? count : Math.min(count, 10);
   type Particle = { id: number; x: number; y: number; size: number; dur: number; delay: number; opacity: number; color: string };
-  const [particles] = useState<Particle[]>(() =>
-    Array.from({ length: particleCount }, (_, i) => {
+  const particles = useMemo<Particle[]>(
+    () => Array.from({ length: particleCount }, (_, i) => {
       const colorSeed = seeded(i, 7);
       return {
         id: i,
@@ -93,12 +94,13 @@ function ParticleField({ count = 34 }: { count?: number }) {
         opacity: seeded(i, 6) * 0.35 + 0.08,
         color: colorSeed > 0.65 ? C.cyan : colorSeed > 0.5 ? C.blue : "var(--omnix-color-ffffff)",
       };
-    })
+    }),
+    [particleCount],
   );
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       {particles.map(p =>
-        reduceMotion ? (
+        !motionEnabled ? (
           <div
             key={p.id}
             className="absolute rounded-full"
@@ -119,11 +121,11 @@ function ParticleField({ count = 34 }: { count?: number }) {
 
 type DriftingOrbProps = { x:string; y:string; size:number; color:string; dur:number; delay?:number };
 function DriftingOrb({ x, y, size, color, dur, delay=0 }: DriftingOrbProps) {
-  const reduceMotion = useReducedMotion();
-  const style = { left:x, top:y, width:size, height:size, borderRadius:"50%",
+  const motionEnabled = useDecorativeMotionEnabled();
+  const style: CSSProperties = { left:x, top:y, width:size, height:size, borderRadius:"50%",
     background:`radial-gradient(circle,${color} 0%,transparent 70%)`,
     transform:"translate(-50%,-50%)", filter:"blur(2px)" };
-  if (reduceMotion) {
+  if (!motionEnabled) {
     return <div className="absolute pointer-events-none opacity-70" style={style} />;
   }
 
@@ -137,7 +139,7 @@ function DriftingOrb({ x, y, size, color, dur, delay=0 }: DriftingOrbProps) {
 }
 
 function AnimatedGrid({ opacity=0.04 }:{opacity?:number}) {
-  const reduceMotion = useReducedMotion();
+  const motionEnabled = useDecorativeMotionEnabled();
   const gridStyle = {
     backgroundImage:`linear-gradient(var(--omnix-rgba-0-255-255-0-5) 1px,transparent 1px),linear-gradient(90deg,var(--omnix-rgba-0-255-255-0-5) 1px,transparent 1px)`,
     backgroundSize:"64px 64px",
@@ -145,7 +147,7 @@ function AnimatedGrid({ opacity=0.04 }:{opacity?:number}) {
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{opacity}}>
-      {reduceMotion ? (
+      {!motionEnabled ? (
         <div className="w-full h-full" style={gridStyle} />
       ) : (
         <motion.div className="w-full h-full"
@@ -300,11 +302,11 @@ function Navbar() {
 
 // ─── HERO ─────────────────────────────────────────────────────────────────────
 function FloatTag({ text, icon, style }:{ text:string; icon:string; style:CSSProperties }) {
-  const reduceMotion = useReducedMotion();
+  const motionEnabled = useDecorativeMotionEnabled();
 
   return (
     <motion.div
-      animate={reduceMotion ? undefined : {y:[0,-8,0]}}
+      animate={motionEnabled ? {y:[0,-8,0]} : undefined}
       transition={{duration:3.8,repeat:Infinity,ease:"easeInOut"}}
       className="absolute hidden lg:flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold backdrop-blur-sm pointer-events-none"
       style={{background:"var(--omnix-rgba-10-25-47-0-88)",border:`1px solid var(--omnix-rgba-0-255-255-0-2)`,color:C.white,whiteSpace:"nowrap",...style}}>
@@ -539,6 +541,7 @@ function HeroSignalStrip() {
 
 // ─── MARQUEE ──────────────────────────────────────────────────────────────────
 function Marquee() {
+  const motionEnabled = useDecorativeMotionEnabled();
   const items = ["Workspace hierarchy","Document uploads","Searchable history","Source-grounded answers","Role-aware access","Streaming responses","Stream recovery","Workspace switching","Activity feed","Invite flow","Operational telemetry","Retrieval modes"];
   const doubled = [...items,...items];
   return (
@@ -555,7 +558,8 @@ function Marquee() {
         <div className="absolute right-0 top-0 bottom-0 w-32 z-10 pointer-events-none"
           style={{background:`linear-gradient(270deg,var(--omnix-color-061020),transparent)`}}/>
         <motion.div className="flex gap-10 whitespace-nowrap"
-          animate={{x:[0,-2200]}} transition={{duration:38,repeat:Infinity,ease:"linear"}}>
+          animate={motionEnabled ? {x:[0,-2200]} : undefined}
+          transition={{duration:38,repeat:Infinity,ease:"linear"}}>
           {doubled.map((name,i)=>(
             <div key={i} className="flex items-center gap-3 px-5 py-2.5 rounded-xl flex-shrink-0"
               style={{background:C.card,border:`1px solid ${C.border}`}}>
