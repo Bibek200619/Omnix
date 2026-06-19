@@ -39,7 +39,8 @@ pydantic-settings==2.14.1
 pydantic_core==2.46.4
 pyglet==2.1.14
 Pygments==2.20.0
-pytest==9.0.3
+pytest==8.4.2
+pytest==9.0.3\
 pytest-asyncio==1.4.0
 python-dotenv==1.2.2
 PyYAML==6.0.3
