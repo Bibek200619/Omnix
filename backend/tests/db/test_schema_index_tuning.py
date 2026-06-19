@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 
-BASELINE_MIGRATION = Path(__file__).resolve().parents[2] / "migrations" / "0029_schema_baseline_audit.sql"
+BASELINE_MIGRATION = Path(__file__).resolve().parents[3] / "supabase" / "migrations" / "0029_schema_baseline_audit.sql"
 GIN_INDEXES = (
     "idx_workspaces_intelligence_preferences",
     "idx_messages_metadata_gin",
