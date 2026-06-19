@@ -1,9 +1,20 @@
 import type { NextConfig } from "next";
 
+const DEFAULT_API_PROXY_TARGET =
+  process.env.NODE_ENV === "development" ? "http://localhost:8000" : "https://api.omni-x.co.in";
+
+function normalizeProxyTarget(value?: string | null) {
+  const trimmed = value?.trim().replace(/\/+$/, "");
+  if (!trimmed || trimmed.includes("REDACTED")) {
+    return null;
+  }
+  return trimmed;
+}
+
 const apiProxyTarget =
-  process.env.OMNIX_API_PROXY_TARGET?.replace(/\/+$/, "") ||
-  process.env.NEXT_PUBLIC_API_PROXY_TARGET?.replace(/\/+$/, "") ||
-  (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "https://api.omni-x.co.in");
+  normalizeProxyTarget(process.env.OMNIX_API_PROXY_TARGET) ||
+  normalizeProxyTarget(process.env.NEXT_PUBLIC_API_PROXY_TARGET) ||
+  DEFAULT_API_PROXY_TARGET;
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
