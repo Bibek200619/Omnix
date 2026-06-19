@@ -32,16 +32,16 @@ function MiniBarChart({ data, labels, color, label }: { data: number[], labels: 
   const max = Math.max(...data, 1);
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-[var(--omnix-text-3)]">
-        <span>{label}</span>
-        <span style={{ color }}>{data.reduce((a, b) => a + b, 0).toLocaleString()} Total</span>
+      <div className="flex min-w-0 items-center justify-between gap-2 text-[9px] uppercase tracking-widest text-[var(--omnix-text-3)] sm:text-[10px]">
+        <span className="hidden sm:inline">{label}</span>
+        <span className="truncate sm:ml-auto" style={{ color }}>{data.reduce((a, b) => a + b, 0).toLocaleString()} Total</span>
       </div>
-      <div className="flex h-24 items-end gap-1.5 sm:gap-2">
+      <div className="flex h-14 items-end gap-1 sm:h-24 sm:gap-2">
         {data.map((val, i) => (
           <div key={i} className="group relative flex flex-1 flex-col items-center gap-1">
-            <div className="w-full rounded-t-sm transition-all duration-300 group-hover:brightness-125"
+            <div className="w-full rounded-t-sm transition-[filter,height] duration-300 group-hover:brightness-125"
                  style={{ height: `${Math.max((val / max) * 100, 4)}%`, backgroundColor: color, opacity: 0.8 }} />
-            <span className="text-[8px] text-[var(--omnix-text-3)] opacity-0 transition-opacity group-hover:opacity-100 absolute -bottom-4">
+            <span className="absolute -bottom-4 text-[8px] text-[var(--omnix-text-3)] opacity-0 transition-opacity group-hover:opacity-100">
               {labels[i]}
             </span>
           </div>
@@ -78,34 +78,34 @@ export function IntelligenceDashboard() {
 
   if (loading || !data) {
     return (
-      <div className="flex h-48 items-center justify-center rounded-xl border border-white/5 bg-black/10">
+      <div className="flex h-28 items-center justify-center rounded-xl border border-white/5 bg-black/10 sm:h-48">
         <Activity className="h-5 w-5 animate-pulse text-cyan-500/50" />
       </div>
     );
   }
 
   return (
-    <div className="grid gap-6 sm:grid-cols-3">
-      <div className="rounded-xl border border-white/5 bg-black/20 p-4 shadow-inner">
-        <div className="mb-4 flex items-center gap-2">
+    <div className="grid grid-cols-3 gap-2 sm:gap-6">
+      <div className="min-w-0 rounded-xl border border-white/5 bg-black/20 p-2.5 shadow-inner sm:p-4">
+        <div className="mb-2 flex min-w-0 items-center gap-1.5 sm:mb-4 sm:gap-2">
           <MessageSquare className="h-4 w-4 text-cyan-400" />
-          <h4 className="text-xs font-semibold text-white">Conversation Volume</h4>
+          <h4 className="truncate text-[10px] font-semibold text-white sm:text-xs">Conversation Volume</h4>
         </div>
         <MiniBarChart data={data.conversations} labels={data.dates} color="var(--omnix-cyan)" label="7-Day Trend" />
       </div>
       
-      <div className="rounded-xl border border-white/5 bg-black/20 p-4 shadow-inner">
-        <div className="mb-4 flex items-center gap-2">
+      <div className="min-w-0 rounded-xl border border-white/5 bg-black/20 p-2.5 shadow-inner sm:p-4">
+        <div className="mb-2 flex min-w-0 items-center gap-1.5 sm:mb-4 sm:gap-2">
           <Database className="h-4 w-4 text-emerald-400" />
-          <h4 className="text-xs font-semibold text-white">Source Growth</h4>
+          <h4 className="truncate text-[10px] font-semibold text-white sm:text-xs">Source Growth</h4>
         </div>
         <MiniBarChart data={data.sources} labels={data.dates} color="var(--omnix-color-10b981)" label="7-Day Trend" />
       </div>
 
-      <div className="rounded-xl border border-white/5 bg-black/20 p-4 shadow-inner">
-        <div className="mb-4 flex items-center gap-2">
+      <div className="min-w-0 rounded-xl border border-white/5 bg-black/20 p-2.5 shadow-inner sm:p-4">
+        <div className="mb-2 flex min-w-0 items-center gap-1.5 sm:mb-4 sm:gap-2">
           <BarChart3 className="h-4 w-4 text-purple-400" />
-          <h4 className="text-xs font-semibold text-white">Token Utilization</h4>
+          <h4 className="truncate text-[10px] font-semibold text-white sm:text-xs">Token Utilization</h4>
         </div>
         <MiniBarChart data={data.tokens} labels={data.dates} color="var(--omnix-color-a855f7)" label="7-Day Trend" />
       </div>

@@ -12,6 +12,7 @@ class UserProfileRead(BaseModel):
     email: str | None = None
     username: str | None = None
     display_name: str | None = None
+    phone_number: str | None = None
     avatar_url: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -22,5 +23,6 @@ class UserProfileUpdate(BaseModel):
 
     display_name: str | None = Field(default=None, min_length=1, max_length=80)
     username: str | None = Field(default=None, min_length=3, max_length=30)
+    phone_number: str | None = Field(default=None, min_length=7, max_length=32)
     avatar_url: str | None = Field(default=None, max_length=300_000)
     remove_avatar: bool = False

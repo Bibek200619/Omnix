@@ -54,17 +54,20 @@ export function AccountProfileSettings() {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [handleDraft, setHandleDraft] = useState("");
+  const [phoneDraft, setPhoneDraft] = useState("");
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [removeAvatar, setRemoveAvatar] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const [savingAvatar, setSavingAvatar] = useState(false);
   const [savingHandle, setSavingHandle] = useState(false);
+  const [savingPhone, setSavingPhone] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const displayName = profile?.display_name || metadataName(user?.user_metadata) || user?.email || "Omnix user";
   const email = profile?.email || user?.email || "";
   const avatarUrl = removeAvatar ? null : avatarPreview || profile?.avatar_url || null;
   const handle = profile?.username || profile?.handle || "";
+  const phoneNumber = profile?.phone_number || "";
 
   useEffect(() => {
     setNameDraft(displayName);
@@ -73,6 +76,10 @@ export function AccountProfileSettings() {
   useEffect(() => {
     setHandleDraft(handle);
   }, [handle]);
+
+  useEffect(() => {
+    setPhoneDraft(phoneNumber);
+  }, [phoneNumber]);
 
   async function saveName() {
     const nextName = nameDraft.trim();
@@ -114,6 +121,31 @@ export function AccountProfileSettings() {
       setError("Unable to reserve handle. Try a different handle or retry in a moment.");
     } finally {
       setSavingHandle(false);
+    }
+  }
+
+  async function savePhone() {
+    const nextPhone = phoneDraft.trim().replace(/[\s().-]+/g, "");
+    if (!nextPhone) {
+      setError("Enter a phone number before saving.");
+      return;
+    }
+    if (!/^\+?[1-9]\d{6,19}$/.test(nextPhone)) {
+      setError("Phone number must be 7-20 digits and may start with +.");
+      return;
+    }
+
+    try {
+      setSavingPhone(true);
+      setError(null);
+      await updateProfile({ phone_number: nextPhone });
+      setMessage("Phone number updated.");
+      window.setTimeout(() => setMessage(null), 2200);
+    } catch (err) {
+      logClientError("Failed to save phone number", err, { endpoint: "/profile" });
+      setError("Unable to save phone number. Check the number and try again.");
+    } finally {
+      setSavingPhone(false);
     }
   }
 
@@ -260,6 +292,34 @@ export function AccountProfileSettings() {
                 )}
                 <p className="mt-2 text-xs leading-5 text-slate-500">
                   Handles are unique and can be used to invite teammates.
+                </p>
+              </div>
+              <div className="rounded-lg border border-[var(--omnix-border)] bg-black/15 p-4 sm:col-span-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Phone number</p>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    value={phoneDraft}
+                    onChange={(event) => setPhoneDraft(event.target.value)}
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="+1 555 123 4567"
+                    className="h-10"
+                    disabled={savingPhone}
+                    aria-label="Phone number"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    isLoading={savingPhone}
+                    disabled={!phoneDraft.trim() || phoneDraft.trim() === phoneNumber}
+                    onClick={savePhone}
+                  >
+                    Save
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  Required for account recovery and workspace contact details.
                 </p>
               </div>
             </div>

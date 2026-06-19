@@ -3,8 +3,10 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE_URL, ApiError, apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { showMentionBrowserNotification } from "@/lib/browser-notifications";
 import { logClientError } from "@/lib/errors";
 import { realtimeRegistry } from "@/lib/realtime-registry";
+import { useToast } from "@/lib/toast-context";
 import { useWorkspaceTree } from "@/lib/workspace-context";
 import type { WorkspaceMentionInboxItem } from "@/lib/workspace-types";
 
@@ -19,8 +21,13 @@ type WorkspaceNotificationsContextType = {
 };
 
 type MentionRealtimePayload = {
+  eventType?: string;
   new?: { workspace_id?: string | null; mentioned_user_id?: string | null };
   old?: { workspace_id?: string | null; mentioned_user_id?: string | null };
+};
+
+type RefreshNotificationsOptions = {
+  announceNew?: boolean;
 };
 
 const WorkspaceNotificationsContext = createContext<WorkspaceNotificationsContextType | undefined>(undefined);
@@ -56,6 +63,7 @@ function notificationLoadErrorMessage(error: unknown) {
 
 export function WorkspaceNotificationsProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
+  const { showToast } = useToast();
   const { activeWorkspaceId } = useWorkspaceTree();
   const userId = session?.user.id ?? null;
   const [mentions, setMentions] = useState<WorkspaceMentionInboxItem[]>([]);
@@ -63,13 +71,40 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestRef = useRef(0);
+  const knownMentionIdsRef = useRef<Set<string>>(new Set());
+  const hasLoadedMentionsRef = useRef(false);
 
-  const refreshNotifications = useCallback(async () => {
+  const announceMentions = useCallback(
+    (newMentions: WorkspaceMentionInboxItem[]) => {
+      if (newMentions.length === 0) return;
+
+      const [firstMention] = newMentions;
+      const extraCount = newMentions.length - 1;
+      const title = extraCount > 0 ? `${newMentions.length} new mentions` : "New mention";
+      const message =
+        extraCount > 0
+          ? `${firstMention.source_title} and ${extraCount} more mention${extraCount === 1 ? "" : "s"} need your attention.`
+          : `${firstMention.mentioned_by_name || firstMention.mentioned_by_email || "Workspace member"} mentioned you in ${firstMention.source_title}.`;
+
+      showToast({
+        title,
+        message,
+        variant: "info",
+        durationMs: 5200,
+      });
+      showMentionBrowserNotification(firstMention);
+    },
+    [showToast],
+  );
+
+  const refreshNotifications = useCallback(async (options: RefreshNotificationsOptions = {}) => {
     if (!activeWorkspaceId || !userId) {
       setMentions([]);
       setUnreadCount(0);
       setError(null);
       setLoading(false);
+      knownMentionIdsRef.current = new Set();
+      hasLoadedMentionsRef.current = false;
       return;
     }
 
@@ -81,9 +116,20 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
         apiClient.getWorkspaceMentionsUnreadCount(activeWorkspaceId),
       ]);
       if (requestId !== requestRef.current) return;
+      const previousIds = knownMentionIdsRef.current;
+      const nextIds = new Set(incoming.map((mention) => mention.id));
+      const newUnreadMentions = incoming.filter((mention) => !mention.read_at && !previousIds.has(mention.id));
+
       setMentions(incoming);
       setUnreadCount(unread.unread_count);
       setError(null);
+
+      if (options.announceNew && hasLoadedMentionsRef.current) {
+        announceMentions(newUnreadMentions);
+      }
+
+      knownMentionIdsRef.current = nextIds;
+      hasLoadedMentionsRef.current = true;
     } catch (err) {
       if (requestId !== requestRef.current) return;
       logClientError("Failed to load workspace notifications", err, {
@@ -93,7 +139,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
     } finally {
       if (requestId === requestRef.current) setLoading(false);
     }
-  }, [activeWorkspaceId, userId]);
+  }, [activeWorkspaceId, announceMentions, userId]);
 
   const refreshRef = useRef(refreshNotifications);
 
@@ -104,6 +150,8 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
   useEffect(() => {
     setMentions([]);
     setUnreadCount(0);
+    knownMentionIdsRef.current = new Set();
+    hasLoadedMentionsRef.current = false;
     void refreshNotifications();
   }, [refreshNotifications]);
 
@@ -124,7 +172,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
           (payload: MentionRealtimePayload) => {
             const row = payload.new ?? payload.old;
             if (String(row?.mentioned_user_id ?? "") === userId) {
-              void refreshRef.current();
+              void refreshRef.current({ announceNew: payload.eventType === "INSERT" });
             }
           },
         ),
@@ -132,6 +180,26 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
 
     return () => {
       realtimeRegistry.unsubscribe({ type: "workspace_mentions", workspaceId: activeWorkspaceId });
+    };
+  }, [activeWorkspaceId, userId]);
+
+  useEffect(() => {
+    if (!activeWorkspaceId || !userId) return;
+
+    function refreshIfVisible() {
+      if (document.visibilityState !== "hidden") {
+        void refreshRef.current({ announceNew: true });
+      }
+    }
+
+    const intervalId = window.setInterval(refreshIfVisible, 60_000);
+    window.addEventListener("focus", refreshIfVisible);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshIfVisible);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
     };
   }, [activeWorkspaceId, userId]);
 

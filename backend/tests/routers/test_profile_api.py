@@ -25,6 +25,7 @@ def _profile_row(**overrides: Any) -> dict[str, Any]:
         "email": "alex@example.com",
         "username": "alex-dev",
         "display_name": "Alex Dev",
+        "phone_number": "+15551234567",
         "avatar_url": "https://example.com/avatar.png",
         "created_at": None,
         "updated_at": None,
@@ -67,6 +68,7 @@ def test_get_profile_returns_authenticated_user_profile(monkeypatch: pytest.Monk
     assert body["user_id"] == "user-1"
     assert body["username"] == "alex-dev"
     assert body["display_name"] == "Alex Dev"
+    assert body["phone_number"] == "+15551234567"
 
 
 def test_patch_profile_updates_display_name_username_and_avatar(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -81,6 +83,7 @@ def test_patch_profile_updates_display_name_username_and_avatar(monkeypatch: pyt
         return _profile_row(
             username=payload["username"],
             display_name=payload["display_name"],
+            phone_number=payload["phone_number"],
             avatar_url=payload["avatar_url"],
         )
 
@@ -92,6 +95,7 @@ def test_patch_profile_updates_display_name_username_and_avatar(monkeypatch: pyt
         json={
             "display_name": "Alex Morgan",
             "username": "alex-morgan",
+            "phone_number": "+15559876543",
             "avatar_url": "https://example.com/new-avatar.png",
         },
     )
@@ -100,11 +104,13 @@ def test_patch_profile_updates_display_name_username_and_avatar(monkeypatch: pyt
     assert captured_payload == {
         "display_name": "Alex Morgan",
         "username": "alex-morgan",
+        "phone_number": "+15559876543",
         "avatar_url": "https://example.com/new-avatar.png",
     }
     body = response.json()
     assert body["display_name"] == "Alex Morgan"
     assert body["username"] == "alex-morgan"
+    assert body["phone_number"] == "+15559876543"
     assert body["avatar_url"] == "https://example.com/new-avatar.png"
 
 
@@ -127,13 +133,14 @@ async def test_update_user_profile_maps_api_fields_to_profile_columns(monkeypatc
         filters: dict[str, Any],
     ) -> dict[str, Any] | None:
         assert table == "profiles"
-        assert columns == "id,name,username,avatar_url,created_at,updated_at"
+        assert columns == "id,name,username,avatar_url,created_at,updated_at,phone_number"
         selected_filters.append(filters)
         if "id" in filters:
             return {
                 "id": "user-1",
                 "username": None,
                 "name": None,
+                "phone_number": None,
                 "avatar_url": None,
                 "created_at": None,
                 "updated_at": None,
@@ -152,6 +159,7 @@ async def test_update_user_profile_maps_api_fields_to_profile_columns(monkeypatc
             "id": "user-1",
             "username": payload["username"],
             "name": payload["name"],
+            "phone_number": payload["phone_number"],
             "avatar_url": payload["avatar_url"],
             "created_at": None,
             "updated_at": payload["updated_at"],
@@ -166,6 +174,7 @@ async def test_update_user_profile_maps_api_fields_to_profile_columns(monkeypatc
         {
             "display_name": "Alex Morgan",
             "username": "Alex-Morgan",
+            "phone_number": "(555) 987-6543",
             "avatar_url": "https://example.com/avatar.png",
         },
     )
@@ -177,11 +186,13 @@ async def test_update_user_profile_maps_api_fields_to_profile_columns(monkeypatc
             "name": "Alex Morgan",
             "avatar_url": "https://example.com/avatar.png",
             "username": "alex-morgan",
+            "phone_number": "5559876543",
         }
     ]
     assert response["user_id"] == "user-1"
     assert response["display_name"] == "Alex Morgan"
     assert response["username"] == "alex-morgan"
+    assert response["phone_number"] == "5559876543"
 
 
 @pytest.mark.asyncio
@@ -200,6 +211,7 @@ async def test_update_user_profile_retries_without_updated_at_when_schema_is_beh
             "id": "user-1",
             "username": "alex-dev",
             "name": "Alex Dev",
+            "phone_number": "+15551234567",
             "avatar_url": None,
             "created_at": None,
             "updated_at": None,
@@ -219,6 +231,7 @@ async def test_update_user_profile_retries_without_updated_at_when_schema_is_beh
             "id": "user-1",
             "username": "alex-dev",
             "name": payload["name"],
+            "phone_number": "+15551234567",
             "avatar_url": None,
             "created_at": None,
         }
@@ -287,6 +300,7 @@ async def test_ensure_user_profile_retries_insert_without_timestamps_when_schema
             "id": "user-1",
             "username": "alex-dev",
             "name": "Alex Dev",
+            "phone_number": None,
             "avatar_url": None,
             "created_at": "2026-05-18T00:00:00+00:00",
             "updated_at": "2026-05-18T00:00:00+00:00",
@@ -295,6 +309,7 @@ async def test_ensure_user_profile_retries_insert_without_timestamps_when_schema
             "id": "user-1",
             "username": "alex-dev",
             "name": "Alex Dev",
+            "phone_number": None,
             "avatar_url": None,
         },
     ]
@@ -316,6 +331,7 @@ async def test_update_user_profile_rejects_existing_username_change(monkeypatch:
             "id": "user-1",
             "username": "alex-dev",
             "name": "Alex Dev",
+            "phone_number": None,
             "avatar_url": None,
             "created_at": None,
             "updated_at": None,
