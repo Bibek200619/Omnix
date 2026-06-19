@@ -62,14 +62,14 @@ DROP CONSTRAINT IF EXISTS workspace_members_role_check;
 
 ALTER TABLE workspace_members
 ADD CONSTRAINT workspace_members_role_check
-CHECK (role IN ('owner', 'co_owner', 'member'));
+CHECK (role IN ('owner', 'founder', 'super_founder', 'co_owner', 'team_lead', 'sub_leader', 'sub_member', 'member'));
 
 ALTER TABLE workspace_invites
 DROP CONSTRAINT IF EXISTS workspace_invites_role_check;
 
 ALTER TABLE workspace_invites
 ADD CONSTRAINT workspace_invites_role_check
-CHECK (role IN ('co_owner', 'member'));
+CHECK (role IN ('owner', 'founder', 'super_founder', 'co_owner', 'team_lead', 'sub_leader', 'sub_member', 'member'));
 
 CREATE INDEX IF NOT EXISTS idx_workspace_invites_workspace_status_created_at
 ON workspace_invites(workspace_id, status, created_at DESC);

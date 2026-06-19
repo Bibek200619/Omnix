@@ -214,7 +214,7 @@ export function InviteNotificationBell() {
           setOpen((current) => !current);
           void refreshPendingInvites();
         }}
-        className="relative h-10 w-10 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] sm:h-9 sm:w-9"
+        className="relative h-11 w-11 rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-surface)] text-[var(--omnix-text-2)] hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)]"
       >
         {pendingInvitesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
         {pendingInvites.length > 0 ? (

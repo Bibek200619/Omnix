@@ -26,6 +26,10 @@ const C = {
 
 const FEATURES_HREF = `${String.fromCharCode(35)}features`;
 
+function tint(color: string, percent: number) {
+  return `color-mix(in srgb, ${color} ${percent}%, transparent)`;
+}
+
 // ─── Logo ─────────────────────────────────────────────────────────────────────
 function OmnixMark({ size = 36 }: { size?: number }) {
   return <BrandMark size={size} />;
@@ -579,12 +583,12 @@ function Features() {
           {FEATS.map((f,i)=>(
             <motion.div key={f.title} variants={fadeUp}
               className="relative rounded-2xl p-6 cursor-pointer transition-all duration-300 group overflow-hidden"
-              style={{background:hov===i?`${f.accent}09`:C.card,border:`1px solid ${hov===i?`${f.accent}28`:C.border}`,transform:hov===i?"translateY(-4px)":"translateY(0)",boxShadow:hov===i?`0 24px 64px ${f.accent}14`:"none"}}
+              style={{background:hov===i?tint(f.accent,4):C.card,border:`1px solid ${hov===i?tint(f.accent,16):C.border}`,transform:hov===i?"translateY(-4px)":"translateY(0)",boxShadow:hov===i?`0 24px 64px ${tint(f.accent,8)}`:"none"}}
               onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)}>
               <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                style={{background:`radial-gradient(circle at top right,${f.accent}18,transparent 70%)`}}/>
+                style={{background:`radial-gradient(circle at top right,${tint(f.accent,9)},transparent 70%)`}}/>
               <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5"
-                style={{background:`${f.accent}12`,border:`1px solid ${f.accent}22`}}>
+                style={{background:tint(f.accent,7),border:`1px solid ${tint(f.accent,13)}`}}>
                 <Icon d={f.icon} size={22} stroke={f.accent} sw={1.7}/>
               </div>
               <h3 className="font-black text-base mb-2" style={{color:C.white}}>{f.title}</h3>
@@ -896,10 +900,10 @@ function RetrievalModes() {
               <button key={md.name} onClick={()=>setActive(i)}
                 className="flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all duration-200"
                 style={{
-                  background:active===i?`${md.color}14`:C.card,
-                  border:`1px solid ${active===i?`${md.color}35`:C.border}`,
+                  background:active===i?tint(md.color,8):C.card,
+                  border:`1px solid ${active===i?tint(md.color,21):C.border}`,
                   color:active===i?md.color:C.faint,
-                  boxShadow:active===i?`0 0 24px ${md.color}16`:"none",
+                  boxShadow:active===i?`0 0 24px ${tint(md.color,9)}`:"none",
                 }}>
                 <Icon d={md.icon} size={16} stroke={active===i?md.color:C.faint} sw={1.8}/>
                 {md.name}
@@ -911,10 +915,10 @@ function RetrievalModes() {
               initial={{opacity:0,x:20}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-20}}
               transition={{duration:0.28}}
               className="flex-1 rounded-2xl p-5 sm:p-8"
-              style={{background:`${m.color}06`,border:`1px solid ${m.color}28`,boxShadow:`0 0 40px ${m.color}10`}}>
+              style={{background:tint(m.color,3),border:`1px solid ${tint(m.color,16)}`,boxShadow:`0 0 40px ${tint(m.color,6)}`}}>
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                  style={{background:`${m.color}14`,border:`1px solid ${m.color}28`}}>
+                  style={{background:tint(m.color,8),border:`1px solid ${tint(m.color,16)}`}}>
                   <Icon d={m.icon} size={22} stroke={m.color} sw={1.7}/>
                 </div>
                 <div>
@@ -960,7 +964,7 @@ function Security() {
             {badges.map(b=>(
               <motion.div key={b.label} variants={fadeUp}
                 className="flex items-center gap-2.5 px-5 py-3 rounded-2xl text-sm font-bold"
-                style={{background:`${b.color}0d`,border:`1px solid ${b.color}28`,color:b.color}}>
+                style={{background:tint(b.color,5),border:`1px solid ${tint(b.color,16)}`,color:b.color}}>
                 <Icon d={ICONS.shield} size={15} stroke={b.color} sw={1.8}/>
                 {b.label}
               </motion.div>
@@ -1057,7 +1061,7 @@ function Pricing() {
                 {p.features.map(f=>(
                   <li key={f} className="flex items-start gap-2.5 text-sm">
                     <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                      style={{background:`${p.accent}18`,border:`1px solid ${p.accent}30`}}>
+                      style={{background:tint(p.accent,9),border:`1px solid ${tint(p.accent,19)}`}}>
                       <Icon d={ICONS.check} size={8} stroke={p.accent} sw={2.5}/>
                     </div>
                     <span style={{color:C.muted}}>{f}</span>
@@ -1066,8 +1070,8 @@ function Pricing() {
               </ul>
               <Link href={p.href}
                 className="block w-full py-3.5 rounded-xl text-center font-black text-sm transition-all duration-200"
-                  style={{background:p.popular?C.cyan:"transparent",border:p.popular?"none":`1px solid ${p.accent}50`,color:p.popular?C.navyDark:p.accent}}
-                  onMouseEnter={e=>{if(p.popular){(e.currentTarget as HTMLElement).style.boxShadow=`0 0 40px var(--omnix-rgba-0-255-255-0-5)`;}else{(e.currentTarget as HTMLElement).style.background=`${p.accent}14`;}}}
+                  style={{background:p.popular?C.cyan:"transparent",border:p.popular?"none":`1px solid ${tint(p.accent,31)}`,color:p.popular?C.navyDark:p.accent}}
+                  onMouseEnter={e=>{if(p.popular){(e.currentTarget as HTMLElement).style.boxShadow=`0 0 40px var(--omnix-rgba-0-255-255-0-5)`;}else{(e.currentTarget as HTMLElement).style.background=tint(p.accent,8);}}}
                   onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.boxShadow="none";if(!p.popular)(e.currentTarget as HTMLElement).style.background="transparent";}}>
                   {p.cta}
               </Link>
@@ -1106,15 +1110,15 @@ function TrustLedger() {
             <motion.div key={item.title} variants={fadeUp}
               className="p-6 rounded-2xl flex flex-col gap-5 transition-all duration-300"
               style={{background:C.card,border:`1px solid ${C.border}`}}
-              onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor=`${item.color}28`;(e.currentTarget as HTMLElement).style.transform="translateY(-3px)";}}
+              onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor=tint(item.color,16);(e.currentTarget as HTMLElement).style.transform="translateY(-3px)";}}
               onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor=C.border;(e.currentTarget as HTMLElement).style.transform="translateY(0)";}}>
               <div className="flex items-center justify-between gap-4">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{background:`${item.color}14`,border:`1px solid ${item.color}28`}}>
+                  style={{background:tint(item.color,8),border:`1px solid ${tint(item.color,16)}`}}>
                   <Icon d={item.icon} size={18} stroke={item.color} sw={1.8}/>
                 </div>
                 <div className="rounded-full px-3 py-1 text-xs font-black"
-                  style={{background:`${item.color}12`,border:`1px solid ${item.color}28`,color:item.color}}>
+                  style={{background:tint(item.color,7),border:`1px solid ${tint(item.color,16)}`,color:item.color}}>
                   {item.status}
                 </div>
               </div>

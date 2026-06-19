@@ -240,7 +240,7 @@ export function useChatStream({
         ? await reconcileConversationMessages(targetConversationId, { allowInactiveConversation: true, force: true, silent: true })
         : false;
       if (!recovered) {
-        setError("Unable to send message.");
+        setError("Unable to send message. Check your connection and try again.");
         setMessages((current) =>
           current.map((item) => (item.id === (persistedUserMessageId ?? messageId) ? { ...item, status: "failed", error: "Not sent" } : item)),
         );

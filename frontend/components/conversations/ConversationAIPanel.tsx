@@ -129,7 +129,7 @@ export function ConversationAIPanel({
             type="button"
             onClick={() => void requestAssistance(mode as WorkspaceConversationAssistanceMode)}
             disabled={Boolean(assistanceLoading) || messagesCount === 0}
-            className="inline-flex items-center gap-1 rounded-md border border-cyan-300/12 bg-cyan-300/[0.04] px-2 py-1.5 text-[11px] text-cyan-100/80 transition hover:bg-cyan-300/10 disabled:opacity-40"
+            className="inline-flex min-h-11 items-center gap-1 rounded-md border border-cyan-300/12 bg-cyan-300/[0.04] px-3 text-[11px] text-cyan-100/80 transition hover:bg-cyan-300/10 disabled:opacity-40"
           >
             {assistanceLoading === mode ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
             {label}
@@ -161,7 +161,7 @@ export function ConversationAIPanel({
             <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-purple-100/80">
               <Sparkles className="h-3.5 w-3.5" /> Ambient assistance / {assistance.mode}
             </p>
-            <button type="button" onClick={() => setAssistance(null)} aria-label="Dismiss assistance" title="Dismiss assistance" className="text-white/30 hover:text-white">
+            <button type="button" onClick={() => setAssistance(null)} aria-label="Dismiss assistance" title="Dismiss assistance" className="inline-flex h-11 w-11 items-center justify-center rounded-md text-white/30 hover:bg-white/5 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -172,7 +172,7 @@ export function ConversationAIPanel({
               <button
                 type="button"
                 onClick={() => onOpenTask({ kind: "assistance", assistance })}
-                className="inline-flex items-center gap-1.5 rounded-md border border-purple-300/15 px-2 py-1 text-[11px] text-purple-100/85 transition hover:bg-purple-300/[0.08]"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-purple-300/15 px-3 text-[11px] text-purple-100/85 transition hover:bg-purple-300/[0.08]"
               >
                 <ClipboardCheck className="h-3.5 w-3.5" /> Convert selected action
               </button>

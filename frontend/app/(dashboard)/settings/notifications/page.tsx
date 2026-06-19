@@ -47,7 +47,7 @@ export default function NotificationSettingsPage() {
               </div>
               <Link
                 href={surface.href}
-                className="relative z-10 inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-cyan-300/14 bg-cyan-300/[0.055] px-3 text-sm font-medium text-cyan-100/85 transition hover:border-cyan-300/25 hover:bg-cyan-300/[0.09] active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
+                className="relative z-10 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-cyan-300/14 bg-cyan-300/[0.055] px-3 text-sm font-medium text-cyan-100/85 transition hover:border-cyan-300/25 hover:bg-cyan-300/[0.09] active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
               >
                 {surface.action}
                 <ArrowUpRight className="h-3.5 w-3.5" />

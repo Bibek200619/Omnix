@@ -4,8 +4,8 @@
   "outputDirectory": ".next",
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "https://api.omnix.ai/$1"
+      "source": "/api/:path*",
+      "destination": "https://api.omni-x.co.in/:path*"
     }
   ],
   "headers": [
