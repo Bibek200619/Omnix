@@ -16,6 +16,7 @@ import {
   type DisplayMessage,
   type TaskSource,
   canCreateOperationalChannel,
+  mergeMessage,
 } from "@/components/conversations/conversationUtils";
 import { useWorkspaceConversationSender } from "@/components/conversations/useWorkspaceConversationSender";
 import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
@@ -219,7 +220,7 @@ function WorkspaceConversationSurfaceContent() {
           setMessages((current) => current.map((message) => message.id === incoming.parent_message_id ? { ...message, thread_reply_count: message.thread_reply_count + 1 } : message));
           return;
         }
-        void loadMessages(selectedChannelId);
+        setMessages((current) => mergeMessage(current, incoming));
       }),
     );
     return () => realtimeRegistry.unsubscribe({ type: "channel_messages", workspaceId: activeWorkspaceId, conversationId: selectedChannelId });
