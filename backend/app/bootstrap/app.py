@@ -24,6 +24,10 @@ _DEV_CORS_ORIGINS = (
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
 )
+_PRODUCTION_CORS_ORIGINS = (
+    "https://omni-x.co.in",
+    "https://www.omni-x.co.in",
+)
 
 
 def _is_dev_environment(settings: Any) -> bool:
@@ -87,6 +91,8 @@ def _cors_allowed_origins(settings: Any) -> list[str]:
 
     if is_dev:
         candidates.extend(_DEV_CORS_ORIGINS)
+    else:
+        candidates.extend(_PRODUCTION_CORS_ORIGINS)
 
     origins: list[str] = []
     for candidate in candidates:
