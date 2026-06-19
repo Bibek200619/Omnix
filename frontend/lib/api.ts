@@ -7,8 +7,26 @@ import type {
   WorkspaceSearchResponse,
 } from "@/lib/workspace-types";
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "OMNIX_API_PROXY_TARGET_REDACTED";
+const DEFAULT_API_BASE_URL = "/api";
+
+function normalizeApiBaseUrl(value?: string | null) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return DEFAULT_API_BASE_URL;
+  }
+  return trimmed.replace(/\/+$/, "") || DEFAULT_API_BASE_URL;
+}
+
+function normalizeEndpoint(endpoint: string) {
+  const trimmed = endpoint.trim();
+  return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+}
+
+export const API_BASE_URL = normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
+
+export function apiUrl(endpoint: string) {
+  return `${API_BASE_URL}${normalizeEndpoint(endpoint)}`;
+}
 
 export type ApiStatus = "idle" | "loading" | "success" | "error";
 
@@ -48,6 +66,20 @@ export class ApiError extends Error {
     this.responsePayload = payload.responsePayload;
     this.rawMessage = payload.rawMessage;
   }
+
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      endpoint: this.endpoint,
+      url: this.url,
+      method: this.method,
+      status: this.status,
+      statusText: this.statusText,
+      rawMessage: this.rawMessage,
+      responsePayload: this.responsePayload,
+    };
+  }
 }
 
 function extractErrorMessage(errorData: { detail?: string | { msg?: string }[]; message?: string }) {
@@ -65,14 +97,7 @@ function extractErrorMessage(errorData: { detail?: string | { msg?: string }[]; 
 }
 
 function logApiError(error: ApiError) {
-  console.error("[api] request failed", {
-    error,
-    endpoint: error.endpoint,
-    method: error.method,
-    status: error.status,
-    responsePayload: error.responsePayload,
-    rawMessage: error.rawMessage,
-  });
+  console.error("[api] request failed", error.toJSON());
 }
 
 class ApiClient {
@@ -103,7 +128,8 @@ class ApiClient {
   }
 
   async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const normalizedEndpoint = normalizeEndpoint(endpoint);
+    const url = apiUrl(normalizedEndpoint);
     const token = await this.getAuthToken();
     const headers = new Headers(options.headers);
     const isFormData =
@@ -128,7 +154,7 @@ class ApiClient {
       });
     } catch (exc) {
       const error = new ApiError("Omnix API is unreachable.", {
-        endpoint,
+        endpoint: normalizedEndpoint,
         url,
         method: options.method ?? "GET",
         rawMessage: exc instanceof Error ? exc.message : String(exc),
@@ -144,7 +170,7 @@ class ApiClient {
       };
       await supabase?.auth.signOut();
       const error = new ApiError("Authentication is required.", {
-        endpoint,
+        endpoint: normalizedEndpoint,
         url,
         method: options.method ?? "GET",
         status: response.status,
@@ -163,7 +189,7 @@ class ApiClient {
       };
 
       const error = new ApiError("Omnix API request failed.", {
-        endpoint,
+        endpoint: normalizedEndpoint,
         url,
         method: options.method ?? "GET",
         status: response.status,
@@ -183,7 +209,8 @@ class ApiClient {
    * iterate over response.body as a stream. Does not attempt to parse JSON.
    */
   async stream(endpoint: string, options: RequestInit = {}): Promise<Response> {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const normalizedEndpoint = normalizeEndpoint(endpoint);
+    const url = apiUrl(normalizedEndpoint);
     const token = await this.getAuthToken();
     const headers = new Headers(options.headers);
     const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
@@ -205,7 +232,7 @@ class ApiClient {
       });
     } catch (exc) {
       const error = new ApiError("Omnix API is unreachable.", {
-        endpoint,
+        endpoint: normalizedEndpoint,
         url,
         method: options.method ?? "POST",
         rawMessage: exc instanceof Error ? exc.message : String(exc),
@@ -221,7 +248,7 @@ class ApiClient {
       };
       await supabase?.auth.signOut();
       const error = new ApiError("Authentication is required.", {
-        endpoint,
+        endpoint: normalizedEndpoint,
         url,
         method: options.method ?? "POST",
         status: response.status,
@@ -241,7 +268,7 @@ class ApiClient {
       };
 
       const error = new ApiError("Omnix API request failed.", {
-        endpoint,
+        endpoint: normalizedEndpoint,
         url,
         method: options.method ?? "POST",
         status: response.status,

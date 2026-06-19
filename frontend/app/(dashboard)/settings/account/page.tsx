@@ -211,7 +211,7 @@ export default function AccountSettingsPage() {
                 email={email}
                 handle={handle}
                 avatarUrl={avatarUrl}
-                className="h-24 w-24 border-cyan-300/30 bg-cyan-300/10 text-3xl text-cyan-50 shadow-[0_0_36px_rgba(0,255,255,0.14)]"
+                className="h-24 w-24 border-cyan-300/30 bg-cyan-300/10 text-3xl text-cyan-50 shadow-[0_0_36px_var(--omnix-rgba-0-255-255-0-14)]"
               />
               <div className="min-w-0">
                 <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">

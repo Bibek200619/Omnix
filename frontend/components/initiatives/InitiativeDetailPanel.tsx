@@ -117,7 +117,7 @@ export function InitiativeDetailPanel({
               <button
                 type="button"
                 onClick={onBack}
-                className="flex h-8 items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 text-[10px] font-bold uppercase tracking-wider text-cyan-200"
+                className="flex h-11 items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 text-[10px] font-bold uppercase tracking-wider text-cyan-200"
               >
                 ‹ Back
               </button>
@@ -130,7 +130,7 @@ export function InitiativeDetailPanel({
                   type="button"
                   onClick={() => onMobileTabChange(tab)}
                   className={cn(
-                    "flex-1 rounded-md py-2 text-[10px] font-bold uppercase tracking-wider transition-all",
+                    "min-h-11 flex-1 rounded-md px-2 text-[10px] font-bold uppercase tracking-wider transition-all",
                     mobileTab === tab
                       ? "bg-cyan-400/10 text-cyan-400 shadow-[inset_0_1px_1px_var(--omnix-rgba-255-255-255-0-05)]"
                       : "text-[var(--omnix-text-3)]",
@@ -284,7 +284,7 @@ export function InitiativeDetailPanel({
                         <p className="truncate text-xs font-medium text-white">{task.title}</p>
                         <p className="mt-1 text-[10px] font-bold uppercase tracking-tighter text-[var(--omnix-text-3)]">{task.status}</p>
                       </div>
-                      <button type="button" onClick={() => onDetachTask(task)} className="text-[var(--omnix-text-3)] transition-colors hover:text-rose-400" aria-label="Detach task">
+                      <button type="button" onClick={() => onDetachTask(task)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--omnix-text-3)] transition-colors hover:bg-rose-400/10 hover:text-rose-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/70" aria-label="Detach task">
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -328,7 +328,7 @@ export function InitiativeDetailPanel({
                         <p className="truncate text-xs font-medium text-white">{channel.name}</p>
                         <p className="mt-1 text-[10px] text-[var(--omnix-text-3)]">{channel.message_count} messages recorded</p>
                       </div>
-                      <button type="button" onClick={() => onDetachChannel(channel.id)} className="text-[var(--omnix-text-3)] transition-colors hover:text-rose-400" aria-label="Detach conversation">
+                      <button type="button" onClick={() => onDetachChannel(channel.id)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--omnix-text-3)] transition-colors hover:bg-rose-400/10 hover:text-rose-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/70" aria-label="Detach conversation">
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -371,7 +371,7 @@ export function InitiativeDetailPanel({
                       key={`${resource.resource_type}-${resource.resource_id}`}
                       type="button"
                       onClick={() => onPatchInitiative({ linked_resources: selected.linked_resources.filter((item) => item !== resource) })}
-                      className="inline-flex max-w-full items-center gap-2 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.06] px-3 py-1.5 text-left text-xs text-cyan-100/90 transition-colors hover:bg-cyan-300/10"
+                      className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.06] px-3 text-left text-xs text-cyan-100/90 transition-colors hover:bg-cyan-300/10"
                       title="Remove link"
                     >
                       <span className="shrink-0 text-[10px] font-bold uppercase text-cyan-400/60">{resource.resource_type}</span>

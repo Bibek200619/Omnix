@@ -133,7 +133,7 @@ export function ChatInput({
               </div>
               <button
                 type="button"
-                className="ml-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-cyan-100/55 transition hover:bg-cyan-300/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                className="ml-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-cyan-100/55 transition hover:bg-cyan-300/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
                 aria-label={`Remove ${attachmentName(file)}`}
                 title="Remove attachment"
                 onClick={() => onRemoveAttachment?.(file.id)}

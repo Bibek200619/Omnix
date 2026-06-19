@@ -45,7 +45,7 @@ export function DecisionLifecycleControls({ decision, onUpdate }: DecisionLifecy
           <Button
             size="sm"
             variant="ghost"
-            className="h-8 rounded-full border border-emerald-400/30 bg-emerald-400/[0.08] px-4 text-[10px] font-bold uppercase tracking-widest text-emerald-400 hover:bg-emerald-400/[0.15] hover:text-emerald-300 shadow-[0_2px_10px_var(--omnix-rgba-52-211-153-0-05)]"
+            className="h-11 rounded-full border border-emerald-400/30 bg-emerald-400/[0.08] px-4 text-[10px] font-bold uppercase tracking-widest text-emerald-400 hover:bg-emerald-400/[0.15] hover:text-emerald-300 shadow-[0_2px_10px_var(--omnix-rgba-52-211-153-0-05)]"
             onClick={() => updateStatus("accepted")}
             disabled={!!loading}
             leftIcon={loading === "accepted" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
@@ -55,7 +55,7 @@ export function DecisionLifecycleControls({ decision, onUpdate }: DecisionLifecy
           <Button
             size="sm"
             variant="ghost"
-            className="h-8 rounded-full border border-rose-400/20 bg-rose-400/[0.05] px-4 text-[10px] font-bold uppercase tracking-widest text-rose-400/80 hover:bg-rose-400/[0.1] hover:text-rose-300"
+            className="h-11 rounded-full border border-rose-400/20 bg-rose-400/[0.05] px-4 text-[10px] font-bold uppercase tracking-widest text-rose-400/80 hover:bg-rose-400/[0.1] hover:text-rose-300"
             onClick={() => updateStatus("rejected")}
             disabled={!!loading}
             leftIcon={loading === "rejected" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
@@ -69,7 +69,7 @@ export function DecisionLifecycleControls({ decision, onUpdate }: DecisionLifecy
         <Button
           size="sm"
           variant="ghost"
-          className="h-8 rounded-full border border-amber-400/30 bg-amber-400/[0.08] px-4 text-[10px] font-bold uppercase tracking-widest text-amber-400 hover:bg-amber-400/[0.15] hover:text-amber-300 shadow-[0_2px_10px_var(--omnix-rgba-251-191-36-0-05)]"
+          className="h-11 rounded-full border border-amber-400/30 bg-amber-400/[0.08] px-4 text-[10px] font-bold uppercase tracking-widest text-amber-400 hover:bg-amber-400/[0.15] hover:text-amber-300 shadow-[0_2px_10px_var(--omnix-rgba-251-191-36-0-05)]"
           onClick={() => updateStatus("superseded")}
           disabled={!!loading}
           leftIcon={loading === "superseded" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <History className="h-3.5 w-3.5" />}
@@ -87,4 +87,3 @@ export function DecisionLifecycleControls({ decision, onUpdate }: DecisionLifecy
     </div>
   );
 }
-
