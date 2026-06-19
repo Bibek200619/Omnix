@@ -288,7 +288,7 @@ export async function createWorkspaceRequest(payload: WorkspaceCreatePayload) {
   invalidateWorkspaceTreeQueries();
   const [workspace] = normalizeWorkspaceForest([created]);
   if (!workspace) {
-    throw new Error("Workspace could not be created.");
+    throw new Error("Workspace could not be created. Refresh the workspace list and try again.");
   }
   return workspace;
 }

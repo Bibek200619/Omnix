@@ -69,7 +69,7 @@ export function WorkspaceContinuityProvider({ children }: { children: ReactNode 
         activeWorkspaceIdRef.current === requestWorkspaceId &&
         requestGenerationRef.current === generation
       ) {
-        setError("Unable to load continuity data.");
+        setError("Unable to load continuity data. Check your connection and try again.");
       }
     } finally {
       if (

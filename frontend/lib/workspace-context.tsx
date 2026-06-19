@@ -233,7 +233,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           return;
         }
         logClientError("[workspace] failed to load hierarchy", err, { endpoint: "/workspaces/hierarchy" });
-        setError("Unable to load workspaces.");
+        setError("Unable to load workspaces. Check your connection and try again.");
       } finally {
         if (workspaceFetchIdRef.current === requestId && !options?.silent) {
           setLoading(false);
@@ -267,7 +267,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         if (!options?.silent) {
           logClientError("[workspace] failed to load workspace hierarchy", err, { endpoint: `/workspaces/${normalizedWorkspaceId}/hierarchy` });
-          setError("Unable to load workspaces.");
+          setError("Unable to load workspaces. Check your connection and try again.");
         }
         return null;
       } finally {
@@ -416,7 +416,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           requestGenerationRef.current === generation
         ) {
           setActiveMembers([]);
-          setMembersError("Unable to load team members.");
+          setMembersError("Unable to load team members. Check your connection and try again.");
         }
       } finally {
         if (
@@ -513,7 +513,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           requestGenerationRef.current === generation
         ) {
           setActiveWorkspaceIntelligence(null);
-          setIntelligenceError("Unable to load workspace intelligence.");
+          setIntelligenceError("Unable to load workspace intelligence. Please try again in a moment.");
         }
         return null;
       } finally {

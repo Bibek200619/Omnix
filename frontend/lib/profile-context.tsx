@@ -54,7 +54,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setError(null);
     } catch (err) {
       logClientError("Failed to load profile", err, { endpoint: "/profile" });
-      setError("Unable to load profile.");
+      setError("Unable to load profile. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
