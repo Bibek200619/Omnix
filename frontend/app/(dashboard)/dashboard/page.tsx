@@ -7,9 +7,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
-  BrainCircuit,
+  BarChart3,
   Database,
-  FileText,
   History,
   MessageSquare,
   Sparkles,
@@ -20,8 +19,8 @@ import {
   ChevronRight,
   Layers3,
   ShieldCheck,
+  UploadCloud,
 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
 import { PageTitle } from "@/components/ui/Typography";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
@@ -95,39 +94,6 @@ function DashboardPageContent() {
 
   const actions = [
     {
-      label: "Analyze Document",
-      desc: "Upload and query source material",
-      icon: FileText,
-      color: "var(--omnix-blue)",
-      surface: "var(--omnix-rgba-51-102-255-0-18)",
-      border: "var(--omnix-rgba-51-102-255-0-28)",
-      glow: "var(--omnix-rgba-51-102-255-0-18)",
-      iconGlow: "var(--omnix-rgba-51-102-255-0-8)",
-      href: "/sources",
-    },
-    {
-      label: "Start AI Chat",
-      desc: "Open a collaborative thread",
-      icon: Sparkles,
-      color: "var(--omnix-cyan)",
-      surface: "var(--omnix-rgba-0-255-255-0-18)",
-      border: "var(--omnix-rgba-0-255-255-0-28)",
-      glow: "var(--omnix-rgba-0-255-255-0-18)",
-      iconGlow: "var(--omnix-rgba-0-255-255-0-8)",
-      href: "/chat",
-    },
-    {
-      label: "Deep Research",
-      desc: "Use web and workspace context",
-      icon: BrainCircuit,
-      color: "var(--omnix-purple)",
-      surface: "var(--omnix-rgba-155-92-255-0-18)",
-      border: "var(--omnix-rgba-155-92-255-0-28)",
-      glow: "var(--omnix-rgba-155-92-255-0-18)",
-      iconGlow: "var(--omnix-rgba-155-92-255-0-8)",
-      href: "/chat",
-    },
-    {
       label: "Workspace Map",
       desc: "Review hierarchy and subspaces",
       icon: Database,
@@ -153,47 +119,104 @@ function DashboardPageContent() {
 
   const recent = conversations.slice(0, 4);
   const recentWorkspaces = workspaces.slice(0, 4);
+  const workspacePulse = [
+    {
+      label: "Live Members",
+      value: presence?.active_count ?? presence?.online_count ?? 0,
+      detail: "connected now",
+      icon: Activity,
+      accent: "var(--omnix-green)",
+      fill: Math.min(((presence?.active_count ?? presence?.online_count ?? 0) / 8) * 100, 100),
+    },
+    {
+      label: "AI Sessions",
+      value: conversations.length,
+      detail: recent.length ? "recent threads" : "ready to start",
+      icon: MessageSquare,
+      accent: "var(--omnix-cyan)",
+      fill: Math.min((conversations.length / 12) * 100, 100),
+    },
+    {
+      label: "Activity",
+      value: activity.length,
+      detail: loadingActivity ? "syncing updates" : "latest events",
+      icon: Zap,
+      accent: "var(--omnix-amber)",
+      fill: loadingActivity ? 62 : Math.min((activity.length / 12) * 100, 100),
+    },
+    {
+      label: "Workspace Roots",
+      value: workspaces.length,
+      detail: "available spaces",
+      icon: Layers3,
+      accent: "var(--omnix-purple)",
+      fill: Math.min((workspaces.length / 8) * 100, 100),
+    },
+  ];
+
+  const heroActions = [
+    { label: "Start Chat", href: "/chat", icon: Sparkles, variant: "primary" },
+    { label: "Upload Sources", href: "/sources", icon: UploadCloud, variant: "secondary" },
+    { label: "View Report", href: "/analytics", icon: BarChart3, variant: "ghost" },
+  ];
 
   return (
     <section className="omnix-page-frame omnix-scrollbar">
       <div className="omnix-content-max flex flex-col gap-4 sm:gap-6">
 
-        <div className="relative overflow-hidden rounded-[18px] border border-[var(--omnix-rgba-0-255-255-0-12)] bg-[radial-gradient(circle_at_12%_0%,var(--omnix-rgba-0-255-255-0-16),transparent_32%),linear-gradient(145deg,var(--omnix-rgba-8-20-36-0-94),var(--omnix-rgba-6-9-18-0-86))] p-4 shadow-[0_30px_110px_var(--omnix-rgba-0-0-0-0-38),var(--omnix-glow-xs)] sm:rounded-[28px] sm:p-7">
-          <div
-            className="pointer-events-none absolute inset-0 w-2/5 bg-[linear-gradient(90deg,transparent,var(--omnix-rgba-0-255-255-0-08),transparent)]"
-            style={{ animation: "omnix-sheen-sweep 4s cubic-bezier(0.4, 0, 0.2, 1) infinite" }}
-          />
-          <div className="pointer-events-none absolute right-[-7rem] top-[-8rem] h-80 w-80 rounded-full bg-purple-400/10 blur-[95px]" />
+        <div className="omnix-dashboard-hero omnix-page-enter">
+          <div className="omnix-dashboard-grid" />
+          <div className="omnix-dashboard-sheen" />
           <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
               <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/18 bg-cyan-300/8 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">
                 <Sparkles className="h-3.5 w-3.5" />
                 Omnix command center
               </p>
-            <PageTitle className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/[0.08] shadow-[var(--omnix-glow-sm)]">
-                <Sparkles className="h-4 w-4 text-[var(--omnix-cyan)] drop-shadow-[0_0_10px_var(--omnix-rgba-0-255-255-0-9)]" />
-              </span>
-              <span className="omnix-gradient-text">{activeWorkspace?.name ?? "Workspace Overview"}</span>
-            </PageTitle>
-            <p className="omnix-page-subtitle">
-              A real-time operating surface for workspace knowledge, AI sessions, hierarchy, and team access.
-            </p>
+              <PageTitle className="flex items-center gap-3 text-balance">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/[0.08] shadow-[var(--omnix-glow-sm)]">
+                  <Sparkles className="h-4 w-4 text-[var(--omnix-cyan)] drop-shadow-[0_0_10px_var(--omnix-rgba-0-255-255-0-9)]" />
+                </span>
+                <span className="omnix-gradient-text break-words">{activeWorkspace?.name ?? "Workspace Overview"}</span>
+              </PageTitle>
+              <p className="omnix-page-subtitle hidden max-w-3xl text-pretty sm:block">
+                A real-time operating surface for workspace knowledge, AI sessions, hierarchy, and team access.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 sm:mt-5">
+                {heroActions.map((action) => {
+                  const Icon = action.icon;
+                  return (
+                    <button
+                      key={action.label}
+                      type="button"
+                      onClick={() => router.push(action.href)}
+                      className={cn(
+                        "omnix-dashboard-hero-action group",
+                        action.variant === "primary" && "omnix-dashboard-hero-action-primary",
+                        action.variant === "secondary" && "omnix-dashboard-hero-action-secondary",
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{action.label}</span>
+                      <ChevronRight className="h-3.5 w-3.5 opacity-60 transition-transform duration-150 ease-out group-hover:translate-x-0.5" />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:min-w-[28rem]">
+            <div className="grid grid-cols-3 gap-2 xl:min-w-[28rem]">
               {[
                 { label: "Role", value: workspaceRoleLabel(activeWorkspace?.current_user_role), icon: ShieldCheck },
                 { label: "Access", value: activeWorkspace?.is_shared ? "Shared" : "Private", icon: Users },
                 { label: "Roots", value: workspaces.length, icon: Layers3 },
-              ].map((item, i) => {
+              ].map((item) => {
                 const Icon = item.icon;
                 return (
                   <div key={item.label} className={cn(
-                    "rounded-xl border border-white/[0.07] bg-white/[0.035] p-3 transition-colors hover:bg-white/[0.05]",
-                    i === 2 && "col-span-2 sm:col-span-1"
+                    "min-w-0 rounded-xl border border-white/[0.07] bg-white/[0.035] p-2.5 transition-colors duration-150 ease-out hover:bg-white/[0.05] sm:p-3"
                   )}>
-                    <Icon className="h-4 w-4 text-cyan-200" />
-                    <div className="mt-3 text-[10px] uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">{item.label}</div>
+                    <Icon className="h-3.5 w-3.5 text-cyan-200 sm:h-4 sm:w-4" />
+                    <div className="mt-2 truncate text-[9px] uppercase tracking-[0.12em] text-[var(--omnix-text-3)] sm:mt-3 sm:text-[10px]">{item.label}</div>
                     <div className="mt-1 truncate text-sm font-semibold text-white">{item.value}</div>
                   </div>
                 );
@@ -202,16 +225,34 @@ function DashboardPageContent() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            leftIcon={<Activity className="h-4 w-4 text-[var(--omnix-cyan)]" />}
-            onClick={() => router.push("/analytics")}
-            className="omnix-ghost-action shrink-0 border-[var(--omnix-border)] bg-[var(--omnix-surface)]"
-          >
-            View Full Report
-          </Button>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {workspacePulse.map((item, i) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => router.push(i === 1 ? "/history" : i === 2 ? "/workspace" : "/analytics")}
+                className={cn("omnix-dashboard-metric group/dashboard-metric omnix-page-enter text-left", pageEnterDelay(i + 1))}
+                style={{ "--metric-accent": item.accent, "--metric-fill": `${item.fill}%` } as CSSProperties}
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span className="omnix-dashboard-metric-icon">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-[var(--omnix-text-3)] transition-transform duration-150 ease-out group-hover/dashboard-metric:-translate-y-0.5 group-hover/dashboard-metric:translate-x-0.5" />
+                </span>
+                <span className="mt-4 block text-2xl font-semibold tabular-nums text-white">{item.value}</span>
+                <span className="mt-1 flex min-w-0 items-center justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-semibold uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">{item.label}</span>
+                    <span className="mt-1 block truncate text-xs text-[var(--omnix-text-2)]">{item.detail}</span>
+                  </span>
+                </span>
+                <span className="omnix-dashboard-meter" />
+              </button>
+            );
+          })}
         </div>
 
         <WorkspaceIntelligencePanel
@@ -245,7 +286,7 @@ function DashboardPageContent() {
                   <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-amber-300/25 bg-amber-300/10">
                     <Zap className="h-3.5 w-3.5 text-amber-300 drop-shadow-[0_0_6px_var(--omnix-rgba-255-184-0-8)]" />
                   </span>
-                  Quick Actions
+                  Workspace Shortcuts
                 </h2>
                 <span className="omnix-dot-badge" />
               </div>
@@ -257,7 +298,7 @@ function DashboardPageContent() {
                       key={action.label}
                       type="button"
                       onClick={() => router.push(action.href)}
-                      className={cn("omnix-command-button omnix-page-enter group relative z-10 flex items-center gap-4 p-4 text-left", pageEnterDelay(i + 3))}
+                      className={cn("omnix-command-button omnix-page-enter group relative z-10 flex items-center gap-4 p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas", pageEnterDelay(i + 3))}
                       style={{
                         "--command-color": action.color,
                       } as CSSProperties}
@@ -267,7 +308,7 @@ function DashboardPageContent() {
                         style={{ animation: "omnix-sheen-sweep 4s cubic-bezier(0.4, 0, 0.2, 1) infinite" }}
                       />
                       <span
-                        className="rounded-xl p-2.5 transition-all duration-200 group-hover:scale-110"
+                        className="rounded-xl p-2.5 transition-transform duration-150 ease-out group-hover:scale-105"
                         style={{
                           background: action.surface,
                           border: `1px solid ${action.border}`,
@@ -282,7 +323,7 @@ function DashboardPageContent() {
                         </span>
                         <span className="mt-0.5 block text-xs text-[var(--omnix-text-3)]">{action.desc}</span>
                       </span>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--omnix-text-3)] opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100" />
+                      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--omnix-text-3)] opacity-0 transition-[opacity,transform] duration-150 ease-out group-hover:translate-x-0.5 group-hover:opacity-100" />
                     </button>
                   );
                 })}
@@ -301,7 +342,7 @@ function DashboardPageContent() {
                 <button
                   type="button"
                   onClick={() => router.push("/history")}
-                  className="flex items-center gap-1 text-xs font-semibold text-[var(--omnix-cyan)] transition hover:text-white"
+                  className="flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-semibold text-[var(--omnix-cyan)] transition-colors duration-150 ease-out hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                 >
                   View all <ArrowUpRight className="h-3 w-3" />
                 </button>
@@ -313,7 +354,7 @@ function DashboardPageContent() {
                     type="button"
                     onClick={() => router.push(`/chat?conversation=${chat.id}`)}
                     className={cn(
-                      "group relative z-10 flex w-full items-center justify-between gap-3 rounded-[var(--omnix-radius-sm)] border border-transparent p-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)]",
+                      "group relative z-10 flex w-full items-center justify-between gap-3 rounded-[var(--omnix-radius-sm)] border border-transparent p-3 text-left transition-[border-color,background-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-0.5 hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
                       "omnix-page-enter",
                       pageEnterDelay(i + 4),
                     )}
@@ -340,7 +381,7 @@ function DashboardPageContent() {
                     <button
                       type="button"
                       onClick={() => router.push("/chat")}
-                      className="omnix-primary-action mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold"
+                      className="omnix-primary-action mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                     >
                       <Sparkles className="h-3.5 w-3.5" /> Start Chat
                     </button>
@@ -364,9 +405,9 @@ function DashboardPageContent() {
                     key={workspace.id}
                     type="button"
                     onClick={() => router.push("/workspace")}
-                    className="flex w-full items-center gap-3 rounded-xl border border-[var(--omnix-border)] bg-black/15 px-3 py-3 text-left transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)]"
+                    className="group flex w-full items-center gap-3 rounded-xl border border-[var(--omnix-border)] bg-black/15 px-3 py-3 text-left transition-[border-color,background-color,transform] duration-150 ease-out hover:-translate-y-0.5 hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                   >
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-300/10 text-sm font-bold text-cyan-100">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-300/10 text-sm font-bold text-cyan-100 transition-transform duration-150 ease-out group-hover:scale-105">
                       {workspace.name.charAt(0).toUpperCase()}
                     </span>
                     <span className="min-w-0 flex-1">

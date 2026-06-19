@@ -13,6 +13,7 @@ export const supabase: SupabaseClient | null =
           autoRefreshToken: true,
           detectSessionInUrl: false,
           flowType: "pkce",
+          storageKey: "omnix.supabase.auth",
         },
       })
     : null;
