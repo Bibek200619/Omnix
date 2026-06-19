@@ -156,9 +156,19 @@ export function MessageThread({
   selectedChannel,
   sending,
 }: MessageThreadProps) {
+  function sendDraft() {
+    const content = draft.trim();
+    if (!content || !mayPost || sending) return;
+    const mentions = draftMentions;
+    onDraftChange("");
+    onDraftMentionsChange([]);
+    onTypingChange(false);
+    onSend(content, undefined, mentions);
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onSend(draft, undefined, draftMentions);
+    sendDraft();
   }
 
   return (
@@ -207,7 +217,7 @@ export function MessageThread({
           onKeyDown={(event) => {
             if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
               event.preventDefault();
-              onSend(draft, undefined, draftMentions);
+              sendDraft();
             }
           }}
           placeholder={
