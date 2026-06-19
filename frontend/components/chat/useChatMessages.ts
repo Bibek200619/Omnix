@@ -162,7 +162,7 @@ export function useChatMessages({
       logClientError("Failed to load conversation", err, { endpoint: `/conversations/${convId}/messages` });
       const rawMessage = err instanceof ApiError ? err.rawMessage ?? "" : "";
       const missingConversation = err instanceof ApiError && (err.status === 404 || /conversation not found/i.test(rawMessage));
-      setError("Unable to load conversation.");
+      setError("Unable to load conversation. Check your connection and try again.");
       if (missingConversation) {
         setMessages([]);
         currentConversationRef.current = null;

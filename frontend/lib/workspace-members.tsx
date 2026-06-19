@@ -91,7 +91,7 @@ export async function acceptWorkspaceInvite(inviteId: string): Promise<Workspace
   const created = await apiClient.post<WorkspaceApiRecord>(`/workspace-invites/${inviteId}/accept`);
   const [workspace] = normalizeWorkspaceForest([created]);
   if (!workspace) {
-    throw new Error("Invite was accepted, but the workspace could not be loaded.");
+    throw new Error("Invite was accepted, but the workspace could not be loaded. Refresh the workspace list and try again.");
   }
   return workspace;
 }

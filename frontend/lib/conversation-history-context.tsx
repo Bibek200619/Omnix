@@ -136,7 +136,7 @@ export function ConversationHistoryProvider({
           requestGenerationRef.current === generation
         ) {
           logClientError("Failed to load conversations", err, { endpoint: "/conversations" });
-          setError("Unable to load conversations.");
+          setError("Unable to load conversations. Check your connection and try again.");
           if (!options?.silent) {
             setConversations([]);
           }
