@@ -7,10 +7,12 @@ import { Alert } from "@/components/ui/Alert";
 import { LoadingButton } from "@/components/ui/LoadingButton";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import {
+  AUTH_C,
   AUTH_ICONS,
   AuthIcon,
   AuthInput,
 } from "@/components/auth/OmnixAuthVisuals";
+import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api";
 import { authLink, redirectFromWindow } from "@/lib/auth-redirects";
 import { useAuth } from "@/lib/auth-context";
@@ -23,6 +25,7 @@ export function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ handle?: string; email?: string; phone?: string; password?: string }>({});
+  const [phoneCountryCode, setPhoneCountryCode] = useState("+1");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -37,7 +40,8 @@ export function RegisterForm() {
     const email = String(formData.get("email") ?? "").trim();
     const phone = String(formData.get("phone") ?? "").trim();
     const password = String(formData.get("password") ?? "");
-    const normalizedPhone = phone.replace(/[\s().-]+/g, "");
+    const phoneDigits = phone.replace(/\D/g, "");
+    const normalizedPhone = `${phoneCountryCode}${phoneDigits}`;
     const nextFieldErrors: { handle?: string; email?: string; phone?: string; password?: string } = {};
 
     if (!/^[a-z0-9][a-z0-9_-]{2,29}$/.test(handle)) {
@@ -46,10 +50,10 @@ export function RegisterForm() {
     if (!email) {
       nextFieldErrors.email = "Enter your email address.";
     }
-    if (!normalizedPhone) {
+    if (!phoneDigits) {
       nextFieldErrors.phone = "Enter your phone number.";
-    } else if (!/^\+?[1-9]\d{6,19}$/.test(normalizedPhone)) {
-      nextFieldErrors.phone = "Use 7-20 digits, with + allowed at the start.";
+    } else if (!/^\+[1-9]\d{6,19}$/.test(normalizedPhone)) {
+      nextFieldErrors.phone = "Choose a country code and enter 6-20 digits.";
     }
     if (!password) {
       nextFieldErrors.password = "Create a password.";
@@ -98,9 +102,9 @@ export function RegisterForm() {
           phone_number: normalizedPhone,
         });
 
-        // Send welcome email — failures must not block signup
+        // Send welcome email - failures must not block signup
         try {
-          await apiClient.post("/email/welcome", { email, name });
+          await apiClient.post("/email/welcome");
         } catch (emailErr) {
           logClientError("Welcome email request failed", emailErr);
         }
@@ -181,19 +185,55 @@ export function RegisterForm() {
         disabled={loading || !isConfigured}
         error={fieldErrors.email}
       />
-      <AuthInput
-        id="phone"
-        name="phone"
-        label="Phone number"
-        type="tel"
-        autoComplete="tel"
-        placeholder="+1 555 123 4567"
-        required
-        icon={<AuthIcon d={AUTH_ICONS.phone} size={16} stroke="currentColor" sw={1.8} />}
-        hint="Used to complete your account profile."
-        disabled={loading || !isConfigured}
-        error={fieldErrors.phone}
-      />
+      <label className="group flex flex-col gap-1.5" htmlFor="phone">
+        <span className="text-xs font-bold" style={{ color: AUTH_C.muted }}>
+          Phone number
+        </span>
+        <span className="relative flex rounded-xl border border-white/[0.08] bg-white/[0.04] transition-all duration-200 hover:border-white/[0.16] focus-within:border-cyan-300/40 focus-within:bg-white/[0.055] focus-within:ring-2 focus-within:ring-cyan-300/10">
+          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 transition-colors group-focus-within:text-cyan-300">
+            <AuthIcon d={AUTH_ICONS.phone} size={16} stroke="currentColor" sw={1.8} />
+          </span>
+          <select
+            aria-label="Country code"
+            value={phoneCountryCode}
+            onChange={(event) => setPhoneCountryCode(event.target.value)}
+            disabled={loading || !isConfigured}
+            className="ml-10 my-2 h-9 w-[84px] shrink-0 rounded-md border border-white/[0.08] bg-black/20 px-2 text-xs font-semibold text-cyan-100 outline-none transition hover:border-white/[0.16] focus:border-cyan-300/40 disabled:cursor-not-allowed disabled:opacity-55"
+          >
+            <option value="+1">US +1</option>
+            <option value="+91">IN +91</option>
+            <option value="+44">UK +44</option>
+            <option value="+61">AU +61</option>
+            <option value="+971">AE +971</option>
+            <option value="+977">NP +977</option>
+            <option value="+81">JP +81</option>
+            <option value="+49">DE +49</option>
+          </select>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            autoComplete="tel-national"
+            placeholder="555 123 4567"
+            required
+            aria-describedby={fieldErrors.phone ? "phone-error" : undefined}
+            aria-invalid={fieldErrors.phone ? true : undefined}
+            disabled={loading || !isConfigured}
+            className={cn(
+              "min-w-0 flex-1 rounded-r-xl bg-transparent py-3 pl-3 pr-4 text-sm text-white outline-none transition-all duration-200",
+              "placeholder:text-white/30 disabled:cursor-not-allowed disabled:opacity-55",
+            )}
+          />
+        </span>
+        <span className="text-xs leading-5" style={{ color: AUTH_C.faint }}>
+          Used to complete your account profile.
+        </span>
+        {fieldErrors.phone ? (
+          <span id="phone-error" className="text-xs leading-5 text-rose-200">
+            {fieldErrors.phone}
+          </span>
+        ) : null}
+      </label>
       <AuthInput
         id="password"
         name="password"

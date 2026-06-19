@@ -86,7 +86,7 @@ export function useChatStream({
     }, 2000);
   }, [clearStreamAnnouncerTimer]);
 
-  useEffect(() => void (respondingRef.current = responding), [responding]);
+  useEffect(() => void (respondingRef.current = responding), [responding, respondingRef]);
   useEffect(() => {
     return () => {
       clearStreamAnnouncerTimer();
@@ -226,10 +226,6 @@ export function useChatStream({
       await readChatStream(reader, handleStreamEvent, streamAbortController);
       flushPendingTokens();
 
-      const targetConversationId = streamConversationId || currentConversationRef.current;
-      if (targetConversationId) {
-        await reconcileConversationMessages(targetConversationId, { allowInactiveConversation: true, force: true, silent: true });
-      }
       await refreshConversations({ force: true, silent: true });
     } catch (err) {
       if (mountedRef.current) flushPendingTokens();

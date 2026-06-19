@@ -50,8 +50,8 @@ export function messageIdentity(message: WorkspaceChannelMessage) {
 export function readableTime(value?: string | null) {
   if (!value) return "";
   return new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
+    dateStyle: "medium",
+    timeStyle: "short",
   }).format(new Date(value));
 }
 

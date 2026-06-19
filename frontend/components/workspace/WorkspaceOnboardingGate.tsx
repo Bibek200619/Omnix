@@ -30,6 +30,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { UploadDropzone } from "@/components/upload/UploadDropzone";
 import type { MessageAttachment } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
+import type { User } from "@supabase/supabase-js";
 
 type WorkspaceOnboardingGateProps = {
   children: ReactNode;
@@ -80,6 +81,19 @@ function userLabel(email?: string | null) {
 
 function inviteLabel(invite: WorkspaceInvite) {
   return invite.workspace_name || invite.email || "Workspace invitation";
+}
+
+function isLikelyFirstAuthSession(user: User | null) {
+  if (!user?.created_at) return false;
+
+  const createdAt = new Date(user.created_at).getTime();
+  const lastSignInAt = user.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : createdAt;
+
+  if (!Number.isFinite(createdAt) || !Number.isFinite(lastSignInAt)) {
+    return false;
+  }
+
+  return Math.abs(lastSignInAt - createdAt) < 5 * 60 * 1000;
 }
 
 export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGateProps) {
@@ -133,20 +147,22 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
 
   useEffect(() => {
     setOnboardingComplete(readOnboardingCompleted(user?.id));
+    setOnboardingWorkspaceId(null);
+    setStep("account");
   }, [user?.id]);
 
   useEffect(() => {
     if (loading) {
       return;
     }
-    if (!loading && !hasWorkspaces && !error) {
-      setStep("account");
-    }
     if (workspaceLoadFailed) {
       setStep("workspace");
       return;
     }
     if (hasWorkspaces && !onboardingComplete && !onboardingWorkspaceId && step === "account") {
+      if (isLikelyFirstAuthSession(user)) {
+        return;
+      }
       markOnboardingCompleted(user?.id);
       setOnboardingComplete(true);
       return;
@@ -155,7 +171,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       setOnboardingWorkspaceId((current) => current ?? activeWorkspace?.id ?? activeWorkspaceId ?? workspaces[0]?.id ?? null);
       setStep((current) => (current === "account" || current === "workspace" ? "team" : current));
     }
-  }, [activeWorkspace?.id, activeWorkspaceId, error, hasWorkspaces, loading, onboardingComplete, onboardingWorkspaceId, step, user?.id, workspaceLoadFailed, workspaces]);
+  }, [activeWorkspace?.id, activeWorkspaceId, error, hasWorkspaces, loading, onboardingComplete, onboardingWorkspaceId, step, user, workspaceLoadFailed, workspaces]);
 
   const isBlocked = !loading && (workspaceLoadFailed || !hasWorkspaces || !onboardingComplete);
   const onboardingTrapRef = useFocusTrap<HTMLElement>(isBlocked);
