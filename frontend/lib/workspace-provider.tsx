@@ -88,8 +88,10 @@ type DestructiveConfirmation = {
   resolve: (confirmed: boolean) => void;
 };
 
-function workspaceStorageKey() {
-  return "omnix.activeWorkspaceId";
+const LEGACY_WORKSPACE_STORAGE_KEY = "omnix.activeWorkspaceId";
+
+function workspaceStorageKey(userId?: string | null) {
+  return userId ? `${LEGACY_WORKSPACE_STORAGE_KEY}.${userId}` : null;
 }
 
 const WORKSPACE_SILENT_REFRESH_MIN_MS = 15_000;
@@ -188,16 +190,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setApiWorkspaceId(id);
     try {
       if (typeof window !== "undefined") {
+        const storageKey = workspaceStorageKey(userId);
+        window.localStorage.removeItem(LEGACY_WORKSPACE_STORAGE_KEY);
+        if (!storageKey) {
+          return;
+        }
         if (id) {
-          window.localStorage.setItem(workspaceStorageKey(), id);
+          window.localStorage.setItem(storageKey, id);
         } else {
-          window.localStorage.removeItem(workspaceStorageKey());
+          window.localStorage.removeItem(storageKey);
         }
       }
     } catch {
       // ignore
     }
-  }, []);
+  }, [userId]);
 
   const refreshWorkspaces = useCallback(async (options?: RefreshOptions) => {
     const now = Date.now();
@@ -864,10 +871,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!userId) {
       workspaceFetchIdRef.current += 1;
       createWorkspaceInFlightRef.current.clear();
+      workspaceRefreshInFlightRef.current = null;
       workspaceTreeRefreshInFlightRef.current.clear();
       subspaceRefreshInFlightRef.current.clear();
+      pendingInvitesInFlightRef.current = null;
       activeWorkspaceDataInFlightRef.current = null;
       workspaceIntelligenceInFlightRef.current = null;
+      lastWorkspaceRefreshAtRef.current = 0;
+      lastPendingInvitesRefreshAtRef.current = 0;
+      lastActiveWorkspaceDataRefreshAtRef.current = 0;
       setWorkspaces([]);
       setActiveWorkspace(null);
       setActiveMembers([]);
@@ -882,11 +894,37 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    workspaceFetchIdRef.current += 1;
+    createWorkspaceInFlightRef.current.clear();
+    workspaceRefreshInFlightRef.current = null;
+    workspaceTreeRefreshInFlightRef.current.clear();
+    subspaceRefreshInFlightRef.current.clear();
+    pendingInvitesInFlightRef.current = null;
+    activeWorkspaceDataInFlightRef.current = null;
+    workspaceIntelligenceInFlightRef.current = null;
+    lastWorkspaceRefreshAtRef.current = 0;
+    lastPendingInvitesRefreshAtRef.current = 0;
+    lastActiveWorkspaceDataRefreshAtRef.current = 0;
+    setWorkspaces([]);
+    setActiveWorkspaceId(null);
+    setApiWorkspaceId(null);
+    setActiveMembers([]);
+    setActiveInvites([]);
+    setPendingInvites([]);
+    setActiveWorkspaceIntelligence(null);
+    setIntelligenceError(null);
+    setMembersError(null);
+    setSubspaceLoadingByParentId({});
+    setSubspaceErrorByParentId({});
+    setError(null);
+    setLoading(true);
+
     refreshWorkspaces({ force: true });
     refreshPendingInvites({ force: true });
 
     try {
-      const saved = typeof window !== "undefined" ? window.localStorage.getItem(workspaceStorageKey()) : null;
+      const storageKey = workspaceStorageKey(userId);
+      const saved = typeof window !== "undefined" && storageKey ? window.localStorage.getItem(storageKey) : null;
       logger.debug("[workspace] hydration read saved active workspace", { saved });
       setApiWorkspaceId(saved);
       if (saved) {
