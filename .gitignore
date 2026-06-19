@@ -98,4 +98,8 @@ fix_*.js
 
 # Local agent tooling
 .agents/
+.claude/
+.codex/
+ANTIGRAVITY.md
+CLAUDE.md
 skills-lock.json

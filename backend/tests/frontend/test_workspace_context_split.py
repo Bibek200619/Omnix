@@ -5,7 +5,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FRONTEND_ROOT = REPO_ROOT / "frontend"
-WORKSPACE_CONTEXT = FRONTEND_ROOT / "lib" / "workspace-context.tsx"
+WORKSPACE_CONTEXT = FRONTEND_ROOT / "lib" / "workspace-provider.tsx"
 
 
 def read_frontend(relative_path: str) -> str:
