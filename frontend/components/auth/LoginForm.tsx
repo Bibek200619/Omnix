@@ -11,6 +11,7 @@ import {
   AuthIcon,
   AuthInput,
 } from "@/components/auth/OmnixAuthVisuals";
+import { apiClient } from "@/lib/api";
 import { authLink, redirectFromWindow } from "@/lib/auth-redirects";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
@@ -76,6 +77,11 @@ export function LoginForm() {
       }
 
       await refreshSession();
+      try {
+        await apiClient.post("/email/welcome");
+      } catch (emailErr) {
+        logClientError("Welcome email request failed", emailErr);
+      }
       router.replace(redirectFromWindow());
     } catch (err) {
       logClientError("Unexpected sign in failure", err);
