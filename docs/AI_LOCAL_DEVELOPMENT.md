@@ -23,10 +23,10 @@ Backend `.env`:
 ENV=dev
 DEV_MODE=true
 
-SUPABASE_URL=SUPABASE_URL_REDACTED
+SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your_public_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_backend_only_service_role_key
-SUPABASE_JWKS_URL=SUPABASE_JWKS_URL_REDACTED
+SUPABASE_JWKS_URL=https://your-project.supabase.co/auth/v1/.well-known/jwks.json
 
 REDIS_URL=redis://localhost:6379/0
 
@@ -46,7 +46,7 @@ HYBRID_POOL_SIZE=6
 Frontend `.env.local`:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=SUPABASE_URL_REDACTED
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_public_anon_key
 NEXT_PUBLIC_API_BASE_URL=http://18.204.231.209
 ```
@@ -190,7 +190,7 @@ NEXT_PUBLIC_API_BASE_URL=http://18.204.231.209
 After `api.omni-x.co.in` is configured with HTTPS, switch Vercel to:
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=OMNIX_API_PROXY_TARGET_REDACTED
+NEXT_PUBLIC_API_BASE_URL=https://api.omni-x.co.in
 ```
 
 ## Rollback
