@@ -1,9 +1,24 @@
-# Environment variables
+# ──────────────────────────────────────────────
+# Environment & Secrets
+# ──────────────────────────────────────────────
 .env
 .env.*
-!.env.example
+!**/.env.example
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+*.jks
+*.keystore
+**/serviceAccount*.json
+**/credentials*.json
+**/secret*.json
+.env.keys
 
+# ──────────────────────────────────────────────
 # Logs
+# ──────────────────────────────────────────────
 *.log
 *.log.*
 logs/
@@ -11,15 +26,23 @@ debug.log*
 *.pid
 *.pid.lock
 
+# ──────────────────────────────────────────────
 # IDEs and Editors
+# ──────────────────────────────────────────────
 .idea/
 .vscode/
 .fleet/
+.zed/
 *.iml
 *.swp
 *.swo
+*~
+*.sublime-project
+*.sublime-workspace
 
+# ──────────────────────────────────────────────
 # OS generated files
+# ──────────────────────────────────────────────
 .DS_Store
 .DS_Store?
 ._*
@@ -27,12 +50,24 @@ debug.log*
 .Trashes
 ehthumbs.db
 Thumbs.db
+Desktop.ini
 
+# ──────────────────────────────────────────────
 # Python / Backend
+# ──────────────────────────────────────────────
 __pycache__/
 *.pyc
 *.py[cod]
 *$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+sdist/
+develop-eggs/
+.installed.cfg
 venv/
 env/
 ven/
@@ -47,18 +82,23 @@ ven/
 .hypothesis/
 .ipynb_checkpoints/
 pip-wheel-metadata/
+pip-log.txt
 .coverage
+.coverage.*
 coverage.xml
 coverage/
 htmlcov/
 backend/data/
 
+# ──────────────────────────────────────────────
 # Node.js / Frontend
+# ──────────────────────────────────────────────
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+.pnpm-store/
 .next/
 .vercel/
 .netlify/
@@ -74,32 +114,71 @@ playwright-report/
 test-results/
 storybook-static/
 *.tsbuildinfo
+next-env.d.ts
 
+# ──────────────────────────────────────────────
 # Local runtime data
+# ──────────────────────────────────────────────
 *.db
 *.db-*
 *.sqlite
 *.sqlite3
 *.sqlite3-*
+*.db-journal
 
+# ──────────────────────────────────────────────
 # Uploads and User Data
+# ──────────────────────────────────────────────
 uploads/
 backend/uploads/
 
+# ──────────────────────────────────────────────
 # Codebase analysis / tooling artifacts
+# ──────────────────────────────────────────────
 graphify-out/
 graphify.log
 
+# ──────────────────────────────────────────────
 # Scratch / one-off scripts (should never be committed)
+# ──────────────────────────────────────────────
 patch_*.py
 patch_*.js
 fix_*.py
 fix_*.js
+test_*.py
+!backend/app/**/test_*.py
 
-# Local agent tooling
+# ──────────────────────────────────────────────
+# Local agent / AI tooling
+# ──────────────────────────────────────────────
 .agents/
 .claude/
 .codex/
 ANTIGRAVITY.md
 CLAUDE.md
+CODEX.md
+GEMINI.md
+AGENTS.md
 skills-lock.json
+
+# ──────────────────────────────────────────────
+# Docker (local overrides only; base files are tracked)
+# ──────────────────────────────────────────────
+docker-compose.override.yml
+docker-compose.override.yaml
+.docker/
+
+# ──────────────────────────────────────────────
+# Supabase local
+# ──────────────────────────────────────────────
+supabase/.branches
+supabase/.temp
+
+# ──────────────────────────────────────────────
+# Miscellaneous
+# ──────────────────────────────────────────────
+*.bak
+*.tmp
+*.temp
+*.orig
+*.rej
