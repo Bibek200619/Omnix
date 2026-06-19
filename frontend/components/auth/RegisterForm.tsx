@@ -97,6 +97,14 @@ export function RegisterForm() {
           username: handle,
           phone_number: normalizedPhone,
         });
+
+        // Send welcome email — failures must not block signup
+        try {
+          await apiClient.post("/email/welcome", { email, name });
+        } catch (emailErr) {
+          logClientError("Welcome email request failed", emailErr);
+        }
+
         await refreshSession();
         router.replace(redirectFromWindow());
         return;
