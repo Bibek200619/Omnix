@@ -122,6 +122,10 @@ export function sortSubspaces(subspaces: Workspace[]) {
   });
 }
 
+function isGlobalWorkspace(workspace: Workspace) {
+  return workspace.is_global || workspace.workspace_type === "global_workspace";
+}
+
 export function normalizeWorkspaceForest(records: WorkspaceApiRecord[] | null | undefined) {
   if (!Array.isArray(records)) {
     return [];
@@ -154,7 +158,9 @@ export function normalizeWorkspaceForest(records: WorkspaceApiRecord[] | null | 
       continue;
     }
 
-    roots.push(workspace);
+    if (!isGlobalWorkspace(workspace)) {
+      roots.push(workspace);
+    }
   }
 
   function attachChildren(workspace: Workspace, seen = new Set<string>()): Workspace {

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { motion, useInView, AnimatePresence, type Variants } from "framer-motion";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { motion, useInView, AnimatePresence, useReducedMotion, type Variants } from "framer-motion";
 import { OmnixMark as BrandMark } from "@/components/brand/OmnixMark";
+import { useDecorativeMotionEnabled } from "@/lib/use-decorative-motion";
 
 // ─── Brand ───────────────────────────────────────────────────────────────────
 const C = {
@@ -76,10 +77,12 @@ function seeded(index: number, salt: number) {
   return value - Math.floor(value);
 }
 
-function ParticleField() {
+function ParticleField({ count = 34 }: { count?: number }) {
+  const motionEnabled = useDecorativeMotionEnabled();
+  const particleCount = motionEnabled ? count : Math.min(count, 10);
   type Particle = { id: number; x: number; y: number; size: number; dur: number; delay: number; opacity: number; color: string };
-  const [particles] = useState<Particle[]>(() =>
-    Array.from({ length: 55 }, (_, i) => {
+  const particles = useMemo<Particle[]>(
+    () => Array.from({ length: particleCount }, (_, i) => {
       const colorSeed = seeded(i, 7);
       return {
         id: i,
@@ -91,29 +94,44 @@ function ParticleField() {
         opacity: seeded(i, 6) * 0.35 + 0.08,
         color: colorSeed > 0.65 ? C.cyan : colorSeed > 0.5 ? C.blue : "var(--omnix-color-ffffff)",
       };
-    })
+    }),
+    [particleCount],
   );
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {particles.map(p => (
-        <motion.div key={p.id}
-          className="absolute rounded-full"
-          style={{ left:`${p.x}%`, top:`${p.y}%`, width:p.size, height:p.size, background:p.color, opacity:p.opacity }}
-          animate={{ y:[-18,18,-18], x:[-8,8,-8], opacity:[p.opacity, p.opacity*2.2, p.opacity] }}
-          transition={{ duration:p.dur, delay:p.delay, repeat:Infinity, ease:"easeInOut" }}
-        />
-      ))}
+      {particles.map(p =>
+        !motionEnabled ? (
+          <div
+            key={p.id}
+            className="absolute rounded-full"
+            style={{ left:`${p.x}%`, top:`${p.y}%`, width:p.size, height:p.size, background:p.color, opacity:p.opacity }}
+          />
+        ) : (
+          <motion.div key={p.id}
+            className="absolute rounded-full"
+            style={{ left:`${p.x}%`, top:`${p.y}%`, width:p.size, height:p.size, background:p.color, opacity:p.opacity }}
+            animate={{ y:[-18,18,-18], x:[-8,8,-8], opacity:[p.opacity, p.opacity*2.2, p.opacity] }}
+            transition={{ duration:p.dur, delay:p.delay, repeat:Infinity, ease:"easeInOut" }}
+          />
+        )
+      )}
     </div>
   );
 }
 
 type DriftingOrbProps = { x:string; y:string; size:number; color:string; dur:number; delay?:number };
 function DriftingOrb({ x, y, size, color, dur, delay=0 }: DriftingOrbProps) {
+  const motionEnabled = useDecorativeMotionEnabled();
+  const style: CSSProperties = { left:x, top:y, width:size, height:size, borderRadius:"50%",
+    background:`radial-gradient(circle,${color} 0%,transparent 70%)`,
+    transform:"translate(-50%,-50%)", filter:"blur(2px)" };
+  if (!motionEnabled) {
+    return <div className="absolute pointer-events-none opacity-70" style={style} />;
+  }
+
   return (
     <motion.div className="absolute pointer-events-none"
-      style={{ left:x, top:y, width:size, height:size, borderRadius:"50%",
-        background:`radial-gradient(circle,${color} 0%,transparent 70%)`,
-        transform:"translate(-50%,-50%)", filter:"blur(2px)" }}
+      style={style}
       animate={{ x:[-30,30,-30], y:[-20,20,-20], scale:[1,1.15,1] }}
       transition={{ duration:dur, delay, repeat:Infinity, ease:"easeInOut" }}
     />
@@ -121,16 +139,23 @@ function DriftingOrb({ x, y, size, color, dur, delay=0 }: DriftingOrbProps) {
 }
 
 function AnimatedGrid({ opacity=0.04 }:{opacity?:number}) {
+  const motionEnabled = useDecorativeMotionEnabled();
+  const gridStyle = {
+    backgroundImage:`linear-gradient(var(--omnix-rgba-0-255-255-0-5) 1px,transparent 1px),linear-gradient(90deg,var(--omnix-rgba-0-255-255-0-5) 1px,transparent 1px)`,
+    backgroundSize:"64px 64px",
+  };
+
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{opacity}}>
-      <motion.div className="w-full h-full"
-        animate={{ backgroundPosition:["0px 0px","64px 64px"] }}
-        transition={{ duration:22, repeat:Infinity, ease:"linear" }}
-        style={{
-          backgroundImage:`linear-gradient(var(--omnix-rgba-0-255-255-0-5) 1px,transparent 1px),linear-gradient(90deg,var(--omnix-rgba-0-255-255-0-5) 1px,transparent 1px)`,
-          backgroundSize:"64px 64px",
-        }}
-      />
+      {!motionEnabled ? (
+        <div className="w-full h-full" style={gridStyle} />
+      ) : (
+        <motion.div className="w-full h-full"
+          animate={{ backgroundPosition:["0px 0px","64px 64px"] }}
+          transition={{ duration:22, repeat:Infinity, ease:"linear" }}
+          style={gridStyle}
+        />
+      )}
     </div>
   );
 }
@@ -277,9 +302,11 @@ function Navbar() {
 
 // ─── HERO ─────────────────────────────────────────────────────────────────────
 function FloatTag({ text, icon, style }:{ text:string; icon:string; style:CSSProperties }) {
+  const motionEnabled = useDecorativeMotionEnabled();
+
   return (
     <motion.div
-      animate={{y:[0,-8,0]}}
+      animate={motionEnabled ? {y:[0,-8,0]} : undefined}
       transition={{duration:3.8,repeat:Infinity,ease:"easeInOut"}}
       className="absolute hidden lg:flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold backdrop-blur-sm pointer-events-none"
       style={{background:"var(--omnix-rgba-10-25-47-0-88)",border:`1px solid var(--omnix-rgba-0-255-255-0-2)`,color:C.white,whiteSpace:"nowrap",...style}}>
@@ -431,7 +458,7 @@ function Hero() {
   return (
     <section className="relative overflow-hidden pb-16 pt-5 sm:pb-28 sm:pt-8">
       <SectionBg>
-        <ParticleField/>
+        <ParticleField count={34}/>
         <DriftingOrb x="50%" y="28%" size={900} color="var(--omnix-rgba-0-255-255-0-07)" dur={20}/>
         <DriftingOrb x="80%" y="60%" size={480} color="var(--omnix-rgba-0-51-255-0-07)" dur={25} delay={-5}/>
         <DriftingOrb x="14%" y="72%" size={400} color="var(--omnix-rgba-0-51-255-0-06)" dur={30} delay={-10}/>
@@ -475,14 +502,46 @@ function Hero() {
             </span>
           ))}
         </motion.div>
+        <HeroSignalStrip/>
         <HeroChat/>
       </div>
     </section>
   );
 }
 
+function HeroSignalStrip() {
+  const reduceMotion = useReducedMotion();
+  const signals = [
+    { label: "Workspace", value: "Ready" },
+    { label: "Sources", value: "Scoped" },
+    { label: "Team", value: "Invited" },
+  ];
+
+  return (
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+      animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, delay: 0.62, ease: easeOutExpo }}
+      className="mt-7 grid w-full max-w-2xl grid-cols-3 overflow-hidden rounded-2xl border"
+      style={{ borderColor:"var(--omnix-rgba-0-255-255-0-16)", background:"var(--omnix-rgba-255-255-255-0-035)", boxShadow:"0 18px 70px var(--omnix-rgba-0-0-0-0-24)" }}
+    >
+      {signals.map((signal, index) => (
+        <div
+          key={signal.label}
+          className="min-w-0 px-3 py-3 text-center sm:px-5"
+          style={{ borderLeft:index === 0 ? "0" : "1px solid var(--omnix-rgba-255-255-255-0-06)" }}
+        >
+          <div className="truncate text-[10px] font-black uppercase" style={{ color:C.faint, letterSpacing:"0.12em" }}>{signal.label}</div>
+          <div className="mt-1 truncate text-sm font-black sm:text-base" style={{ color:C.white }}>{signal.value}</div>
+        </div>
+      ))}
+    </motion.div>
+  );
+}
+
 // ─── MARQUEE ──────────────────────────────────────────────────────────────────
 function Marquee() {
+  const motionEnabled = useDecorativeMotionEnabled();
   const items = ["Workspace hierarchy","Document uploads","Searchable history","Source-grounded answers","Role-aware access","Streaming responses","Stream recovery","Workspace switching","Activity feed","Invite flow","Operational telemetry","Retrieval modes"];
   const doubled = [...items,...items];
   return (
@@ -499,7 +558,8 @@ function Marquee() {
         <div className="absolute right-0 top-0 bottom-0 w-32 z-10 pointer-events-none"
           style={{background:`linear-gradient(270deg,var(--omnix-color-061020),transparent)`}}/>
         <motion.div className="flex gap-10 whitespace-nowrap"
-          animate={{x:[0,-2200]}} transition={{duration:38,repeat:Infinity,ease:"linear"}}>
+          animate={motionEnabled ? {x:[0,-2200]} : undefined}
+          transition={{duration:38,repeat:Infinity,ease:"linear"}}>
           {doubled.map((name,i)=>(
             <div key={i} className="flex items-center gap-3 px-5 py-2.5 rounded-xl flex-shrink-0"
               style={{background:C.card,border:`1px solid ${C.border}`}}>
@@ -569,7 +629,7 @@ function Features() {
       <SectionBg>
         <DriftingOrb x="14%" y="55%" size={600} color="var(--omnix-rgba-0-51-255-0-07)" dur={28} delay={-6}/>
         <DriftingOrb x="88%" y="35%" size={480} color="var(--omnix-rgba-0-255-255-0-06)" dur={22} delay={-3}/>
-        <ParticleField/>
+        <ParticleField count={20}/>
       </SectionBg>
       <Sec className="max-w-6xl mx-auto relative z-10">
         <motion.div variants={fadeUp} className="text-center mb-16">

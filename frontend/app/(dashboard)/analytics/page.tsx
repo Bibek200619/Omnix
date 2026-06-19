@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { Activity, AlertCircle, Cpu, Database, LayoutDashboard, MessageSquare, RefreshCw, Server, Users, Sparkles, Globe } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PageTitle } from "@/components/ui/Typography";
@@ -43,21 +44,40 @@ type Metric = {
   halo: string;
 };
 
+const pageEase = [0.23, 1, 0.32, 1] as const;
+
 function StudioCard({ title, subtitle, children, className }: { title: string; subtitle: string; children: ReactNode; className?: string }) {
+  const reduceMotion = useReducedMotion();
+
   return (
-    <section className={cn("relative overflow-hidden rounded-[var(--omnix-radius)] border border-white/5 bg-black/20 p-4 shadow-inner sm:p-5", className)}>
+    <motion.section
+      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+      whileInView={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.18 }}
+      transition={{ duration: 0.32, ease: pageEase }}
+      className={cn("relative overflow-hidden rounded-[var(--omnix-radius)] border border-white/5 bg-black/20 p-4 shadow-inner sm:p-5", className)}
+    >
       <div className="relative z-10 mb-4 flex flex-col gap-1 sm:mb-6">
         <h2 className="text-[13px] font-bold tracking-wide text-white">{title}</h2>
         <p className="hidden text-[11px] leading-relaxed text-[var(--omnix-text-3)] sm:block">{subtitle}</p>
       </div>
       <div className="relative z-10">{children}</div>
-    </section>
+    </motion.section>
   );
 }
 
-function MetricCard({ metric }: { metric: Metric }) {
+function MetricCard({ metric, index }: { metric: Metric; index: number }) {
+  const reduceMotion = useReducedMotion();
+
   return (
-    <article className="relative min-h-[6.75rem] overflow-hidden rounded-xl border border-[var(--omnix-border)] bg-black/20 p-3 transition-[border-color,background-color,transform] duration-150 ease-out hover:-translate-y-0.5 hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] sm:min-h-0 sm:p-4">
+    <motion.article
+      initial={reduceMotion ? false : { opacity: 0, y: 12, scale: 0.98 }}
+      whileInView={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+      whileHover={reduceMotion ? undefined : { y: -3 }}
+      viewport={{ once: true, amount: 0.35 }}
+      transition={{ duration: 0.26, delay: reduceMotion ? 0 : Math.min(index * 0.035, 0.18), ease: pageEase }}
+      className="relative min-h-[6.75rem] overflow-hidden rounded-xl border border-[var(--omnix-border)] bg-black/20 p-3 transition-[border-color,background-color] duration-150 ease-out hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] sm:min-h-0 sm:p-4"
+    >
       <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2" style={{ background: `radial-gradient(ellipse at 100% 50%, ${metric.halo} 0%, transparent 70%)` }} />
       <div className="relative z-10 flex items-center gap-2 sm:gap-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border sm:h-10 sm:w-10" style={{ background: metric.surface, borderColor: metric.border, color: metric.color }}>
@@ -69,7 +89,7 @@ function MetricCard({ metric }: { metric: Metric }) {
         </span>
       </div>
       <p className="relative z-10 mt-3 hidden text-xs leading-5 text-[var(--omnix-text-3)] sm:block">{metric.detail}</p>
-    </article>
+    </motion.article>
   );
 }
 
@@ -229,8 +249,8 @@ function AnalyticsPageContent() {
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {realMetrics.map((metric) => (
-            <MetricCard key={metric.label} metric={metric} />
+          {realMetrics.map((metric, index) => (
+            <MetricCard key={metric.label} metric={metric} index={index} />
           ))}
         </div>
 

@@ -53,6 +53,11 @@ async def send_welcome_email(email: str, name: str):
     if client is None:
         return False
 
+    app_url = settings.OMNIX_APP_URL.rstrip("/") or "http://localhost:3000"
+    safe_name = escape(name.strip()) if isinstance(name, str) and name.strip() else ""
+    greeting = f"Congratulations, {safe_name}!" if safe_name else "Congratulations!"
+    safe_app_url = escape(app_url, quote=True)
+
     try:
         client.Emails.send(
             {
@@ -61,30 +66,56 @@ async def send_welcome_email(email: str, name: str):
                     "Omnix <noreply@omni-x.co.in>",
                 ),
                 "to": [email],
-                "subject": "Congratulations - welcome to Omnix",
+                "subject": "Welcome to Omnix - your workspace is ready",
+                "text": (
+                    f"{greeting} Your Omnix account is ready. "
+                    "Create a workspace, invite teammates, upload knowledge, and start working with AI. "
+                    f"Open Omnix: {app_url}"
+                ),
                 "html": f"""
-                <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;">
-                    <h1>Congratulations{name and f", {escape(name)}"}!</h1>
+                <div style="margin:0;background:#061020;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#e5f8ff;">
+                  <div style="max-width:640px;margin:0 auto;overflow:hidden;border:1px solid rgba(0,255,255,0.22);border-radius:24px;background:linear-gradient(180deg,#0b1b30 0%,#071221 100%);box-shadow:0 28px 90px rgba(0,0,0,0.42);">
+                    <div style="padding:28px 28px 12px;background:radial-gradient(circle at 20% 0%,rgba(0,255,255,0.24),transparent 34%),radial-gradient(circle at 100% 20%,rgba(51,102,255,0.22),transparent 32%);">
+                      <div style="display:inline-block;border:1px solid rgba(0,255,255,0.3);border-radius:999px;background:rgba(0,255,255,0.08);padding:7px 12px;color:#74f7ff;font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;">
+                        Omnix account active
+                      </div>
+                      <h1 style="margin:22px 0 10px;color:#ffffff;font-size:32px;line-height:1.12;letter-spacing:-0.02em;">
+                        {greeting}
+                      </h1>
+                      <p style="margin:0;max-width:520px;color:#b8c7d9;font-size:16px;line-height:1.65;">
+                        Your AI-native workspace is ready for documents, teammates, decisions, and focused execution.
+                      </p>
+                    </div>
 
-                    <p>Your account has been successfully created.</p>
+                    <div style="padding:12px 28px 30px;">
+                      <div style="margin:16px 0 24px;border:1px solid rgba(255,255,255,0.08);border-radius:18px;background:rgba(255,255,255,0.04);padding:18px;">
+                        <div style="display:grid;gap:12px;">
+                          <p style="margin:0;color:#eafcff;font-size:15px;line-height:1.6;">
+                            Start by creating your first workspace, inviting the people who need context, and uploading the knowledge Omnix should reason over.
+                          </p>
+                          <p style="margin:0;color:#8fa4ba;font-size:14px;line-height:1.6;">
+                            Omnix keeps work scoped to the right workspace so conversations, sources, and team access stay organized from day one.
+                          </p>
+                        </div>
+                      </div>
 
-                    <p>
-                        Omnix is your AI-native workspace where teams,
-                        knowledge, collaboration, and intelligence come together.
-                    </p>
+                      <a href="{safe_app_url}"
+                         style="display:inline-block;border-radius:14px;background:#00ffff;color:#061020;padding:14px 22px;text-decoration:none;font-size:14px;font-weight:800;box-shadow:0 0 32px rgba(0,255,255,0.35);">
+                        Open Omnix
+                      </a>
 
-                    <p>
-                        You can now create workspaces, collaborate with teammates,
-                        and work alongside AI.
-                    </p>
+                      <p style="margin:22px 0 0;color:#7f91a8;font-size:12px;line-height:1.6;">
+                        If the button does not work, open this link:
+                        <br>
+                        <a href="{safe_app_url}" style="color:#74f7ff;text-decoration:none;">{safe_app_url}</a>
+                      </p>
 
-                    <br>
-
-                    <p>We're excited to have you onboard.</p>
-
-                    <p>
-                        <strong>— The Omnix Team</strong>
-                    </p>
+                      <p style="margin:26px 0 0;color:#b8c7d9;font-size:14px;line-height:1.6;">
+                        Welcome aboard,<br>
+                        <strong style="color:#ffffff;">The Omnix Team</strong>
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 """,
             }
