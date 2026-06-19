@@ -488,7 +488,7 @@ export function CommandPalette() {
           setOpen(true);
           setQuery("");
         }}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--omnix-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-0-255-255-0-04)] text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-rgba-0-255-255-0-3)] hover:bg-[var(--omnix-rgba-0-255-255-0-08)] active:scale-[0.97] md:hidden"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-[var(--omnix-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-0-255-255-0-04)] text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-rgba-0-255-255-0-3)] hover:bg-[var(--omnix-rgba-0-255-255-0-08)] active:scale-[0.97] md:hidden"
         aria-label="Open command palette"
         title="Open command palette"
       >
@@ -500,7 +500,7 @@ export function CommandPalette() {
           setOpen(true);
           setQuery("");
         }}
-        className="hidden h-9 w-[17rem] items-center gap-3 rounded-[10px] border border-cyan-300/10 bg-black/20 px-3 text-left text-sm text-white/45 transition hover:border-cyan-300/25 hover:bg-black/30 hover:text-white/65 md:inline-flex lg:w-[22rem] xl:w-[28rem]"
+        className="hidden h-11 w-[17rem] items-center gap-3 rounded-[10px] border border-cyan-300/10 bg-black/20 px-3 text-left text-sm text-white/45 transition hover:border-cyan-300/25 hover:bg-black/30 hover:text-white/65 md:inline-flex lg:w-[22rem] xl:w-[28rem]"
         aria-label="Open command palette"
       >
         <Search className="h-4 w-4 shrink-0 text-cyan-100/35" />

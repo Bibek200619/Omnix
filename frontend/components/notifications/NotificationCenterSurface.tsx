@@ -146,7 +146,7 @@ function NotificationCenterSurfaceContent() {
             variant="ghost"
             onClick={() => void refreshNotifications()}
             isLoading={loading}
-            className="min-h-10 flex-1 min-[390px]:flex-none"
+            className="min-h-11 flex-1 min-[390px]:flex-none"
           >
             Refresh
           </Button>
@@ -157,7 +157,7 @@ function NotificationCenterSurfaceContent() {
             isLoading={markingAll}
             disabled={unreadCount === 0}
             leftIcon={<Check className="h-3.5 w-3.5" />}
-            className="min-h-10 flex-1 min-[390px]:flex-none"
+            className="min-h-11 flex-1 min-[390px]:flex-none"
           >
             Mark all read
           </Button>
@@ -279,7 +279,7 @@ function NotificationCenterSurfaceContent() {
                       <button
                         type="button"
                         onClick={() => void openNotification(item)}
-                        className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-cyan-300/14 bg-cyan-300/[0.04] px-3 text-xs font-medium text-cyan-100/80 transition hover:border-cyan-300/25 hover:bg-cyan-300/[0.08] sm:w-full"
+                        className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-cyan-300/14 bg-cyan-300/[0.04] px-3 text-xs font-medium text-cyan-100/80 transition hover:border-cyan-300/25 hover:bg-cyan-300/[0.08] sm:w-full"
                       >
                         Open
                         <ArrowUpRight className="h-3.5 w-3.5" />
@@ -289,7 +289,7 @@ function NotificationCenterSurfaceContent() {
                           type="button"
                           onClick={() => void handleMarkRead(item)}
                           disabled={busy}
-                          className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-cyan-300/14 bg-cyan-300/[0.055] px-3 text-xs font-medium text-cyan-100/85 transition hover:border-cyan-300/25 hover:bg-cyan-300/[0.09] disabled:cursor-not-allowed disabled:opacity-60 sm:w-full"
+                          className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-cyan-300/14 bg-cyan-300/[0.055] px-3 text-xs font-medium text-cyan-100/85 transition hover:border-cyan-300/25 hover:bg-cyan-300/[0.09] disabled:cursor-not-allowed disabled:opacity-60 sm:w-full"
                         >
                           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                           Mark read
