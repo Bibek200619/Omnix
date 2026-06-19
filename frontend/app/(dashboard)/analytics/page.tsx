@@ -38,6 +38,9 @@ type Metric = {
   detail: string;
   icon: ReactNode;
   color: string;
+  surface: string;
+  border: string;
+  halo: string;
 };
 
 function StudioCard({ title, subtitle, children, className }: { title: string; subtitle: string; children: ReactNode; className?: string }) {
@@ -55,9 +58,9 @@ function StudioCard({ title, subtitle, children, className }: { title: string; s
 function MetricCard({ metric }: { metric: Metric }) {
   return (
     <article className="relative overflow-hidden rounded-xl border border-[var(--omnix-border)] bg-black/20 p-4 transition hover:-translate-y-0.5 hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)]">
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2" style={{ background: `radial-gradient(ellipse at 100% 50%, ${metric.color}14 0%, transparent 70%)` }} />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2" style={{ background: `radial-gradient(ellipse at 100% 50%, ${metric.halo} 0%, transparent 70%)` }} />
       <div className="relative z-10 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg border" style={{ background: `${metric.color}14`, borderColor: `${metric.color}33`, color: metric.color }}>
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg border" style={{ background: metric.surface, borderColor: metric.border, color: metric.color }}>
           {metric.icon}
         </span>
         <span className="min-w-0">
@@ -134,42 +137,60 @@ function AnalyticsPageContent() {
         value: conversationsLoading ? <Skeleton className="h-8 w-16 rounded-full" /> : conversations.length,
         detail: "Active sessions in workspace.",
         icon: <MessageSquare className="h-4 w-4" />,
-        color: "#00FFFF",
+        color: "var(--omnix-cyan)",
+        surface: "var(--omnix-rgba-0-255-255-0-14)",
+        border: "var(--omnix-rgba-0-255-255-0-28)",
+        halo: "var(--omnix-rgba-0-255-255-0-14)",
       },
       {
         label: "Team Members",
         value: activeWorkspace?.member_count ?? activeMembers.length,
         detail: "Authorized workspace agents.",
         icon: <Users className="h-4 w-4" />,
-        color: "#9b5cff",
+        color: "var(--omnix-purple)",
+        surface: "var(--omnix-rgba-155-92-255-0-14)",
+        border: "var(--omnix-rgba-155-92-255-0-28)",
+        halo: "var(--omnix-rgba-155-92-255-0-14)",
       },
       {
         label: "Data Sources",
         value: filesLoading ? <Skeleton className="h-8 w-16 rounded-full" /> : files.length,
         detail: "Indexed knowledge assets.",
         icon: <Database className="h-4 w-4" />,
-        color: "#00e87a",
+        color: "var(--omnix-green)",
+        surface: "var(--omnix-rgba-0-232-122-0-14)",
+        border: "var(--omnix-rgba-0-232-122-0-28)",
+        halo: "var(--omnix-rgba-0-232-122-0-14)",
       },
       {
         label: "System Uptime",
         value: loadingRuntime ? <Skeleton className="h-8 w-24 rounded-full" /> : runtimeInfo ? `${Math.floor(runtimeInfo.uptime_seconds / 3600)}h ${Math.floor((runtimeInfo.uptime_seconds % 3600) / 60)}m` : "Unavailable",
         detail: runtimeInfo?.version ? `Omnix ${runtimeInfo.version} node` : "Runtime version not reported.",
         icon: <Activity className="h-4 w-4" />,
-        color: "#ffb800",
+        color: "var(--omnix-amber)",
+        surface: "var(--omnix-rgba-255-184-0-14)",
+        border: "var(--omnix-rgba-255-184-0-28)",
+        halo: "var(--omnix-rgba-255-184-0-14)",
       },
       {
         label: "Active Workers",
         value: loadingRuntime ? <Skeleton className="h-8 w-16 rounded-full" /> : runtimeInfo ? workers.length : "Unavailable",
         detail: runtimeInfo ? "Workers reported by runtime telemetry." : "Worker status not reported.",
         icon: <Cpu className="h-4 w-4" />,
-        color: "#ff4df4",
+        color: "var(--omnix-pink)",
+        surface: "var(--omnix-rgba-255-77-244-0-14)",
+        border: "var(--omnix-rgba-255-77-244-0-28)",
+        halo: "var(--omnix-rgba-255-77-244-0-14)",
       },
       {
         label: "Workspaces",
         value: workspaces.length,
         detail: "Configured super-workspaces.",
         icon: <LayoutDashboard className="h-4 w-4" />,
-        color: "#3366ff",
+        color: "var(--omnix-blue)",
+        surface: "var(--omnix-rgba-51-102-255-0-14)",
+        border: "var(--omnix-rgba-51-102-255-0-28)",
+        halo: "var(--omnix-rgba-51-102-255-0-14)",
       },
     ],
     [conversations.length, conversationsLoading, activeWorkspace, activeMembers.length, files.length, filesLoading, loadingRuntime, runtimeInfo, workers.length, workspaces.length],

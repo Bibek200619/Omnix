@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type { CSSProperties, FormEvent } from "react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
@@ -46,8 +46,44 @@ import {
 } from "@/lib/workspace-roles";
 import type { Workspace } from "@/lib/workspace-types";
 
-function workspaceColor(index: number) {
-  return ["var(--omnix-cyan)", "var(--omnix-purple)", "var(--omnix-green)", "var(--omnix-amber)", "var(--omnix-pink)"][index % 5];
+function workspaceAccent(index: number) {
+  return [
+    {
+      color: "var(--omnix-cyan)",
+      faint: "var(--omnix-rgba-0-255-255-0-08)",
+      surface: "var(--omnix-rgba-0-255-255-0-14)",
+      border: "var(--omnix-rgba-0-255-255-0-28)",
+      borderStrong: "var(--omnix-rgba-0-255-255-0-45)",
+    },
+    {
+      color: "var(--omnix-purple)",
+      faint: "var(--omnix-rgba-155-92-255-0-08)",
+      surface: "var(--omnix-rgba-155-92-255-0-14)",
+      border: "var(--omnix-rgba-155-92-255-0-28)",
+      borderStrong: "var(--omnix-rgba-155-92-255-0-55)",
+    },
+    {
+      color: "var(--omnix-green)",
+      faint: "var(--omnix-rgba-0-232-122-0-08)",
+      surface: "var(--omnix-rgba-0-232-122-0-14)",
+      border: "var(--omnix-rgba-0-232-122-0-28)",
+      borderStrong: "var(--omnix-rgba-0-232-122-0-55)",
+    },
+    {
+      color: "var(--omnix-amber)",
+      faint: "var(--omnix-rgba-255-184-0-08)",
+      surface: "var(--omnix-rgba-255-184-0-14)",
+      border: "var(--omnix-rgba-255-184-0-28)",
+      borderStrong: "var(--omnix-rgba-255-184-0-55)",
+    },
+    {
+      color: "var(--omnix-pink)",
+      faint: "var(--omnix-rgba-255-77-244-0-08)",
+      surface: "var(--omnix-rgba-255-77-244-0-14)",
+      border: "var(--omnix-rgba-255-77-244-0-28)",
+      borderStrong: "var(--omnix-rgba-255-77-244-0-55)",
+    },
+  ][index % 5];
 }
 
 function selectionId(workspaceId: string) {
@@ -118,19 +154,17 @@ function WorkspacePageContent() {
   const selected = selectedWorkspace(workspaces, selectedId, activeWorkspace);
   const DetailIcon = Layers3;
   const selectedIndex = selected ? Math.max(0, workspaces.findIndex((workspace) => workspace.id === selected.id)) : 0;
-  const selectedColor = workspaceColor(selectedIndex);
+  const selectedAccent = workspaceAccent(selectedIndex);
+  const selectedColor = selectedAccent.color;
   const members = activeMembers.length > 0 ? activeMembers : selected?.members_preview ?? [];
   const selectedLiveStatus = statusForWorkspace(selected?.id);
 
-  const workspaceMetrics = useMemo(
-    () => [
-      { label: "Active now", value: selectedLiveStatus?.active_count ?? presence?.active_count ?? 0, icon: Users, color: selectedColor },
-      { label: "Subspaces", value: selected?.subspaces?.length ?? 0, icon: Layers3, color: "var(--omnix-purple)" },
-      { label: "Sources", value: selectedLiveStatus?.source_count ?? 0, icon: Database, color: "var(--omnix-green)" },
-      { label: "Invites", value: activeInvites.length || "Clear", icon: UserPlus, color: "var(--omnix-amber)" },
-    ],
-    [activeInvites.length, presence?.active_count, selected, selectedColor, selectedLiveStatus?.active_count, selectedLiveStatus?.source_count],
-  );
+  const workspaceMetrics = [
+    { label: "Active now", value: selectedLiveStatus?.active_count ?? presence?.active_count ?? 0, icon: Users, color: selectedColor, surface: selectedAccent.surface, border: selectedAccent.border },
+    { label: "Subspaces", value: selected?.subspaces?.length ?? 0, icon: Layers3, color: "var(--omnix-purple)", surface: "var(--omnix-rgba-155-92-255-0-14)", border: "var(--omnix-rgba-155-92-255-0-28)" },
+    { label: "Sources", value: selectedLiveStatus?.source_count ?? 0, icon: Database, color: "var(--omnix-green)", surface: "var(--omnix-rgba-0-232-122-0-14)", border: "var(--omnix-rgba-0-232-122-0-28)" },
+    { label: "Invites", value: activeInvites.length || "Clear", icon: UserPlus, color: "var(--omnix-amber)", surface: "var(--omnix-rgba-255-184-0-14)", border: "var(--omnix-rgba-255-184-0-28)" },
+  ];
 
   function toggle(workspaceId: string) {
     setExpanded((current) => ({ ...current, [workspaceId]: !(current[workspaceId] ?? true) }));
@@ -217,7 +251,7 @@ function WorkspacePageContent() {
         <div className="omnix-page-hero">
           <div>
             <div className="flex items-center gap-3">
-              <Network className="h-6 w-6 text-[var(--omnix-cyan)] drop-shadow-[0_0_16px_rgba(0,255,255,0.75)]" />
+              <Network className="h-6 w-6 text-[var(--omnix-cyan)] drop-shadow-[0_0_16px_var(--omnix-rgba-0-255-255-0-7)]" />
               <h1 className="omnix-page-title omnix-gradient-text">Workspace Hierarchy</h1>
             </div>
             <p className="omnix-page-subtitle">
@@ -264,7 +298,7 @@ function WorkspacePageContent() {
                 </div>
               ) : (
                 workspaces.map((workspace, index) => {
-                  const color = workspaceColor(index);
+                  const accent = workspaceAccent(index);
                   const open = expanded[workspace.id] ?? true;
                   const rootActive = selected?.id === workspace.id;
                   const liveStatus = statusForWorkspace(workspace.id);
@@ -275,7 +309,7 @@ function WorkspacePageContent() {
                         className={cn(
                           "group flex items-center gap-2 rounded-[var(--omnix-radius-sm)] border px-2.5 py-2.5 transition",
                           rootActive
-                            ? "border-cyan-300/25 bg-[radial-gradient(ellipse_at_0%_50%,rgba(0,255,255,0.1),transparent_70%),rgba(0,255,255,0.06)] shadow-[var(--omnix-glow-xs)]"
+                            ? "border-cyan-300/25 bg-[radial-gradient(ellipse_at_0%_50%,var(--omnix-rgba-0-255-255-0-1),transparent_70%),var(--omnix-rgba-0-255-255-0-06)] shadow-[var(--omnix-glow-xs)]"
                             : "border-[var(--omnix-border)] bg-[var(--omnix-surface)] hover:border-[var(--omnix-border-2)] hover:bg-[var(--omnix-surface-hover)]",
                         )}
                       >
@@ -295,7 +329,7 @@ function WorkspacePageContent() {
                         >
                           <span
                             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border text-xs font-bold shadow-[var(--omnix-glow-xs)]"
-                            style={{ borderColor: color, background: `${color}18`, color }}
+                            style={{ borderColor: accent.border, background: accent.surface, color: accent.color }}
                           >
                             {workspace.name.charAt(0).toUpperCase()}
                           </span>
@@ -312,7 +346,7 @@ function WorkspacePageContent() {
                         <div className="ml-5 mt-2 space-y-1.5 border-l border-cyan-300/15 pl-3">
                           {(workspace.subspaces ?? []).length ? (workspace.subspaces ?? []).map((subspace, childIndex) => {
                             const active = selected?.id === subspace.id;
-                            const color = workspaceColor(index + childIndex + 1);
+                            const accent = workspaceAccent(index + childIndex + 1);
                             const childStatus = statusForWorkspace(subspace.id);
                             return (
                               <button
@@ -326,12 +360,12 @@ function WorkspacePageContent() {
                                     : "border-transparent hover:border-[var(--omnix-border)] hover:bg-[var(--omnix-surface)]",
                                 )}
                                 style={{
-                                  background: active ? `${color}10` : "transparent",
-                                  borderColor: active ? `${color}44` : undefined,
+                                  background: active ? accent.faint : "transparent",
+                                  borderColor: active ? accent.borderStrong : undefined,
                                 }}
                               >
                                 <span className="absolute -left-[13px] top-1/2 h-px w-3 -translate-y-1/2 bg-cyan-300/15" />
-                                <span className="flex h-6 w-6 items-center justify-center rounded-md border text-[10px] font-bold" style={{ background: `${color}13`, borderColor: `${color}33`, color }}>
+                                <span className="flex h-6 w-6 items-center justify-center rounded-md border text-[10px] font-bold" style={{ background: accent.surface, borderColor: accent.border, color: accent.color }}>
                                   {subspace.name.charAt(0).toUpperCase()}
                                 </span>
                                 <span className="min-w-0 flex-1">
@@ -376,7 +410,7 @@ function WorkspacePageContent() {
                 <div className="flex min-w-0 flex-col gap-4 min-[390px]:flex-row">
                   <span
                     className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border shadow-[var(--omnix-glow-md)]"
-                    style={{ borderColor: selectedColor, background: `${selectedColor}15`, color: selectedColor }}
+                    style={{ borderColor: selectedAccent.border, background: selectedAccent.surface, color: selectedColor }}
                   >
                     <DetailIcon className="h-6 w-6" />
                   </span>
@@ -387,7 +421,7 @@ function WorkspacePageContent() {
                       </h2>
                       <span
                         className="rounded-full border px-2.5 py-1 text-[11px] font-semibold"
-                        style={{ borderColor: `${selectedColor}44`, background: `${selectedColor}14`, color: selectedColor }}
+                        style={{ borderColor: selectedAccent.borderStrong, background: selectedAccent.surface, color: selectedColor }}
                       >
                         {selected?.parent_workspace_id ? "Subspace" : "Workspace"}
                       </span>
@@ -450,7 +484,7 @@ function WorkspacePageContent() {
                 return (
                   <article key={metric.label} className="omnix-metric-card p-4" style={{ "--metric-color": metric.color } as CSSProperties}>
                     <div className="relative z-10 flex items-center justify-between">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--omnix-border)]" style={{ background: `${metric.color}14` }}>
+                      <span className="flex h-9 w-9 items-center justify-center rounded-lg border" style={{ background: metric.surface, borderColor: metric.border }}>
                         <Icon className="h-4 w-4" style={{ color: metric.color }} />
                       </span>
                       <Sparkles className="h-3.5 w-3.5 text-[var(--omnix-text-3)]" />
@@ -497,16 +531,16 @@ function WorkspacePageContent() {
                 </div>
                 <div className="relative z-10 grid gap-3 md:grid-cols-3">
                   {(selected?.subspaces ?? []).length ? (selected?.subspaces ?? []).map((subspace, index) => {
-                    const color = workspaceColor(index + 1);
+                    const accent = workspaceAccent(index + 1);
                     return (
                       <button
                         key={subspace.id}
                         type="button"
                         onClick={() => choose(subspace)}
                         className="omnix-command-button p-4 text-left"
-                        style={{ "--command-color": color } as CSSProperties}
+                        style={{ "--command-color": accent.color } as CSSProperties}
                       >
-                        <span className="flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold" style={{ background: `${color}14`, borderColor: `${color}33`, color }}>
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold" style={{ background: accent.surface, borderColor: accent.border, color: accent.color }}>
                           {subspace.name.charAt(0).toUpperCase()}
                         </span>
                         <span className="mt-4 block text-sm font-semibold text-white">{subspace.name}</span>

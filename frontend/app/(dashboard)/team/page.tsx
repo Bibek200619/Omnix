@@ -400,7 +400,7 @@ function TeamPageContent() {
   return (
     <section className="omnix-page-frame omnix-scrollbar">
       <div className="omnix-content-max flex flex-col gap-5">
-        <div className="relative overflow-hidden rounded-[18px] border border-[rgba(0,255,255,0.12)] bg-[linear-gradient(145deg,rgba(0,255,255,0.06),rgba(155,92,255,0.035)_45%,rgba(0,0,0,0.18))] p-4 shadow-[0_28px_100px_rgba(0,0,0,0.34)] sm:rounded-[26px] sm:p-6">
+        <div className="relative overflow-hidden rounded-[18px] border border-[var(--omnix-rgba-0-255-255-0-12)] bg-[linear-gradient(145deg,var(--omnix-rgba-0-255-255-0-06),var(--omnix-rgba-155-92-255-0-035)_45%,var(--omnix-rgba-0-0-0-0-18))] p-4 shadow-[0_28px_100px_var(--omnix-rgba-0-0-0-0-34)] sm:rounded-[26px] sm:p-6">
           <div className="pointer-events-none absolute -right-16 -top-20 h-72 w-72 rounded-full bg-cyan-300/10 blur-[85px]" />
           <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div>
@@ -430,11 +430,11 @@ function TeamPageContent() {
 
         <div className="grid gap-3 md:grid-cols-3">
           {[
-            { label: "Members", value: activeWorkspace?.member_count ?? members.length, color: "#00FFFF" },
-            { label: "Your role", value: displayRole(activeWorkspace?.current_user_role), color: "#00e87a" },
-            { label: "Pending invites", value: pendingInviteCount || "Clear", color: "#9b5cff" },
+            { label: "Members", value: activeWorkspace?.member_count ?? members.length, color: "var(--omnix-cyan)" },
+            { label: "Your role", value: displayRole(activeWorkspace?.current_user_role), color: "var(--omnix-green)" },
+            { label: "Pending invites", value: pendingInviteCount || "Clear", color: "var(--omnix-purple)" },
           ].map((item) => (
-            <div key={item.label} className="rounded-xl border border-[rgba(0,255,255,0.08)] bg-[rgba(0,255,255,0.03)] px-4 py-3">
+            <div key={item.label} className="rounded-xl border border-[var(--omnix-rgba-0-255-255-0-08)] bg-[var(--omnix-rgba-0-255-255-0-03)] px-4 py-3">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">{item.label}</div>
               <div className="omnix-display mt-2 text-xl font-bold text-white" style={{ color: item.color }}>{item.value}</div>
             </div>
@@ -488,7 +488,7 @@ function TeamPageContent() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[var(--omnix-radius)] border border-[var(--omnix-border)] bg-[rgba(0,255,255,0.025)]">
+        <div className="overflow-hidden rounded-[var(--omnix-radius)] border border-[var(--omnix-border)] bg-[var(--omnix-rgba-0-255-255-0-025)]">
           {membersError && members.length === 0 ? null : filteredMembers.length ? filteredMembers.map((member) => {
             const key = memberKey(member);
             const RoleIcon = roleIcon(member.role);
