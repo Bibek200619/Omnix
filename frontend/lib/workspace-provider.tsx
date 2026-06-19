@@ -569,14 +569,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     logger.debug("[workspace] explicit create requested", { name: normalizedPayload.name });
     const request = createWorkspaceRequest(normalizedPayload)
-      .then((workspace) => {
+      .then(async (workspace) => {
         logger.debug("[workspace] create success", { id: workspace.id, name: workspace.name });
-        setWorkspaces((current) => [workspace, ...current.filter((item) => item.id !== workspace.id)]);
+        const nextWorkspace =
+          workspace.workspace_type === "super_workspace"
+            ? (await refreshWorkspaceTree(workspace.id, { force: true, silent: true })) ?? workspace
+            : workspace;
+        setWorkspaces((current) => upsertWorkspaceTree(current, nextWorkspace));
         showToast({ title: "Workspace created", message: workspace.name });
-        if (workspace.workspace_type === "super_workspace") {
-          void refreshWorkspaceTree(workspace.id, { silent: true });
-        }
-        return workspace;
+        return nextWorkspace;
       })
       .finally(() => {
         createWorkspaceInFlightRef.current.delete(inFlightKey);
