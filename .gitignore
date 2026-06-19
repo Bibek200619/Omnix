@@ -1,0 +1,105 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+*.log.*
+logs/
+debug.log*
+*.pid
+*.pid.lock
+
+# IDEs and Editors
+.idea/
+.vscode/
+.fleet/
+*.iml
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Python / Backend
+__pycache__/
+*.pyc
+*.py[cod]
+*$py.class
+venv/
+env/
+ven/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyre/
+.pytype/
+.tox/
+.nox/
+.hypothesis/
+.ipynb_checkpoints/
+pip-wheel-metadata/
+.coverage
+coverage.xml
+coverage/
+htmlcov/
+backend/data/
+
+# Node.js / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.next/
+.vercel/
+.netlify/
+.turbo/
+.vite/
+.parcel-cache/
+out/
+build/
+dist/
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+storybook-static/
+*.tsbuildinfo
+
+# Local runtime data
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+
+# Uploads and User Data
+uploads/
+backend/uploads/
+
+# Codebase analysis / tooling artifacts
+graphify-out/
+graphify.log
+
+# Scratch / one-off scripts (should never be committed)
+patch_*.py
+patch_*.js
+fix_*.py
+fix_*.js
+
+# Local agent tooling
+.agents/
+.claude/
+.codex/
+ANTIGRAVITY.md
+CLAUDE.md
+skills-lock.json

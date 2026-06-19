@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - REDIS_URL=redis://redis:6379/0
+      - ENV=dev
+    depends_on:
+      - redis
+    volumes:
+      - ./backend:/app
+    networks:
+      - omnix-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - omnix-network
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    command: ["python", "-m", "app.automation.scheduler"] # Placeholder for worker command
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - backend
+    networks:
+      - omnix-network
+
+networks:
+  omnix-network:
+    driver: bridge
+
+volumes:
+  redis_data:
