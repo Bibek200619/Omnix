@@ -14,7 +14,7 @@ export type SenderLookup = {
 
 export function formatChatTime(value?: string) {
   const date = value ? new Date(value) : new Date();
-  return new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit" }).format(
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
     Number.isNaN(date.getTime()) ? new Date() : date,
   );
 }
