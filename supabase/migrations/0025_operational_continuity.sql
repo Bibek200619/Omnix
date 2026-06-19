@@ -70,5 +70,23 @@ CREATE INDEX IF NOT EXISTS idx_workspace_timeline_workspace_time ON workspace_op
 CREATE INDEX IF NOT EXISTS idx_workspace_timeline_initiative ON workspace_operational_timeline(initiative_id);
 
 -- Enable realtime for new tables
-ALTER PUBLICATION supabase_realtime ADD TABLE workspace_initiatives;
-ALTER PUBLICATION supabase_realtime ADD TABLE workspace_operational_timeline;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'workspace_initiatives'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.workspace_initiatives;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'workspace_operational_timeline'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.workspace_operational_timeline;
+  END IF;
+END$$;

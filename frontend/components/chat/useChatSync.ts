@@ -72,7 +72,7 @@ export function useChatSync({
         } catch (err) {
           if (!options.silent && mountedRef.current) {
             logClientError("Failed to sync conversation", err, { endpoint: `/conversations/${convId}/messages` });
-            setError("Unable to sync conversation.");
+            setError("Unable to sync conversation. Check your connection and try again.");
           }
           return false;
         } finally {

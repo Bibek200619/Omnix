@@ -115,7 +115,7 @@ export function useWorkspaceConversationSender({
       if (inThread) setThreadMessages(markFailed);
       else setMessages(markFailed);
       logClientError("Failed to deliver message", err, { endpoint: `/workspaces/${activeWorkspaceId}/channels/${selectedChannelId}/messages` });
-      setError("Unable to deliver message.");
+      setError("Unable to deliver message. Check your connection and try again.");
     } finally {
       if (inThread) setThreadSending(false);
       else setSending(false);

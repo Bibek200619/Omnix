@@ -27,7 +27,7 @@ const WorkspaceNotificationsContext = createContext<WorkspaceNotificationsContex
 
 function notificationLoadErrorMessage(error: unknown) {
   if (!(error instanceof ApiError)) {
-    return "Unable to load notifications.";
+    return "Unable to load notifications. Check your connection and try again.";
   }
 
   if (!error.status) {
@@ -51,7 +51,7 @@ function notificationLoadErrorMessage(error: unknown) {
     return "Mention notification storage is not ready. Run the workspace_mentions migration on the configured database.";
   }
 
-  return rawMessage ? `Notification service returned: ${rawMessage}` : "Unable to load notifications.";
+  return rawMessage ? `Notification service returned: ${rawMessage}` : "Unable to load notifications. Please try again in a moment.";
 }
 
 export function WorkspaceNotificationsProvider({ children }: { children: ReactNode }) {
@@ -164,7 +164,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
         logClientError("Failed to mark mention read", err, {
           endpoint: `/workspaces/${activeWorkspaceId}/mentions/${mentionId}/read`,
         });
-        setError("Unable to update notification read state.");
+        setError("Unable to update notification read state. Refresh notifications and try again.");
         void refreshNotifications();
         throw err;
       }
@@ -186,7 +186,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
       logClientError("Failed to mark all mentions read", err, {
         endpoint: `/workspaces/${activeWorkspaceId}/mentions/read-all`,
       });
-      setError("Unable to update notification read state.");
+      setError("Unable to update notification read state. Refresh notifications and try again.");
       void refreshNotifications();
       throw err;
     }

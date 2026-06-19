@@ -143,13 +143,90 @@ const sourceTypes: Array<{
   description: string;
   icon: typeof FileText;
   color: string;
+  surface: string;
+  border: string;
+  activeSurface: string;
+  activeBorder: string;
+  iconSurface: string;
+  iconBorder: string;
+  shadow: string;
   action: string;
 }> = [
-  { id: "file", title: "File upload", description: "PDF, DOCX, TXT, Markdown", icon: FileUp, color: "var(--omnix-cyan)", action: "Upload" },
-  { id: "knowledge_link", title: "Knowledge link", description: "Docs, wiki, or policy URL", icon: Link2, color: "var(--omnix-amber)", action: "Sync link" },
-  { id: "file_repository", title: "File repository", description: "Git URL or internal repo path", icon: GitBranch, color: "var(--omnix-pink)", action: "Set up" },
-  { id: "company_drive", title: "Company drive link", description: "Shared Drive, SharePoint, or folder URL", icon: HardDrive, color: "var(--omnix-purple)", action: "Connect" },
-  { id: "external_database", title: "External database", description: "Structured connection request", icon: Server, color: "var(--omnix-green)", action: "Request" },
+  {
+    id: "file",
+    title: "File upload",
+    description: "PDF, DOCX, TXT, Markdown",
+    icon: FileUp,
+    color: "var(--omnix-cyan)",
+    surface: "var(--omnix-rgba-255-255-255-0-025)",
+    border: "var(--omnix-rgba-255-255-255-0-07)",
+    activeSurface: "var(--omnix-rgba-0-255-255-0-12)",
+    activeBorder: "var(--omnix-rgba-0-255-255-0-55)",
+    iconSurface: "var(--omnix-rgba-0-255-255-0-14)",
+    iconBorder: "var(--omnix-rgba-0-255-255-0-28)",
+    shadow: "var(--omnix-rgba-0-255-255-0-18)",
+    action: "Upload",
+  },
+  {
+    id: "knowledge_link",
+    title: "Knowledge link",
+    description: "Docs, wiki, or policy URL",
+    icon: Link2,
+    color: "var(--omnix-amber)",
+    surface: "var(--omnix-rgba-255-255-255-0-025)",
+    border: "var(--omnix-rgba-255-255-255-0-07)",
+    activeSurface: "var(--omnix-rgba-255-184-0-12)",
+    activeBorder: "var(--omnix-rgba-255-184-0-55)",
+    iconSurface: "var(--omnix-rgba-255-184-0-14)",
+    iconBorder: "var(--omnix-rgba-255-184-0-28)",
+    shadow: "var(--omnix-rgba-255-184-0-18)",
+    action: "Sync link",
+  },
+  {
+    id: "file_repository",
+    title: "File repository",
+    description: "Git URL or internal repo path",
+    icon: GitBranch,
+    color: "var(--omnix-pink)",
+    surface: "var(--omnix-rgba-255-255-255-0-025)",
+    border: "var(--omnix-rgba-255-255-255-0-07)",
+    activeSurface: "var(--omnix-rgba-255-77-244-0-12)",
+    activeBorder: "var(--omnix-rgba-255-77-244-0-55)",
+    iconSurface: "var(--omnix-rgba-255-77-244-0-14)",
+    iconBorder: "var(--omnix-rgba-255-77-244-0-28)",
+    shadow: "var(--omnix-rgba-255-77-244-0-18)",
+    action: "Set up",
+  },
+  {
+    id: "company_drive",
+    title: "Company drive link",
+    description: "Shared Drive, SharePoint, or folder URL",
+    icon: HardDrive,
+    color: "var(--omnix-purple)",
+    surface: "var(--omnix-rgba-255-255-255-0-025)",
+    border: "var(--omnix-rgba-255-255-255-0-07)",
+    activeSurface: "var(--omnix-rgba-155-92-255-0-12)",
+    activeBorder: "var(--omnix-rgba-155-92-255-0-55)",
+    iconSurface: "var(--omnix-rgba-155-92-255-0-14)",
+    iconBorder: "var(--omnix-rgba-155-92-255-0-28)",
+    shadow: "var(--omnix-rgba-155-92-255-0-18)",
+    action: "Connect",
+  },
+  {
+    id: "external_database",
+    title: "External database",
+    description: "Structured connection request",
+    icon: Server,
+    color: "var(--omnix-green)",
+    surface: "var(--omnix-rgba-255-255-255-0-025)",
+    border: "var(--omnix-rgba-255-255-255-0-07)",
+    activeSurface: "var(--omnix-rgba-0-232-122-0-12)",
+    activeBorder: "var(--omnix-rgba-0-232-122-0-55)",
+    iconSurface: "var(--omnix-rgba-0-232-122-0-14)",
+    iconBorder: "var(--omnix-rgba-0-232-122-0-28)",
+    shadow: "var(--omnix-rgba-0-232-122-0-18)",
+    action: "Request",
+  },
 ];
 
 const statusLabel: Record<ConnectorStatus | "not_configured", string> = {
@@ -259,8 +336,8 @@ function connectorIcon(type: ConnectorType) {
   return sourceTypes.find((item) => item.id === type)?.icon ?? Database;
 }
 
-function connectorColor(type: ConnectorType) {
-  return sourceTypes.find((item) => item.id === type)?.color ?? "var(--omnix-cyan)";
+function connectorAccent(type: ConnectorType) {
+  return sourceTypes.find((item) => item.id === type) ?? sourceTypes[0];
 }
 
 function emptyForm(type: ConnectorType): ConnectorFormState {
@@ -693,7 +770,7 @@ function FilesPageContent() {
           <div>
             <h1 className="omnix-page-title flex items-center gap-3">
               <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-300/[0.08] shadow-[var(--omnix-glow-sm)]">
-                <Database className="h-4 w-4 text-[var(--omnix-cyan)] drop-shadow-[0_0_6px_rgba(0,255,255,0.8)]" />
+                <Database className="h-4 w-4 text-[var(--omnix-cyan)] drop-shadow-[0_0_6px_var(--omnix-rgba-0-255-255-0-8)]" />
               </span>
               <span className="omnix-gradient-text">{activeWorkspace?.name ?? "Workspace"} sources</span>
             </h1>
@@ -702,7 +779,7 @@ function FilesPageContent() {
             </p>
           </div>
           {activeWorkspace ? (
-            <div className="flex items-center gap-3 rounded-[var(--omnix-radius)] border border-[rgba(0,255,255,0.12)] bg-[rgba(0,255,255,0.05)] px-4 py-3 shadow-[var(--omnix-glow-xs)]">
+            <div className="flex items-center gap-3 rounded-[var(--omnix-radius)] border border-[var(--omnix-rgba-0-255-255-0-12)] bg-[var(--omnix-rgba-0-255-255-0-05)] px-4 py-3 shadow-[var(--omnix-glow-xs)]">
               <WorkspaceMemberStack members={workspaceMembers} totalCount={activeWorkspace.member_count} size="md" />
               <div className="text-right text-xs">
                 <div className="font-semibold text-white">{activeWorkspace.member_count} {activeWorkspace.member_count === 1 ? "member" : "members"}</div>
@@ -723,7 +800,7 @@ function FilesPageContent() {
                 type="button"
                 onClick={() => setActiveSection(section.id)}
                 className={cn(
-                  "inline-flex min-h-9 flex-1 items-center justify-center gap-2 rounded-lg px-3 text-xs font-bold uppercase tracking-[0.08em] transition sm:flex-none",
+                  "inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg px-3 text-xs font-bold uppercase tracking-[0.08em] transition sm:flex-none",
                   activeSection === section.id
                     ? "bg-cyan-300/12 text-cyan-100 shadow-[var(--omnix-glow-xs)]"
                     : "text-[var(--omnix-text-3)] hover:bg-white/[0.035] hover:text-white",
@@ -775,13 +852,13 @@ function FilesPageContent() {
                     active ? "scale-[1.01]" : "hover:-translate-y-0.5",
                   )}
                   style={{
-                    background: active ? `${type.color}12` : "rgba(255,255,255,0.025)",
-                    borderColor: active ? `${type.color}55` : "rgba(255,255,255,0.07)",
-                    boxShadow: active ? `0 0 22px ${type.color}18` : "none",
+                    background: active ? type.activeSurface : type.surface,
+                    borderColor: active ? type.activeBorder : type.border,
+                    boxShadow: active ? `0 0 22px ${type.shadow}` : "none",
                   }}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border" style={{ background: `${type.color}14`, borderColor: `${type.color}33`, color: type.color }}>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border" style={{ background: type.iconSurface, borderColor: type.iconBorder, color: type.color }}>
                       <Icon className="h-4 w-4" />
                     </span>
                     <span className={cn("rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-wider", statusStyle[cardStatus])}>
@@ -805,15 +882,15 @@ function FilesPageContent() {
 
         <div className="grid gap-3 md:grid-cols-3">
           {[
-            { label: "Uploaded sources", value: files.length, icon: FileText, color: "var(--omnix-cyan)" },
-            { label: "Configured connectors", value: connectors.length, icon: Link2, color: "var(--omnix-amber)" },
-            { label: "AI context", value: activeWorkspaceIntelligence?.retrieval_scope === "global" ? "Global" : "Scoped", icon: Database, color: "var(--omnix-purple)" },
+            { label: "Uploaded sources", value: files.length, icon: FileText, color: "var(--omnix-cyan)", surface: "var(--omnix-rgba-0-255-255-0-14)", border: "var(--omnix-rgba-0-255-255-0-28)" },
+            { label: "Configured connectors", value: connectors.length, icon: Link2, color: "var(--omnix-amber)", surface: "var(--omnix-rgba-255-184-0-14)", border: "var(--omnix-rgba-255-184-0-28)" },
+            { label: "AI context", value: activeWorkspaceIntelligence?.retrieval_scope === "global" ? "Global" : "Scoped", icon: Database, color: "var(--omnix-purple)", surface: "var(--omnix-rgba-155-92-255-0-14)", border: "var(--omnix-rgba-155-92-255-0-28)" },
           ].map((stat) => {
             const Icon = stat.icon;
             return (
               <div key={stat.label} className="omnix-metric-card p-4" style={{ "--metric-color": stat.color } as CSSProperties}>
                 <div className="relative z-10 flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-lg border" style={{ background: `${stat.color}14`, borderColor: `${stat.color}33` }}>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg border" style={{ background: stat.surface, borderColor: stat.border }}>
                     <Icon className="h-4 w-4" style={{ color: stat.color }} />
                   </span>
                   <span>
@@ -863,7 +940,7 @@ function FilesPageContent() {
             <div className="relative z-10 mt-4 grid gap-3">
               {connectors.map((connector) => {
                 const Icon = connectorIcon(connector.connector_type);
-                const color = connectorColor(connector.connector_type);
+                const accent = connectorAccent(connector.connector_type);
                 const busy = actionConnectorId === connector.id;
                 const googleDriveNeedsAuth =
                   connector.connector_type === "company_drive" &&
@@ -872,7 +949,7 @@ function FilesPageContent() {
                 return (
                   <div key={connector.id} className="omnix-source-card flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex min-w-0 gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border" style={{ background: `${color}14`, borderColor: `${color}33`, color }}>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border" style={{ background: accent.iconSurface, borderColor: accent.iconBorder, color: accent.color }}>
                         <Icon className="h-[18px] w-[18px]" />
                       </span>
                       <div className="min-w-0">
@@ -893,17 +970,17 @@ function FilesPageContent() {
                     </div>
                     <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center lg:justify-end">
                       {googleDriveNeedsAuth ? (
-                        <Button type="button" size="sm" variant="secondary" className="min-h-10" leftIcon={<ExternalLink className="h-3.5 w-3.5" />} isLoading={authConnectorId === connector.id} onClick={() => void handleDriveAuth(connector)}>
+                        <Button type="button" size="sm" variant="secondary" className="min-h-11" leftIcon={<ExternalLink className="h-3.5 w-3.5" />} isLoading={authConnectorId === connector.id} onClick={() => void handleDriveAuth(connector)}>
                           Authenticate
                         </Button>
                       ) : null}
-                      <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<RefreshCw className="h-3.5 w-3.5" />} isLoading={busy} onClick={() => void handleRetryConnector(connector)}>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<RefreshCw className="h-3.5 w-3.5" />} isLoading={busy} onClick={() => void handleRetryConnector(connector)}>
                         Retry
                       </Button>
-                      <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => openSetup(connector.connector_type, connector)}>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => openSetup(connector.connector_type, connector)}>
                         Configure
                       </Button>
-                      <Button type="button" size="sm" variant="ghost" className="min-h-10 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Unplug className="h-3.5 w-3.5" />} isLoading={busy} onClick={() => void handleRemoveConnector(connector)}>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-11 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Unplug className="h-3.5 w-3.5" />} isLoading={busy} onClick={() => void handleRemoveConnector(connector)}>
                         Remove
                       </Button>
                     </div>
@@ -927,7 +1004,7 @@ function FilesPageContent() {
               className="omnix-input h-11 w-full rounded-[var(--omnix-radius-sm)] py-2 pl-8 pr-3 text-sm sm:h-9 sm:text-xs"
             />
           </div>
-          <div className="flex min-h-11 overflow-hidden rounded-[9px] border border-[rgba(0,255,255,0.1)] bg-[rgba(0,255,255,0.03)] sm:min-h-9">
+          <div className="flex min-h-11 overflow-hidden rounded-[9px] border border-[var(--omnix-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-0-255-255-0-03)] sm:min-h-9">
             {(["grid", "list"] as const).map((mode) => (
               <button
                 key={mode}
@@ -935,8 +1012,8 @@ function FilesPageContent() {
                 onClick={() => setView(mode)}
                 className="flex h-11 w-12 items-center justify-center transition active:scale-[0.97] sm:h-9 sm:w-10"
                 style={{
-                  background: view === mode ? "rgba(0,255,255,0.1)" : "transparent",
-                  color: view === mode ? "var(--omnix-cyan)" : "rgba(255,255,255,0.3)",
+                  background: view === mode ? "var(--omnix-rgba-0-255-255-0-1)" : "transparent",
+                  color: view === mode ? "var(--omnix-cyan)" : "var(--omnix-rgba-255-255-255-0-3)",
                 }}
                 aria-label={`${mode} view`}
                 title={`${mode} view`}
@@ -1003,7 +1080,7 @@ function FilesPageContent() {
                 return (
                   <div key={f.id} className={view === "grid" ? "omnix-source-card flex min-h-[174px] flex-col justify-between gap-3 p-[18px]" : "omnix-source-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"}>
                     <div className="flex min-w-0 items-start gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_0_14px_rgba(0,255,255,0.12)]">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_0_14px_var(--omnix-rgba-0-255-255-0-12)]">
                         <FileText className="h-[19px] w-[19px]" />
                       </span>
                       <div className="min-w-0">
@@ -1018,9 +1095,9 @@ function FilesPageContent() {
                       </div>
                     </div>
                     <div className={view === "grid" ? "grid grid-cols-2 gap-2 border-t border-white/5 pt-3 sm:flex sm:items-center" : "grid grid-cols-2 gap-2 sm:flex sm:items-center"}>
-                      <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<BadgeCheck className="h-3.5 w-3.5" />} onClick={() => void scanDocumentDecisionCandidates(f)}>Decisions</Button>
-                      <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
-                      <Button type="button" size="sm" variant="ghost" className="min-h-10 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<BadgeCheck className="h-3.5 w-3.5" />} onClick={() => void scanDocumentDecisionCandidates(f)}>Decisions</Button>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-11 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
                     </div>
                   </div>
                 );
@@ -1035,7 +1112,7 @@ function FilesPageContent() {
       {candidateFile ? (
         <DocumentPortal>
           <div className="fixed inset-0 z-[155] flex items-end justify-center bg-black/70 px-3 py-4 backdrop-blur-md sm:items-center">
-            <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(12,18,28,0.98),rgba(3,6,12,0.98))] p-4 shadow-2xl sm:rounded-2xl sm:p-5">
+            <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-white/10 bg-[linear-gradient(180deg,var(--omnix-rgba-12-18-28-0-98),var(--omnix-rgba-3-6-12-0-98))] p-4 shadow-2xl sm:rounded-2xl sm:p-5">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Document suggestions</p>
@@ -1048,7 +1125,7 @@ function FilesPageContent() {
                     setDecisionCandidates([]);
                     setDecisionCandidatesError(null);
                   }}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
                   aria-label="Close document decision suggestions"
                   title="Close"
                 >
@@ -1087,10 +1164,10 @@ function FilesPageContent() {
       {setupType && setupMeta ? (
         <DocumentPortal>
         <div className="fixed inset-0 z-[160] flex items-end justify-center bg-black/70 px-3 py-4 backdrop-blur-md sm:items-center">
-          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(12,18,28,0.98),rgba(3,6,12,0.98))] p-5 shadow-2xl sm:rounded-2xl sm:p-6">
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-white/10 bg-[linear-gradient(180deg,var(--omnix-rgba-12-18-28-0-98),var(--omnix-rgba-3-6-12-0-98))] p-5 shadow-2xl sm:rounded-2xl sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border" style={{ background: `${setupMeta.color}14`, borderColor: `${setupMeta.color}33`, color: setupMeta.color }}>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border" style={{ background: setupMeta.iconSurface, borderColor: setupMeta.iconBorder, color: setupMeta.color }}>
                   <setupMeta.icon className="h-5 w-5" />
                 </span>
                 <div className="min-w-0">
@@ -1101,7 +1178,7 @@ function FilesPageContent() {
               <button
                 type="button"
                 onClick={() => setSetupType(null)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
                 aria-label="Close connector setup"
                 title="Close"
               >

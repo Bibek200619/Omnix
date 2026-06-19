@@ -87,7 +87,7 @@ export function ConversationMessageRow({
                 <button
                   type="button"
                   onClick={() => onOpenThread(message)}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-1 text-[11px] text-[var(--omnix-text-3)] transition hover:text-cyan-100 md:min-h-0 md:px-0"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-[11px] text-[var(--omnix-text-3)] transition hover:text-cyan-100"
                 >
                   <CornerDownRight className="h-3.5 w-3.5" />
                   {message.thread_reply_count ? `${message.thread_reply_count} thread replies` : "Open thread"}
@@ -96,7 +96,7 @@ export function ConversationMessageRow({
               <button
                 type="button"
                 onClick={() => onOpenTask(message)}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-1 text-[11px] text-[var(--omnix-text-3)] transition hover:text-cyan-100 md:min-h-0 md:px-0"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-[11px] text-[var(--omnix-text-3)] transition hover:text-cyan-100"
               >
                 <ClipboardCheck className="h-3.5 w-3.5" />
                 Track as task
@@ -104,7 +104,7 @@ export function ConversationMessageRow({
               <button
                 type="button"
                 onClick={() => onOpenDecision(message)}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-1 text-[11px] text-[var(--omnix-text-3)] transition hover:text-cyan-100 md:min-h-0 md:px-0"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-[11px] text-[var(--omnix-text-3)] transition hover:text-cyan-100"
               >
                 <BadgeCheck className="h-3.5 w-3.5" />
                 Convert to Decision

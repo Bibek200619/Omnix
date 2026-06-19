@@ -116,7 +116,7 @@ export function TaskFromMessageModal({
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Discussion to execution</p>
               <h2 className="mt-1 text-base font-semibold text-white">Open linked task</h2>
             </div>
-            <button type="button" onClick={onClose} className="rounded-md p-1.5 text-white/45 hover:text-white" aria-label="Close task conversion">
+            <button type="button" onClick={onClose} className="inline-flex h-11 w-11 items-center justify-center rounded-md text-white/45 hover:bg-white/5 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70" aria-label="Close task conversion">
               <X className="h-4 w-4" />
             </button>
           </div>
