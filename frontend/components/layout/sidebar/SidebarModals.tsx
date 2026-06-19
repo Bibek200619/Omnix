@@ -259,23 +259,23 @@ export function WorkspaceManagementActions({
                 </div>
               </form>
             ) : (
-              <button type="button" onClick={onOpenCreate} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[9px] font-medium uppercase tracking-wider text-cyan-400/60 transition hover:bg-cyan-400/10 hover:text-cyan-400">
+              <button type="button" onClick={onOpenCreate} className="flex min-h-11 w-full items-center gap-2 rounded-md px-3 text-[9px] font-medium uppercase tracking-wider text-cyan-400/60 transition hover:bg-cyan-400/10 hover:text-cyan-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
                 <Plus className="h-3 w-3" /> New Workspace
               </button>
             )}
             {canCreateSubspace ? (
-              <button type="button" onClick={onOpenSubspace} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[9px] font-medium uppercase tracking-wider text-emerald-400/60 transition hover:bg-emerald-400/10 hover:text-emerald-400">
+              <button type="button" onClick={onOpenSubspace} className="flex min-h-11 w-full items-center gap-2 rounded-md px-3 text-[9px] font-medium uppercase tracking-wider text-emerald-400/60 transition hover:bg-emerald-400/10 hover:text-emerald-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
                 <Plus className="h-3 w-3" /> New Subspace
               </button>
             ) : null}
           </div>
 
-          <button type="button" onClick={() => onShowManageActionsChange(false)} className="w-full py-1 text-[8px] font-bold uppercase tracking-[0.2em] text-white/10 transition-colors hover:text-white/20">
+          <button type="button" onClick={() => onShowManageActionsChange(false)} className="min-h-11 w-full rounded-md px-3 text-[8px] font-bold uppercase tracking-[0.2em] text-white/10 transition-colors hover:bg-white/5 hover:text-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
             Close Settings
           </button>
         </motion.div>
       ) : (
-        <button type="button" onClick={() => onShowManageActionsChange(true)} className="flex w-full items-center justify-center gap-2 rounded-lg py-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-white/20 transition hover:bg-white/5 hover:text-white/40">
+        <button type="button" onClick={() => onShowManageActionsChange(true)} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-3 text-[9px] font-bold uppercase tracking-[0.2em] text-white/20 transition hover:bg-white/5 hover:text-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
           <Settings className="h-3 w-3" /> Workspace Management
         </button>
       )}

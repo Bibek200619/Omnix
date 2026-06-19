@@ -250,7 +250,7 @@ function WorkspaceDecisionsSurfaceContent() {
                     key={s}
                     onClick={() => setStatusFilter(s)}
                     className={cn(
-                      "flex-1 rounded-md py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all",
+                      "min-h-11 flex-1 rounded-md px-2 text-[10px] font-bold uppercase tracking-wider transition-all",
                       statusFilter === s 
                         ? "bg-cyan-400/10 text-cyan-400 shadow-[inset_0_1px_1px_var(--omnix-rgba-255-255-255-0-05)]" 
                         : "text-[var(--omnix-text-3)] hover:text-[var(--omnix-text-2)]"
@@ -272,7 +272,7 @@ function WorkspaceDecisionsSurfaceContent() {
                   </p>
                   <button 
                     onClick={() => setStatusFilter("all")}
-                    className="mt-3 inline-flex min-h-9 items-center rounded-lg border border-cyan-300/14 bg-cyan-300/[0.055] px-3 text-[10px] font-bold uppercase tracking-widest text-cyan-400 hover:text-cyan-300"
+                    className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-cyan-300/14 bg-cyan-300/[0.055] px-3 text-[10px] font-bold uppercase tracking-widest text-cyan-400 hover:text-cyan-300"
                   >
                     Clear filter
                   </button>
@@ -335,7 +335,7 @@ function WorkspaceDecisionsSurfaceContent() {
                         <button
                           type="button"
                           onClick={() => setSelectedId(null)}
-                          className="omnix-decisions-back flex items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-200"
+                          className="omnix-decisions-back flex min-h-11 items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 text-[10px] font-bold uppercase tracking-wider text-cyan-200"
                         >
                           ‹ Back
                         </button>

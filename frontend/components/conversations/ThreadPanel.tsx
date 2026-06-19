@@ -63,7 +63,7 @@ export function ThreadPanel({
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Operational thread</p>
           <p className="mt-1 text-xs text-[var(--omnix-text-2)]">Focused follow-through</p>
         </div>
-        <button type="button" onClick={onClose} className="rounded-md p-1.5 text-white/40 hover:bg-white/5 hover:text-white" aria-label="Close thread">
+        <button type="button" onClick={onClose} className="inline-flex h-11 w-11 items-center justify-center rounded-md text-white/40 hover:bg-white/5 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70" aria-label="Close thread">
           <X className="h-4 w-4" />
         </button>
       </div>
