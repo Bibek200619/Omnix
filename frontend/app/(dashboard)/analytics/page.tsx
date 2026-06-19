@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, AlertCircle, Cpu, Database, LayoutDashboard, MessageSquare, RefreshCw, Server, Users, Sparkles, Globe } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PageTitle } from "@/components/ui/Typography";
-import { apiClient } from "@/lib/api";
+import { ApiError, apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspaceMembership, useWorkspaceTree } from "@/lib/workspace-context";
@@ -45,10 +45,10 @@ type Metric = {
 
 function StudioCard({ title, subtitle, children, className }: { title: string; subtitle: string; children: ReactNode; className?: string }) {
   return (
-    <section className={cn("relative overflow-hidden rounded-[var(--omnix-radius)] border border-white/5 bg-black/20 p-5 shadow-inner", className)}>
-      <div className="relative z-10 mb-6 flex flex-col gap-1">
+    <section className={cn("relative overflow-hidden rounded-[var(--omnix-radius)] border border-white/5 bg-black/20 p-4 shadow-inner sm:p-5", className)}>
+      <div className="relative z-10 mb-4 flex flex-col gap-1 sm:mb-6">
         <h2 className="text-[13px] font-bold tracking-wide text-white">{title}</h2>
-        <p className="text-[11px] leading-relaxed text-[var(--omnix-text-3)]">{subtitle}</p>
+        <p className="hidden text-[11px] leading-relaxed text-[var(--omnix-text-3)] sm:block">{subtitle}</p>
       </div>
       <div className="relative z-10">{children}</div>
     </section>
@@ -57,18 +57,18 @@ function StudioCard({ title, subtitle, children, className }: { title: string; s
 
 function MetricCard({ metric }: { metric: Metric }) {
   return (
-    <article className="relative overflow-hidden rounded-xl border border-[var(--omnix-border)] bg-black/20 p-4 transition hover:-translate-y-0.5 hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)]">
+    <article className="relative min-h-[6.75rem] overflow-hidden rounded-xl border border-[var(--omnix-border)] bg-black/20 p-3 transition-[border-color,background-color,transform] duration-150 ease-out hover:-translate-y-0.5 hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] sm:min-h-0 sm:p-4">
       <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2" style={{ background: `radial-gradient(ellipse at 100% 50%, ${metric.halo} 0%, transparent 70%)` }} />
-      <div className="relative z-10 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg border" style={{ background: metric.surface, borderColor: metric.border, color: metric.color }}>
+      <div className="relative z-10 flex items-center gap-2 sm:gap-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border sm:h-10 sm:w-10" style={{ background: metric.surface, borderColor: metric.border, color: metric.color }}>
           {metric.icon}
         </span>
         <span className="min-w-0">
-          <span className="omnix-display block text-2xl font-bold text-white">{metric.value}</span>
-          <span className="block text-xs text-[var(--omnix-text-3)]">{metric.label}</span>
+          <span className="omnix-display block truncate text-lg font-bold text-white tabular-nums sm:text-2xl">{metric.value}</span>
+          <span className="block truncate text-[11px] text-[var(--omnix-text-3)] sm:text-xs">{metric.label}</span>
         </span>
       </div>
-      <p className="relative z-10 mt-3 text-xs leading-5 text-[var(--omnix-text-3)]">{metric.detail}</p>
+      <p className="relative z-10 mt-3 hidden text-xs leading-5 text-[var(--omnix-text-3)] sm:block">{metric.detail}</p>
     </article>
   );
 }
@@ -119,7 +119,15 @@ function AnalyticsPageContent() {
       setRuntimeInfo(null);
       setWorkers([]);
       setRuntimeError("Runtime telemetry is unavailable. Please try again in a moment.");
-      logClientError("Failed to load runtime telemetry", err);
+      if (err instanceof ApiError) {
+        console.debug("Runtime telemetry unavailable", {
+          endpoint: err.endpoint,
+          status: err.status,
+          rawMessage: err.rawMessage,
+        });
+      } else {
+        console.debug("Runtime telemetry unavailable", err);
+      }
     } finally {
       setLoadingRuntime(false);
     }
@@ -220,22 +228,22 @@ function AnalyticsPageContent() {
           </button>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
           {realMetrics.map((metric) => (
             <MetricCard key={metric.label} metric={metric} />
           ))}
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-3 sm:gap-6 lg:grid-cols-2">
           <StudioCard title="Runtime Environment" subtitle="Operational health of the underlying service infrastructure.">
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {runtimeError ? (
                 <div className="flex items-start gap-3 rounded-lg border border-amber-300/20 bg-amber-300/10 p-3 text-xs leading-5 text-amber-100">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{runtimeError}</span>
                 </div>
               ) : null}
-              <div className="flex items-center justify-between rounded-lg border border-white/5 bg-black/40 p-4">
+              <div className="flex items-center justify-between rounded-lg border border-white/5 bg-black/40 p-3 sm:p-4">
                 <div className="flex items-center gap-3">
                   <Server className="h-4 w-4 text-cyan-400" />
                   <span className="text-xs font-semibold text-white">Service Status</span>
@@ -252,18 +260,18 @@ function AnalyticsPageContent() {
                 )}
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-lg border border-white/5 bg-black/40 p-4">
+              <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                <div className="rounded-lg border border-white/5 bg-black/40 p-3 sm:p-4">
                   <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--omnix-text-3)]">Environment</p>
                   {loadingRuntime ? <Skeleton className="mt-2 h-4 w-24 rounded-full" /> : <p className="mt-1.5 text-sm font-semibold text-white capitalize">{runtimeInfo?.environment || "Not reported"}</p>}
                 </div>
-                <div className="rounded-lg border border-white/5 bg-black/40 p-4">
+                <div className="rounded-lg border border-white/5 bg-black/40 p-3 sm:p-4">
                   <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--omnix-text-3)]">Version</p>
                   {loadingRuntime ? <Skeleton className="mt-2 h-4 w-20 rounded-full" /> : <p className="mt-1.5 text-sm font-semibold text-white">{runtimeInfo?.version || "Not reported"}</p>}
                 </div>
               </div>
 
-              <div className="rounded-lg border border-white/5 bg-black/40 p-4">
+              <div className="rounded-lg border border-white/5 bg-black/40 p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--omnix-text-3)]">Telemetry Source</p>
                   <Globe className="h-3.5 w-3.5 text-white/20" />
@@ -274,41 +282,41 @@ function AnalyticsPageContent() {
           </StudioCard>
 
           <StudioCard title="Background Workers" subtitle="Status of ingestion and automation workers.">
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {workers.length > 0 ? (
                 workers.map(worker => (
-                  <div key={worker.id} className="flex items-center justify-between rounded-lg border border-white/5 bg-black/40 p-4 transition-colors hover:bg-black/60">
-                    <div className="flex items-center gap-3">
+                  <div key={worker.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/5 bg-black/40 p-3 transition-colors hover:bg-black/60 sm:p-4">
+                    <div className="flex min-w-0 items-center gap-3">
                       <div className="relative flex h-2.5 w-2.5 items-center justify-center">
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40"></span>
                         <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
                       </div>
-                      <span className="text-xs font-semibold text-white">{worker.name}</span>
+                      <span className="truncate text-xs font-semibold text-white">{worker.name}</span>
                     </div>
-                    <span className="text-[10px] text-[var(--omnix-text-3)] font-medium">
+                    <span className="shrink-0 text-[10px] font-medium text-[var(--omnix-text-3)]">
                       Pulse: {new Date(worker.last_heartbeat).toLocaleTimeString()}
                     </span>
                   </div>
                 ))
               ) : (
-                <div className="flex flex-col items-center justify-center rounded-lg border border-white/5 bg-black/40 py-8 text-center">
-                  <Activity className="h-6 w-6 text-white/10" />
-                  <p className="mt-3 text-xs text-[var(--omnix-text-3)]">
-                    Standalone workers not detected.<br/>Using integrated runtime execution.
+                <div className="flex items-center justify-center gap-3 rounded-lg border border-white/5 bg-black/40 px-4 py-4 text-center sm:flex-col sm:py-8">
+                  <Activity className="h-5 w-5 text-white/10 sm:h-6 sm:w-6" />
+                  <p className="text-xs text-[var(--omnix-text-3)] sm:mt-3">
+                    Standalone workers not detected.<span className="hidden sm:inline"><br/>Using integrated runtime execution.</span>
                   </p>
                 </div>
               )}
-              <div className="mt-2 rounded-lg border border-cyan-500/10 bg-cyan-500/5 p-4 text-[10px] leading-relaxed text-cyan-200/70">
+              <div className="mt-2 hidden rounded-lg border border-cyan-500/10 bg-cyan-500/5 p-4 text-[10px] leading-relaxed text-cyan-200/70 sm:block">
                 <strong className="text-cyan-400">Note:</strong> Distributed workers require a Redis instance for coordination. Integrated workers handle standard ingestion.
               </div>
             </div>
           </StudioCard>
         </div>
 
-        <section className="omnix-cinematic-card p-5 sm:p-6 overflow-hidden">
+        <section className="omnix-cinematic-card overflow-hidden p-3 sm:p-6">
           <div className="pointer-events-none absolute right-[-6rem] top-[-6rem] h-72 w-72 rounded-full bg-cyan-400/5 blur-[88px]" />
           <div className="relative z-10">
-            <div className="mb-6 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/50">
+            <div className="mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/50 sm:mb-6">
               <Sparkles className="h-3.5 w-3.5" />
               Custom Intelligence Dashboards
             </div>

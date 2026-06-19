@@ -8,6 +8,7 @@ import { KeyboardShortcutsModal } from "@/components/layout/KeyboardShortcutsMod
 import { MobileDock } from "@/components/layout/MobileDock";
 import { PageTransition } from "@/components/layout/PageTransition";
 import { AmbientParticles } from "@/components/layout/AmbientParticles";
+import { PhoneNumberPrompt } from "@/components/profile/PhoneNumberPrompt";
 import { ConversationHistoryProvider } from "@/lib/conversation-history-context";
 import { ProfileProvider } from "@/lib/profile-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
@@ -145,6 +146,7 @@ export function AppShell({ children }: AppShellProps) {
                         isOpen={isShortcutsOpen}
                         onClose={() => setIsShortcutsOpen(false)}
                       />
+                      <PhoneNumberPrompt />
                     </div>
                   </div>
                 </WorkspaceOnboardingGate>

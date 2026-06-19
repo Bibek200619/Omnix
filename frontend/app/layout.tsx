@@ -56,7 +56,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} dark`} suppressHydrationWarning>
-      <body>
+      <body suppressHydrationWarning>
         <AppErrorBoundary>
           <AuthProvider>
             <ToastProvider>{children}</ToastProvider>
