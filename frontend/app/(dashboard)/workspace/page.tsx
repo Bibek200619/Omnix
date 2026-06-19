@@ -590,7 +590,7 @@ function WorkspacePageContent() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9"
+                  className="h-11 w-11"
                   aria-label="Close create workspace modal"
                   title="Close create workspace modal"
                   onClick={() => setCreateOpen(false)}
@@ -660,7 +660,7 @@ function WorkspacePageContent() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9"
+                  className="h-11 w-11"
                   aria-label="Close create subworkspace modal"
                   title="Close create subworkspace modal"
                   onClick={() => setSubspaceOpen(false)}

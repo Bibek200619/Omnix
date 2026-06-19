@@ -476,7 +476,7 @@ function WorkspaceTasksSurfaceContent() {
         <main className="omnix-panel flex min-w-0 flex-col rounded-xl p-3 sm:p-4 xl:min-h-[28rem]">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--omnix-border)] pb-3">
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setFilter("open")} className={cn("rounded-full border px-3 py-1.5 text-xs font-medium transition", filter === "open" ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100" : "border-[var(--omnix-border)] text-[var(--omnix-text-2)]")}>Current Flow</button>
+              <button type="button" onClick={() => setFilter("open")} className={cn("min-h-11 rounded-full border px-3 text-xs font-medium transition", filter === "open" ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100" : "border-[var(--omnix-border)] text-[var(--omnix-text-2)]")}>Current Flow</button>
               <p className="text-xs text-[var(--omnix-text-3)]">{displayedTasks.length} items</p>
             </div>
             <Button size="sm" onClick={() => setCreateOpen((open) => !open)} leftIcon={<Plus className="h-3.5 w-3.5" />}>

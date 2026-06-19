@@ -173,7 +173,7 @@ function MemberActionsMenu({
         aria-label={`Open actions for ${memberName(member)}`}
         disabled={busy}
         onClick={onToggle}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--omnix-border)] bg-black/15 text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--omnix-border)] bg-black/15 text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
       </button>
@@ -190,7 +190,7 @@ function MemberActionsMenu({
                 type="button"
                 role="menuitem"
                 onClick={() => select("role")}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm text-slate-200 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
+                className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm text-slate-200 transition hover:bg-[var(--omnix-surface)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
               >
                 <ShieldCheck className="h-4 w-4 text-cyan-100" />
                 <span>Update Role</span>
@@ -201,7 +201,7 @@ function MemberActionsMenu({
                 type="button"
                 role="menuitem"
                 onClick={() => select("remove")}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm text-rose-100 transition hover:bg-rose-400/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/60"
+                className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm text-rose-100 transition hover:bg-rose-400/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/60"
               >
                 <Ban className="h-4 w-4" />
                 <span>Remove From Workspace</span>
@@ -476,7 +476,7 @@ function TeamPageContent() {
                 type="button"
                 onClick={() => setFilter(item)}
                 className={cn(
-                  "min-h-10 shrink-0 rounded-full border px-3.5 py-2 text-[11px] font-semibold transition active:scale-[0.98]",
+                  "min-h-11 shrink-0 rounded-full border px-3.5 text-[11px] font-semibold transition active:scale-[0.98]",
                   filter === item
                     ? "border-cyan-300/35 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]"
                     : "border-[var(--omnix-border)] bg-black/10 text-[var(--omnix-text-3)] hover:text-white",
@@ -538,7 +538,7 @@ function TeamPageContent() {
                         <button
                           type="button"
                           onClick={() => commitLabel(member)}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
+                          className="flex h-11 w-11 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
                           aria-label="Save label"
                           title="Save label"
                         >
@@ -547,7 +547,7 @@ function TeamPageContent() {
                         <button
                           type="button"
                           onClick={() => setEditingKey(null)}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--omnix-border)] bg-black/15 text-[var(--omnix-text-2)]"
+                          className="flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--omnix-border)] bg-black/15 text-[var(--omnix-text-2)]"
                           aria-label="Cancel label edit"
                           title="Cancel label edit"
                         >
@@ -569,7 +569,7 @@ function TeamPageContent() {
                             key={preset}
                             type="button"
                             onClick={() => commitLabel(member, preset)}
-                            className="min-h-8 rounded-full border border-[var(--omnix-border)] bg-black/15 px-2.5 py-1 text-[10px] text-[var(--omnix-text-3)] transition hover:text-white active:scale-[0.98]"
+                            className="min-h-11 rounded-full border border-[var(--omnix-border)] bg-black/15 px-3 text-[10px] text-[var(--omnix-text-3)] transition hover:text-white active:scale-[0.98]"
                           >
                             {preset}
                           </button>
@@ -580,7 +580,7 @@ function TeamPageContent() {
                   <button
                     type="button"
                     onClick={() => startEdit(member)}
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[var(--omnix-border)] bg-black/15 px-3 text-xs font-semibold text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-border-active)] hover:text-white active:scale-[0.98] sm:h-9 sm:min-h-0"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--omnix-border)] bg-black/15 px-3 text-xs font-semibold text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-border-active)] hover:text-white active:scale-[0.98]"
                   >
                     <Edit3 className="h-3.5 w-3.5" />
                     Label
@@ -615,7 +615,7 @@ function TeamPageContent() {
                 <Button
                   type="button"
                   size="sm"
-                  className="mt-4 min-h-10"
+                  className="mt-4 min-h-11"
                   leftIcon={<Plus className="h-3.5 w-3.5" />}
                   onClick={() => {
                     setInviteError(null);

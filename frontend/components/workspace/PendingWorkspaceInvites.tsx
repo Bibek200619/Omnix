@@ -190,7 +190,7 @@ export function PendingWorkspaceInvites({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className={compact ? "h-8 flex-1 px-2 text-xs" : undefined}
+                    className={compact ? "h-11 flex-1 px-2 text-xs" : undefined}
                     leftIcon={<X className="h-3.5 w-3.5" />}
                     onClick={() => handleDecline(inviteId)}
                     isLoading={declineBusy}
@@ -201,7 +201,7 @@ export function PendingWorkspaceInvites({
                   <Button
                     type="button"
                     size="sm"
-                    className={compact ? "h-8 flex-1 px-2 text-xs" : undefined}
+                    className={compact ? "h-11 flex-1 px-2 text-xs" : undefined}
                     leftIcon={<Check className="h-3.5 w-3.5" />}
                     onClick={() => handleAccept(inviteId)}
                     isLoading={acceptBusy}

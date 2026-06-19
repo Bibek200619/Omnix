@@ -205,7 +205,7 @@ export function WorkspaceSearch() {
         type="button"
         disabled={disabled}
         onClick={openSearch}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--omnix-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-0-255-255-0-04)] text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-rgba-0-255-255-0-3)] hover:bg-[var(--omnix-rgba-0-255-255-0-08)] active:scale-[0.97] disabled:opacity-40 md:hidden"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-[var(--omnix-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-0-255-255-0-04)] text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-rgba-0-255-255-0-3)] hover:bg-[var(--omnix-rgba-0-255-255-0-08)] active:scale-[0.97] disabled:opacity-40 md:hidden"
         aria-label="Search Omnix"
         title="Search Omnix"
       >
@@ -298,7 +298,7 @@ export function WorkspaceSearch() {
                 <button
                   type="button"
                   onClick={clearSearch}
-                  className="mt-3 inline-flex min-h-9 items-center rounded-lg border border-cyan-300/14 bg-cyan-300/[0.055] px-3 text-xs font-medium text-cyan-100/85"
+                  className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-cyan-300/14 bg-cyan-300/[0.055] px-3 text-xs font-medium text-cyan-100/85"
                 >
                   Clear search
                 </button>

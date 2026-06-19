@@ -62,7 +62,7 @@ export function DecisionCandidatePanel({
               type="button"
               size="sm"
               variant="ghost"
-              className="min-h-9"
+              className="min-h-11"
               onClick={onRefresh}
               isLoading={loading}
               leftIcon={!loading ? <Sparkles className="h-3.5 w-3.5" /> : undefined}
@@ -108,7 +108,7 @@ export function DecisionCandidatePanel({
                       type="button"
                       size="sm"
                       variant="ghost"
-                      className="min-h-9"
+                      className="min-h-11"
                       onClick={() => onDismiss(candidate)}
                       leftIcon={<X className="h-3.5 w-3.5" />}
                     >
@@ -117,7 +117,7 @@ export function DecisionCandidatePanel({
                     <Button
                       type="button"
                       size="sm"
-                      className="min-h-9"
+                      className="min-h-11"
                       onClick={() => onCreate(candidate)}
                       leftIcon={<BadgeCheck className="h-3.5 w-3.5" />}
                     >

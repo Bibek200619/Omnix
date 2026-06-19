@@ -723,7 +723,7 @@ function FilesPageContent() {
                 type="button"
                 onClick={() => setActiveSection(section.id)}
                 className={cn(
-                  "inline-flex min-h-9 flex-1 items-center justify-center gap-2 rounded-lg px-3 text-xs font-bold uppercase tracking-[0.08em] transition sm:flex-none",
+                  "inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg px-3 text-xs font-bold uppercase tracking-[0.08em] transition sm:flex-none",
                   activeSection === section.id
                     ? "bg-cyan-300/12 text-cyan-100 shadow-[var(--omnix-glow-xs)]"
                     : "text-[var(--omnix-text-3)] hover:bg-white/[0.035] hover:text-white",
@@ -893,17 +893,17 @@ function FilesPageContent() {
                     </div>
                     <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center lg:justify-end">
                       {googleDriveNeedsAuth ? (
-                        <Button type="button" size="sm" variant="secondary" className="min-h-10" leftIcon={<ExternalLink className="h-3.5 w-3.5" />} isLoading={authConnectorId === connector.id} onClick={() => void handleDriveAuth(connector)}>
+                        <Button type="button" size="sm" variant="secondary" className="min-h-11" leftIcon={<ExternalLink className="h-3.5 w-3.5" />} isLoading={authConnectorId === connector.id} onClick={() => void handleDriveAuth(connector)}>
                           Authenticate
                         </Button>
                       ) : null}
-                      <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<RefreshCw className="h-3.5 w-3.5" />} isLoading={busy} onClick={() => void handleRetryConnector(connector)}>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<RefreshCw className="h-3.5 w-3.5" />} isLoading={busy} onClick={() => void handleRetryConnector(connector)}>
                         Retry
                       </Button>
-                      <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => openSetup(connector.connector_type, connector)}>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => openSetup(connector.connector_type, connector)}>
                         Configure
                       </Button>
-                      <Button type="button" size="sm" variant="ghost" className="min-h-10 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Unplug className="h-3.5 w-3.5" />} isLoading={busy} onClick={() => void handleRemoveConnector(connector)}>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-11 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Unplug className="h-3.5 w-3.5" />} isLoading={busy} onClick={() => void handleRemoveConnector(connector)}>
                         Remove
                       </Button>
                     </div>
@@ -1018,9 +1018,9 @@ function FilesPageContent() {
                       </div>
                     </div>
                     <div className={view === "grid" ? "grid grid-cols-2 gap-2 border-t border-white/5 pt-3 sm:flex sm:items-center" : "grid grid-cols-2 gap-2 sm:flex sm:items-center"}>
-                      <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<BadgeCheck className="h-3.5 w-3.5" />} onClick={() => void scanDocumentDecisionCandidates(f)}>Decisions</Button>
-                      <Button type="button" size="sm" variant="ghost" className="min-h-10" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
-                      <Button type="button" size="sm" variant="ghost" className="min-h-10 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<BadgeCheck className="h-3.5 w-3.5" />} onClick={() => void scanDocumentDecisionCandidates(f)}>Decisions</Button>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-11 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
                     </div>
                   </div>
                 );
@@ -1048,7 +1048,7 @@ function FilesPageContent() {
                     setDecisionCandidates([]);
                     setDecisionCandidatesError(null);
                   }}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
                   aria-label="Close document decision suggestions"
                   title="Close"
                 >
@@ -1101,7 +1101,7 @@ function FilesPageContent() {
               <button
                 type="button"
                 onClick={() => setSetupType(null)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
                 aria-label="Close connector setup"
                 title="Close"
               >
