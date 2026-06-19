@@ -51,9 +51,19 @@ export function ThreadPanel({
   if (!root) return null;
   const rootId = root.id;
 
+  function sendThreadDraft() {
+    const content = threadDraft.trim();
+    if (!content || !mayPost || threadSending) return;
+    const mentions = threadDraftMentions;
+    onThreadDraftChange("");
+    onThreadDraftMentionsChange([]);
+    onTypingChange(false);
+    onSend(content, rootId, mentions);
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onSend(threadDraft, rootId, threadDraftMentions);
+    sendThreadDraft();
   }
 
   return (
