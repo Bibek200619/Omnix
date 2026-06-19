@@ -450,25 +450,35 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       }
     }, STATUS_INTERVAL_MS);
 
-    const handleFocus = () => {
+    const refreshVisibleWorkspaceState = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
       void heartbeatPresence();
       void refreshActivity();
       void refreshLiveStatuses();
     };
 
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleFocus);
+    window.addEventListener("focus", refreshVisibleWorkspaceState);
+    document.addEventListener("visibilitychange", refreshVisibleWorkspaceState);
 
     return () => {
       window.clearInterval(heartbeatId);
       window.clearInterval(statusId);
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleFocus);
+      window.removeEventListener("focus", refreshVisibleWorkspaceState);
+      document.removeEventListener("visibilitychange", refreshVisibleWorkspaceState);
     };
   }, [refreshActivity, refreshLiveStatuses, heartbeatPresence, userId]);
 
   useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
     const timeoutId = window.setInterval(() => {
+       if (document.visibilityState !== "visible") {
+          return;
+       }
        setTypingUsers(current => {
           const now = Date.now();
           let changed = false;
@@ -486,7 +496,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     }, 2000);
 
     return () => window.clearInterval(timeoutId);
-  }, []);
+  }, [userId]);
 
   const value = useMemo<CollaborationContextType>(
     () => ({
