@@ -18,7 +18,7 @@ export function ensureSentence(message: string) {
 export function logClientError(label: string, error: unknown, diagnostics: ClientErrorDiagnostics = {}) {
   const apiError = error instanceof ApiError ? error : null;
   console.error(label, {
-    error,
+    error: apiError ? apiError.toJSON() : error,
     endpoint: diagnostics.endpoint ?? apiError?.endpoint,
     status: diagnostics.status ?? apiError?.status,
     responsePayload: diagnostics.responsePayload ?? apiError?.responsePayload,

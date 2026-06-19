@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
-import { API_BASE_URL } from "@/lib/api";
+import { apiUrl } from "@/lib/api";
 import { logger } from "@/lib/logger";
 import type { MessageAttachment } from "@/components/chat/types";
 
@@ -56,7 +56,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
 
 
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${API_BASE_URL}/upload`);
+    xhr.open("POST", apiUrl("/upload"));
 
     xhr.upload.onprogress = (ev) => {
       if (!ev.lengthComputable) return;
