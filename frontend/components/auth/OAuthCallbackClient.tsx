@@ -127,6 +127,11 @@ export function OAuthCallbackClient() {
         }
 
         await ensureOAuthProfile(activeSession.user);
+        try {
+          await apiClient.post("/email/welcome");
+        } catch (emailErr) {
+          logClientError("Welcome email request failed", emailErr);
+        }
         setState("success");
 
         window.setTimeout(() => {

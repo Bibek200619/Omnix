@@ -40,6 +40,14 @@ class AuthUserProfile:
     phone_number: str | None
 
 
+@dataclass(slots=True)
+class WelcomeEmailClaim:
+    user_id: str
+    email: str
+    name: str
+    should_send: bool
+
+
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -117,6 +125,10 @@ def _has_missing_profile_timestamp(exc: SupabaseServiceError) -> bool:
 
 def _has_missing_profile_phone_number(exc: SupabaseServiceError) -> bool:
     return _is_missing_supabase_column(exc, "phone_number")
+
+
+def _has_missing_profile_welcome_email_sent_at(exc: SupabaseServiceError) -> bool:
+    return _is_missing_supabase_column(exc, "welcome_email_sent_at")
 
 
 def _is_unique_profile_violation(exc: SupabaseServiceError) -> bool:
@@ -364,6 +376,43 @@ async def update_user_profile(current_user: Any, payload: Mapping[str, Any]) -> 
             raise HTTPException(status_code=500, detail="Internal server error") from exc
 
     return _merge_profile(updated, _metadata_profile(current_user), user_id)
+
+
+async def claim_welcome_email_delivery(current_user: Any) -> WelcomeEmailClaim:
+    user_id = user_id_from_claims(current_user)
+    profile = await ensure_user_profile(current_user)
+    email = user_email_from_claims(current_user) or str(profile.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Authenticated user has no email address.")
+
+    name = str(profile.get("display_name") or profile.get("username") or "").strip()
+    timestamp = utc_now_iso()
+    try:
+        updated = await update_one_trusted(
+            PROFILE_TABLE,
+            {PROFILE_ID_COLUMN: user_id, "welcome_email_sent_at": {"is": "null"}},
+            {"welcome_email_sent_at": timestamp, "updated_at": timestamp},
+        )
+    except SupabaseServiceError as exc:
+        if not _has_missing_profile_welcome_email_sent_at(exc):
+            logger.exception("Failed to claim welcome email delivery | user_id=%s", user_id)
+            raise HTTPException(status_code=500, detail="Internal server error") from exc
+
+        logger.warning("profiles.welcome_email_sent_at is unavailable; skipping welcome email idempotency.")
+        updated = None
+
+    return WelcomeEmailClaim(user_id=user_id, email=email, name=name, should_send=updated is not None)
+
+
+async def reset_welcome_email_delivery_claim(user_id: str) -> None:
+    try:
+        await update_one_trusted(
+            PROFILE_TABLE,
+            {PROFILE_ID_COLUMN: user_id},
+            {"welcome_email_sent_at": None, "updated_at": utc_now_iso()},
+        )
+    except SupabaseServiceError:
+        logger.exception("Failed to reset welcome email delivery claim | user_id=%s", user_id)
 
 
 async def get_user_profile_map(user_ids: list[str]) -> dict[str, dict[str, Any]]:

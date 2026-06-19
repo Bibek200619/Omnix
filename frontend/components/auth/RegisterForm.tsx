@@ -98,9 +98,9 @@ export function RegisterForm() {
           phone_number: normalizedPhone,
         });
 
-        // Send welcome email — failures must not block signup
+        // Send welcome email - failures must not block signup
         try {
-          await apiClient.post("/email/welcome", { email, name });
+          await apiClient.post("/email/welcome");
         } catch (emailErr) {
           logClientError("Welcome email request failed", emailErr);
         }
