@@ -1,16 +1,18 @@
 import os
 from dataclasses import dataclass
 from html import escape
+from importlib import import_module
+from types import ModuleType
 from urllib.parse import quote
 
-import resend
 from dotenv import load_dotenv
 
 from ..settings import get_settings
 
 load_dotenv()
 
-resend.api_key = os.getenv("RESEND_API_KEY")
+_resend_client: ModuleType | None = None
+_resend_import_failed = False
 
 
 @dataclass(frozen=True)
@@ -28,19 +30,41 @@ def _provider_id(response: object) -> str | None:
     return str(value) if value else None
 
 
+def _get_resend_client(api_key: str | None) -> ModuleType | None:
+    global _resend_client, _resend_import_failed
+
+    if not api_key or _resend_import_failed:
+        return None
+
+    if _resend_client is None:
+        try:
+            _resend_client = import_module("resend")
+        except ModuleNotFoundError:
+            _resend_import_failed = True
+            return None
+
+    _resend_client.api_key = api_key
+    return _resend_client
+
+
 async def send_welcome_email(email: str, name: str):
+    settings = get_settings()
+    client = _get_resend_client(settings.RESEND_API_KEY or os.getenv("RESEND_API_KEY"))
+    if client is None:
+        return False
+
     try:
-        resend.Emails.send(
+        client.Emails.send(
             {
                 "from": os.getenv(
                     "EMAIL_FROM",
                     "Omnix <noreply@omni-x.co.in>",
                 ),
                 "to": [email],
-                "subject": "Welcome to Omnix 🚀",
+                "subject": "Congratulations - welcome to Omnix",
                 "html": f"""
                 <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;">
-                    <h1>Welcome to Omnix, {name}! 🚀</h1>
+                    <h1>Congratulations{name and f", {escape(name)}"}!</h1>
 
                     <p>Your account has been successfully created.</p>
 
@@ -88,7 +112,13 @@ async def send_workspace_invite_email(
             error="RESEND_API_KEY is not configured",
         )
 
-    resend.api_key = api_key
+    client = _get_resend_client(api_key)
+    if client is None:
+        return EmailDeliveryResult(
+            status="skipped",
+            error="Resend package is not installed",
+        )
+
     app_url = settings.OMNIX_APP_URL.rstrip("/") or "http://localhost:3000"
     invite_url = f"{app_url}/invite?invite={quote(invite_id)}"
     subject_workspace_name = workspace_name or "Omnix workspace"
@@ -98,7 +128,7 @@ async def send_workspace_invite_email(
     safe_invite_url = escape(invite_url, quote=True)
 
     try:
-        response = resend.Emails.send(
+        response = client.Emails.send(
             {
                 "from": settings.RESEND_FROM_EMAIL,
                 "to": [to_email],
