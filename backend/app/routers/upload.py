@@ -35,6 +35,9 @@ ALLOWED_MIMES = {
     "text/x-markdown",
 }
 
+UPLOAD_DIR = os.environ.get("OMNIX_UPLOAD_DIR", "./uploads")
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -116,7 +119,7 @@ async def upload_file(
 
     # Save raw file to disk
     try:
-        storage_path = await save_bytes_to_user_upload(user_id, filename, contents)
+        storage_path = await save_bytes_to_user_upload(user_id, filename, contents, root=UPLOAD_DIR)
         logger.info("Document uploaded")
     except Exception as exc:
         logger.exception("Failed to persist uploaded file to disk: %s", exc)
