@@ -7,6 +7,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { safeLinkHref } from "@/lib/url-safety";
 
 type MarkdownRendererProps = {
   content: string;
@@ -78,9 +79,14 @@ export function MarkdownRenderer({ content, compact = false }: MarkdownRendererP
       );
     },
     a({ children, href }) {
+      const safeHref = safeLinkHref(href);
+      if (!safeHref) {
+        return <span className="font-medium text-slate-200">{children}</span>;
+      }
+
       return (
         <a
-          href={href}
+          href={safeHref}
           target="_blank"
           rel="noreferrer"
           className="font-medium text-cyan-200 underline decoration-cyan-200/30 underline-offset-4 hover:text-cyan-100"
