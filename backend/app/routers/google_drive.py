@@ -20,7 +20,8 @@ from ..integrations.google_drive import (
     parse_oauth_state,
 )
 from ..services.supabase_service import SupabaseServiceError, insert_one
-from ..routers.upload import _save_bytes_to_path, _extract_text_from_bytes
+from ..services.file_storage import sanitize_filename, save_bytes_to_user_upload
+from ..routers.upload import _extract_text_from_bytes
 from ..rag.ingestion import RAGIngestionPipeline
 from ..rag.startup import get_vector_store
 
@@ -117,9 +118,9 @@ async def import_file(workspace_id: str, file_id: str, current_user: dict[str, A
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to download file")
 
     # Save to disk like upload flow
-    filename = file_meta.get("name") or f"drive_{file_id}"
+    filename = sanitize_filename(file_meta.get("name") or f"drive_{file_id}")
     try:
-        storage_path = await _save_bytes_to_path(user_id, filename, data)
+        storage_path = await save_bytes_to_user_upload(user_id, filename, data)
     except Exception as exc:
         logger.exception("Failed to save downloaded file: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to store file")

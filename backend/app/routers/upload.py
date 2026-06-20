@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -17,6 +16,7 @@ from ..services.document_intelligence_service import (
 )
 from ..services.supabase_service import SupabaseServiceError, insert_one, update_one
 from ..services.document_context_service import store_extracted_text_chunks
+from ..services.file_storage import sanitize_filename, save_bytes_to_user_upload
 from ..services.workspace_service import active_workspace_id_from_request, require_workspace_access
 from ..services.workspace_collaboration_service import log_workspace_activity
 from .conversations import require_conversation_access
@@ -35,21 +35,8 @@ ALLOWED_MIMES = {
     "text/x-markdown",
 }
 
-UPLOAD_DIR = os.environ.get("OMNIX_UPLOAD_DIR", "./uploads")
-
-
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-async def _save_bytes_to_path(user_id: str, filename: str, data: bytes) -> str:
-    user_dir = os.path.join(UPLOAD_DIR, user_id)
-    os.makedirs(user_dir, exist_ok=True)
-    unique_name = f"{uuid.uuid4().hex}_{filename}"
-    path = os.path.join(user_dir, unique_name)
-    with open(path, "wb") as fh:
-        fh.write(data)
-    return path
 
 
 def _extract_text_from_bytes(filename: str, file_type: str | None, data: bytes) -> str:
@@ -123,13 +110,13 @@ async def upload_file(
 
     # Validate mime/extension
     file_type = (file.content_type or "").lower()
-    filename = os.path.basename(file.filename or "unnamed")
+    filename = sanitize_filename(file.filename or "unnamed")
     if file_type not in ALLOWED_MIMES and not any(filename.lower().endswith(ext) for ext in (".pdf", ".docx", ".txt", ".md")):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported file type")
 
     # Save raw file to disk
     try:
-        storage_path = await _save_bytes_to_path(user_id, filename, contents)
+        storage_path = await save_bytes_to_user_upload(user_id, filename, contents)
         logger.info("Document uploaded")
     except Exception as exc:
         logger.exception("Failed to persist uploaded file to disk: %s", exc)
