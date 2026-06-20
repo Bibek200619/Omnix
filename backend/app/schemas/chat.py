@@ -115,12 +115,13 @@ class AIGenerationResponse(BaseModel):
 
 
 class FileCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     conversation_id: str | None = None
     workspace_id: str | None = None
     file_name: str = Field(..., min_length=1, max_length=512)
     file_type: str | None = Field(default=None, max_length=255)
     size_bytes: int | None = Field(default=None, ge=0)
-    storage_path: str | None = Field(default=None, max_length=1024)
     metadata: dict[str, Any] | None = None
 
 

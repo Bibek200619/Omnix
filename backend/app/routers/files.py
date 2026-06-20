@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -16,6 +15,7 @@ from ..services.supabase_service import (
     select_all_trusted,
     select_one_trusted,
 )
+from ..services.file_storage import resolve_managed_storage_path, sanitize_filename
 from ..services.workspace_service import (
     active_workspace_id_from_request,
     can_manage_workspace_resource,
@@ -188,12 +188,13 @@ async def download_file(
     file_row, _ = await _require_file_access(file_id, user_id)
 
     storage_path = file_row.get("storage_path")
-    if not storage_path or not os.path.exists(storage_path):
+    safe_path = resolve_managed_storage_path(storage_path)
+    if safe_path is None or not safe_path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File content not found on server.")
 
-    filename = file_row.get("file_name") or "download"
+    filename = sanitize_filename(file_row.get("file_name") or "download", fallback="download")
     file_type = file_row.get("file_type") or "application/octet-stream"
-    return FileResponse(path=storage_path, filename=filename, media_type=file_type)
+    return FileResponse(path=safe_path, filename=filename, media_type=file_type)
 
 
 @router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -230,11 +231,13 @@ async def delete_file(
 
     storage_path = file_row.get("storage_path")
     if storage_path:
-        try:
-            os.remove(storage_path)
-        except FileNotFoundError:
-            pass
-        except Exception as exc:
-            raise _database_error() from exc
+        safe_path = resolve_managed_storage_path(storage_path)
+        if safe_path is not None:
+            try:
+                safe_path.unlink()
+            except FileNotFoundError:
+                pass
+            except Exception as exc:
+                raise _database_error() from exc
 
     return None

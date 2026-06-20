@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 from datetime import datetime, timezone
 
+from ..services.file_storage import resolve_managed_storage_path
 from ..services.supabase_service import (
     select_one_trusted,
     update_one_trusted,
@@ -47,15 +47,15 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
         if file_row is None:
             raise RuntimeError("File not found for ingestion")
 
-        storage_path = file_row.get("storage_path")
+        storage_path = resolve_managed_storage_path(file_row.get("storage_path"))
         filename = file_row.get("file_name") or "imported"
         file_type = file_row.get("file_type")
 
-        if not storage_path or not os.path.exists(storage_path):
+        if storage_path is None or not storage_path.exists():
             raise RuntimeError("Stored file not found on disk")
 
         # Read bytes
-        with open(storage_path, "rb") as fh:
+        with storage_path.open("rb") as fh:
             data = fh.read()
 
         extraction_result = extract_document_with_diagnostics(filename, file_type, data)
