@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import vector_store, observability, workers, redis, shutdown, middleware
 from ..runtime.manager import RuntimeManager
 from ..health.router import router as health_router
-from ..routers import conversations, files, cache, messages, upload, workspaces, workspace_conversations, workspace_tasks, workspace_decisions, workspace_search, workspace_mentions, actions, artifacts, insights, automations, google_drive, admin, profile, continuity, connectors, email
+from ..routers import conversations, files, cache, messages, upload, workspaces, workspace_invites, workspace_conversations, workspace_tasks, workspace_decisions, workspace_search, workspace_mentions, actions, artifacts, insights, automations, google_drive, admin, profile, continuity, connectors, email
 from ..core.security import auth_context_middleware
 from ..settings import get_settings
 
@@ -141,8 +141,9 @@ def create_app() -> FastAPI:
     app.include_router(upload.router)
     app.include_router(cache.router)
     app.include_router(profile.router)
+    app.include_router(workspace_invites.workspace_router)
     app.include_router(workspaces.router)
-    app.include_router(workspaces.invite_router)
+    app.include_router(workspace_invites.router)
     app.include_router(workspace_conversations.router)
     app.include_router(workspace_tasks.router)
     app.include_router(workspace_decisions.router)
