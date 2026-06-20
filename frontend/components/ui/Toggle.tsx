@@ -19,6 +19,7 @@ export function Toggle({
     <label
       className={cn(
         "flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-[var(--omnix-border)] bg-black/20 p-4 transition hover:-translate-y-0.5 hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface)] hover:shadow-[var(--omnix-glow-xs)]",
+        "motion-reduce:transition-none motion-reduce:hover:translate-y-0",
         className,
       )}
     >
