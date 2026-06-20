@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { FilePlus, X, FileText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { apiUrl } from "@/lib/api";
 import { logger } from "@/lib/logger";
@@ -38,9 +38,12 @@ function uploadProcessingStatus(file: MessageAttachment): MessageAttachment["pro
 export function UploadDropzone({ conversationId, compact = false, onUploadSuccess, onUploadComplete }: UploadDropzoneProps = {}) {
   const [items, setItems] = useState<UploadItem[]>([]);
   const [isDragActive, setIsDragActive] = useState(false);
+  const reduceMotion = useReducedMotion();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeUploadsRef = useRef(0);
   const batchHadSuccessRef = useRef(false);
+  const springTransition = reduceMotion ? { duration: 0 } : { type: "spring" as const, stiffness: 300, damping: 20 };
+  const itemTransition = reduceMotion ? { duration: 0 } : { type: "spring" as const, stiffness: 400, damping: 25 };
 
   const markUploadSettled = useCallback((success: boolean) => {
     if (success) {
@@ -190,9 +193,9 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
         animate={{
           borderColor: isDragActive ? "var(--omnix-rgba-0-255-255-0-5)" : "var(--omnix-rgba-0-255-255-0-12)",
           backgroundColor: isDragActive ? "var(--omnix-rgba-0-255-255-0-06)" : "var(--omnix-rgba-0-255-255-0-035)",
-          scale: isDragActive ? 1.01 : 1,
+          scale: reduceMotion ? 1 : isDragActive ? 1.01 : 1,
         }}
-        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        transition={springTransition}
         className={cn(
           "relative overflow-hidden rounded-xl border border-dashed text-center transition-shadow hover:border-[var(--omnix-border-active)] hover:shadow-[var(--omnix-glow-xs)]",
           compact ? "p-4" : "p-5 sm:p-8",
@@ -202,12 +205,12 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
           <div className={cn("flex items-center justify-center gap-4", compact ? "flex-row" : "flex-col sm:flex-row")}>
             <motion.div 
               animate={{ 
-                scale: isDragActive ? 1.1 : 1,
-                rotate: isDragActive ? 10 : 0,
+                scale: reduceMotion ? 1 : isDragActive ? 1.1 : 1,
+                rotate: reduceMotion ? 0 : isDragActive ? 10 : 0,
                 color: isDragActive ? "var(--omnix-color-22d3ee)" : "var(--omnix-color-67e8f9)",
                 backgroundColor: isDragActive ? "var(--omnix-rgba-34-211-238-0-1)" : "var(--omnix-rgba-255-255-255-0-03)"
               }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              transition={springTransition}
               className={cn("flex shrink-0 items-center justify-center rounded-xl", compact ? "h-10 w-10" : "h-14 w-14")}
             >
               <FilePlus className={cn(compact ? "h-5 w-5" : "h-7 w-7")} />
@@ -226,8 +229,8 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
           </div>
 
           <motion.div 
-            animate={{ opacity: isDragActive ? 0 : 1, y: isDragActive ? 10 : 0 }}
-            transition={{ duration: 0.2 }}
+            animate={{ opacity: isDragActive ? 0 : 1, y: reduceMotion ? 0 : isDragActive ? 10 : 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.2 }}
             className={cn("flex items-center justify-center", compact ? "mt-4" : "mt-6")}
           >
             <input ref={fileInputRef} type="file" multiple onChange={handleChoose} className="hidden" accept=".pdf,.docx,.txt,.md,text/*,application/pdf" />
@@ -238,7 +241,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
         <AnimatePresence>
           {isDragActive && (
             <motion.div
-              initial={{ opacity: 0 }}
+              initial={reduceMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-cyan-500/10 via-transparent to-purple-500/10"
@@ -252,10 +255,10 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
           {items.map((it) => (
             <motion.div 
               key={it.id} 
-              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              initial={reduceMotion ? false : { opacity: 0, y: 10, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+              transition={itemTransition}
               className={cn(
                 "group flex flex-col gap-4 rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] transition-colors hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)] sm:flex-row sm:items-center",
                 compact ? "p-3" : "p-4",
@@ -274,7 +277,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: it.progress + "%" }}
-                          transition={{ ease: "linear" }}
+                          transition={{ duration: reduceMotion ? 0 : undefined, ease: "linear" }}
                           className="h-full rounded-full bg-cyan-400" 
                         />
                       </div>
@@ -287,7 +290,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
                 {it.status === "uploading" ? (
                   <span className="text-xs font-medium text-cyan-400 w-12 text-right">{it.progress}%</span>
                 ) : it.status === "done" ? (
-                  <motion.span initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={cn("text-xs font-medium", it.processingStatus === "failed" ? "text-rose-400" : "text-emerald-400")}>{it.processingStatus === "failed" ? "Processing issue" : it.processingStatus === "queued" ? "Queued" : "Uploaded"}</motion.span>
+                  <motion.span initial={reduceMotion ? false : { scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.18 }} className={cn("text-xs font-medium", it.processingStatus === "failed" ? "text-rose-400" : "text-emerald-400")}>{it.processingStatus === "failed" ? "Processing issue" : it.processingStatus === "queued" ? "Queued" : "Uploaded"}</motion.span>
                 ) : it.status === "error" ? (
                   <span className="text-xs font-medium text-rose-400">Failed</span>
                 ) : (

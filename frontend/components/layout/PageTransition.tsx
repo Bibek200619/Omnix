@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 type PageTransitionProps = {
@@ -9,11 +9,13 @@ type PageTransitionProps = {
 };
 
 export function PageTransition({ children, className }: PageTransitionProps) {
+  const reduceMotion = useReducedMotion();
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, ease: "easeOut" }}
+      transition={{ duration: reduceMotion ? 0 : 0.22, ease: "easeOut" }}
       className={cn("min-h-0", className)}
     >
       {children}
