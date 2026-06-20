@@ -8,7 +8,8 @@ from typing import Any
 from fastapi import HTTPException, status
 
 from .supabase_service import SupabaseServiceError, select_all_trusted, select_one_trusted
-from .workspace_service import require_workspace_access
+from .workspace_mention_service import list_mentions_for_user
+from .workspace_service import list_workspace_members, require_workspace_access
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,27 @@ TASK_COLUMNS = "id,workspace_id,title,description,status,created_at,updated_at"
 INITIATIVE_COLUMNS = "id,workspace_id,title,description,status,created_at,updated_at"
 DECISION_COLUMNS = "id,workspace_id,title,description,decision_reason,status,created_at,updated_at"
 CHANNEL_MEMBER_COLUMNS = "channel_id,user_id,role,created_at"
+FILE_COLUMNS = (
+    "id,workspace_id,user_id,file_name,file_type,size_bytes,processing_status,"
+    "extraction_status,metadata,created_at,updated_at"
+)
+DOCUMENT_COLUMNS = "id,workspace_id,file_id,content,chunk_index,metadata,source_type,created_at,updated_at"
+CONNECTOR_COLUMNS = (
+    "id,workspace_id,connector_type,display_name,status,last_error,source_file_id,"
+    "last_synced_at,created_at,updated_at"
+)
+SEARCH_GROUPS = (
+    "conversations",
+    "tasks",
+    "initiatives",
+    "decisions",
+    "files",
+    "documents",
+    "sources",
+    "members",
+    "mentions",
+    "workspaces",
+)
 
 
 def _database_error() -> HTTPException:
@@ -51,16 +73,40 @@ def _result_time(row: Mapping[str, Any]) -> str:
     return str(row.get("updated_at") or row.get("created_at") or "")
 
 
-def _dedupe_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _result_rank(result: Mapping[str, Any], query: str) -> int:
+    normalized_query = query.lower()
+    title = str(result.get("title") or "").lower()
+    preview = str(result.get("preview") or "").lower()
+    context = str(result.get("context") or "").lower()
+    matched_field = str(result.get("matched_field") or "").lower()
+    if title == normalized_query:
+        return 0
+    if title.startswith(normalized_query):
+        return 1
+    if normalized_query in title:
+        return 2
+    if matched_field in {"title", "name", "file_name", "display_name"}:
+        return 3
+    if normalized_query in preview:
+        return 4
+    if normalized_query in context:
+        return 5
+    return 6
+
+
+def _dedupe_results(results: list[dict[str, Any]], *, query: str = "", limit: int = SEARCH_GROUP_LIMIT) -> list[dict[str, Any]]:
     seen: set[str] = set()
     unique: list[dict[str, Any]] = []
-    for result in sorted(results, key=_result_time, reverse=True):
+    ordered = sorted(results, key=_result_time, reverse=True)
+    if query:
+        ordered.sort(key=lambda result: _result_rank(result, query))
+    for result in ordered:
         result_id = str(result.get("id") or "")
         if not result_id or result_id in seen:
             continue
         seen.add(result_id)
         unique.append(result)
-        if len(unique) >= SEARCH_GROUP_LIMIT:
+        if len(unique) >= limit:
             break
     return unique
 
@@ -162,7 +208,7 @@ def _conversation_result_from_message(
     }
 
 
-async def _search_conversations(workspace_id: str, user_id: str, pattern: str) -> list[dict[str, Any]]:
+async def _search_conversations(workspace_id: str, user_id: str, pattern: str, query: str) -> list[dict[str, Any]]:
     channels = await _visible_channels(workspace_id, user_id)
     channel_ids = [str(channel["id"]) for channel in channels if channel.get("id")]
     if not channel_ids:
@@ -191,7 +237,7 @@ async def _search_conversations(workspace_id: str, user_id: str, pattern: str) -
         for row in message_rows
         if (result := _conversation_result_from_message(row, channels_by_id)) is not None
     )
-    return _dedupe_results(results)
+    return _dedupe_results(results, query=query)
 
 
 def _task_result(row: Mapping[str, Any]) -> dict[str, Any]:
@@ -242,21 +288,200 @@ def _decision_result(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _file_result(row: Mapping[str, Any]) -> dict[str, Any]:
+    file_id = str(row["id"])
+    status_text = str(row.get("processing_status") or row.get("extraction_status") or "File").replace("_", " ").title()
+    file_type = str(row.get("file_type") or "").strip()
+    size_bytes = row.get("size_bytes")
+    size_context = f"{size_bytes} bytes" if size_bytes is not None else None
+    return {
+        "id": file_id,
+        "workspace_id": str(row["workspace_id"]),
+        "type": "file",
+        "title": str(row.get("file_name") or "Workspace file"),
+        "preview": file_type or size_context,
+        "context": status_text,
+        "url": f"/files?id={file_id}",
+        "matched_field": row.get("_matched_field"),
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
+    }
+
+
+def _document_title(row: Mapping[str, Any]) -> str:
+    metadata = row.get("metadata")
+    if isinstance(metadata, Mapping):
+        for key in ("file_name", "source_name", "title", "connector_name"):
+            value = metadata.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    chunk_index = row.get("chunk_index")
+    if chunk_index is not None:
+        return f"Document snippet {chunk_index}"
+    return "Document snippet"
+
+
+def _document_result(row: Mapping[str, Any]) -> dict[str, Any]:
+    document_id = str(row["id"])
+    file_id = str(row.get("file_id") or "")
+    return {
+        "id": document_id,
+        "workspace_id": str(row["workspace_id"]),
+        "type": "document",
+        "title": _document_title(row),
+        "preview": _compact_text(row.get("content"), limit=220),
+        "context": str(row.get("source_type") or "Extracted document text").replace("_", " ").title(),
+        "url": f"/files?id={file_id}" if file_id else "/files",
+        "matched_field": row.get("_matched_field"),
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
+    }
+
+
+def _source_result(row: Mapping[str, Any]) -> dict[str, Any]:
+    connector_id = str(row["id"])
+    connector_type = str(row.get("connector_type") or "source").replace("_", " ").title()
+    status_text = str(row.get("status") or "Source").replace("_", " ").title()
+    return {
+        "id": connector_id,
+        "workspace_id": str(row["workspace_id"]),
+        "type": "source",
+        "title": str(row.get("display_name") or connector_type),
+        "preview": _compact_text(row.get("last_error")) if row.get("last_error") else connector_type,
+        "context": status_text,
+        "url": f"/files?source={connector_id}",
+        "matched_field": row.get("_matched_field"),
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at") or row.get("last_synced_at"),
+    }
+
+
+def _member_result(row: Mapping[str, Any]) -> dict[str, Any]:
+    user_id = str(row.get("user_id") or "")
+    title = str(row.get("full_name") or row.get("handle") or row.get("email") or "Workspace member")
+    role = str(row.get("role") or "member").replace("_", " ").title()
+    return {
+        "id": user_id,
+        "workspace_id": str(row.get("workspace_id") or ""),
+        "type": "member",
+        "title": title,
+        "preview": _compact_text(row.get("operational_label") or row.get("email") or row.get("handle")),
+        "context": role,
+        "url": "/team",
+        "matched_field": row.get("_matched_field"),
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
+    }
+
+
+def _mention_result(row: Mapping[str, Any]) -> dict[str, Any]:
+    mention_id = str(row.get("id") or "")
+    source_type = str(row.get("source_type") or "mention").replace("_", " ").title()
+    actor = str(row.get("mentioned_by_name") or row.get("mentioned_by_email") or "A teammate")
+    read_at = row.get("read_at")
+    return {
+        "id": mention_id,
+        "workspace_id": str(row.get("workspace_id") or ""),
+        "type": "mention",
+        "title": str(row.get("source_title") or "Workspace mention"),
+        "preview": _compact_text(row.get("source_preview") or f"{actor} mentioned you"),
+        "context": f"{'Read' if read_at else 'Unread'} {source_type} mention",
+        "url": str(row.get("source_url") or "/notifications"),
+        "matched_field": row.get("_matched_field"),
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("created_at"),
+    }
+
+
+def _workspace_result(row: Mapping[str, Any], query: str) -> dict[str, Any] | None:
+    haystack = " ".join(
+        str(row.get(key) or "")
+        for key in (
+            "name",
+            "description",
+            "expertise_area",
+            "workspace_focus",
+            "ai_specialization",
+        )
+    ).lower()
+    if query.lower() not in haystack:
+        return None
+    workspace_id = str(row.get("id") or "")
+    return {
+        "id": workspace_id,
+        "workspace_id": workspace_id,
+        "type": "workspace",
+        "title": str(row.get("name") or "Workspace"),
+        "preview": _compact_text(row.get("description") or row.get("expertise_area")),
+        "context": str(row.get("workspace_focus") or row.get("workspace_type") or "Workspace").replace("_", " ").title(),
+        "url": "/workspace",
+        "matched_field": "workspace_metadata",
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
+    }
+
+
+def _empty_response() -> dict[str, list[dict[str, Any]]]:
+    return {group: [] for group in SEARCH_GROUPS}
+
+
+async def _search_members(workspace: Mapping[str, Any], query: str) -> list[dict[str, Any]]:
+    members = await list_workspace_members(dict(workspace))
+    normalized_query = query.lower()
+    matches: list[dict[str, Any]] = []
+    for member in members:
+        fields = {
+            "full_name": member.get("full_name"),
+            "email": member.get("email"),
+            "handle": member.get("handle"),
+            "role": member.get("role"),
+            "operational_label": member.get("operational_label"),
+        }
+        matched_field = next(
+            (field for field, value in fields.items() if normalized_query in str(value or "").lower()),
+            None,
+        )
+        if matched_field:
+            matches.append({**member, "_matched_field": matched_field})
+    return _dedupe_results([_member_result(row) for row in matches], query=query)
+
+
+async def _search_mentions(workspace_id: str, user_id: str, query: str) -> list[dict[str, Any]]:
+    mentions = await list_mentions_for_user(workspace_id=workspace_id, user_id=user_id, limit=50)
+    normalized_query = query.lower()
+    matches: list[dict[str, Any]] = []
+    for mention in mentions:
+        fields = {
+            "source_title": mention.get("source_title"),
+            "source_preview": mention.get("source_preview"),
+            "mentioned_by_name": mention.get("mentioned_by_name"),
+            "mentioned_by_email": mention.get("mentioned_by_email"),
+            "source_type": mention.get("source_type"),
+        }
+        matched_field = next(
+            (field for field, value in fields.items() if normalized_query in str(value or "").lower()),
+            None,
+        )
+        if matched_field:
+            matches.append({**mention, "_matched_field": matched_field})
+    return _dedupe_results([_mention_result(row) for row in matches], query=query)
+
+
 async def search_workspace(
     *,
     workspace_id: str,
     user_id: str,
     query: str,
 ) -> dict[str, list[dict[str, Any]]]:
-    await require_workspace_access(workspace_id, user_id)
+    access = await require_workspace_access(workspace_id, user_id)
     normalized_query = _normalize_query(query)
-    empty = {"conversations": [], "tasks": [], "initiatives": [], "decisions": []}
+    empty = _empty_response()
     if not normalized_query:
         return empty
 
     pattern = _ilike_pattern(normalized_query)
     try:
-        conversations_task = _search_conversations(workspace_id, user_id, pattern)
+        conversations_task = _search_conversations(workspace_id, user_id, pattern, normalized_query)
         tasks_task = _search_table_fields(
             table="workspace_tasks",
             columns=TASK_COLUMNS,
@@ -278,19 +503,64 @@ async def search_workspace(
             fields=("title", "decision_reason", "description"),
             pattern=pattern,
         )
-        conversation_rows, task_rows, initiative_rows, decision_rows = await asyncio.gather(
+        files_task = _search_table_fields(
+            table="files",
+            columns=FILE_COLUMNS,
+            workspace_id=workspace_id,
+            fields=("file_name", "file_type"),
+            pattern=pattern,
+        )
+        documents_task = _search_table_fields(
+            table="documents",
+            columns=DOCUMENT_COLUMNS,
+            workspace_id=workspace_id,
+            fields=("content",),
+            pattern=pattern,
+        )
+        sources_task = _search_table_fields(
+            table="workspace_connectors",
+            columns=CONNECTOR_COLUMNS,
+            workspace_id=workspace_id,
+            fields=("display_name", "connector_type", "status"),
+            pattern=pattern,
+        )
+        members_task = _search_members(access.workspace, normalized_query)
+        mentions_task = _search_mentions(workspace_id, user_id, normalized_query)
+        (
+            conversation_rows,
+            task_rows,
+            initiative_rows,
+            decision_rows,
+            file_rows,
+            document_rows,
+            source_rows,
+            member_rows,
+            mention_rows,
+        ) = await asyncio.gather(
             conversations_task,
             tasks_task,
             initiatives_task,
             decisions_task,
+            files_task,
+            documents_task,
+            sources_task,
+            members_task,
+            mentions_task,
         )
     except SupabaseServiceError as exc:
         logger.exception("Workspace search failed | workspace_id=%s", workspace_id)
         raise _database_error() from exc
 
+    workspace_result = _workspace_result(access.workspace, normalized_query)
     return {
         "conversations": conversation_rows,
-        "tasks": _dedupe_results([_task_result(row) for row in task_rows]),
-        "initiatives": _dedupe_results([_initiative_result(row) for row in initiative_rows]),
-        "decisions": _dedupe_results([_decision_result(row) for row in decision_rows]),
+        "tasks": _dedupe_results([_task_result(row) for row in task_rows], query=normalized_query),
+        "initiatives": _dedupe_results([_initiative_result(row) for row in initiative_rows], query=normalized_query),
+        "decisions": _dedupe_results([_decision_result(row) for row in decision_rows], query=normalized_query),
+        "files": _dedupe_results([_file_result(row) for row in file_rows], query=normalized_query),
+        "documents": _dedupe_results([_document_result(row) for row in document_rows], query=normalized_query),
+        "sources": _dedupe_results([_source_result(row) for row in source_rows], query=normalized_query),
+        "members": member_rows,
+        "mentions": mention_rows,
+        "workspaces": [workspace_result] if workspace_result else [],
     }

@@ -3,10 +3,21 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
-WorkspaceSearchResultType = Literal["conversation", "task", "initiative", "decision"]
+WorkspaceSearchResultType = Literal[
+    "conversation",
+    "task",
+    "initiative",
+    "decision",
+    "file",
+    "document",
+    "source",
+    "member",
+    "mention",
+    "workspace",
+]
 
 
 class WorkspaceSearchResult(BaseModel):
@@ -27,7 +38,13 @@ class WorkspaceSearchResult(BaseModel):
 
 
 class WorkspaceSearchResponse(BaseModel):
-    conversations: list[WorkspaceSearchResult]
-    tasks: list[WorkspaceSearchResult]
-    initiatives: list[WorkspaceSearchResult]
-    decisions: list[WorkspaceSearchResult]
+    conversations: list[WorkspaceSearchResult] = Field(default_factory=list)
+    tasks: list[WorkspaceSearchResult] = Field(default_factory=list)
+    initiatives: list[WorkspaceSearchResult] = Field(default_factory=list)
+    decisions: list[WorkspaceSearchResult] = Field(default_factory=list)
+    files: list[WorkspaceSearchResult] = Field(default_factory=list)
+    documents: list[WorkspaceSearchResult] = Field(default_factory=list)
+    sources: list[WorkspaceSearchResult] = Field(default_factory=list)
+    members: list[WorkspaceSearchResult] = Field(default_factory=list)
+    mentions: list[WorkspaceSearchResult] = Field(default_factory=list)
+    workspaces: list[WorkspaceSearchResult] = Field(default_factory=list)
