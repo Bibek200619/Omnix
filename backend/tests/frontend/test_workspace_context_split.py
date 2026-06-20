@@ -14,16 +14,18 @@ def read_frontend(relative_path: str) -> str:
 
 def test_workspace_provider_exposes_split_contexts() -> None:
     source = WORKSPACE_CONTEXT.read_text(encoding="utf-8")
+    context_values = read_frontend("lib/workspace-context-values.ts")
 
-    assert "useMemo<WorkspaceTreeContextValue>" in source
-    assert "useMemo<WorkspaceMembershipContextValue>" in source
-    assert "useMemo<WorkspaceIntelligenceContextValue>" in source
+    assert "useWorkspaceContextValues" in source
+    assert "useMemo<WorkspaceTreeContextValue>" in context_values
+    assert "useMemo<WorkspaceMembershipContextValue>" in context_values
+    assert "useMemo<WorkspaceIntelligenceContextValue>" in context_values
     assert "<WorkspaceTreeContext.Provider value={treeValue}>" in source
     assert "<WorkspaceMembershipContext.Provider value={membershipValue}>" in source
     assert "<WorkspaceIntelligenceContext.Provider value={intelligenceValue}>" in source
-    assert "...treeValue" in source
-    assert "...membershipValue" in source
-    assert "...intelligenceValue" in source
+    assert "...treeValue" in context_values
+    assert "...membershipValue" in context_values
+    assert "...intelligenceValue" in context_values
     assert "export function useWorkspace()" in source
 
 
@@ -55,17 +57,23 @@ def test_workspace_provider_delegates_storage_and_destructive_confirmation() -> 
     provider = WORKSPACE_CONTEXT.read_text(encoding="utf-8")
     storage = read_frontend("lib/workspace-active-storage.ts")
     confirmation = read_frontend("lib/workspace-destructive-confirmation.tsx")
+    effects = read_frontend("lib/workspace-provider-effects.ts")
 
     assert "persistActiveWorkspaceId" in provider
     assert "readStoredActiveWorkspaceId" in provider
     assert "WorkspaceDestructiveConfirmationModal" in provider
     assert "useWorkspaceDestructiveConfirmation" in provider
+    assert "usePendingWorkspaceInvitePolling" in provider
+    assert "useActiveWorkspaceReconciliation" in provider
     assert 'from "@/components/ui/Button"' not in provider
     assert 'from "@/components/ui/Modal"' not in provider
     assert "export function persistActiveWorkspaceId" in storage
     assert "export function readStoredActiveWorkspaceId" in storage
     assert "export function useWorkspaceDestructiveConfirmation" in confirmation
     assert "export function WorkspaceDestructiveConfirmationModal" in confirmation
+    assert "export function usePendingWorkspaceInvitePolling" in effects
+    assert "export function useActiveWorkspaceReconciliation" in effects
+    assert len(provider.splitlines()) <= 1_000
 
 
 def test_low_scope_consumers_use_targeted_workspace_hooks() -> None:
