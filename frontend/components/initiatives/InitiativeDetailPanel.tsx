@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { DecisionTraceabilityList } from "@/components/decisions/DecisionTraceabilityList";
+import { RecordTraceabilityPanel } from "@/components/provenance/RecordTraceabilityPanel";
 import { cn } from "@/lib/utils";
 import type {
   WorkspaceChannel,
@@ -67,6 +68,18 @@ type InitiativeDetailPanelProps = {
   onRequestAssistance: (mode: WorkspaceInitiativeAssistanceMode) => void;
 };
 
+function readableOrigin(value: unknown) {
+  const origin = String(value || "manual").replace(/[_-]/g, " ").trim();
+  if (!origin) return "Manual";
+  return origin.charAt(0).toUpperCase() + origin.slice(1);
+}
+
+function resourceHref(resource: WorkspaceInitiativeResource) {
+  if (resource.resource_type === "file") return `/files?id=${resource.resource_id}`;
+  if (resource.resource_type === "decision") return `/decisions?id=${resource.resource_id}`;
+  return undefined;
+}
+
 export function InitiativeDetailPanel({
   selected,
   selectedId,
@@ -99,6 +112,49 @@ export function InitiativeDetailPanel({
   onAddResource,
   onRequestAssistance,
 }: InitiativeDetailPanelProps) {
+  const traceabilityOrigin = selected
+    ? {
+        kind: "origin" as const,
+        label: `${readableOrigin(selected.activity_metadata?.origin)} initiative`,
+        detail: selected.creator_name ? `Recorded by ${selected.creator_name}` : selected.created_at ? `Recorded ${new Date(selected.created_at).toLocaleDateString()}` : null,
+      }
+    : null;
+  const traceabilityEvidence = selected?.initiative_context
+    ? [{
+        kind: "evidence" as const,
+        label: "Mission context",
+        detail: selected.initiative_context,
+      }]
+    : [];
+  const traceabilityTasks = selected?.linked_tasks.map((task) => ({
+    kind: "task" as const,
+    label: task.title,
+    href: `/tasks?id=${task.id}`,
+    detail: task.status,
+  })) ?? [];
+  const traceabilityDecisions = selected?.linked_decisions.map((decision) => ({
+    kind: "decision" as const,
+    label: decision.title,
+    href: `/decisions?id=${decision.id}`,
+    detail: decision.decision_reason || decision.status,
+  })) ?? [];
+  const traceabilitySources = selected
+    ? [
+        ...selected.linked_channels.map((channel) => ({
+          kind: "conversation" as const,
+          label: channel.name,
+          href: `/conversations?channel=${channel.id}`,
+          detail: `${channel.message_count} messages recorded`,
+        })),
+        ...selected.linked_resources.map((resource) => ({
+          kind: resource.resource_type === "file" ? "file" as const : "source" as const,
+          label: resource.label || resource.resource_id,
+          href: resourceHref(resource),
+          detail: resource.resource_type.replace("_", " "),
+        })),
+      ]
+    : [];
+
   return (
     <main
       className={cn(
@@ -230,6 +286,18 @@ export function InitiativeDetailPanel({
             <div className={cn("mb-8 rounded-2xl border border-cyan-300/12 bg-cyan-300/[0.025] p-4", mobileTab !== "brief" && "hidden lg:block")}>
               <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-300/50">Mission Context</p>
               <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-[var(--omnix-text)]">{selected.initiative_context}</p>
+            </div>
+          ) : null}
+
+          {traceabilityOrigin ? (
+            <div className={cn("mb-8", mobileTab !== "brief" && "hidden lg:block")}>
+              <RecordTraceabilityPanel
+                origin={traceabilityOrigin}
+                evidence={traceabilityEvidence}
+                decisions={traceabilityDecisions}
+                tasks={traceabilityTasks}
+                sources={traceabilitySources}
+              />
             </div>
           ) : null}
 
