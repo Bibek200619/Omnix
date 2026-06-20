@@ -176,6 +176,28 @@ class TestEnqueueJob:
         fake_redis.lpush.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_enqueue_raises_persisted_error_if_redis_push_fails(self):
+        """If Redis push fails, the caller can report the persisted queued DB job."""
+        import app.jobs.queue as q
+
+        fake_redis = AsyncMock()
+        fake_redis.lpush = AsyncMock(side_effect=ConnectionError("Redis down"))
+        fake_svc = MagicMock()
+        fake_svc.insert_one_trusted = AsyncMock(return_value={"id": "job-x"})
+
+        with (
+            patch.object(q, "_redis_client", None),
+            patch("app.jobs.queue.get_redis", return_value=fake_redis),
+            patch.dict(sys.modules, {"app.services.supabase_service": fake_svc}),
+        ):
+            with pytest.raises(q.JobEnqueueError) as exc_info:
+                await q.enqueue_job({"type": "ingest_file", "file_id": "f1", "user_id": "u1"})
+
+        assert exc_info.value.persisted is True
+        assert isinstance(exc_info.value.job_id, str) and len(exc_info.value.job_id) == 36
+        fake_redis.lpush.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_enqueue_db_row_has_correct_fields(self):
         """The DB record must have status=queued, attempts=0, correct type."""
         import app.jobs.queue as q

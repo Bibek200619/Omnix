@@ -113,9 +113,9 @@ async def test_file_upload_ingestion_rag_chat_and_decision_extraction(monkeypatc
     async def fake_log_activity(**kwargs: Any) -> None:
         state["activities"].append(kwargs)
 
-    async def fake_enqueue_job(payload: dict[str, Any]) -> dict[str, Any]:
+    async def fake_enqueue_job(payload: dict[str, Any]) -> str:
         state["jobs"].append(payload)
-        return {"id": "job-platform", **payload}
+        return "job-platform"
 
     async def fake_web_supplements(*args: Any, **kwargs: Any):
         del args, kwargs
@@ -194,8 +194,10 @@ async def test_file_upload_ingestion_rag_chat_and_decision_extraction(monkeypatc
     )
 
     assert uploaded["id"] == "file-platform"
-    assert uploaded["metadata"]["text_chunk_count"] >= 1
-    assert state["documents"]
+    assert uploaded["processing_status"] == "queued"
+    assert uploaded["processing_job_id"] == "job-platform"
+    assert uploaded["metadata"]["processing_status"] == "queued"
+    assert not state["documents"]
     assert state["jobs"] == [
         {
             "type": "ingest_file",
@@ -204,6 +206,24 @@ async def test_file_upload_ingestion_rag_chat_and_decision_extraction(monkeypatc
             "workspace_id": workspace_id,
         }
     ]
+
+    stored_chunks = await document_context_service.store_extracted_text_chunks(
+        file_id=uploaded["id"],
+        user_id=user_id,
+        text=DOCUMENT_TEXT,
+        workspace_id=workspace_id,
+        replace_existing=True,
+    )
+    state["files"][0]["processing_status"] = "chunked"
+    state["files"][0]["metadata"].update(
+        {
+            "processing_status": "chunked",
+            "text_chunk_count": stored_chunks.chunk_count,
+            "text_chunks_truncated": stored_chunks.truncated,
+        }
+    )
+
+    assert state["documents"]
 
     prompt, sources, retrieval_debug = await messages._retrieve_prompt_context(
         "In the uploaded document, what decision was made about vector search?",

@@ -517,7 +517,17 @@ export type DecisionCandidateList = {
   generated_at: string;
 };
 
-export type WorkspaceSearchResultType = "conversation" | "task" | "initiative" | "decision";
+export type WorkspaceSearchResultType =
+  | "conversation"
+  | "task"
+  | "initiative"
+  | "decision"
+  | "file"
+  | "document"
+  | "source"
+  | "member"
+  | "mention"
+  | "workspace";
 
 export type WorkspaceSearchResult = {
   id: string;
@@ -539,6 +549,12 @@ export type WorkspaceSearchResponse = {
   tasks: WorkspaceSearchResult[];
   initiatives: WorkspaceSearchResult[];
   decisions: WorkspaceSearchResult[];
+  files: WorkspaceSearchResult[];
+  documents: WorkspaceSearchResult[];
+  sources: WorkspaceSearchResult[];
+  members: WorkspaceSearchResult[];
+  mentions: WorkspaceSearchResult[];
+  workspaces: WorkspaceSearchResult[];
 };
 
 export type WorkspaceMentionSourceType = "conversation_message" | "task" | "decision";

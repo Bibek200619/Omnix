@@ -59,6 +59,12 @@ const searchGroups: Array<{ key: SearchGroupKey; label: string; icon: LucideIcon
   { key: "decisions", label: "Decisions", icon: BadgeCheck },
   { key: "initiatives", label: "Initiatives", icon: Compass },
   { key: "conversations", label: "Conversations", icon: MessagesSquare },
+  { key: "files", label: "Files", icon: FileText },
+  { key: "documents", label: "Document Text", icon: FileText },
+  { key: "sources", label: "Sources", icon: FileText },
+  { key: "members", label: "Team Members", icon: UsersRound },
+  { key: "mentions", label: "Mentions", icon: Bell },
+  { key: "workspaces", label: "Workspace Metadata", icon: Settings },
 ];
 
 const emptyResults: WorkspaceSearchResponse = {
@@ -66,6 +72,12 @@ const emptyResults: WorkspaceSearchResponse = {
   tasks: [],
   initiatives: [],
   decisions: [],
+  files: [],
+  documents: [],
+  sources: [],
+  members: [],
+  mentions: [],
+  workspaces: [],
 };
 
 const quickActions: PaletteItem[] = [
@@ -194,6 +206,12 @@ function searchResultTypeLabel(result: WorkspaceSearchResult) {
   if (result.type === "conversation") return "Conversation";
   if (result.type === "initiative") return "Initiative";
   if (result.type === "decision") return "Decision";
+  if (result.type === "file") return "File";
+  if (result.type === "document") return "Document Text";
+  if (result.type === "source") return "Source";
+  if (result.type === "member") return "Team Member";
+  if (result.type === "mention") return "Mention";
+  if (result.type === "workspace") return "Workspace";
   return "Task";
 }
 
@@ -201,6 +219,10 @@ function searchResultIcon(result: WorkspaceSearchResult): LucideIcon {
   if (result.type === "conversation") return MessagesSquare;
   if (result.type === "initiative") return Compass;
   if (result.type === "decision") return BadgeCheck;
+  if (result.type === "file" || result.type === "document" || result.type === "source") return FileText;
+  if (result.type === "member") return UsersRound;
+  if (result.type === "mention") return Bell;
+  if (result.type === "workspace") return Settings;
   return ClipboardCheck;
 }
 
@@ -275,7 +297,18 @@ export function CommandPalette() {
           acc[group.key] = results[group.key].map((result) => searchResultItem(result, group.key));
           return acc;
         },
-        { conversations: [], tasks: [], initiatives: [], decisions: [] },
+        {
+          conversations: [],
+          tasks: [],
+          initiatives: [],
+          decisions: [],
+          files: [],
+          documents: [],
+          sources: [],
+          members: [],
+          mentions: [],
+          workspaces: [],
+        },
       ),
     [results],
   );
@@ -371,7 +404,7 @@ export function CommandPalette() {
         .searchWorkspace(activeWorkspaceId, trimmedQuery)
         .then((incoming) => {
           if (requestId !== requestRef.current) return;
-          setResults(incoming);
+          setResults({ ...emptyResults, ...incoming });
         })
         .catch((err) => {
           if (requestId !== requestRef.current) return;
@@ -411,27 +444,37 @@ export function CommandPalette() {
     router.push(hrefWithFreshCreateToken(item));
   }
 
+  function focusPaletteItem(index: number) {
+    const item = flatItems[index];
+    if (!item) return;
+    window.requestAnimationFrame(() => {
+      itemRefs.current[item.id]?.focus();
+    });
+  }
+
   function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
       closePalette();
       return;
     }
-    if (event.key === "ArrowDown" || event.key === "Tab") {
+    if (event.key === "ArrowDown") {
       event.preventDefault();
       if (!flatItems.length) return;
-      setActiveIndex((current) =>
-        event.shiftKey ? (current - 1 + flatItems.length) % flatItems.length : (current + 1) % flatItems.length,
-      );
+      const nextIndex = (activeIndex + 1) % flatItems.length;
+      setActiveIndex(nextIndex);
+      focusPaletteItem(nextIndex);
       return;
     }
     if (event.key === "ArrowUp") {
       event.preventDefault();
       if (!flatItems.length) return;
-      setActiveIndex((current) => (current - 1 + flatItems.length) % flatItems.length);
+      const nextIndex = (activeIndex - 1 + flatItems.length) % flatItems.length;
+      setActiveIndex(nextIndex);
+      focusPaletteItem(nextIndex);
       return;
     }
-    if (event.key === "Enter") {
+    if (event.key === "Enter" && event.target === inputRef.current) {
       event.preventDefault();
       selectItem(flatItems[activeIndex]);
     }
@@ -447,18 +490,19 @@ export function CommandPalette() {
           itemRefs.current[item.id] = node;
         }}
         type="button"
-        tabIndex={-1}
         onMouseEnter={() => setActiveIndex(index)}
+        onFocus={() => setActiveIndex(index)}
         onClick={() => selectItem(item)}
+        aria-current={active ? "true" : undefined}
         className={cn(
-          "group flex min-h-[4.25rem] w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition active:scale-[0.995] sm:min-h-[3.9rem] sm:py-2.5",
+          "group flex min-h-[4.25rem] w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition active:scale-[0.995] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55 sm:min-h-[3.9rem] sm:py-2.5",
           active
             ? "border-cyan-300/35 bg-cyan-300/[0.08] shadow-[var(--omnix-glow-xs)]"
             : "border-transparent bg-white/[0.018] hover:border-cyan-300/18 hover:bg-white/[0.04]",
         )}
       >
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-300/10 bg-cyan-300/[0.045] text-cyan-100/70">
-          <Icon className="h-4 w-4" />
+          <Icon aria-hidden="true" className="h-4 w-4" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-2">
@@ -473,7 +517,7 @@ export function CommandPalette() {
             {item.description}
           </span>
         </span>
-        <ArrowUpRight className="h-4 w-4 shrink-0 text-white/25 transition group-hover:text-cyan-100/70" />
+        <ArrowUpRight aria-hidden="true" className="h-4 w-4 shrink-0 text-white/25 transition group-hover:text-cyan-100/70" />
       </button>
     );
   }
@@ -488,11 +532,11 @@ export function CommandPalette() {
           setOpen(true);
           setQuery("");
         }}
-        className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-[var(--omnix-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-0-255-255-0-04)] text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-rgba-0-255-255-0-3)] hover:bg-[var(--omnix-rgba-0-255-255-0-08)] active:scale-[0.97] md:hidden"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-[var(--omnix-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-0-255-255-0-04)] text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-rgba-0-255-255-0-3)] hover:bg-[var(--omnix-rgba-0-255-255-0-08)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55 md:hidden"
         aria-label="Open command palette"
         title="Open command palette"
       >
-        <Command className="h-4 w-4" />
+        <Command aria-hidden="true" className="h-4 w-4" />
       </button>
       <button
         type="button"
@@ -500,11 +544,11 @@ export function CommandPalette() {
           setOpen(true);
           setQuery("");
         }}
-        className="hidden h-11 w-[17rem] items-center gap-3 rounded-[10px] border border-cyan-300/10 bg-black/20 px-3 text-left text-sm text-white/45 transition hover:border-cyan-300/25 hover:bg-black/30 hover:text-white/65 md:inline-flex lg:w-[22rem] xl:w-[28rem]"
+        className="hidden h-11 w-[17rem] items-center gap-3 rounded-[10px] border border-cyan-300/10 bg-black/20 px-3 text-left text-sm text-white/45 transition hover:border-cyan-300/25 hover:bg-black/30 hover:text-white/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55 md:inline-flex lg:w-[22rem] xl:w-[28rem]"
         aria-label="Open command palette"
       >
-        <Search className="h-4 w-4 shrink-0 text-cyan-100/35" />
-        <span className="min-w-0 flex-1 truncate">Search Omnix or run a command...</span>
+        <Search aria-hidden="true" className="h-4 w-4 shrink-0 text-cyan-100/35" />
+        <span className="min-w-0 flex-1 truncate">Search Omnix or run a command…</span>
         <kbd className="shrink-0 rounded-md border border-white/8 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-white/35">
           {commandShortcut}
         </kbd>
@@ -541,31 +585,35 @@ export function CommandPalette() {
                     type="button"
                     onClick={closePalette}
                     title="Close command palette"
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03] text-white/55 hover:bg-white/[0.06] hover:text-white/80"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03] text-white/55 hover:bg-white/[0.06] hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
                     aria-label="Close command palette"
                   >
-                    <X className="h-4 w-4" />
+                    <X aria-hidden="true" className="h-4 w-4" />
                   </button>
                 </div>
                 <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-100/35" />
+                  <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-100/35" />
                   <input
                     ref={inputRef}
+                    id="omnix-command-palette-search"
+                    name="command_palette_search"
                     value={query}
                     onChange={(event) => setQuery(event.target.value.slice(0, 120))}
-                    placeholder="Type a task, decision, page, or command..."
-                    className="h-12 w-full rounded-xl border border-cyan-300/12 bg-black/25 pl-9 pr-11 text-base text-white outline-none placeholder:text-white/25 focus:border-cyan-300/35 focus:shadow-[var(--omnix-glow-xs)]"
+                    placeholder="Type a task, decision, page, or command…"
+                    aria-label="Search Omnix commands and workspace results"
+                    autoComplete="off"
+                    className="h-12 w-full rounded-xl border border-cyan-300/12 bg-black/25 pl-9 pr-11 text-base text-white outline-none placeholder:text-white/25 focus:border-cyan-300/35 focus:shadow-[var(--omnix-glow-xs)] focus-visible:ring-2 focus-visible:ring-cyan-300/45"
                   />
                   {loading ? (
-                    <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-cyan-100/45" />
+                    <Loader2 aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-cyan-100/45" />
                   ) : query ? (
                     <button
                       type="button"
                       onClick={() => setQuery("")}
-                      className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-white/35 hover:bg-white/5 hover:text-white/70"
+                      className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-white/35 hover:bg-white/5 hover:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
                       aria-label="Clear command palette query"
                     >
-                      <X className="h-4 w-4" />
+                      <X aria-hidden="true" className="h-4 w-4" />
                     </button>
                   ) : null}
                 </div>
@@ -586,7 +634,7 @@ export function CommandPalette() {
                 {trimmedQuery ? (
                   <section className="mb-4">
                     <div className="mb-1.5 flex items-center gap-2 px-2">
-                      <Search className="h-3.5 w-3.5 text-cyan-100/45" />
+                      <Search aria-hidden="true" className="h-3.5 w-3.5 text-cyan-100/45" />
                       <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100/45">
                         Workspace Search
                       </p>
@@ -595,8 +643,8 @@ export function CommandPalette() {
                       <p className="px-2 py-3 text-sm text-rose-100">{error}</p>
                     ) : loading && !hasSearchResults ? (
                       <div className="flex items-center gap-2 px-2 py-3 text-sm text-[var(--omnix-text-2)]">
-                        <Loader2 className="h-4 w-4 animate-spin text-cyan-100/50" />
-                        Searching workspace
+                        <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-cyan-100/50" />
+                        Searching workspace…
                       </div>
                     ) : !hasSearchResults ? (
                       <div className="rounded-xl border border-dashed border-[var(--omnix-border)] bg-black/10 px-3 py-4">
@@ -614,7 +662,7 @@ export function CommandPalette() {
                           return (
                             <div key={group.key}>
                               <div className="mb-1 flex items-center gap-2 px-2">
-                                <Icon className="h-3.5 w-3.5 text-cyan-100/40" />
+                                <Icon aria-hidden="true" className="h-3.5 w-3.5 text-cyan-100/40" />
                                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100/40">
                                   {group.label}
                                 </p>

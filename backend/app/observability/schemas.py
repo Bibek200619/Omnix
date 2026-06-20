@@ -1,7 +1,12 @@
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import UTC, datetime
 import uuid
+
+
+def utc_now() -> datetime:
+    return datetime.now(UTC)
+
 
 class TraceContext(BaseModel):
     trace_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -9,7 +14,7 @@ class TraceContext(BaseModel):
     workspace_id: Optional[str] = None
     conversation_id: Optional[str] = None
     session_id: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utc_now)
 
 class TokenUsage(BaseModel):
     prompt_tokens: int = 0
@@ -49,6 +54,6 @@ class GraphSnapshot(BaseModel):
 class ObservabilityEvent(BaseModel):
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     event_type: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utc_now)
     trace_context: TraceContext
     payload: Dict[str, Any]

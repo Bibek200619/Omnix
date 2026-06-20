@@ -3,17 +3,17 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 
-from ..core.security import get_current_user
+from ..core.admin_auth import require_runtime_admin
 from ..runtime.manager import RuntimeManager
 
 router = APIRouter(prefix="/admin/runtime", tags=["admin"])
 
 @router.get("/")
-async def get_runtime_status(current_user: dict[str, Any] = Depends(get_current_user)):
+async def get_runtime_status(current_user: dict[str, Any] = Depends(require_runtime_admin)):
     return RuntimeManager.get().get_runtime_info()
 
 @router.get("/workers")
-async def get_workers(current_user: dict[str, Any] = Depends(get_current_user)):
+async def get_workers(current_user: dict[str, Any] = Depends(require_runtime_admin)):
     workers_dict = RuntimeManager.get().active_workers
     return [
         {
@@ -26,11 +26,11 @@ async def get_workers(current_user: dict[str, Any] = Depends(get_current_user)):
     ]
 
 @router.get("/providers")
-async def get_providers(current_user: dict[str, Any] = Depends(get_current_user)):
+async def get_providers(current_user: dict[str, Any] = Depends(require_runtime_admin)):
     return RuntimeManager.get().active_providers
 
 @router.get("/settings")
-async def get_current_settings(current_user: dict[str, Any] = Depends(get_current_user)):
+async def get_current_settings(current_user: dict[str, Any] = Depends(require_runtime_admin)):
     # Only return non-sensitive settings
     from ..settings import get_settings
     settings = get_settings()

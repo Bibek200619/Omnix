@@ -219,6 +219,7 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
           realtimeStatus === "connected" && "border-cyan-300/20",
         )}
         aria-expanded={open}
+        aria-label={active ? `Switch workspace. Current workspace: ${active.name}` : "Switch workspace"}
       >
         <div className="flex min-w-0 items-center gap-3 sm:gap-[9px]">
           <div className="relative shrink-0">

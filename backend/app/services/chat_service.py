@@ -10,6 +10,7 @@ import httpx
 from fastapi import status
 
 from ..core.config import get_settings
+from ..observability.safe_logging import allow_sensitive_logging, safe_text_preview
 from ..rag.token_utils import count_tokens, tail_tokens
 
 logger = logging.getLogger(__name__)
@@ -148,7 +149,7 @@ class OllamaChatService:
                 "chars": len(message.get("content") or ""),
                 "has_web_search_results": "WEB SEARCH RESULTS:" in (message.get("content") or ""),
                 "has_document_context": "DOCUMENT CONTEXT:" in (message.get("content") or ""),
-                "preview": (message.get("content") or "").replace("\n", " ")[:360],
+                "preview": safe_text_preview(message.get("content"), max_chars=360),
             }
             for index, message in enumerate(payload["messages"])
         ]
@@ -165,8 +166,8 @@ class OllamaChatService:
             "DOCUMENT CONTEXT:" in (prompt or ""),
             messages_summary,
         )
-        logger.debug("Ollama final user prompt preview: %r", (prompt or "")[:500])
-        if self.settings.DEV_MODE:
+        logger.debug("Ollama final user prompt preview: %r", safe_text_preview(prompt, max_chars=500))
+        if allow_sensitive_logging():
             logger.debug("Ollama final payload debug: %s", json.dumps(payload, ensure_ascii=False))
         return payload
 
@@ -242,7 +243,7 @@ class OllamaChatService:
                         "Ollama rejected request with HTTP %s at %s: %s",
                         status_code,
                         self.model_url,
-                        exc.response.text[:500],
+                        safe_text_preview(exc.response.text, max_chars=500),
                     )
                     raise ModelServiceError(
                         "Ollama rejected the request. Check that phi3:mini is installed and MODEL_URL uses /api/chat.",
@@ -427,7 +428,11 @@ class OpenAIChatService(OllamaChatService):
             logger.warning("OpenAI request timed out.")
             raise ModelServiceError("OpenAI request timed out.", status.HTTP_504_GATEWAY_TIMEOUT) from exc
         except httpx.HTTPStatusError as exc:
-            logger.warning("OpenAI HTTP %s: %s", exc.response.status_code, exc.response.text[:500])
+            logger.warning(
+                "OpenAI HTTP %s: %s",
+                exc.response.status_code,
+                safe_text_preview(exc.response.text, max_chars=500),
+            )
             raise ModelServiceError("OpenAI request failed.", status.HTTP_502_BAD_GATEWAY) from exc
         except (httpx.RequestError, json.JSONDecodeError) as exc:
             logger.warning("OpenAI generation failed: %s", exc)
@@ -582,7 +587,11 @@ class AnthropicChatService(OllamaChatService):
             logger.warning("Anthropic request timed out.")
             raise ModelServiceError("Anthropic request timed out.", status.HTTP_504_GATEWAY_TIMEOUT) from exc
         except httpx.HTTPStatusError as exc:
-            logger.warning("Anthropic HTTP %s: %s", exc.response.status_code, exc.response.text[:500])
+            logger.warning(
+                "Anthropic HTTP %s: %s",
+                exc.response.status_code,
+                safe_text_preview(exc.response.text, max_chars=500),
+            )
             raise ModelServiceError("Anthropic request failed.", status.HTTP_502_BAD_GATEWAY) from exc
         except (httpx.RequestError, json.JSONDecodeError) as exc:
             logger.warning("Anthropic generation failed: %s", exc)

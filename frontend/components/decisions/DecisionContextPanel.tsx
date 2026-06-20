@@ -3,6 +3,7 @@
 import { BadgeCheck, CircleDot, User, Calendar, MessageSquare } from "lucide-react";
 import { WorkspaceDecision } from "@/lib/workspace-types";
 import { MentionText } from "@/components/mentions/MentionText";
+import { RecordTraceabilityPanel } from "@/components/provenance/RecordTraceabilityPanel";
 import { DecisionLifecycleControls } from "./DecisionLifecycleControls";
 import { DecisionTaskLinker } from "./DecisionTaskLinker";
 import { DecisionInitiativeLinker } from "./DecisionInitiativeLinker";
@@ -29,7 +30,52 @@ function creatorLabel(decision: WorkspaceDecision) {
   return decision.creator_name || decision.creator_email || decision.created_by;
 }
 
+function decisionOrigin(decision: WorkspaceDecision) {
+  if (decision.source_message_id) {
+    return {
+      kind: "origin" as const,
+      label: "Conversation-derived decision",
+      href: decision.source_channel_id ? `/conversations?channel=${decision.source_channel_id}` : "/conversations",
+      detail: `Source message ${decision.source_message_id}`,
+    };
+  }
+  return {
+    kind: "origin" as const,
+    label: "Recorded decision",
+    detail: `Authority: ${creatorLabel(decision)}`,
+  };
+}
+
 export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPanelProps) {
+  const traceabilityTasks = decision.linked_tasks.map((task) => ({
+    kind: "task" as const,
+    label: task.title,
+    href: `/tasks?id=${task.id}`,
+    detail: task.status,
+  }));
+  const traceabilityInitiatives = decision.initiative
+    ? [{
+        kind: "initiative" as const,
+        label: decision.initiative.title,
+        href: `/initiatives?id=${decision.initiative.id}`,
+        detail: decision.initiative.status,
+      }]
+    : [];
+  const traceabilityEvidence = decision.source_message_id
+    ? [{
+        kind: "conversation" as const,
+        label: "Source conversation",
+        href: decision.source_channel_id ? `/conversations?channel=${decision.source_channel_id}` : "/conversations",
+        detail: decision.decision_reason || "Decision extracted from workspace conversation context",
+      }]
+    : decision.decision_reason
+      ? [{
+          kind: "evidence" as const,
+          label: "Primary rationale",
+          detail: decision.decision_reason,
+        }]
+      : [];
+
   return (
     <div className="omnix-container-responsive omnix-scrollbar h-full overflow-y-auto p-4 sm:p-6 xl:p-8">
       <div className="mx-auto max-w-6xl">
@@ -107,6 +153,13 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
                   </div>
                 )}
               </div>
+              <RecordTraceabilityPanel
+                origin={decisionOrigin(decision)}
+                evidence={traceabilityEvidence}
+                tasks={traceabilityTasks}
+                initiatives={traceabilityInitiatives}
+                className="mt-6"
+              />
             </section>
           </div>
 
