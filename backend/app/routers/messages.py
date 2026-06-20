@@ -12,6 +12,7 @@ from starlette.responses import StreamingResponse
 
 from ..core.config import get_settings
 from ..core.security import get_current_user
+from ..observability.safe_logging import allow_sensitive_logging, safe_text_preview
 from ..rag.token_utils import count_tokens, tail_tokens
 from ..schemas.chat import AIGenerationRequest, AIGenerationResponse, ChatRequest, ChatResponse, MessageRead
 from ..services.chat_service import (
@@ -220,7 +221,7 @@ def _retrieval_debug_from_context(strategy: str, built_context: Any) -> dict[str
     return {
         "strategy": strategy,
         "retrieved_chunks_count": len(chunks) or len(sources),
-        "first_chunk_preview": str(preview).replace("\n", " ")[:240],
+        "first_chunk_preview": safe_text_preview(preview, max_chars=240),
         "diagnostics": getattr(built_context, "diagnostics", {}),
     }
 
@@ -493,10 +494,11 @@ def _log_ollama_prompt_debug(
     diagnostics = retrieval_debug.get("diagnostics") if isinstance(retrieval_debug.get("diagnostics"), dict) else {}
     web_search = diagnostics.get("web_search") if isinstance(diagnostics.get("web_search"), dict) else {}
     context_diag = diagnostics if isinstance(diagnostics, dict) else {}
+    sensitive_logging = allow_sensitive_logging()
     logger.info(
         "Ollama prompt debug: conversation_id=%s retrieval_strategy=%s retrieved_chunks_count=%d "
         "prompt_length=%d has_web_results=%s has_document_context=%s web_search=%s context_counts=%s "
-        "first_retrieved_chunk_preview=%r prompt_preview=%r",
+        "sensitive_previews_enabled=%s first_retrieved_chunk_preview=%r prompt_preview=%r",
         conversation_id,
         retrieval_debug.get("strategy", "unknown"),
         int(retrieval_debug.get("retrieved_chunks_count") or 0),
@@ -509,8 +511,9 @@ def _log_ollama_prompt_debug(
             "document_context_count": context_diag.get("document_context_count"),
             "estimated_context_tokens": context_diag.get("estimated_context_tokens"),
         },
-        retrieval_debug.get("first_chunk_preview") or "",
-        (prompt or "").replace("\n", " ")[:1000],
+        sensitive_logging,
+        safe_text_preview(retrieval_debug.get("first_chunk_preview") or "", max_chars=240),
+        safe_text_preview(prompt, max_chars=1000),
     )
 
 
@@ -586,7 +589,7 @@ async def _build_web_supplements(
         decision.needs_web,
         decision.confidence,
         decision.reasons,
-        message_text[:240],
+        safe_text_preview(message_text, max_chars=240),
     )
     if not decision.needs_web:
         return [], [], decision, diagnostics
@@ -603,7 +606,7 @@ async def _build_web_supplements(
     if not search_response.results:
         logger.warning(
             "Web search returned no usable results: query=%r diagnostics=%s",
-            message_text[:160],
+            safe_text_preview(message_text, max_chars=160),
             diagnostics["search"],
         )
         return [], [], decision, diagnostics
@@ -618,12 +621,12 @@ async def _build_web_supplements(
     ]
     logger.info(
         "Web context formatted: query=%r result_count=%d first_result=%s",
-        message_text[:160],
+        safe_text_preview(message_text, max_chars=160),
         len(supplements),
         {
             "title": search_response.results[0].title,
             "url": search_response.results[0].url,
-            "snippet_preview": search_response.results[0].snippet[:240],
+            "snippet_preview": safe_text_preview(search_response.results[0].snippet, max_chars=240),
         },
     )
     return supplements, sources, decision, diagnostics

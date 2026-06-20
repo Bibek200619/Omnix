@@ -1,5 +1,7 @@
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import UTC, datetime
+
+from .safe_logging import safe_text_preview
 
 class RetrievalTrace:
     """Captures semantic, keyword, and hybrid retrieval diagnostics."""
@@ -12,9 +14,9 @@ class RetrievalTrace:
         
     def add_query(self, query: str, query_type: str = "hybrid"):
         self.queries.append({
-            "query": query,
+            "query": safe_text_preview(query, max_chars=200),
             "type": query_type,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         })
         
     def set_filters(self, filters: Dict[str, Any]):
@@ -24,7 +26,7 @@ class RetrievalTrace:
         self.results.append({
             "chunk_id": chunk_id,
             "score": score,
-            "preview": content_preview[:100] + "..." if len(content_preview) > 100 else content_preview,
+            "preview": safe_text_preview(content_preview, max_chars=100),
             "rank": rank,
             "match_type": match_type
         })
