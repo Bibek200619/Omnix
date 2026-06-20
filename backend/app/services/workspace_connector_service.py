@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html import unescape
@@ -7,6 +8,7 @@ from html.parser import HTMLParser
 import ipaddress
 import logging
 import re
+import socket
 import uuid
 from typing import Any
 from urllib.parse import urljoin, urlparse
@@ -51,6 +53,7 @@ MAX_LINK_BYTES = 2 * 1024 * 1024
 MAX_LINK_TEXT_CHARS = 250_000
 REDIRECT_LIMIT = 4
 SECRET_KEYS = {"password", "pass", "secret", "token", "api_key", "access_token", "refresh_token"}
+BLOCKED_HOSTNAMES = {"localhost", "metadata.google.internal", "metadata.google.com"}
 
 
 @dataclass(slots=True)
@@ -142,21 +145,31 @@ def _public_config(config: dict[str, Any] | None) -> dict[str, Any]:
     return redacted
 
 
-def _is_safe_http_url(url: str) -> bool:
+def _parse_allowed_http_url(url: str):
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return False
-
-    host = (parsed.hostname or "").strip().lower()
-    if not host or host in {"localhost", "0.0.0.0"} or host.endswith(".local"):
-        return False
+        return None
 
     try:
-        ip = ipaddress.ip_address(host)
+        parsed.port
     except ValueError:
-        return True
+        return None
 
-    return not (
+    if parsed.username or parsed.password:
+        return None
+
+    host = (parsed.hostname or "").strip().lower()
+    if not host or host in BLOCKED_HOSTNAMES or host == "0.0.0.0" or host.endswith((".local", ".localhost")):
+        return None
+
+    return parsed
+
+
+def _is_public_ip_address(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+
+    return bool(ip.is_global) and not (
         ip.is_private
         or ip.is_loopback
         or ip.is_link_local
@@ -164,6 +177,59 @@ def _is_safe_http_url(url: str) -> bool:
         or ip.is_reserved
         or ip.is_unspecified
     )
+
+
+def _is_safe_http_url(url: str) -> bool:
+    parsed = _parse_allowed_http_url(url)
+    if parsed is None:
+        return False
+
+    host = (parsed.hostname or "").strip().lower()
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return True
+
+    return _is_public_ip_address(ip)
+
+
+def _resolve_host_addresses(host: str, port: int) -> list[str]:
+    results = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    addresses: list[str] = []
+    for result in results:
+        sockaddr = result[4]
+        if sockaddr:
+            addresses.append(str(sockaddr[0]))
+    return addresses
+
+
+async def _is_public_http_url(url: str) -> bool:
+    parsed = _parse_allowed_http_url(url)
+    if parsed is None:
+        return False
+
+    host = (parsed.hostname or "").strip().lower()
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        try:
+            addresses = await asyncio.to_thread(_resolve_host_addresses, host, port)
+        except OSError:
+            return False
+        if not addresses:
+            return False
+
+        for address in addresses:
+            try:
+                resolved_ip = ipaddress.ip_address(address)
+            except ValueError:
+                return False
+            if not _is_public_ip_address(resolved_ip):
+                return False
+        return True
+
+    return _is_public_ip_address(ip)
 
 
 def _require_http_url(value: Any, *, field_name: str) -> str:
@@ -592,7 +658,7 @@ async def _activate_knowledge_link(connector: dict[str, Any], user_id: str) -> d
 
 
 async def fetch_knowledge_link(url: str) -> LinkFetchResult:
-    if not _is_safe_http_url(url):
+    if not await _is_public_http_url(url):
         return LinkFetchResult(ok=False, url=url, error="The URL is not allowed for server-side retrieval.")
 
     current_url = url
@@ -602,17 +668,20 @@ async def fetch_knowledge_link(url: str) -> LinkFetchResult:
     try:
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
             for _ in range(REDIRECT_LIMIT + 1):
-                response = await client.get(current_url, headers=headers)
-                if response.status_code in {301, 302, 303, 307, 308}:
-                    location = response.headers.get("location")
-                    if not location:
-                        break
-                    next_url = urljoin(current_url, location)
-                    if not _is_safe_http_url(next_url):
-                        return LinkFetchResult(ok=False, url=current_url, error="The link redirects to an unsupported or private URL.")
-                    current_url = next_url
-                    continue
-                return _parse_link_response(response, current_url)
+                if not await _is_public_http_url(current_url):
+                    return LinkFetchResult(ok=False, url=current_url, error="The URL is not allowed for server-side retrieval.")
+
+                async with client.stream("GET", current_url, headers=headers) as response:
+                    if response.status_code in {301, 302, 303, 307, 308}:
+                        location = response.headers.get("location")
+                        if not location:
+                            break
+                        next_url = urljoin(current_url, location)
+                        if not await _is_public_http_url(next_url):
+                            return LinkFetchResult(ok=False, url=current_url, error="The link redirects to an unsupported or private URL.")
+                        current_url = next_url
+                        continue
+                    return await _parse_link_response_stream(response, current_url)
     except httpx.TimeoutException:
         return LinkFetchResult(ok=False, url=current_url, error="The link timed out while Omnix tried to read it.")
     except httpx.TransportError:
@@ -621,7 +690,39 @@ async def fetch_knowledge_link(url: str) -> LinkFetchResult:
     return LinkFetchResult(ok=False, url=current_url, error="The link redirected too many times.")
 
 
-def _parse_link_response(response: httpx.Response, url: str) -> LinkFetchResult:
+async def _parse_link_response_stream(response: httpx.Response, url: str) -> LinkFetchResult:
+    content_length = response.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > MAX_LINK_BYTES:
+                return LinkFetchResult(
+                    ok=False,
+                    url=url,
+                    status_code=response.status_code,
+                    content_type=(response.headers.get("content-type") or "").split(";", 1)[0].strip().lower() or None,
+                    error="The link is too large for Omnix to ingest safely.",
+                )
+        except ValueError:
+            pass
+
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in response.aiter_bytes():
+        total += len(chunk)
+        if total > MAX_LINK_BYTES:
+            return LinkFetchResult(
+                ok=False,
+                url=url,
+                status_code=response.status_code,
+                content_type=(response.headers.get("content-type") or "").split(";", 1)[0].strip().lower() or None,
+                error="The link is too large for Omnix to ingest safely.",
+            )
+        chunks.append(chunk)
+
+    return _parse_link_response_bytes(response, url, b"".join(chunks))
+
+
+def _parse_link_response_bytes(response: httpx.Response, url: str, raw: bytes) -> LinkFetchResult:
     status_code = response.status_code
     content_type = (response.headers.get("content-type") or "").split(";", 1)[0].strip().lower() or None
     if status_code in {401, 403}:
@@ -642,7 +743,6 @@ def _parse_link_response(response: httpx.Response, url: str) -> LinkFetchResult:
             error=f"The link returned HTTP {status_code}.",
         )
 
-    raw = response.content[:MAX_LINK_BYTES]
     if not raw:
         return LinkFetchResult(ok=False, url=url, status_code=status_code, content_type=content_type, error="The link returned no readable content.")
 
