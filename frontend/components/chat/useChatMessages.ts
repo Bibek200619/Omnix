@@ -52,7 +52,7 @@ export function attachFilesToMessages(messages: Message[], files: MessageAttachm
 export async function fetchConversationSnapshot(convId: string, senderLookup: SenderLookup) {
   const [data, files] = await Promise.all([
     apiClient.get<ApiMessage[]>(`/conversations/${convId}/messages`),
-    apiClient.get<MessageAttachment[]>("/files?conversation_id=" + convId).catch((err) => {
+    apiClient.get<MessageAttachment[]>(`/files?conversation_id=${encodeURIComponent(convId)}`).catch((err) => {
       console.error("Failed to load conversation files", err);
       return [];
     }),
