@@ -12,6 +12,11 @@ import {
   WorkspaceDestructiveConfirmationModal,
 } from "./workspace-destructive-confirmation";
 import { isWorkspaceFounderRole } from "./workspace-roles";
+import { useWorkspaceContextValues } from "./workspace-context-values";
+import {
+  useActiveWorkspaceReconciliation,
+  usePendingWorkspaceInvitePolling,
+} from "./workspace-provider-effects";
 import { flattenWorkspaces } from "./workspace-utils";
 import {
   acceptWorkspaceInvite,
@@ -66,9 +71,6 @@ import { WorkspaceTreeContext } from "./workspace-tree-context";
 import type {
   RefreshOptions,
   WorkspaceContextType,
-  WorkspaceIntelligenceContextValue,
-  WorkspaceMembershipContextValue,
-  WorkspaceTreeContextValue,
 } from "./workspace-context-types";
 
 export { useWorkspaceIntelligence } from "./workspace-intelligence-context";
@@ -897,58 +899,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshPendingInvites, refreshWorkspaces, setActiveWorkspace, userId]);
 
-  useEffect(() => {
-    if (!userId) {
-      return;
-    }
+  usePendingWorkspaceInvitePolling({
+    userId,
+    intervalMs: PENDING_INVITES_POLL_INTERVAL_MS,
+    refreshPendingInvites,
+  });
 
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState !== "hidden") {
-        void refreshPendingInvites({ silent: true });
-      }
-    }, PENDING_INVITES_POLL_INTERVAL_MS);
-
-    function handleVisibilityChange() {
-      if (document.visibilityState === "visible") {
-        void refreshPendingInvites({ silent: true });
-      }
-    }
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      window.clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [refreshPendingInvites, userId]);
-
-  useEffect(() => {
-    if (!userId || loading) {
-      return;
-    }
-
-    if (error && workspaces.length === 0) {
-      logger.debug("[workspace] fetch failed; preserving active workspace id during failure state");
-      return;
-    }
-
-    if (workspaces.length === 0) {
-      logger.debug("[workspace] no workspaces after verified fetch; waiting for explicit create");
-      if (activeWorkspaceId) {
-        setActiveWorkspace(null);
-      }
-      return;
-    }
-
-    const activeExists = Boolean(findWorkspaceById(workspaces, activeWorkspaceId));
-    if (!activeExists) {
-      const nextWorkspaceId = flattenWorkspaces(workspaces)[0]?.id ?? null;
-      logger.debug("[workspace] saved active workspace missing; selecting first available workspace", {
-        activeWorkspaceId,
-        nextWorkspaceId,
-      });
-      setActiveWorkspace(nextWorkspaceId);
-    }
-  }, [activeWorkspaceId, error, loading, setActiveWorkspace, userId, workspaces]);
+  useActiveWorkspaceReconciliation({
+    activeWorkspaceId,
+    error,
+    loading,
+    setActiveWorkspace,
+    userId,
+    workspaces,
+  });
 
   useEffect(() => {
     lastActiveWorkspaceDataRefreshAtRef.current = 0;
@@ -961,109 +925,45 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     void refreshWorkspaceIntelligence({ force: true });
   }, [refreshWorkspaceIntelligence]);
 
-  const treeValue = useMemo<WorkspaceTreeContextValue>(
-    () => ({
-      workspaces,
-      loading,
-      error,
-      activeWorkspaceId,
-      activeWorkspace,
-      activeRootWorkspace,
-      subspaceLoadingByParentId,
-      subspaceErrorByParentId,
-      setActiveWorkspace,
-      refreshWorkspaces,
-      refreshWorkspaceTree,
-      refreshWorkspaceSubspaces,
-      createWorkspace,
-      createSubspace,
-      renameWorkspace,
-      deleteWorkspace,
-    }),
-    [
-      workspaces,
-      loading,
-      error,
-      activeWorkspaceId,
-      activeWorkspace,
-      activeRootWorkspace,
-      subspaceLoadingByParentId,
-      subspaceErrorByParentId,
-      setActiveWorkspace,
-      refreshWorkspaces,
-      refreshWorkspaceTree,
-      refreshWorkspaceSubspaces,
-      createWorkspace,
-      createSubspace,
-      renameWorkspace,
-      deleteWorkspace,
-    ],
-  );
-
-  const membershipValue = useMemo<WorkspaceMembershipContextValue>(
-    () => ({
-      activeMembers,
-      activeInvites,
-      pendingInvites,
-      membersError,
-      membersLoading,
-      invitesLoading,
-      pendingInvitesLoading,
-      refreshActiveWorkspaceData,
-      refreshPendingInvites,
-      inviteToActiveWorkspace,
-      updateWorkspaceMemberRole,
-      removeWorkspaceMember,
-      assignWorkspaceMember,
-      revokeInvite,
-      acceptInvite,
-      declineInvite,
-    }),
-    [
-      activeMembers,
-      activeInvites,
-      pendingInvites,
-      membersError,
-      membersLoading,
-      invitesLoading,
-      pendingInvitesLoading,
-      refreshActiveWorkspaceData,
-      refreshPendingInvites,
-      inviteToActiveWorkspace,
-      updateWorkspaceMemberRole,
-      removeWorkspaceMember,
-      assignWorkspaceMember,
-      revokeInvite,
-      acceptInvite,
-      declineInvite,
-    ],
-  );
-
-  const intelligenceValue = useMemo<WorkspaceIntelligenceContextValue>(
-    () => ({
-      activeWorkspaceIntelligence,
-      intelligenceError,
-      intelligenceLoading,
-      refreshWorkspaceIntelligence,
-      updateWorkspaceIntelligence,
-    }),
-    [
-      activeWorkspaceIntelligence,
-      intelligenceError,
-      intelligenceLoading,
-      refreshWorkspaceIntelligence,
-      updateWorkspaceIntelligence,
-    ],
-  );
-
-  const value = useMemo<WorkspaceContextType>(
-    () => ({
-      ...treeValue,
-      ...membershipValue,
-      ...intelligenceValue,
-    }),
-    [treeValue, membershipValue, intelligenceValue],
-  );
+  const { treeValue, membershipValue, intelligenceValue, value } = useWorkspaceContextValues({
+    workspaces,
+    loading,
+    error,
+    activeWorkspaceId,
+    activeWorkspace,
+    activeRootWorkspace,
+    subspaceLoadingByParentId,
+    subspaceErrorByParentId,
+    setActiveWorkspace,
+    refreshWorkspaces,
+    refreshWorkspaceTree,
+    refreshWorkspaceSubspaces,
+    createWorkspace,
+    createSubspace,
+    renameWorkspace,
+    deleteWorkspace,
+    activeMembers,
+    activeInvites,
+    pendingInvites,
+    membersError,
+    membersLoading,
+    invitesLoading,
+    pendingInvitesLoading,
+    refreshActiveWorkspaceData,
+    refreshPendingInvites,
+    inviteToActiveWorkspace,
+    updateWorkspaceMemberRole,
+    removeWorkspaceMember,
+    assignWorkspaceMember,
+    revokeInvite,
+    acceptInvite,
+    declineInvite,
+    activeWorkspaceIntelligence,
+    intelligenceError,
+    intelligenceLoading,
+    refreshWorkspaceIntelligence,
+    updateWorkspaceIntelligence,
+  });
 
   return (
     <WorkspaceTreeContext.Provider value={treeValue}>
