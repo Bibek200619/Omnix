@@ -1,5 +1,7 @@
 from typing import Dict, Any, List, Optional
 
+from .safe_logging import safe_text_preview
+
 class PromptTrace:
     """Captures prompt assembly and injection states securely."""
     
@@ -13,13 +15,13 @@ class PromptTrace:
         self.truncation_events: List[Dict[str, Any]] = []
         
     def set_system_prompt(self, prompt: str):
-        self.system_prompt = prompt
+        self.system_prompt = safe_text_preview(prompt, max_chars=500)
         
     def add_context(self, source: str, content: str):
-        self.injected_context.append({"source": source, "content_preview": content[:200]})
+        self.injected_context.append({"source": source, "content_preview": safe_text_preview(content, max_chars=200)})
         
     def add_memory(self, memory_type: str, content: str):
-        self.memory_sections.append({"type": memory_type, "content": content})
+        self.memory_sections.append({"type": memory_type, "content": safe_text_preview(content, max_chars=500)})
         
     def add_citation(self, citation_id: str, source_id: str):
         self.citations.append({"citation_id": citation_id, "source_id": source_id})
@@ -36,9 +38,13 @@ class PromptTrace:
         })
         
     def set_final_messages(self, messages: List[Dict[str, Any]]):
-        # We store final messages, but in a real-world scenario we might sanitize them
-        # to ensure no raw secrets are present.
-        self.final_messages = messages
+        self.final_messages = [
+            {
+                **message,
+                "content": safe_text_preview(message.get("content"), max_chars=500),
+            }
+            for message in messages
+        ]
         
     def get_snapshot(self) -> Dict[str, Any]:
         return {

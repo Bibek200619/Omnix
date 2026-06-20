@@ -62,6 +62,9 @@ export type MessageAttachment = {
   text_page_count?: number | null;
   extraction_status?: "processing" | "searchable" | "ocr_required" | "extraction_failed" | null;
   extraction_failure_reason?: string | null;
+  processing_status?: "uploaded" | "queued" | "processing" | "extracted" | "chunked" | "embedded" | "failed" | null;
+  processing_error?: string | null;
+  processing_job_id?: string | null;
   ocr_used?: boolean | null;
   ocr_character_count?: number | null;
 };

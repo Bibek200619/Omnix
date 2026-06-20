@@ -43,6 +43,7 @@ function SubspaceRow({ subspace, index, onSelectWorkspace }: SubspaceRowProps) {
       transition={{ duration: 0.12, delay: index * 0.015 }}
       type="button"
       onClick={() => onSelectWorkspace(subspace.id)}
+      aria-label={`Switch to ${subspace.name}`}
       className={cn(
         "relative my-0.5 flex min-h-[44px] w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-left transition-all duration-300 sm:min-h-[44px]",
         isActive
@@ -139,6 +140,7 @@ export function WorkspaceTreeNode({
         <button
           type="button"
           onClick={() => onSelectWorkspace(workspace.id)}
+          aria-label={`Switch to ${workspace.name}`}
           className={cn(
             "relative flex min-h-[48px] min-w-0 flex-1 items-center gap-2.5 rounded-[9px] px-3 py-2 text-left transition-all duration-300",
             isActive

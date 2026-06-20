@@ -10,6 +10,7 @@ from typing import Any
 from ..rag.chunking import chunk_text
 from ..retrieval.context_builder import BuiltContext, ContextBuilder, ContextSupplement
 from ..retrieval.scoring import RetrievalResult
+from ..observability.safe_logging import safe_text_preview
 from ..services.document_intelligence_service import diagnostics_from_file
 from ..services.supabase_service import (
     SupabaseServiceError,
@@ -244,7 +245,7 @@ async def build_uploaded_document_context(
         len(built.sources),
         len(built.chunks),
         len(built.prompt),
-        str(first_preview).replace("\n", " ")[:240],
+        safe_text_preview(first_preview, max_chars=240),
     )
     return built
 

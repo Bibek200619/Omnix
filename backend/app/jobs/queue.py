@@ -22,6 +22,13 @@ _QUEUE_KEY = os.environ.get("OMNIX_JOB_QUEUE", "omnix:jobs")
 _redis_client: Any | None = None
 
 
+class JobEnqueueError(RuntimeError):
+    def __init__(self, message: str, *, job_id: str, persisted: bool) -> None:
+        super().__init__(message)
+        self.job_id = job_id
+        self.persisted = persisted
+
+
 def _configured_redis_url() -> str:
     try:
         from ..settings import get_settings
@@ -88,7 +95,7 @@ async def enqueue_job(payload: Dict[str, Any], queue: str | None = None) -> str:
         )
 
     if not db_ok:
-        raise RuntimeError(f"Job {job_id} could not be persisted to DB; enqueue aborted.")
+        raise JobEnqueueError(f"Job {job_id} could not be persisted to DB; enqueue aborted.", job_id=job_id, persisted=False)
 
     # Step 2: Push to Redis. If Redis is down, the DB row is the recovery source.
     try:
@@ -102,7 +109,10 @@ async def enqueue_job(payload: Dict[str, Any], queue: str | None = None) -> str:
             job_id,
             queue_name,
         )
-        # Re-raise so the caller knows Redis is unavailable.
-        raise
+        raise JobEnqueueError(
+            f"Job {job_id} was persisted but could not be pushed to Redis queue {queue_name}.",
+            job_id=job_id,
+            persisted=True,
+        )
 
     return job_id

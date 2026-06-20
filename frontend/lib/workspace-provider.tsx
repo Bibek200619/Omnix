@@ -1,14 +1,22 @@
 "use client";
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
 import { setApiWorkspaceId } from "./api";
 import { useAuth } from "./auth-context";
 import { logClientError } from "./errors";
 import { logger } from "./logger";
 import { useToast } from "./toast-context";
+import { persistActiveWorkspaceId, readStoredActiveWorkspaceId } from "./workspace-active-storage";
+import {
+  useWorkspaceDestructiveConfirmation,
+  WorkspaceDestructiveConfirmationModal,
+} from "./workspace-destructive-confirmation";
 import { isWorkspaceFounderRole } from "./workspace-roles";
+import { useWorkspaceContextValues } from "./workspace-context-values";
+import {
+  useActiveWorkspaceReconciliation,
+  usePendingWorkspaceInvitePolling,
+} from "./workspace-provider-effects";
 import { flattenWorkspaces } from "./workspace-utils";
 import {
   acceptWorkspaceInvite,
@@ -63,9 +71,6 @@ import { WorkspaceTreeContext } from "./workspace-tree-context";
 import type {
   RefreshOptions,
   WorkspaceContextType,
-  WorkspaceIntelligenceContextValue,
-  WorkspaceMembershipContextValue,
-  WorkspaceTreeContextValue,
 } from "./workspace-context-types";
 
 export { useWorkspaceIntelligence } from "./workspace-intelligence-context";
@@ -80,19 +85,6 @@ export type {
 } from "./workspace-context-types";
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
-
-type DestructiveConfirmation = {
-  title: string;
-  description: string;
-  confirmLabel: string;
-  resolve: (confirmed: boolean) => void;
-};
-
-const LEGACY_WORKSPACE_STORAGE_KEY = "omnix.activeWorkspaceId";
-
-function workspaceStorageKey(userId?: string | null) {
-  return userId ? `${LEGACY_WORKSPACE_STORAGE_KEY}.${userId}` : null;
-}
 
 const WORKSPACE_SILENT_REFRESH_MIN_MS = 15_000;
 const PENDING_INVITES_POLL_INTERVAL_MS = 60_000;
@@ -119,7 +111,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [intelligenceLoading, setIntelligenceLoading] = useState(false);
   const [subspaceLoadingByParentId, setSubspaceLoadingByParentId] = useState<Record<string, boolean>>({});
   const [subspaceErrorByParentId, setSubspaceErrorByParentId] = useState<Record<string, string | null>>({});
-  const [destructiveConfirmation, setDestructiveConfirmation] = useState<DestructiveConfirmation | null>(null);
+  const {
+    confirmation: destructiveConfirmation,
+    confirmDestructiveAction,
+    cancelDestructiveConfirmation,
+    approveDestructiveConfirmation,
+  } = useWorkspaceDestructiveConfirmation();
   
   const requestGenerationRef = useRef(0);
   const workspaceFetchIdRef = useRef(0);
@@ -144,28 +141,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const lastPendingInvitesRefreshAtRef = useRef(0);
   const lastActiveWorkspaceDataRefreshAtRef = useRef(0);
 
-  const confirmDestructiveAction = useCallback(
-    (confirmation: Omit<DestructiveConfirmation, "resolve">) =>
-      new Promise<boolean>((resolve) => {
-        setDestructiveConfirmation({ ...confirmation, resolve });
-      }),
-    [],
-  );
-
-  const cancelDestructiveConfirmation = useCallback(() => {
-    setDestructiveConfirmation((current) => {
-      current?.resolve(false);
-      return null;
-    });
-  }, []);
-
-  const approveDestructiveConfirmation = useCallback(() => {
-    setDestructiveConfirmation((current) => {
-      current?.resolve(true);
-      return null;
-    });
-  }, []);
-
   const activeWorkspace = useMemo(
     () => findWorkspaceById(workspaces, activeWorkspaceId),
     [activeWorkspaceId, workspaces],
@@ -189,18 +164,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActiveWorkspaceId(id);
     setApiWorkspaceId(id);
     try {
-      if (typeof window !== "undefined") {
-        const storageKey = workspaceStorageKey(userId);
-        window.localStorage.removeItem(LEGACY_WORKSPACE_STORAGE_KEY);
-        if (!storageKey) {
-          return;
-        }
-        if (id) {
-          window.localStorage.setItem(storageKey, id);
-        } else {
-          window.localStorage.removeItem(storageKey);
-        }
-      }
+      persistActiveWorkspaceId(userId, id);
     } catch {
       // ignore
     }
@@ -924,8 +888,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     refreshPendingInvites({ force: true });
 
     try {
-      const storageKey = workspaceStorageKey(userId);
-      const saved = typeof window !== "undefined" && storageKey ? window.localStorage.getItem(storageKey) : null;
+      const saved = readStoredActiveWorkspaceId(userId);
       logger.debug("[workspace] hydration read saved active workspace", { saved });
       setApiWorkspaceId(saved);
       if (saved) {
@@ -936,58 +899,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshPendingInvites, refreshWorkspaces, setActiveWorkspace, userId]);
 
-  useEffect(() => {
-    if (!userId) {
-      return;
-    }
+  usePendingWorkspaceInvitePolling({
+    userId,
+    intervalMs: PENDING_INVITES_POLL_INTERVAL_MS,
+    refreshPendingInvites,
+  });
 
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState !== "hidden") {
-        void refreshPendingInvites({ silent: true });
-      }
-    }, PENDING_INVITES_POLL_INTERVAL_MS);
-
-    function handleVisibilityChange() {
-      if (document.visibilityState === "visible") {
-        void refreshPendingInvites({ silent: true });
-      }
-    }
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      window.clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [refreshPendingInvites, userId]);
-
-  useEffect(() => {
-    if (!userId || loading) {
-      return;
-    }
-
-    if (error && workspaces.length === 0) {
-      logger.debug("[workspace] fetch failed; preserving active workspace id during failure state");
-      return;
-    }
-
-    if (workspaces.length === 0) {
-      logger.debug("[workspace] no workspaces after verified fetch; waiting for explicit create");
-      if (activeWorkspaceId) {
-        setActiveWorkspace(null);
-      }
-      return;
-    }
-
-    const activeExists = Boolean(findWorkspaceById(workspaces, activeWorkspaceId));
-    if (!activeExists) {
-      const nextWorkspaceId = flattenWorkspaces(workspaces)[0]?.id ?? null;
-      logger.debug("[workspace] saved active workspace missing; selecting first available workspace", {
-        activeWorkspaceId,
-        nextWorkspaceId,
-      });
-      setActiveWorkspace(nextWorkspaceId);
-    }
-  }, [activeWorkspaceId, error, loading, setActiveWorkspace, userId, workspaces]);
+  useActiveWorkspaceReconciliation({
+    activeWorkspaceId,
+    error,
+    loading,
+    setActiveWorkspace,
+    userId,
+    workspaces,
+  });
 
   useEffect(() => {
     lastActiveWorkspaceDataRefreshAtRef.current = 0;
@@ -1000,109 +925,45 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     void refreshWorkspaceIntelligence({ force: true });
   }, [refreshWorkspaceIntelligence]);
 
-  const treeValue = useMemo<WorkspaceTreeContextValue>(
-    () => ({
-      workspaces,
-      loading,
-      error,
-      activeWorkspaceId,
-      activeWorkspace,
-      activeRootWorkspace,
-      subspaceLoadingByParentId,
-      subspaceErrorByParentId,
-      setActiveWorkspace,
-      refreshWorkspaces,
-      refreshWorkspaceTree,
-      refreshWorkspaceSubspaces,
-      createWorkspace,
-      createSubspace,
-      renameWorkspace,
-      deleteWorkspace,
-    }),
-    [
-      workspaces,
-      loading,
-      error,
-      activeWorkspaceId,
-      activeWorkspace,
-      activeRootWorkspace,
-      subspaceLoadingByParentId,
-      subspaceErrorByParentId,
-      setActiveWorkspace,
-      refreshWorkspaces,
-      refreshWorkspaceTree,
-      refreshWorkspaceSubspaces,
-      createWorkspace,
-      createSubspace,
-      renameWorkspace,
-      deleteWorkspace,
-    ],
-  );
-
-  const membershipValue = useMemo<WorkspaceMembershipContextValue>(
-    () => ({
-      activeMembers,
-      activeInvites,
-      pendingInvites,
-      membersError,
-      membersLoading,
-      invitesLoading,
-      pendingInvitesLoading,
-      refreshActiveWorkspaceData,
-      refreshPendingInvites,
-      inviteToActiveWorkspace,
-      updateWorkspaceMemberRole,
-      removeWorkspaceMember,
-      assignWorkspaceMember,
-      revokeInvite,
-      acceptInvite,
-      declineInvite,
-    }),
-    [
-      activeMembers,
-      activeInvites,
-      pendingInvites,
-      membersError,
-      membersLoading,
-      invitesLoading,
-      pendingInvitesLoading,
-      refreshActiveWorkspaceData,
-      refreshPendingInvites,
-      inviteToActiveWorkspace,
-      updateWorkspaceMemberRole,
-      removeWorkspaceMember,
-      assignWorkspaceMember,
-      revokeInvite,
-      acceptInvite,
-      declineInvite,
-    ],
-  );
-
-  const intelligenceValue = useMemo<WorkspaceIntelligenceContextValue>(
-    () => ({
-      activeWorkspaceIntelligence,
-      intelligenceError,
-      intelligenceLoading,
-      refreshWorkspaceIntelligence,
-      updateWorkspaceIntelligence,
-    }),
-    [
-      activeWorkspaceIntelligence,
-      intelligenceError,
-      intelligenceLoading,
-      refreshWorkspaceIntelligence,
-      updateWorkspaceIntelligence,
-    ],
-  );
-
-  const value = useMemo<WorkspaceContextType>(
-    () => ({
-      ...treeValue,
-      ...membershipValue,
-      ...intelligenceValue,
-    }),
-    [treeValue, membershipValue, intelligenceValue],
-  );
+  const { treeValue, membershipValue, intelligenceValue, value } = useWorkspaceContextValues({
+    workspaces,
+    loading,
+    error,
+    activeWorkspaceId,
+    activeWorkspace,
+    activeRootWorkspace,
+    subspaceLoadingByParentId,
+    subspaceErrorByParentId,
+    setActiveWorkspace,
+    refreshWorkspaces,
+    refreshWorkspaceTree,
+    refreshWorkspaceSubspaces,
+    createWorkspace,
+    createSubspace,
+    renameWorkspace,
+    deleteWorkspace,
+    activeMembers,
+    activeInvites,
+    pendingInvites,
+    membersError,
+    membersLoading,
+    invitesLoading,
+    pendingInvitesLoading,
+    refreshActiveWorkspaceData,
+    refreshPendingInvites,
+    inviteToActiveWorkspace,
+    updateWorkspaceMemberRole,
+    removeWorkspaceMember,
+    assignWorkspaceMember,
+    revokeInvite,
+    acceptInvite,
+    declineInvite,
+    activeWorkspaceIntelligence,
+    intelligenceError,
+    intelligenceLoading,
+    refreshWorkspaceIntelligence,
+    updateWorkspaceIntelligence,
+  });
 
   return (
     <WorkspaceTreeContext.Provider value={treeValue}>
@@ -1110,31 +971,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         <WorkspaceIntelligenceContext.Provider value={intelligenceValue}>
           <WorkspaceContext.Provider value={value}>
             {children}
-            <Modal
-              isOpen={Boolean(destructiveConfirmation)}
-              onClose={cancelDestructiveConfirmation}
-              title={destructiveConfirmation?.title || "Confirm destructive action"}
-              footer={
-                <>
-                  <Button type="button" variant="ghost" onClick={cancelDestructiveConfirmation}>
-                    Cancel
-                  </Button>
-                  <Button type="button" variant="danger" onClick={approveDestructiveConfirmation}>
-                    {destructiveConfirmation?.confirmLabel || "Confirm"}
-                  </Button>
-                </>
-              }
-            >
-              <Modal.Header>
-                <div>
-                  <p className="text-base font-semibold text-white">{destructiveConfirmation?.title || "Confirm destructive action"}</p>
-                  <p className="mt-1 text-sm text-[var(--omnix-text-2)]">This action needs confirmation before it runs.</p>
-                </div>
-              </Modal.Header>
-              <Modal.Body>
-                <p className="text-sm leading-6 text-[var(--omnix-text)]">{destructiveConfirmation?.description}</p>
-              </Modal.Body>
-            </Modal>
+            <WorkspaceDestructiveConfirmationModal
+              confirmation={destructiveConfirmation}
+              onCancel={cancelDestructiveConfirmation}
+              onConfirm={approveDestructiveConfirmation}
+            />
           </WorkspaceContext.Provider>
         </WorkspaceIntelligenceContext.Provider>
       </WorkspaceMembershipContext.Provider>

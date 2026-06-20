@@ -3,36 +3,30 @@
 import { Suspense } from "react";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import dynamic from "next/dynamic";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import {
-  AlertCircle,
   BadgeCheck,
-  CheckCircle2,
-  Clock3,
   Database,
   Download,
   ExternalLink,
   FileText,
   FileUp,
-  GitBranch,
-  HardDrive,
   LayoutGrid,
   Link2,
   List,
-  LockKeyhole,
   Plus,
   RefreshCw,
   Search,
-  Server,
   Trash2,
   Unplug,
   X,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { ConnectorSetupModal } from "@/components/files/ConnectorSetupModal";
 import { CreateDecisionModal } from "@/components/decisions/CreateDecisionModal";
+import { DocumentPortal } from "@/components/files/DocumentPortal";
 import { DecisionCandidatePanel } from "@/components/decisions/DecisionCandidatePanel";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
@@ -44,368 +38,32 @@ import { workspaceRoleLabel } from "@/lib/workspace-roles";
 import { cn } from "@/lib/utils";
 import type { MessageAttachment } from "@/components/chat/types";
 import type { DecisionCandidate, DecisionCandidateList, WorkspaceDecisionStatus } from "@/lib/workspace-types";
+import {
+  connectorAccent,
+  connectorIcon,
+  connectorSummary,
+  emptyForm,
+  fileIngestionStatus,
+  fileStatusDetail,
+  fileStatusLabel,
+  fileStatusStyle,
+  formatDate,
+  formatFileSize,
+  formFromConnector,
+  newestConnector,
+  sourceTypes,
+  statusLabel,
+  statusStyle,
+  valueFromConfig,
+  type ConnectorFormState,
+  type ConnectorType,
+  type FileData,
+  type SourceSection,
+  type SourceType,
+  type WorkspaceConnector,
+} from "@/components/files/filesPageModel";
 
 const UploadDropzone = dynamic(() => import("@/components/upload/UploadDropzone").then((m) => m.UploadDropzone), { ssr: false });
-
-function DocumentPortal({ children }: { children: ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) return null;
-
-  return createPortal(children, document.body);
-}
-
-interface FileData {
-  id: string;
-  file_name?: string;
-  filename?: string;
-  file_type?: string;
-  content_type?: string;
-  size_bytes?: number;
-  storage_path?: string;
-  metadata?: Record<string, unknown> | null;
-  page_count?: number | null;
-  extractor_used?: string | null;
-  extracted_character_count?: number | null;
-  image_page_count?: number | null;
-  text_page_count?: number | null;
-  extraction_status?: "processing" | "searchable" | "ocr_required" | "extraction_failed" | null;
-  extraction_failure_reason?: string | null;
-  ocr_used?: boolean | null;
-  ocr_character_count?: number | null;
-}
-
-type ConnectorType = "knowledge_link" | "file_repository" | "company_drive" | "external_database";
-type SourceType = "file" | ConnectorType;
-type SourceSection = "files" | "connectors";
-
-type ConnectorStatus =
-  | "live"
-  | "connecting"
-  | "connected"
-  | "syncing"
-  | "failed"
-  | "pending_ingestion"
-  | "request_submitted"
-  | "needs_authentication";
-
-type ConnectorJob = {
-  id: string;
-  type?: string | null;
-  status?: string | null;
-  progress?: number | null;
-  attempts?: number | null;
-  error?: string | null;
-  created_at?: string | null;
-};
-
-type WorkspaceConnector = {
-  id: string;
-  workspace_id: string;
-  user_id: string;
-  connector_type: ConnectorType;
-  display_name: string;
-  status: ConnectorStatus;
-  config: Record<string, unknown>;
-  last_error?: string | null;
-  job_id?: string | null;
-  source_file_id?: string | null;
-  last_synced_at?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  job?: ConnectorJob | null;
-};
-
-type ConnectorFormState = {
-  displayName: string;
-  url: string;
-  repository: string;
-  branch: string;
-  authMode: "none" | "token_reference" | "ssh_key_reference" | "needs_setup";
-  credentialReference: string;
-  provider: string;
-  engine: "postgres" | "mysql" | "mssql" | "snowflake" | "bigquery" | "redshift" | "other";
-  host: string;
-  port: string;
-  database: string;
-  schema: string;
-  dbAuthMode: "credential_reference" | "iam" | "oauth" | "network_allowlist" | "needs_setup";
-  notes: string;
-};
-
-const sourceTypes: Array<{
-  id: SourceType;
-  title: string;
-  description: string;
-  icon: typeof FileText;
-  color: string;
-  surface: string;
-  border: string;
-  activeSurface: string;
-  activeBorder: string;
-  iconSurface: string;
-  iconBorder: string;
-  shadow: string;
-  action: string;
-}> = [
-  {
-    id: "file",
-    title: "File upload",
-    description: "PDF, DOCX, TXT, Markdown",
-    icon: FileUp,
-    color: "var(--omnix-cyan)",
-    surface: "var(--omnix-rgba-255-255-255-0-025)",
-    border: "var(--omnix-rgba-255-255-255-0-07)",
-    activeSurface: "var(--omnix-rgba-0-255-255-0-12)",
-    activeBorder: "var(--omnix-rgba-0-255-255-0-55)",
-    iconSurface: "var(--omnix-rgba-0-255-255-0-14)",
-    iconBorder: "var(--omnix-rgba-0-255-255-0-28)",
-    shadow: "var(--omnix-rgba-0-255-255-0-18)",
-    action: "Upload",
-  },
-  {
-    id: "knowledge_link",
-    title: "Knowledge link",
-    description: "Docs, wiki, or policy URL",
-    icon: Link2,
-    color: "var(--omnix-amber)",
-    surface: "var(--omnix-rgba-255-255-255-0-025)",
-    border: "var(--omnix-rgba-255-255-255-0-07)",
-    activeSurface: "var(--omnix-rgba-255-184-0-12)",
-    activeBorder: "var(--omnix-rgba-255-184-0-55)",
-    iconSurface: "var(--omnix-rgba-255-184-0-14)",
-    iconBorder: "var(--omnix-rgba-255-184-0-28)",
-    shadow: "var(--omnix-rgba-255-184-0-18)",
-    action: "Sync link",
-  },
-  {
-    id: "file_repository",
-    title: "File repository",
-    description: "Git URL or internal repo path",
-    icon: GitBranch,
-    color: "var(--omnix-pink)",
-    surface: "var(--omnix-rgba-255-255-255-0-025)",
-    border: "var(--omnix-rgba-255-255-255-0-07)",
-    activeSurface: "var(--omnix-rgba-255-77-244-0-12)",
-    activeBorder: "var(--omnix-rgba-255-77-244-0-55)",
-    iconSurface: "var(--omnix-rgba-255-77-244-0-14)",
-    iconBorder: "var(--omnix-rgba-255-77-244-0-28)",
-    shadow: "var(--omnix-rgba-255-77-244-0-18)",
-    action: "Set up",
-  },
-  {
-    id: "company_drive",
-    title: "Company drive link",
-    description: "Shared Drive, SharePoint, or folder URL",
-    icon: HardDrive,
-    color: "var(--omnix-purple)",
-    surface: "var(--omnix-rgba-255-255-255-0-025)",
-    border: "var(--omnix-rgba-255-255-255-0-07)",
-    activeSurface: "var(--omnix-rgba-155-92-255-0-12)",
-    activeBorder: "var(--omnix-rgba-155-92-255-0-55)",
-    iconSurface: "var(--omnix-rgba-155-92-255-0-14)",
-    iconBorder: "var(--omnix-rgba-155-92-255-0-28)",
-    shadow: "var(--omnix-rgba-155-92-255-0-18)",
-    action: "Connect",
-  },
-  {
-    id: "external_database",
-    title: "External database",
-    description: "Structured connection request",
-    icon: Server,
-    color: "var(--omnix-green)",
-    surface: "var(--omnix-rgba-255-255-255-0-025)",
-    border: "var(--omnix-rgba-255-255-255-0-07)",
-    activeSurface: "var(--omnix-rgba-0-232-122-0-12)",
-    activeBorder: "var(--omnix-rgba-0-232-122-0-55)",
-    iconSurface: "var(--omnix-rgba-0-232-122-0-14)",
-    iconBorder: "var(--omnix-rgba-0-232-122-0-28)",
-    shadow: "var(--omnix-rgba-0-232-122-0-18)",
-    action: "Request",
-  },
-];
-
-const statusLabel: Record<ConnectorStatus | "not_configured", string> = {
-  live: "Live",
-  connecting: "Connecting",
-  connected: "Connected",
-  syncing: "Syncing",
-  failed: "Failed",
-  pending_ingestion: "Pending Ingestion",
-  request_submitted: "Request Submitted",
-  needs_authentication: "Needs Authentication",
-  not_configured: "Not Configured",
-};
-
-const statusStyle: Record<ConnectorStatus | "not_configured", string> = {
-  live: "border-emerald-300/25 bg-emerald-300/10 text-emerald-200",
-  connecting: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
-  connected: "border-emerald-300/25 bg-emerald-300/10 text-emerald-200",
-  syncing: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
-  failed: "border-rose-300/30 bg-rose-300/10 text-rose-100",
-  pending_ingestion: "border-amber-300/25 bg-amber-300/10 text-amber-100",
-  request_submitted: "border-violet-300/25 bg-violet-300/10 text-violet-100",
-  needs_authentication: "border-amber-300/25 bg-amber-300/10 text-amber-100",
-  not_configured: "border-white/10 bg-white/[0.04] text-white/45",
-};
-
-type FileIngestionStatus = "searchable" | "processing" | "ocr_required" | "ocr_complete" | "extraction_failed";
-
-const fileStatusStyle: Record<FileIngestionStatus, string> = {
-  searchable: "border-emerald-300/25 bg-emerald-300/10 text-emerald-200",
-  processing: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
-  ocr_required: "border-amber-300/25 bg-amber-300/10 text-amber-100",
-  ocr_complete: "border-emerald-300/25 bg-emerald-300/10 text-emerald-200",
-  extraction_failed: "border-rose-300/30 bg-rose-300/10 text-rose-100",
-};
-
-const fileStatusLabel: Record<FileIngestionStatus, string> = {
-  searchable: "Searchable",
-  processing: "Processing",
-  ocr_required: "OCR Required",
-  ocr_complete: "OCR Complete",
-  extraction_failed: "Extraction Failed",
-};
-
-function formatFileSize(size?: number) {
-  if (!size) return "Unknown size";
-  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "Not synced yet";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Not synced yet";
-  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-}
-
-function metadataValue(file: FileData, key: string) {
-  return file.metadata && typeof file.metadata === "object" ? file.metadata[key] : undefined;
-}
-
-function numberDiagnostic(file: FileData, key: keyof FileData) {
-  const direct = file[key];
-  if (typeof direct === "number") return direct;
-  const fromMetadata = metadataValue(file, String(key));
-  return typeof fromMetadata === "number" ? fromMetadata : undefined;
-}
-
-function stringDiagnostic(file: FileData, key: keyof FileData | string) {
-  const direct = key in file ? file[key as keyof FileData] : undefined;
-  if (typeof direct === "string") return direct;
-  const fromMetadata = metadataValue(file, String(key));
-  return typeof fromMetadata === "string" ? fromMetadata : undefined;
-}
-
-function booleanDiagnostic(file: FileData, key: keyof FileData) {
-  const direct = file[key];
-  if (typeof direct === "boolean") return direct;
-  const fromMetadata = metadataValue(file, String(key));
-  return typeof fromMetadata === "boolean" ? fromMetadata : false;
-}
-
-function fileIngestionStatus(file: FileData): FileIngestionStatus {
-  const status = stringDiagnostic(file, "extraction_status");
-  const ocrUsed = booleanDiagnostic(file, "ocr_used");
-  const ocrChars = numberDiagnostic(file, "ocr_character_count") ?? 0;
-  if (status === "searchable" && ocrUsed && ocrChars > 0) return "ocr_complete";
-  if (status === "processing" || status === "ocr_required" || status === "extraction_failed" || status === "searchable") return status;
-  return (numberDiagnostic(file, "extracted_character_count") ?? 0) > 0 ? "searchable" : "processing";
-}
-
-function fileStatusDetail(file: FileData) {
-  const status = fileIngestionStatus(file);
-  const reason = stringDiagnostic(file, "extraction_failure_reason") || stringDiagnostic(file, "extraction_error");
-  if (reason && status !== "searchable" && status !== "ocr_complete") return reason;
-  const extractedChars = numberDiagnostic(file, "extracted_character_count") ?? 0;
-  const ocrChars = numberDiagnostic(file, "ocr_character_count") ?? 0;
-  const pages = numberDiagnostic(file, "page_count");
-  if (status === "processing") return "Text extraction is still running.";
-  if (status === "ocr_required") return "This PDF contains no readable text layer. OCR is required before it becomes searchable.";
-  if (status === "extraction_failed") return "Text extraction failed for this document.";
-  if (status === "ocr_complete") return `OCR extracted ${ocrChars.toLocaleString()} characters${pages ? ` across ${pages} pages` : ""}.`;
-  return `Extracted ${extractedChars.toLocaleString()} characters${pages ? ` across ${pages} pages` : ""}.`;
-}
-
-function connectorIcon(type: ConnectorType) {
-  return sourceTypes.find((item) => item.id === type)?.icon ?? Database;
-}
-
-function connectorAccent(type: ConnectorType) {
-  return sourceTypes.find((item) => item.id === type) ?? sourceTypes[0];
-}
-
-function emptyForm(type: ConnectorType): ConnectorFormState {
-  return {
-    displayName: "",
-    url: "",
-    repository: "",
-    branch: "",
-    authMode: "none",
-    credentialReference: "",
-    provider: type === "company_drive" ? "auto" : "",
-    engine: "postgres",
-    host: "",
-    port: "",
-    database: "",
-    schema: "",
-    dbAuthMode: "credential_reference",
-    notes: "",
-  };
-}
-
-function valueFromConfig(config: Record<string, unknown>, key: string) {
-  const value = config[key];
-  return typeof value === "string" ? value : "";
-}
-
-function formFromConnector(type: ConnectorType, connector?: WorkspaceConnector): ConnectorFormState {
-  const form = emptyForm(type);
-  if (!connector) return form;
-  const config = connector.config || {};
-  return {
-    ...form,
-    displayName: connector.display_name || "",
-    url: valueFromConfig(config, "url"),
-    repository: valueFromConfig(config, "repository"),
-    branch: valueFromConfig(config, "branch"),
-    authMode: (valueFromConfig(config, "auth_mode") as ConnectorFormState["authMode"]) || form.authMode,
-    credentialReference: valueFromConfig(config, "credential_reference"),
-    provider: valueFromConfig(config, "provider") || form.provider,
-    engine: (valueFromConfig(config, "engine") as ConnectorFormState["engine"]) || form.engine,
-    host: valueFromConfig(config, "host"),
-    port: valueFromConfig(config, "port"),
-    database: valueFromConfig(config, "database"),
-    schema: valueFromConfig(config, "schema"),
-    dbAuthMode: (valueFromConfig(config, "auth_mode") as ConnectorFormState["dbAuthMode"]) || form.dbAuthMode,
-    notes: valueFromConfig(config, "notes"),
-  };
-}
-
-function connectorSummary(connector: WorkspaceConnector) {
-  const config = connector.config || {};
-  if (connector.connector_type === "knowledge_link" || connector.connector_type === "company_drive") {
-    return valueFromConfig(config, "url") || "No URL saved";
-  }
-  if (connector.connector_type === "file_repository") {
-    return valueFromConfig(config, "repository") || "No repository saved";
-  }
-  const engine = valueFromConfig(config, "engine").toUpperCase() || "Database";
-  const host = valueFromConfig(config, "host");
-  const database = valueFromConfig(config, "database");
-  return [engine, host, database].filter(Boolean).join(" / ") || "Connection details saved";
-}
-
-function newestConnector(connectors: WorkspaceConnector[], type: ConnectorType) {
-  return connectors
-    .filter((connector) => connector.connector_type === type)
-    .sort((a, b) => Date.parse(b.created_at || "") - Date.parse(a.created_at || ""))[0];
-}
 
 export default function FilesPage() {
   return (
@@ -1162,277 +820,19 @@ function FilesPageContent() {
       ) : null}
 
       {setupType && setupMeta ? (
-        <DocumentPortal>
-        <div className="fixed inset-0 z-[160] flex items-end justify-center bg-black/70 px-3 py-4 backdrop-blur-md sm:items-center">
-          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-white/10 bg-[linear-gradient(180deg,var(--omnix-rgba-12-18-28-0-98),var(--omnix-rgba-3-6-12-0-98))] p-5 shadow-2xl sm:rounded-2xl sm:p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border" style={{ background: setupMeta.iconSurface, borderColor: setupMeta.iconBorder, color: setupMeta.color }}>
-                  <setupMeta.icon className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  <h3 className="omnix-display text-lg font-semibold text-white">{setupMeta.title}</h3>
-                  <p className="mt-1 text-sm leading-6 text-[var(--omnix-text-3)]">{setupMeta.description}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSetupType(null)}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
-                aria-label="Close connector setup"
-                title="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mt-5 grid gap-4">
-              <label className="grid gap-2 text-xs font-medium text-white/60">
-                Display name
-                <input
-                  value={setupForm.displayName}
-                  onChange={(event) => setSetupForm((current) => ({ ...current, displayName: event.target.value }))}
-                  placeholder="Optional workspace-facing name"
-                  className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
-                />
-              </label>
-
-              {setupType === "knowledge_link" ? (
-                <ConnectorUrlField
-                  label="Knowledge URL"
-                  value={setupForm.url}
-                  placeholder="https://company.example.com/handbook/security-policy"
-                  onChange={(url) => setSetupForm((current) => ({ ...current, url }))}
-                />
-              ) : null}
-
-              {setupType === "file_repository" ? (
-                <>
-                  <label className="grid gap-2 text-xs font-medium text-white/60">
-                    Repository URL or path
-                    <input
-                      value={setupForm.repository}
-                      onChange={(event) => setSetupForm((current) => ({ ...current, repository: event.target.value }))}
-                      placeholder="https://github.com/company/repo or //repos/platform"
-                      className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
-                    />
-                  </label>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="grid gap-2 text-xs font-medium text-white/60">
-                      Branch or path scope
-                      <input
-                        value={setupForm.branch}
-                        onChange={(event) => setSetupForm((current) => ({ ...current, branch: event.target.value }))}
-                        placeholder="main, docs/, or runbooks/"
-                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
-                      />
-                    </label>
-                    <label className="grid gap-2 text-xs font-medium text-white/60">
-                      Authentication
-                      <select
-                        value={setupForm.authMode}
-                        onChange={(event) => setSetupForm((current) => ({ ...current, authMode: event.target.value as ConnectorFormState["authMode"] }))}
-                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
-                      >
-                        <option value="none">No auth required</option>
-                        <option value="token_reference">Token reference</option>
-                        <option value="ssh_key_reference">SSH key reference</option>
-                        <option value="needs_setup">Needs setup</option>
-                      </select>
-                    </label>
-                  </div>
-                </>
-              ) : null}
-
-              {setupType === "company_drive" ? (
-                <>
-                  <ConnectorUrlField
-                    label="Drive or folder URL"
-                    value={setupForm.url}
-                    placeholder="https://drive.google.com/drive/folders/..."
-                    onChange={(url) => setSetupForm((current) => ({ ...current, url }))}
-                  />
-                  <label className="grid gap-2 text-xs font-medium text-white/60">
-                    Provider
-                    <select
-                      value={setupForm.provider}
-                      onChange={(event) => setSetupForm((current) => ({ ...current, provider: event.target.value }))}
-                      className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
-                    >
-                      <option value="auto">Detect from URL</option>
-                      <option value="google_drive">Google Drive</option>
-                      <option value="sharepoint">SharePoint</option>
-                      <option value="onedrive">OneDrive</option>
-                      <option value="shared_drive">Other shared drive</option>
-                    </select>
-                  </label>
-                </>
-              ) : null}
-
-              {setupType === "external_database" ? (
-                <>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="grid gap-2 text-xs font-medium text-white/60">
-                      Engine
-                      <select
-                        value={setupForm.engine}
-                        onChange={(event) => setSetupForm((current) => ({ ...current, engine: event.target.value as ConnectorFormState["engine"] }))}
-                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
-                      >
-                        <option value="postgres">Postgres</option>
-                        <option value="mysql">MySQL</option>
-                        <option value="mssql">SQL Server</option>
-                        <option value="snowflake">Snowflake</option>
-                        <option value="bigquery">BigQuery</option>
-                        <option value="redshift">Redshift</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </label>
-                    <label className="grid gap-2 text-xs font-medium text-white/60">
-                      Auth method
-                      <select
-                        value={setupForm.dbAuthMode}
-                        onChange={(event) => setSetupForm((current) => ({ ...current, dbAuthMode: event.target.value as ConnectorFormState["dbAuthMode"] }))}
-                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
-                      >
-                        <option value="credential_reference">Credential reference</option>
-                        <option value="iam">IAM or service account</option>
-                        <option value="oauth">OAuth</option>
-                        <option value="network_allowlist">Network allowlist</option>
-                        <option value="needs_setup">Needs setup</option>
-                      </select>
-                    </label>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
-                    <label className="grid gap-2 text-xs font-medium text-white/60">
-                      Host
-                      <input
-                        value={setupForm.host}
-                        onChange={(event) => setSetupForm((current) => ({ ...current, host: event.target.value }))}
-                        placeholder="warehouse.company.internal"
-                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
-                      />
-                    </label>
-                    <label className="grid gap-2 text-xs font-medium text-white/60">
-                      Port
-                      <input
-                        value={setupForm.port}
-                        onChange={(event) => setSetupForm((current) => ({ ...current, port: event.target.value }))}
-                        placeholder="5432"
-                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
-                      />
-                    </label>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="grid gap-2 text-xs font-medium text-white/60">
-                      Database
-                      <input
-                        value={setupForm.database}
-                        onChange={(event) => setSetupForm((current) => ({ ...current, database: event.target.value }))}
-                        placeholder="analytics"
-                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
-                      />
-                    </label>
-                    <label className="grid gap-2 text-xs font-medium text-white/60">
-                      Schema or tables
-                      <input
-                        value={setupForm.schema}
-                        onChange={(event) => setSetupForm((current) => ({ ...current, schema: event.target.value }))}
-                        placeholder="public.docs, policies"
-                        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
-                      />
-                    </label>
-                  </div>
-                </>
-              ) : null}
-
-              {(setupType === "file_repository" || setupType === "external_database") ? (
-                <label className="grid gap-2 text-xs font-medium text-white/60">
-                  Credential reference
-                  <input
-                    value={setupForm.credentialReference}
-                    onChange={(event) => setSetupForm((current) => ({ ...current, credentialReference: event.target.value }))}
-                    placeholder="Vault path, secret alias, or ticket reference. Do not paste raw passwords."
-                    className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
-                  />
-                </label>
-              ) : null}
-
-              <label className="grid gap-2 text-xs font-medium text-white/60">
-                Access notes
-                <textarea
-                  value={setupForm.notes}
-                  onChange={(event) => setSetupForm((current) => ({ ...current, notes: event.target.value }))}
-                  rows={4}
-                  placeholder="Folder scope, access constraints, schema scope, or ingestion instructions"
-                  className="omnix-input min-h-[96px] w-full resize-none rounded-lg px-3 py-2 text-sm"
-                />
-              </label>
-
-              {setupType === "company_drive" && (setupForm.provider === "google_drive" || setupForm.url.includes("drive.google.com")) ? (
-                <div className="rounded-xl border border-amber-300/20 bg-amber-300/10 p-3 text-sm leading-6 text-amber-50/85">
-                  Google Drive folder setup may require OAuth before Omnix can validate access.
-                  <button type="button" onClick={() => void handleDriveAuth()} className="ml-2 inline-flex font-semibold text-amber-100 underline underline-offset-4">
-                    Start authentication
-                  </button>
-                </div>
-              ) : null}
-
-              {setupMessage ? (
-                <div className="rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-50">
-                  {setupMessage}
-                </div>
-              ) : null}
-
-              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <Button type="button" variant="ghost" onClick={() => setSetupType(null)}>Cancel</Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="border-cyan-300/20 text-cyan-100"
-                  leftIcon={setupType === "knowledge_link" ? <CheckCircle2 className="h-4 w-4" /> : setupType === "external_database" ? <LockKeyhole className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}
-                  isLoading={savingConnector}
-                  onClick={() => void handleSaveConnector()}
-                >
-                  {setupType === "knowledge_link" ? "Save and sync" : "Save setup"}
-                </Button>
-              </div>
-
-              {setupType !== "knowledge_link" ? (
-                <div className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[12px] leading-5 text-white/50">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-200/70" />
-                  This connector setup is persisted now. Ingestion remains in request state until the matching backend importer is available.
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-        </DocumentPortal>
+        <ConnectorSetupModal
+          setupType={setupType}
+          setupMeta={setupMeta}
+          setupForm={setupForm}
+          setSetupForm={setSetupForm}
+          setupMessage={setupMessage}
+          savingConnector={savingConnector}
+          onClose={() => setSetupType(null)}
+          onSave={() => void handleSaveConnector()}
+          onDriveAuth={() => void handleDriveAuth()}
+        />
       ) : null}
     </section>
   );
 }
 
-function ConnectorUrlField({
-  label,
-  value,
-  placeholder,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  placeholder: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="grid gap-2 text-xs font-medium text-white/60">
-      {label}
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="omnix-input min-h-[44px] w-full rounded-lg px-3 text-sm"
-      />
-    </label>
-  );
-}

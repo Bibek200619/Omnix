@@ -1,8 +1,10 @@
 import { AlertTriangle, CalendarDays, Compass, UserRound, X } from "lucide-react";
 import { MentionText } from "@/components/mentions/MentionText";
 import { DecisionTraceabilityList } from "@/components/decisions/DecisionTraceabilityList";
+import { RecordTraceabilityPanel, type TraceabilityLink } from "@/components/provenance/RecordTraceabilityPanel";
 import { cn } from "@/lib/utils";
 import type {
+  WorkspaceTaskContextLink,
   WorkspaceInitiative,
   WorkspaceMember,
   WorkspaceTask,
@@ -29,6 +31,34 @@ type TaskCardProps = {
   taskRef: (taskId: string, node: HTMLElement | null) => void;
 };
 
+function readableOrigin(value: unknown) {
+  const origin = String(value || "manual").replace(/[_-]/g, " ").trim();
+  if (!origin) return "Manual";
+  return origin.charAt(0).toUpperCase() + origin.slice(1);
+}
+
+function contextHref(link: WorkspaceTaskContextLink) {
+  if (link.context_type === "channel") return `/conversations?channel=${link.context_id}`;
+  if (link.context_type === "conversation_message") return `/conversations?message=${link.context_id}`;
+  if (link.context_type === "file") return `/files?id=${link.context_id}`;
+  if (link.context_type === "decision") return `/decisions?id=${link.context_id}`;
+  if (link.context_type === "initiative") return `/initiatives?id=${link.context_id}`;
+  return undefined;
+}
+
+function contextKind(link: WorkspaceTaskContextLink): TraceabilityLink["kind"] {
+  if (link.context_type === "conversation_message" || link.context_type === "channel") return "conversation";
+  if (link.context_type === "file") return "file";
+  if (link.context_type === "decision") return "decision";
+  if (link.context_type === "initiative") return "initiative";
+  return "evidence";
+}
+
+function contextLabel(link: WorkspaceTaskContextLink) {
+  if (link.label) return link.label;
+  return link.context_type.replace(/_/g, " ");
+}
+
 export function TaskCard({
   task,
   members,
@@ -50,6 +80,32 @@ export function TaskCard({
   const threeDaysFromNow = new Date();
   threeDaysFromNow.setDate(now.getDate() + 3);
   const isDueSoon = task.due_date && new Date(task.due_date) <= threeDaysFromNow;
+  const linkedInitiative = initiatives.find((initiative) => initiative.id === task.initiative_id);
+  const traceabilityOrigin = {
+    kind: "origin" as const,
+    label: `${readableOrigin(task.activity_metadata?.origin)} task`,
+    detail: task.creator_name ? `Recorded by ${task.creator_name}` : task.created_at ? `Recorded ${new Date(task.created_at).toLocaleDateString()}` : null,
+  };
+  const traceabilityEvidence = task.linked_context.map((link) => ({
+    kind: contextKind(link),
+    label: contextLabel(link),
+    href: contextHref(link),
+    detail: link.context_id,
+  }));
+  const traceabilityDecisions = task.linked_decisions.map((decision) => ({
+    kind: "decision" as const,
+    label: decision.title,
+    href: `/decisions?id=${decision.id}`,
+    detail: decision.decision_reason || decision.status,
+  }));
+  const traceabilityInitiatives = linkedInitiative
+    ? [{
+        kind: "initiative" as const,
+        label: linkedInitiative.title,
+        href: `/initiatives?id=${linkedInitiative.id}`,
+        detail: linkedInitiative.description || linkedInitiative.status,
+      }]
+    : [];
 
   return (
     <article
@@ -167,6 +223,22 @@ export function TaskCard({
       )}
 
       <DecisionTraceabilityList decisions={task.linked_decisions} />
+
+      <details className="mt-3 rounded-xl border border-white/[0.05] bg-black/[0.08]">
+        <summary className="cursor-pointer px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--omnix-text-3)]">
+          Traceability
+        </summary>
+        <div className="px-2 pb-2">
+          <RecordTraceabilityPanel
+            origin={traceabilityOrigin}
+            evidence={traceabilityEvidence}
+            decisions={traceabilityDecisions}
+            initiatives={traceabilityInitiatives}
+            compact
+            className="border-white/[0.05] bg-black/[0.08]"
+          />
+        </div>
+      </details>
 
       <div className="mt-2.5 border-t border-white/[0.04] pt-2.5 opacity-100 transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover:opacity-100">
         <input
