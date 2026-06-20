@@ -10,6 +10,7 @@ WorkspaceType = Literal["workspace", "super_workspace", "subworkspace", "global_
 WorkspaceFocus = Literal["general", "engineering", "design", "research", "strategy"]
 WorkspaceRole = Literal["founder", "co_owner", "member", "team_lead", "sub_leader", "sub_member"]
 WorkspaceAssignableRole = Literal["co_owner", "member", "team_lead", "sub_leader", "sub_member"]
+FileProcessingStatus = Literal["uploaded", "queued", "processing", "extracted", "chunked", "embedded", "failed"]
 WorkspaceFocusInput = Literal[
     "general",
     "engineering",
@@ -144,6 +145,9 @@ class FileRead(BaseModel):
     text_page_count: int = 0
     extraction_status: Literal["processing", "searchable", "ocr_required", "extraction_failed"] | None = None
     extraction_failure_reason: str | None = None
+    processing_status: FileProcessingStatus | None = None
+    processing_error: str | None = None
+    processing_job_id: str | None = None
     ocr_used: bool = False
     ocr_character_count: int = 0
     created_at: datetime | None = None
