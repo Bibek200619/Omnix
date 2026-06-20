@@ -9,6 +9,8 @@ type ClientErrorDiagnostics = {
   [key: string]: unknown;
 };
 
+const isDevelopment = process.env.NODE_ENV !== "production";
+
 export function ensureSentence(message: string) {
   const trimmed = message.trim();
   if (!trimmed) return trimmed;
@@ -17,10 +19,27 @@ export function ensureSentence(message: string) {
 
 export function logClientError(label: string, error: unknown, diagnostics: ClientErrorDiagnostics = {}) {
   const apiError = error instanceof ApiError ? error : null;
+  const endpoint = diagnostics.endpoint ?? apiError?.endpoint;
+  const status = diagnostics.status ?? apiError?.status;
+
+  if (!isDevelopment) {
+    console.error(label, {
+      error: apiError
+        ? apiError.toJSON({ includeSensitive: false })
+        : error instanceof Error
+          ? { name: error.name, message: "Client error redacted in production logs." }
+          : { type: typeof error },
+      endpoint,
+      status,
+      sensitiveFieldsRedacted: Boolean(diagnostics.responsePayload || apiError?.responsePayload || apiError?.rawMessage),
+    });
+    return;
+  }
+
   console.error(label, {
-    error: apiError ? apiError.toJSON() : error,
-    endpoint: diagnostics.endpoint ?? apiError?.endpoint,
-    status: diagnostics.status ?? apiError?.status,
+    error: apiError ? apiError.toJSON({ includeSensitive: true }) : error,
+    endpoint,
+    status,
     responsePayload: diagnostics.responsePayload ?? apiError?.responsePayload,
     rawMessage: apiError?.rawMessage,
     ...diagnostics,
