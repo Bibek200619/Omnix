@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api";
+import { safeExternalUrl } from "@/lib/url-safety";
 import {
   workspaceRoleAvatarClass,
   workspaceRoleBadgeClass,
@@ -98,9 +99,10 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
 
   function sourceDomain(source: NonNullable<Message["sources"]>[number]) {
     if (source.domain) return source.domain;
-    if (!source.url) return source.type === "web" ? "Web" : "Workspace";
+    const url = safeExternalUrl(source.url);
+    if (!url) return source.type === "web" ? "Web" : "Workspace";
     try {
-      return new URL(source.url).hostname.replace(/^www\./, "");
+      return new URL(url).hostname.replace(/^www\./, "");
     } catch {
       return "Web";
     }
@@ -108,16 +110,6 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
 
   function sourceExcerpt(source: NonNullable<Message["sources"]>[number]) {
     return source.snippet || source.excerpt || source.chunk_preview || "";
-  }
-
-  function safeUrl(url?: string) {
-    if (!url) return null;
-    try {
-      const parsed = new URL(url);
-      return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : null;
-    } catch {
-      return null;
-    }
   }
 
   function sourceBadgeLabel() {
@@ -277,7 +269,8 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
               {sources.map((source, index) => {
                 const sourceId = source.id || source.url || String(index);
                 const isExpanded = expandedSource === sourceId;
-                const url = safeUrl(source.url);
+                const url = safeExternalUrl(source.url);
+                const faviconUrl = safeExternalUrl(source.favicon_url);
                 const excerpt = sourceExcerpt(source);
                 const domain = sourceDomain(source);
                 const isWeb = source.type === "web" || Boolean(url);
@@ -295,9 +288,9 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
                     >
                       <div className="flex min-w-0 gap-2">
                         <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-cyan-300/15 bg-cyan-300/10">
-                          {source.favicon_url && isWeb ? (
+                          {faviconUrl && isWeb ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={source.favicon_url} alt="" className="h-4 w-4 rounded-sm" />
+                            <img src={faviconUrl} alt="" className="h-4 w-4 rounded-sm" />
                           ) : isWeb ? (
                             <Globe2 className="h-3.5 w-3.5 text-cyan-200" />
                           ) : (
