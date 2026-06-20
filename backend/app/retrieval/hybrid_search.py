@@ -7,6 +7,7 @@ import time
 from typing import Any
 
 from ..core.config import get_settings
+from ..observability.safe_logging import safe_text_preview
 from ..rag.startup import get_vector_store
 from ..rag.vector_store_base import VectorStore
 from .context_builder import BuiltContext, ContextBuilder
@@ -286,7 +287,7 @@ class HybridSearchEngine:
             log_level,
             "Hybrid retrieval diagnostics: query=%r semantic=%d keyword=%d merged=%d returned=%d "
             "weights=(semantic=%.2f keyword=%.2f) latency_ms=%.2f reasons=%s",
-            response.query,
+            safe_text_preview(response.query, max_chars=240),
             diagnostics.get("semantic_matches", 0),
             diagnostics.get("keyword_matches", 0),
             diagnostics.get("merged_matches", 0),

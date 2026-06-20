@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 import httpx
 
 from ..core.config import get_settings
+from ..observability.safe_logging import safe_text_preview
 from ..retrieval.context_builder import ContextSupplement
 
 logger = logging.getLogger(__name__)
@@ -130,7 +131,7 @@ class TavilySearchService:
                 "Web search skipped: provider=tavily enabled=%s api_key_present=%s query=%r",
                 self.settings.WEB_SEARCH_ENABLED,
                 bool(self.api_key),
-                clean_query[:160],
+                safe_text_preview(clean_query, max_chars=160),
             )
             return WebSearchResponse(
                 query=clean_query,
@@ -151,7 +152,7 @@ class TavilySearchService:
         }
         logger.info(
             "Tavily search request: query=%r max_results=%d search_depth=%s timeout_seconds=%.1f",
-            clean_query[:240],
+            safe_text_preview(clean_query, max_chars=240),
             result_limit,
             payload["search_depth"],
             self.timeout_seconds,
@@ -173,7 +174,7 @@ class TavilySearchService:
                 results = self._parse_results(data.get("results"), limit=result_limit)
                 logger.info(
                     "Tavily search response: query=%r results=%d latency_ms=%.2f first_domains=%s",
-                    clean_query[:160],
+                    safe_text_preview(clean_query, max_chars=160),
                     len(results),
                     latency_ms,
                     [result.domain for result in results[:3]],
@@ -205,7 +206,7 @@ class TavilySearchService:
         latency_ms = (time.perf_counter() - started_at) * 1000
         logger.warning(
             "Tavily search failed: query=%r error=%s latency_ms=%.2f",
-            clean_query[:160],
+            safe_text_preview(clean_query, max_chars=160),
             last_error or "search_failed",
             latency_ms,
         )
