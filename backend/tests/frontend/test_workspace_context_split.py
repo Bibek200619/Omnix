@@ -51,6 +51,23 @@ def test_workspace_context_modules_have_guarded_hooks() -> None:
         assert f"{hook_name} must be used within WorkspaceProvider" in source
 
 
+def test_workspace_provider_delegates_storage_and_destructive_confirmation() -> None:
+    provider = WORKSPACE_CONTEXT.read_text(encoding="utf-8")
+    storage = read_frontend("lib/workspace-active-storage.ts")
+    confirmation = read_frontend("lib/workspace-destructive-confirmation.tsx")
+
+    assert "persistActiveWorkspaceId" in provider
+    assert "readStoredActiveWorkspaceId" in provider
+    assert "WorkspaceDestructiveConfirmationModal" in provider
+    assert "useWorkspaceDestructiveConfirmation" in provider
+    assert 'from "@/components/ui/Button"' not in provider
+    assert 'from "@/components/ui/Modal"' not in provider
+    assert "export function persistActiveWorkspaceId" in storage
+    assert "export function readStoredActiveWorkspaceId" in storage
+    assert "export function useWorkspaceDestructiveConfirmation" in confirmation
+    assert "export function WorkspaceDestructiveConfirmationModal" in confirmation
+
+
 def test_low_scope_consumers_use_targeted_workspace_hooks() -> None:
     consumers = {
         "lib/conversation-history-context.tsx": "useWorkspaceTree",
