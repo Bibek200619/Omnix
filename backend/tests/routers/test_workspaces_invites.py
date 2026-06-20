@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app.routers import workspaces
+from app.routers import workspace_invites, workspaces
 from app.schemas.chat import WorkspaceInviteCreate, WorkspaceMemberRoleUpdate
 
 
@@ -46,13 +46,13 @@ def _patch_successful_invite_dependencies(
     async def fake_send_workspace_invite_email(**kwargs):
         return SimpleNamespace(status="skipped", provider_id=None)
 
-    monkeypatch.setattr(workspaces, "require_workspace_management_access", fake_require_workspace_management_access)
-    monkeypatch.setattr(workspaces, "list_workspace_members", fake_list_workspace_members)
-    monkeypatch.setattr(workspaces, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(workspaces, "insert_one_trusted", fake_insert_one_trusted)
-    monkeypatch.setattr(workspaces, "hydrate_invites", fake_hydrate_invites)
-    monkeypatch.setattr(workspaces, "send_workspace_invite_email", fake_send_workspace_invite_email)
-    monkeypatch.setattr(workspaces, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
+    monkeypatch.setattr(workspace_invites, "require_workspace_management_access", fake_require_workspace_management_access)
+    monkeypatch.setattr(workspace_invites, "list_workspace_members", fake_list_workspace_members)
+    monkeypatch.setattr(workspace_invites, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_invites, "insert_one_trusted", fake_insert_one_trusted)
+    monkeypatch.setattr(workspace_invites, "hydrate_invites", fake_hydrate_invites)
+    monkeypatch.setattr(workspace_invites, "send_workspace_invite_email", fake_send_workspace_invite_email)
+    monkeypatch.setattr(workspace_invites, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
 
 
 @pytest.mark.asyncio
@@ -60,7 +60,7 @@ async def test_invite_succeeds_when_current_user_has_id(monkeypatch: pytest.Monk
     inserted_payloads: list[dict[str, object]] = []
     _patch_successful_invite_dependencies(monkeypatch, inserted_payloads, "user-id-1")
 
-    response = await workspaces.invite_workspace_member(
+    response = await workspace_invites.invite_workspace_member(
         "workspace-1",
         _invite_payload("Teammate@Example.com"),
         current_user={"id": "user-id-1", "email": "owner@example.com"},
@@ -76,7 +76,7 @@ async def test_invite_succeeds_when_current_user_has_sub(monkeypatch: pytest.Mon
     inserted_payloads: list[dict[str, object]] = []
     _patch_successful_invite_dependencies(monkeypatch, inserted_payloads, "user-sub-1")
 
-    await workspaces.invite_workspace_member(
+    await workspace_invites.invite_workspace_member(
         "workspace-1",
         _invite_payload(),
         current_user=SimpleNamespace(sub="user-sub-1", email="owner@example.com"),
@@ -88,7 +88,7 @@ async def test_invite_succeeds_when_current_user_has_sub(monkeypatch: pytest.Mon
 @pytest.mark.asyncio
 async def test_invite_returns_401_when_current_user_id_cannot_be_resolved() -> None:
     with pytest.raises(HTTPException) as exc_info:
-        await workspaces.invite_workspace_member(
+        await workspace_invites.invite_workspace_member(
             "workspace-1",
             _invite_payload(),
             current_user={"email": "owner@example.com"},
@@ -123,9 +123,9 @@ async def test_top_level_pending_invites_uses_authenticated_email(monkeypatch: p
             }
         ]
 
-    monkeypatch.setattr(workspaces, "list_pending_invites_for_email", fake_list_pending_invites_for_email)
+    monkeypatch.setattr(workspace_invites, "list_pending_invites_for_email", fake_list_pending_invites_for_email)
 
-    response = await workspaces.list_authenticated_workspace_invites(
+    response = await workspace_invites.list_authenticated_workspace_invites(
         current_user={"sub": "user-1", "email": "Invitee@Example.com"},
     )
 
@@ -178,14 +178,14 @@ async def test_accept_invite_creates_membership_and_marks_invite_accepted(monkey
             "members_preview": [],
         }
 
-    monkeypatch.setattr(workspaces, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(workspaces, "resolve_workspace_access", fake_resolve_workspace_access)
-    monkeypatch.setattr(workspaces, "insert_one", fake_insert_one)
-    monkeypatch.setattr(workspaces, "update_one_trusted", fake_update_one_trusted)
-    monkeypatch.setattr(workspaces, "_enriched_workspace_for_user", fake_enriched_workspace_for_user)
-    monkeypatch.setattr(workspaces, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
+    monkeypatch.setattr(workspace_invites, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_invites, "resolve_workspace_access", fake_resolve_workspace_access)
+    monkeypatch.setattr(workspace_invites, "insert_one", fake_insert_one)
+    monkeypatch.setattr(workspace_invites, "update_one_trusted", fake_update_one_trusted)
+    monkeypatch.setattr(workspace_invites, "_enriched_workspace_for_user", fake_enriched_workspace_for_user)
+    monkeypatch.setattr(workspace_invites, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
 
-    response = await workspaces.accept_authenticated_workspace_invite(
+    response = await workspace_invites.accept_authenticated_workspace_invite(
         "invite-1",
         current_user={"sub": "user-2", "email": "Invitee@Example.com"},
     )
@@ -243,14 +243,14 @@ async def test_accept_invite_does_not_create_duplicate_membership(monkeypatch: p
             "members_preview": [],
         }
 
-    monkeypatch.setattr(workspaces, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(workspaces, "resolve_workspace_access", fake_resolve_workspace_access)
-    monkeypatch.setattr(workspaces, "insert_one", fake_insert_one)
-    monkeypatch.setattr(workspaces, "update_one_trusted", fake_update_one_trusted)
-    monkeypatch.setattr(workspaces, "_enriched_workspace_for_user", fake_enriched_workspace_for_user)
-    monkeypatch.setattr(workspaces, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
+    monkeypatch.setattr(workspace_invites, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_invites, "resolve_workspace_access", fake_resolve_workspace_access)
+    monkeypatch.setattr(workspace_invites, "insert_one", fake_insert_one)
+    monkeypatch.setattr(workspace_invites, "update_one_trusted", fake_update_one_trusted)
+    monkeypatch.setattr(workspace_invites, "_enriched_workspace_for_user", fake_enriched_workspace_for_user)
+    monkeypatch.setattr(workspace_invites, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
 
-    await workspaces.accept_authenticated_workspace_invite(
+    await workspace_invites.accept_authenticated_workspace_invite(
         "invite-1",
         current_user={"sub": "user-2", "email": "invitee@example.com"},
     )
@@ -285,7 +285,7 @@ async def test_accept_invite_tolerates_missing_accepted_at_column(monkeypatch: p
             try:
                 raise RuntimeError("Could not find the 'accepted_at' column of 'workspace_invites' in the schema cache")
             except RuntimeError as exc:
-                raise workspaces.SupabaseServiceError("Internal server error") from exc
+                raise workspace_invites.SupabaseServiceError("Internal server error") from exc
         return {"id": filters["id"], **payload}
 
     async def fake_enriched_workspace_for_user(workspace_id: str, user_id: str):
@@ -299,13 +299,13 @@ async def test_accept_invite_tolerates_missing_accepted_at_column(monkeypatch: p
             "members_preview": [],
         }
 
-    monkeypatch.setattr(workspaces, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(workspaces, "resolve_workspace_access", fake_resolve_workspace_access)
-    monkeypatch.setattr(workspaces, "update_one_trusted", fake_update_one_trusted)
-    monkeypatch.setattr(workspaces, "_enriched_workspace_for_user", fake_enriched_workspace_for_user)
-    monkeypatch.setattr(workspaces, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
+    monkeypatch.setattr(workspace_invites, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_invites, "resolve_workspace_access", fake_resolve_workspace_access)
+    monkeypatch.setattr(workspace_invites, "update_one_trusted", fake_update_one_trusted)
+    monkeypatch.setattr(workspace_invites, "_enriched_workspace_for_user", fake_enriched_workspace_for_user)
+    monkeypatch.setattr(workspace_invites, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
 
-    response = await workspaces.accept_authenticated_workspace_invite(
+    response = await workspace_invites.accept_authenticated_workspace_invite(
         "invite-1",
         current_user={"sub": "user-2", "email": "invitee@example.com"},
     )
@@ -347,12 +347,12 @@ async def test_decline_invite_marks_invite_declined(monkeypatch: pytest.MonkeyPa
     async def fake_hydrate_invites(invites: list[dict[str, object]]):
         return [{**invites[0], "invite_id": str(invites[0]["id"]), "invited_by": "owner-1"}]
 
-    monkeypatch.setattr(workspaces, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(workspaces, "update_one_trusted", fake_update_one_trusted)
-    monkeypatch.setattr(workspaces, "hydrate_invites", fake_hydrate_invites)
-    monkeypatch.setattr(workspaces, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
+    monkeypatch.setattr(workspace_invites, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_invites, "update_one_trusted", fake_update_one_trusted)
+    monkeypatch.setattr(workspace_invites, "hydrate_invites", fake_hydrate_invites)
+    monkeypatch.setattr(workspace_invites, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
 
-    response = await workspaces.decline_authenticated_workspace_invite(
+    response = await workspace_invites.decline_authenticated_workspace_invite(
         "invite-1",
         current_user={"sub": "user-2", "email": "invitee@example.com"},
     )
