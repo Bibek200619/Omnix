@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
 import time
 from typing import Any, AsyncIterator
 
@@ -15,6 +14,7 @@ from ..core.security import get_current_user
 from ..observability.safe_logging import allow_sensitive_logging, safe_text_preview
 from ..rag.token_utils import count_tokens, tail_tokens
 from ..schemas.chat import AIGenerationRequest, AIGenerationResponse, ChatRequest, ChatResponse, MessageRead
+from ..services import message_payload_service, message_retrieval_service
 from ..services.chat_service import (
     AIMessage,
     ModelServiceError,
@@ -35,7 +35,7 @@ from ..services.supabase_service import (
     update_one,
     update_one_trusted,
 )
-from ..services.web_search import WebSearchResponse, get_web_search_service
+from ..services.web_search import get_web_search_service
 from ..services.workspace_intelligence_service import (
     build_workspace_intelligence_profile,
     workspace_intelligence_system_prompt,
@@ -65,10 +65,7 @@ FILE_COLUMNS = (
 RATE_LIMIT_REQUESTS = 5
 RATE_LIMIT_WINDOW = 60.0
 _chat_rate_limits: dict[str, list[float]] = {}
-DOCUMENT_INTENT_RE = re.compile(
-    r"\b(file|document|doc|pdf|docx|upload|attached|attachment|summari[sz]e|analy[sz]e|resume|contract|report|context|source)\b",
-    re.IGNORECASE,
-)
+DOCUMENT_INTENT_RE = message_retrieval_service.DOCUMENT_INTENT_RE
 
 
 def _check_rate_limit(user_id: str) -> None:
@@ -206,173 +203,22 @@ async def _touch_conversation(
         raise _database_error() from exc
 
 
-def _retrieval_debug_from_context(strategy: str, built_context: Any) -> dict[str, Any]:
-    chunks = built_context.chunks if getattr(built_context, "chunks", None) else []
-    sources = built_context.sources if getattr(built_context, "sources", None) else []
-    first_chunk: dict[str, Any] = chunks[0] if chunks else {}
-    first_source: dict[str, Any] = sources[0] if sources else {}
-    preview = (
-        first_chunk.get("content")
-        or first_source.get("chunk_preview")
-        or first_source.get("excerpt")
-        or ""
-    )
+_retrieval_debug_from_context = message_retrieval_service.retrieval_debug_from_context
+_empty_retrieval_debug = message_retrieval_service.empty_retrieval_debug
+_document_unavailable_answer = message_retrieval_service.document_unavailable_answer
+_should_skip_retrieval_for_prompt = message_retrieval_service.should_skip_retrieval_for_prompt
+_merge_sources = message_retrieval_service.merge_sources
+_web_only_context = message_retrieval_service.web_only_context
+_compact_intelligence_debug = message_retrieval_service.compact_intelligence_debug
 
-    return {
-        "strategy": strategy,
-        "retrieved_chunks_count": len(chunks) or len(sources),
-        "first_chunk_preview": safe_text_preview(preview, max_chars=240),
-        "diagnostics": getattr(built_context, "diagnostics", {}),
-    }
-
-
-def _empty_retrieval_debug(strategy: str = "none") -> dict[str, Any]:
-    return {
-        "strategy": strategy,
-        "retrieved_chunks_count": 0,
-        "first_chunk_preview": "",
-        "diagnostics": {},
-    }
-
-
-def _document_unavailable_answer(files: list[dict[str, Any]]) -> str:
-    first = files[0] if files else {}
-    name = str(first.get("file_name") or "this file")
-    status_value = str(first.get("extraction_status") or "processing")
-    reason = str(first.get("extraction_failure_reason") or "").strip()
-
-    if status_value == "processing":
-        return f"I cannot summarize {name} yet because text extraction has not completed."
-    if status_value == "ocr_required":
-        return reason or f"I cannot summarize {name} yet because it needs OCR before text can be searched."
-    if status_value == "extraction_failed":
-        return reason or f"I cannot summarize {name} because text extraction failed."
-    return f"I cannot summarize {name} yet because it is not searchable."
-
-
-def _compact_text(value: Any, limit: int) -> str | None:
-    if value is None:
-        return None
-    text = " ".join(str(value).split())
-    if not text:
-        return None
-    return text[:limit]
-
-
-def _compact_sources_for_payload(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    safe_sources: list[dict[str, Any]] = []
-    for source in sources[:12]:
-        if not isinstance(source, dict):
-            continue
-
-        snippet = _compact_text(
-            source.get("snippet") or source.get("excerpt") or source.get("chunk_preview"),
-            700,
-        )
-        compact: dict[str, Any] = {}
-        for key, limit in {
-            "id": 500,
-            "label": 24,
-            "type": 40,
-            "title": 240,
-            "url": 700,
-            "domain": 160,
-            "favicon_url": 700,
-            "published_date": 80,
-            "file_id": 120,
-        }.items():
-            text = _compact_text(source.get(key), limit)
-            if text is not None:
-                compact[key] = text
-
-        if snippet is not None:
-            compact["snippet"] = snippet
-            compact["excerpt"] = snippet
-
-        for key in ("score", "chunk_index", "semantic_score", "keyword_score"):
-            value = source.get(key)
-            if isinstance(value, (int, float)):
-                compact[key] = value
-
-        retrieval_sources = source.get("retrieval_sources")
-        if isinstance(retrieval_sources, list):
-            compact["retrieval_sources"] = [
-                str(item)[:40]
-                for item in retrieval_sources[:5]
-                if isinstance(item, (str, int, float))
-            ]
-
-        if compact:
-            safe_sources.append(compact)
-    return safe_sources
-
-
-def _sources_from_container(container: Any) -> list[dict[str, Any]]:
-    if not isinstance(container, dict):
-        return []
-    sources = container.get("sources")
-    if not isinstance(sources, list):
-        return []
-    return [source for source in sources if isinstance(source, dict)]
-
-
-def _message_sources(message: dict[str, Any]) -> list[dict[str, Any]]:
-    payload_sources = _sources_from_container(message.get("payload"))
-    if payload_sources:
-        return payload_sources
-    return _sources_from_container(message.get("metadata"))
-
-
-def _with_sources_payload(message: dict[str, Any]) -> dict[str, Any]:
-    sources = _message_sources(message)
-    if not sources:
-        return message
-    return {**message, "sources": sources}
-
-
-def _mode_from_retrieval_debug(
-    requested_mode: SearchMode,
-    retrieval_debug: dict[str, Any] | None,
-    sources: list[dict[str, Any]],
-) -> SearchMode:
-    diagnostics = retrieval_debug.get("diagnostics") if isinstance(retrieval_debug, dict) else {}
-    web_search = diagnostics.get("web_search") if isinstance(diagnostics, dict) else {}
-    decision = web_search.get("decision") if isinstance(web_search, dict) else {}
-    effective_mode = decision.get("effective_mode") if isinstance(decision, dict) else None
-    if effective_mode in ("auto", "workspace", "web", "hybrid"):
-        return effective_mode
-    if requested_mode in ("workspace", "web", "hybrid"):
-        return requested_mode
-    if any(source.get("type") == "web" or source.get("url") for source in sources):
-        return "hybrid"
-    return "workspace"
-
-
-def _assistant_message_payload(
-    *,
-    sources: list[dict[str, Any]],
-    search_mode: SearchMode,
-    retrieval_debug: dict[str, Any] | None,
-) -> dict[str, Any]:
-    compact_sources = _compact_sources_for_payload(sources)
-    mode = _mode_from_retrieval_debug(search_mode, retrieval_debug, compact_sources)
-    web_search_used = any(source.get("type") == "web" or source.get("url") for source in compact_sources)
-    citations = [
-        str(source["label"])
-        for source in compact_sources
-        if isinstance(source.get("label"), str) and source.get("label")
-    ]
-    return {
-        "mode": mode,
-        "web_search_used": web_search_used,
-        "sources": compact_sources,
-        "citations": citations,
-    }
-
-
-def _has_persistable_payload(payload: dict[str, Any]) -> bool:
-    sources = payload.get("sources")
-    return bool(payload.get("web_search_used") or (isinstance(sources, list) and sources))
+_compact_text = message_payload_service.compact_text
+_compact_sources_for_payload = message_payload_service.compact_sources_for_payload
+_sources_from_container = message_payload_service.sources_from_container
+_message_sources = message_payload_service.message_sources
+_with_sources_payload = message_payload_service.with_sources_payload
+_mode_from_retrieval_debug = message_payload_service.mode_from_retrieval_debug
+_assistant_message_payload = message_payload_service.assistant_message_payload
+_has_persistable_payload = message_payload_service.has_persistable_payload
 
 
 async def _persist_assistant_payload(
@@ -384,45 +230,15 @@ async def _persist_assistant_payload(
     retrieval_debug: dict[str, Any] | None,
     stage: str,
 ) -> dict[str, Any] | None:
-    message_payload = _assistant_message_payload(
+    return await message_payload_service.persist_assistant_payload(
+        assistant_message_id=assistant_message_id,
+        user_id=user_id,
         sources=sources,
         search_mode=search_mode,
         retrieval_debug=retrieval_debug,
+        stage=stage,
+        update_one_trusted_fn=update_one_trusted,
     )
-    if not _has_persistable_payload(message_payload):
-        return None
-
-    logger.info(
-        "Persisting assistant payload: stage=%s assistant_message_id=%s mode=%s web_search_used=%s source_count=%d",
-        stage,
-        assistant_message_id,
-        message_payload.get("mode"),
-        message_payload.get("web_search_used"),
-        len(message_payload.get("sources") or []),
-    )
-
-    try:
-        updated = await update_one_trusted(
-            "messages",
-            {"id": assistant_message_id, "user_id": user_id},
-            {"payload": message_payload},
-        )
-    except SupabaseServiceError:
-        logger.exception(
-            "Failed to persist assistant payload: stage=%s assistant_message_id=%s",
-            stage,
-            assistant_message_id,
-        )
-        raise
-
-    persisted_payload = updated.get("payload") if isinstance(updated, dict) else None
-    if not _has_persistable_payload(persisted_payload if isinstance(persisted_payload, dict) else {}):
-        logger.warning(
-            "Assistant payload update returned without persisted metadata: stage=%s assistant_message_id=%s",
-            stage,
-            assistant_message_id,
-        )
-    return updated
 
 
 async def _update_assistant_message(
@@ -435,54 +251,82 @@ async def _update_assistant_message(
     search_mode: SearchMode = "auto",
     retrieval_debug: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    payload: dict[str, Any] = {"content": content, "status": status_value}
-    if sources is not None:
-        message_payload = _assistant_message_payload(
-            sources=sources,
-            search_mode=search_mode,
-            retrieval_debug=retrieval_debug,
-        )
-        if _has_persistable_payload(message_payload):
-            payload["payload"] = message_payload
-
-    try:
-        return await update_one(
-            "messages",
-            {"id": assistant_message_id, "user_id": user_id},
-            payload,
-        )
-    except SupabaseServiceError:
-        if "payload" not in payload:
-            raise
-        logger.warning("Message payload column unavailable; trying legacy metadata before finalizing without sources.")
-        try:
-            return await update_one(
-                "messages",
-                {"id": assistant_message_id, "user_id": user_id},
-                {
-                    "content": content,
-                    "status": status_value,
-                    "metadata": {"sources": payload["payload"]["sources"]},
-                },
-            )
-        except SupabaseServiceError:
-            logger.warning("Message metadata column unavailable; finalizing assistant message without persisted sources.")
-            return await update_one(
-                "messages",
-                {"id": assistant_message_id, "user_id": user_id},
-                {"content": content, "status": status_value},
-            )
+    return await message_payload_service.update_assistant_message(
+        assistant_message_id=assistant_message_id,
+        user_id=user_id,
+        content=content,
+        status_value=status_value,
+        sources=sources,
+        search_mode=search_mode,
+        retrieval_debug=retrieval_debug,
+        update_one_fn=update_one,
+)
 
 
-def _should_skip_retrieval_for_prompt(message_text: str) -> bool:
-    normalized = " ".join((message_text or "").strip().split())
-    if not normalized:
-        return True
+async def _build_web_supplements(
+    message_text: str,
+    *,
+    workspace_id: str | None,
+    search_mode: SearchMode,
+) -> tuple[list[Any], list[dict[str, Any]], SearchDecision, dict[str, Any]]:
+    return await message_retrieval_service.build_web_supplements(
+        message_text,
+        workspace_id=workspace_id,
+        search_mode=search_mode,
+        get_web_search_service_fn=get_web_search_service,
+        classify_search_need_fn=classify_search_need,
+    )
 
-    if DOCUMENT_INTENT_RE.search(normalized):
-        return False
 
-    return len(normalized) <= 120
+async def _retrieve_prompt_context(
+    message_text: str,
+    user_id: str,
+    conversation_id: str,
+    workspace_id: str | None,
+    attachment_ids: list[str] | None = None,
+    search_mode: SearchMode = "auto",
+    intelligence_profile: dict[str, Any] | None = None,
+) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
+    return await message_retrieval_service.retrieve_prompt_context(
+        message_text,
+        user_id,
+        conversation_id,
+        workspace_id,
+        attachment_ids,
+        search_mode,
+        intelligence_profile,
+        build_web_supplements_fn=_build_web_supplements,
+        build_uploaded_document_context_fn=build_uploaded_document_context,
+        find_unavailable_uploaded_documents_fn=find_unavailable_uploaded_documents,
+        has_retrievable_documents_fn=_has_retrievable_documents,
+        document_unavailable_answer_fn=_document_unavailable_answer,
+    )
+
+
+async def _load_workspace_intelligence_for_chat(
+    workspace_id: str | None,
+    user_id: str,
+) -> dict[str, Any] | None:
+    return await message_retrieval_service.load_workspace_intelligence_for_chat(
+        workspace_id,
+        user_id,
+        build_workspace_intelligence_profile_fn=build_workspace_intelligence_profile,
+    )
+
+
+async def _has_retrievable_documents(
+    *,
+    user_id: str,
+    workspace_id: str | None,
+    scope_workspace_ids: list[str] | None = None,
+) -> bool:
+    return await message_retrieval_service.has_retrievable_documents(
+        user_id=user_id,
+        workspace_id=workspace_id,
+        scope_workspace_ids=scope_workspace_ids,
+        select_all_fn=select_all,
+        select_all_trusted_fn=select_all_trusted,
+    )
 
 
 def _log_ollama_prompt_debug(
@@ -572,344 +416,6 @@ async def _attach_files_to_conversation(
             )
         except SupabaseServiceError as exc:
             raise _database_error() from exc
-
-
-async def _build_web_supplements(
-    message_text: str,
-    *,
-    workspace_id: str | None,
-    search_mode: SearchMode,
-) -> tuple[list[Any], list[dict[str, Any]], SearchDecision, dict[str, Any]]:
-    decision = classify_search_need(message_text, search_mode)
-    diagnostics: dict[str, Any] = {"decision": decision.to_dict(), "search": None}
-    logger.info(
-        "Web search decision: mode=%s effective_mode=%s needs_web=%s confidence=%.2f reasons=%s query=%r",
-        decision.requested_mode,
-        decision.effective_mode,
-        decision.needs_web,
-        decision.confidence,
-        decision.reasons,
-        safe_text_preview(message_text, max_chars=240),
-    )
-    if not decision.needs_web:
-        return [], [], decision, diagnostics
-
-    service = get_web_search_service()
-    try:
-        search_response: WebSearchResponse = await service.search(message_text)
-    except Exception as exc:
-        logger.exception("Web search failed before generation: %s", exc)
-        diagnostics["search"] = {"ok": False, "error": "unexpected_search_error"}
-        return [], [], decision, diagnostics
-
-    diagnostics["search"] = search_response.to_diagnostics()
-    if not search_response.results:
-        logger.warning(
-            "Web search returned no usable results: query=%r diagnostics=%s",
-            safe_text_preview(message_text, max_chars=160),
-            diagnostics["search"],
-        )
-        return [], [], decision, diagnostics
-
-    supplements = [
-        result.to_supplement(workspace_id=workspace_id)
-        for result in search_response.results
-    ]
-    sources = [
-        result.to_source(label=f"W{index}")
-        for index, result in enumerate(search_response.results, start=1)
-    ]
-    logger.info(
-        "Web context formatted: query=%r result_count=%d first_result=%s",
-        safe_text_preview(message_text, max_chars=160),
-        len(supplements),
-        {
-            "title": search_response.results[0].title,
-            "url": search_response.results[0].url,
-            "snippet_preview": safe_text_preview(search_response.results[0].snippet, max_chars=240),
-        },
-    )
-    return supplements, sources, decision, diagnostics
-
-
-def _merge_sources(*source_groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    merged: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for group in source_groups:
-        for source in group:
-            if not isinstance(source, dict):
-                continue
-            key = str(source.get("url") or source.get("id") or source.get("label") or "")
-            if key and key in seen:
-                continue
-            if key:
-                seen.add(key)
-            merged.append(source)
-    return merged
-
-
-def _web_only_context(
-    message_text: str,
-    *,
-    workspace_id: str | None,
-    web_supplements: list[Any],
-) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
-    from ..retrieval.context_builder import ContextBuilder
-
-    builder = ContextBuilder(
-        max_chunks=max(1, len(web_supplements)),
-        token_budget=2200,
-        max_chunk_tokens=360,
-    )
-    built_context = builder.build(
-        message_text,
-        [],
-        workspace_id=workspace_id,
-        supplemental_contexts=web_supplements,
-    )
-    return (
-        built_context.prompt,
-        built_context.sources,
-        _retrieval_debug_from_context("web", built_context),
-    )
-
-
-async def _retrieve_prompt_context(
-    message_text: str,
-    user_id: str,
-    conversation_id: str,
-    workspace_id: str | None,
-    attachment_ids: list[str] | None = None,
-    search_mode: SearchMode = "auto",
-    intelligence_profile: dict[str, Any] | None = None,
-) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
-    prompt_message = message_text
-    scope_workspace_ids = (
-        [
-            str(item)
-            for item in (intelligence_profile or {}).get("scope_workspace_ids", [])
-            if str(item or "").strip()
-        ]
-        or None
-    )
-    has_new_attachments = any(str(item).strip() for item in attachment_ids or [])
-    web_supplements, web_sources, search_decision, web_diagnostics = await _build_web_supplements(
-        message_text,
-        workspace_id=workspace_id,
-        search_mode=search_mode,
-    )
-    if search_mode == "web":
-        if web_supplements:
-            prompt, sources, debug = _web_only_context(
-                message_text,
-                workspace_id=workspace_id,
-                web_supplements=web_supplements,
-            )
-            debug["diagnostics"]["web_search"] = web_diagnostics
-            return prompt, _merge_sources(sources, web_sources), debug
-        debug = _empty_retrieval_debug("web_unavailable")
-        debug["diagnostics"]["web_search"] = web_diagnostics
-        if intelligence_profile:
-            debug["workspace_intelligence"] = _compact_intelligence_debug(intelligence_profile)
-        return prompt_message, [], debug
-
-    if (
-        not has_new_attachments
-        and not search_decision.needs_web
-        and _should_skip_retrieval_for_prompt(message_text)
-    ):
-        logger.info(
-            "Skipping retrieval for lightweight prompt: conversation_id=%s workspace_id=%s.",
-            conversation_id,
-            workspace_id,
-        )
-        debug = _empty_retrieval_debug("lightweight_prompt")
-        debug["diagnostics"]["web_search"] = web_diagnostics
-        if intelligence_profile:
-            debug["workspace_intelligence"] = _compact_intelligence_debug(intelligence_profile)
-        return prompt_message, [], debug
-
-    try:
-        uploaded_context = await build_uploaded_document_context(
-            message_text,
-            user_id=user_id,
-            conversation_id=conversation_id,
-            workspace_id=workspace_id,
-            scope_workspace_ids=scope_workspace_ids,
-            supplemental_contexts=web_supplements,
-        )
-        if uploaded_context and uploaded_context.sources:
-            uploaded_context.diagnostics["web_search"] = web_diagnostics
-            uploaded_context.diagnostics["workspace_intelligence"] = _compact_intelligence_debug(intelligence_profile)
-            return (
-                uploaded_context.prompt,
-                _merge_sources(uploaded_context.sources, web_sources),
-                _retrieval_debug_from_context("uploaded_document", uploaded_context),
-            )
-    except Exception as exc:
-        logger.exception("Uploaded document context retrieval failed for conversation %s: %s", conversation_id, exc)
-
-    if DOCUMENT_INTENT_RE.search(message_text):
-        unavailable_files = await find_unavailable_uploaded_documents(
-            user_id=user_id,
-            conversation_id=conversation_id,
-            workspace_id=workspace_id,
-            scope_workspace_ids=scope_workspace_ids,
-        )
-        if unavailable_files:
-            debug = _empty_retrieval_debug("document_unavailable")
-            debug["diagnostics"]["web_search"] = web_diagnostics
-            debug["diagnostics"]["unavailable_documents"] = unavailable_files
-            if intelligence_profile:
-                debug["workspace_intelligence"] = _compact_intelligence_debug(intelligence_profile)
-            return _document_unavailable_answer(unavailable_files), [], debug
-
-    if not await _has_retrievable_documents(
-        user_id=user_id,
-        workspace_id=workspace_id,
-        scope_workspace_ids=scope_workspace_ids,
-    ):
-        logger.info(
-            "Skipping hybrid retrieval because no document chunks exist for conversation %s workspace_id=%s.",
-            conversation_id,
-            workspace_id,
-        )
-        if web_supplements:
-            prompt, sources, debug = _web_only_context(
-                message_text,
-                workspace_id=workspace_id,
-                web_supplements=web_supplements,
-            )
-            debug["diagnostics"]["web_search"] = web_diagnostics
-            return prompt, _merge_sources(sources, web_sources), debug
-        debug = _empty_retrieval_debug("no_documents")
-        debug["diagnostics"]["web_search"] = web_diagnostics
-        if intelligence_profile:
-            debug["workspace_intelligence"] = _compact_intelligence_debug(intelligence_profile)
-        return prompt_message, [], debug
-
-    try:
-        from ..rag.startup import get_vector_store
-        from ..retrieval.context_builder import ContextBuilder
-        from ..retrieval.hybrid_search import HybridSearchEngine
-
-        engine = HybridSearchEngine(get_vector_store())
-        response = await engine.search(
-            message_text,
-            user_id=user_id,
-            workspace_id=workspace_id,
-        )
-        if web_supplements:
-            context_builder = ContextBuilder(
-                max_chunks=min(engine.context_builder.max_chunks + len(web_supplements), 10),
-                token_budget=min(engine.context_builder.token_budget + (len(web_supplements) * 360), 4200),
-                max_chunk_tokens=engine.context_builder.max_chunk_tokens,
-            )
-            logger.info(
-                "Hybrid context builder expanded for web: base_max_chunks=%d web_supplements=%d final_max_chunks=%d token_budget=%d",
-                engine.context_builder.max_chunks,
-                len(web_supplements),
-                context_builder.max_chunks,
-                context_builder.token_budget,
-            )
-        else:
-            context_builder = engine.context_builder
-
-        built_context = context_builder.build(
-            message_text,
-            response.results,
-            workspace_id=workspace_id,
-            supplemental_contexts=web_supplements,
-        )
-        response.diagnostics["context"] = built_context.diagnostics
-        built_context.diagnostics["web_search"] = web_diagnostics
-        built_context.diagnostics["workspace_intelligence"] = _compact_intelligence_debug(intelligence_profile)
-
-        if built_context.sources:
-            return (
-                built_context.prompt,
-                _merge_sources(built_context.sources, web_sources),
-                _retrieval_debug_from_context("hybrid", built_context),
-            )
-    except Exception as exc:
-        logger.exception("Hybrid retrieval failed for conversation %s: %s", conversation_id, exc)
-
-    if web_supplements:
-        prompt, sources, debug = _web_only_context(
-            message_text,
-            workspace_id=workspace_id,
-            web_supplements=web_supplements,
-        )
-        debug["diagnostics"]["web_search"] = web_diagnostics
-        return prompt, _merge_sources(sources, web_sources), debug
-
-    debug = _empty_retrieval_debug()
-    debug["diagnostics"]["web_search"] = web_diagnostics
-    if intelligence_profile:
-        debug["workspace_intelligence"] = _compact_intelligence_debug(intelligence_profile)
-    return prompt_message, [], debug
-
-
-def _compact_intelligence_debug(profile: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not profile:
-        return None
-    return {
-        "workspace_id": profile.get("workspace_id"),
-        "workspace_name": profile.get("workspace_name"),
-        "workspace_focus": profile.get("workspace_focus") or profile.get("ai_specialization"),
-        "ai_specialization": profile.get("ai_specialization"),
-        "retrieval_scope": profile.get("retrieval_scope"),
-        "source_count": profile.get("source_count"),
-        "active_domains": profile.get("active_domains", [])[:8],
-        "scope_workspace_ids": profile.get("scope_workspace_ids", [])[:20],
-    }
-
-
-async def _load_workspace_intelligence_for_chat(
-    workspace_id: str | None,
-    user_id: str,
-) -> dict[str, Any] | None:
-    if not workspace_id:
-        return None
-    try:
-        return await build_workspace_intelligence_profile(workspace_id, user_id)
-    except Exception:
-        logger.exception("Failed to load workspace intelligence profile for chat; continuing with generic AI context.")
-        return None
-
-
-async def _has_retrievable_documents(
-    *,
-    user_id: str,
-    workspace_id: str | None,
-    scope_workspace_ids: list[str] | None = None,
-) -> bool:
-    try:
-        workspace_ids = [
-            str(item)
-            for item in (scope_workspace_ids or ([workspace_id] if workspace_id else []))
-            if str(item or "").strip()
-        ]
-        if workspace_ids:
-            rows = await select_all_trusted(
-                "documents",
-                "id,workspace_id",
-                filters={"workspace_id": workspace_ids},
-                limit=1,
-            )
-            scope_set = set(workspace_ids)
-            return any(str(row.get("workspace_id") or "") in scope_set for row in rows)
-
-        rows = await select_all(
-            "documents",
-            "id,workspace_id",
-            filters={"user_id": user_id},
-            limit=1,
-        )
-        return any(not row.get("workspace_id") for row in rows)
-    except Exception:
-        logger.exception("Unable to check document availability; allowing hybrid retrieval fallback.")
-        return True
 
 
 @router.get(
