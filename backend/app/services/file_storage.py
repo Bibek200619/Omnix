@@ -12,8 +12,8 @@ _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]+")
 DEFAULT_UPLOAD_DIR = "./uploads"
 
 
-def upload_root() -> Path:
-    return Path(os.environ.get("OMNIX_UPLOAD_DIR", DEFAULT_UPLOAD_DIR)).resolve()
+def upload_root(root: str | os.PathLike[str] | None = None) -> Path:
+    return Path(root or os.environ.get("OMNIX_UPLOAD_DIR", DEFAULT_UPLOAD_DIR)).resolve()
 
 
 def sanitize_filename(filename: str | None, *, fallback: str = "unnamed") -> str:
@@ -43,9 +43,15 @@ def resolve_managed_storage_path(storage_path: str | os.PathLike[str] | None) ->
         return None
 
 
-async def save_bytes_to_user_upload(user_id: str, filename: str | None, data: bytes) -> str:
+async def save_bytes_to_user_upload(
+    user_id: str,
+    filename: str | None,
+    data: bytes,
+    *,
+    root: str | os.PathLike[str] | None = None,
+) -> str:
     safe_name = sanitize_filename(filename)
-    user_dir = upload_root() / sanitize_filename(user_id, fallback="user")
+    user_dir = upload_root(root) / sanitize_filename(user_id, fallback="user")
     user_dir.mkdir(parents=True, exist_ok=True)
     try:
         os.chmod(user_dir, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP)
