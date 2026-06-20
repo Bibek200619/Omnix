@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { motion, useInView, AnimatePresence, useReducedMotion, type Variants } from "framer-motion";
 import { OmnixMark as BrandMark } from "@/components/brand/OmnixMark";
+import { LandingHeroScene } from "@/components/landing/LandingHeroScene";
 import { useDecorativeMotionEnabled } from "@/lib/use-decorative-motion";
 
 // ─── Brand ───────────────────────────────────────────────────────────────────
@@ -29,6 +30,18 @@ const FEATURES_HREF = `${String.fromCharCode(35)}features`;
 
 function tint(color: string, percent: number) {
   return `color-mix(in srgb, ${color} ${percent}%, transparent)`;
+}
+
+function pct(value: number) {
+  return `${value.toFixed(4)}%`;
+}
+
+function px(value: number) {
+  return `${value.toFixed(3)}px`;
+}
+
+function alpha(value: number) {
+  return value.toFixed(5);
 }
 
 // ─── Logo ─────────────────────────────────────────────────────────────────────
@@ -104,12 +117,12 @@ function ParticleField({ count = 34 }: { count?: number }) {
           <div
             key={p.id}
             className="absolute rounded-full"
-            style={{ left:`${p.x}%`, top:`${p.y}%`, width:p.size, height:p.size, background:p.color, opacity:p.opacity }}
+            style={{ left:pct(p.x), top:pct(p.y), width:px(p.size), height:px(p.size), background:p.color, opacity:alpha(p.opacity) }}
           />
         ) : (
           <motion.div key={p.id}
             className="absolute rounded-full"
-            style={{ left:`${p.x}%`, top:`${p.y}%`, width:p.size, height:p.size, background:p.color, opacity:p.opacity }}
+            style={{ left:pct(p.x), top:pct(p.y), width:px(p.size), height:px(p.size), background:p.color, opacity:alpha(p.opacity) }}
             animate={{ y:[-18,18,-18], x:[-8,8,-8], opacity:[p.opacity, p.opacity*2.2, p.opacity] }}
             transition={{ duration:p.dur, delay:p.delay, repeat:Infinity, ease:"easeInOut" }}
           />
@@ -122,7 +135,7 @@ function ParticleField({ count = 34 }: { count?: number }) {
 type DriftingOrbProps = { x:string; y:string; size:number; color:string; dur:number; delay?:number };
 function DriftingOrb({ x, y, size, color, dur, delay=0 }: DriftingOrbProps) {
   const motionEnabled = useDecorativeMotionEnabled();
-  const style: CSSProperties = { left:x, top:y, width:size, height:size, borderRadius:"50%",
+  const style: CSSProperties = { left:x, top:y, width:px(size), height:px(size), borderRadius:"50%",
     background:`radial-gradient(circle,${color} 0%,transparent 70%)`,
     transform:"translate(-50%,-50%)", filter:"blur(2px)" };
   if (!motionEnabled) {
@@ -458,10 +471,8 @@ function Hero() {
   return (
     <section className="relative overflow-hidden pb-16 pt-5 sm:pb-28 sm:pt-8">
       <SectionBg>
+        <LandingHeroScene/>
         <ParticleField count={34}/>
-        <DriftingOrb x="50%" y="28%" size={900} color="var(--omnix-rgba-0-255-255-0-07)" dur={20}/>
-        <DriftingOrb x="80%" y="60%" size={480} color="var(--omnix-rgba-0-51-255-0-07)" dur={25} delay={-5}/>
-        <DriftingOrb x="14%" y="72%" size={400} color="var(--omnix-rgba-0-51-255-0-06)" dur={30} delay={-10}/>
         <AnimatedGrid opacity={0.045}/>
         <div className="absolute inset-0"
           style={{background:"linear-gradient(180deg,var(--omnix-rgba-10-25-47-0) 0%,var(--omnix-rgba-10-25-47-0) 60%,var(--omnix-rgba-6-16-32-1) 100%)"}}/>
@@ -484,7 +495,7 @@ function Hero() {
           </span>{" "}answers
         </motion.h1>
         <motion.p initial={{opacity:0,y:22}} animate={{opacity:1,y:0}} transition={{duration:0.6,delay:0.36}}
-          className="mt-6 text-base leading-relaxed sm:mt-7 sm:text-lg" style={{color:C.muted,maxWidth:540}}>
+          className="mt-6 text-base leading-relaxed sm:mt-7 sm:text-lg" style={{color:C.muted,maxWidth:540,textShadow:"0 2px 24px rgba(0,0,0,0.85)"}}>
           OMNIX gives operators, support teams, and builders a secure place to ask questions
           against private knowledge — with searchable history, workspaces built for real operations,
           and session-gated access.
@@ -495,10 +506,11 @@ function Hero() {
           <GhostBtn large href="#inside-app"><Icon d={ICONS.play} size={18} stroke={C.muted} sw={1.8}/>View product tour</GhostBtn>
         </motion.div>
         <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.75}}
-          className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 rounded-full border px-4 py-2 backdrop-blur-md sm:px-5"
+          style={{ background:"rgba(6,18,32,0.62)", borderColor:"var(--omnix-rgba-0-255-255-0-12)", boxShadow:"0 18px 52px var(--omnix-rgba-0-0-0-0-24)" }}>
           {["No credit card","Workspace-scoped","Session-gated"].map(t=>(
-            <span key={t} className="text-xs flex items-center gap-1.5" style={{color:"var(--omnix-rgba-255-255-255-0-28)"}}>
-              <Icon d={ICONS.check} size={11} stroke="var(--omnix-rgba-0-255-255-0-5)" sw={2.5}/>{t}
+            <span key={t} className="text-xs flex items-center gap-1.5" style={{color:"var(--omnix-rgba-255-255-255-0-6)"}}>
+              <Icon d={ICONS.check} size={11} stroke="var(--omnix-rgba-0-255-255-0-7)" sw={2.5}/>{t}
             </span>
           ))}
         </motion.div>
@@ -523,7 +535,7 @@ function HeroSignalStrip() {
       animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay: 0.62, ease: easeOutExpo }}
       className="mt-7 grid w-full max-w-2xl grid-cols-3 overflow-hidden rounded-2xl border"
-      style={{ borderColor:"var(--omnix-rgba-0-255-255-0-16)", background:"var(--omnix-rgba-255-255-255-0-035)", boxShadow:"0 18px 70px var(--omnix-rgba-0-0-0-0-24)" }}
+      style={{ borderColor:"var(--omnix-rgba-0-255-255-0-18)", background:"rgba(6,18,32,0.72)", boxShadow:"0 18px 70px var(--omnix-rgba-0-0-0-0-24)", backdropFilter:"blur(18px)" }}
     >
       {signals.map((signal, index) => (
         <div

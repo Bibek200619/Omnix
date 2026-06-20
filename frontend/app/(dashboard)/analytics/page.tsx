@@ -5,7 +5,7 @@ import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Activity, AlertCircle, Cpu, Database, LayoutDashboard, MessageSquare, RefreshCw, Server, Users, Sparkles, Globe } from "lucide-react";
+import { Activity, AlertCircle, ArrowUpRight, Cpu, Database, Gauge, LayoutDashboard, MessageSquare, RefreshCw, Server, ShieldCheck, Sparkles, TrendingUp, Users, Globe } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PageTitle } from "@/components/ui/Typography";
 import { ApiError, apiClient } from "@/lib/api";
@@ -14,6 +14,7 @@ import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspaceMembership, useWorkspaceTree } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import { IntelligenceDashboard } from "@/components/workspace/IntelligenceDashboard";
+import { LiveKnowledgeGraph } from "@/components/analytics/LiveKnowledgeGraph";
 
 type FileData = {
   id: string;
@@ -45,6 +46,11 @@ type Metric = {
 };
 
 const pageEase = [0.23, 1, 0.32, 1] as const;
+const numberFormatter = new Intl.NumberFormat();
+const workerTimeFormatter = new Intl.DateTimeFormat(undefined, {
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 function StudioCard({ title, subtitle, children, className }: { title: string; subtitle: string; children: ReactNode; className?: string }) {
   const reduceMotion = useReducedMotion();
@@ -90,6 +96,52 @@ function MetricCard({ metric, index }: { metric: Metric; index: number }) {
       </div>
       <p className="relative z-10 mt-3 hidden text-xs leading-5 text-[var(--omnix-text-3)] sm:block">{metric.detail}</p>
     </motion.article>
+  );
+}
+
+function formatUptime(seconds?: number) {
+  if (!seconds && seconds !== 0) return "Unavailable";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return `${hours}h ${minutes}m`;
+}
+
+function formatHeartbeat(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return workerTimeFormatter.format(date);
+}
+
+function AnalysisSignalCard({
+  label,
+  value,
+  detail,
+  icon,
+  accent,
+}: {
+  label: string;
+  value: ReactNode;
+  detail: string;
+  icon: ReactNode;
+  accent: string;
+}) {
+  return (
+    <article className="relative min-h-[7.5rem] overflow-hidden rounded-xl border border-white/5 bg-black/20 p-4 shadow-inner transition-[border-color,background-color,transform] duration-150 ease-out hover:-translate-y-0.5 hover:border-white/10 hover:bg-black/30">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-60"
+        style={{ background: `linear-gradient(135deg, color-mix(in srgb, ${accent} 16%, transparent), transparent 46%)` }}
+      />
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">{label}</p>
+          <div className="mt-2 truncate text-xl font-bold text-white tabular-nums">{value}</div>
+        </div>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border" style={{ borderColor: accent, color: accent, background: "rgba(255,255,255,0.035)" }}>
+          {icon}
+        </span>
+      </div>
+      <p className="relative z-10 mt-3 line-clamp-2 text-xs leading-5 text-[var(--omnix-text-3)]">{detail}</p>
+    </article>
   );
 }
 
@@ -192,7 +244,7 @@ function AnalyticsPageContent() {
       },
       {
         label: "System Uptime",
-        value: loadingRuntime ? <Skeleton className="h-8 w-24 rounded-full" /> : runtimeInfo ? `${Math.floor(runtimeInfo.uptime_seconds / 3600)}h ${Math.floor((runtimeInfo.uptime_seconds % 3600) / 60)}m` : "Unavailable",
+        value: loadingRuntime ? <Skeleton className="h-8 w-24 rounded-full" /> : runtimeInfo ? formatUptime(runtimeInfo.uptime_seconds) : "Unavailable",
         detail: runtimeInfo?.version ? `Omnix ${runtimeInfo.version} node` : "Runtime version not reported.",
         icon: <Activity className="h-4 w-4" />,
         color: "var(--omnix-amber)",
@@ -224,29 +276,79 @@ function AnalyticsPageContent() {
     [conversations.length, conversationsLoading, activeWorkspace, activeMembers.length, files.length, filesLoading, loadingRuntime, runtimeInfo, workers.length, workspaces.length],
   );
 
+  const analysisSignals = useMemo(
+    () => [
+      {
+        label: "Workspace Coverage",
+        value: filesLoading ? <Skeleton className="h-7 w-14 rounded-full" /> : numberFormatter.format(files.length),
+        detail: activeWorkspace ? `${activeWorkspace.name} knowledge sources visible to this workspace.` : "No active workspace selected.",
+        icon: <ShieldCheck className="h-4 w-4" />,
+        accent: "var(--omnix-green)",
+      },
+      {
+        label: "Engagement Signal",
+        value: conversationsLoading ? <Skeleton className="h-7 w-14 rounded-full" /> : numberFormatter.format(conversations.length + activeMembers.length),
+        detail: "Combined conversation and member signal for the current operating window.",
+        icon: <TrendingUp className="h-4 w-4" />,
+        accent: "var(--omnix-cyan)",
+      },
+      {
+        label: "Runtime Confidence",
+        value: loadingRuntime ? <Skeleton className="h-7 w-20 rounded-full" /> : runtimeInfo?.status === "healthy" ? "Healthy" : runtimeError ? "Limited" : "Unavailable",
+        detail: runtimeInfo ? `Runtime ${runtimeInfo.version || "version unknown"} reporting from ${runtimeInfo.environment || "unknown"} environment.` : "Runtime telemetry could not be confirmed.",
+        icon: <Gauge className="h-4 w-4" />,
+        accent: runtimeInfo?.status === "healthy" ? "var(--omnix-green)" : "var(--omnix-amber)",
+      },
+    ],
+    [activeMembers.length, activeWorkspace, conversations.length, conversationsLoading, files.length, filesLoading, loadingRuntime, runtimeError, runtimeInfo],
+  );
+
   return (
     <section className="omnix-page-frame omnix-scrollbar">
       <div className="omnix-content-max flex flex-col gap-6">
-        <div className="omnix-page-hero">
-          <div>
-            <PageTitle className="omnix-gradient-text">Analytics Studio</PageTitle>
-            <p className="omnix-page-subtitle">
-              Live workspace telemetry and platform operational status.
-            </p>
+        <div className="relative overflow-hidden rounded-[var(--omnix-radius-lg)] border border-cyan-300/10 bg-[linear-gradient(135deg,rgba(0,255,255,0.105),rgba(124,92,255,0.065),rgba(0,0,0,0.18))] p-4 shadow-[var(--omnix-glow-xs)] sm:p-6">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.045),transparent)]" />
+          <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0">
+              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/18 bg-cyan-300/8 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">
+                <Sparkles className="h-3.5 w-3.5" />
+                Analysis Studio
+              </p>
+              <PageTitle className="omnix-gradient-text">Workspace Intelligence</PageTitle>
+              <p className="omnix-page-subtitle max-w-3xl text-pretty">
+                Live telemetry, knowledge coverage, runtime confidence, and AI usage patterns in one operating view.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void refreshConversations({ force: true });
+                void loadFiles();
+                void loadRuntimeInfo();
+              }}
+              className="omnix-command-button flex h-11 items-center justify-center gap-2 rounded-xl border border-white/5 bg-white/5 px-4 text-xs font-bold text-white transition-[background,border-color,box-shadow,transform] duration-150 ease-out hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas sm:w-fit"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", loadingRuntime && "animate-spin")} />
+              Sync Analysis
+              <ArrowUpRight className="h-3.5 w-3.5 opacity-60" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              void refreshConversations({ force: true });
-              void loadFiles();
-              void loadRuntimeInfo();
-            }}
-            className="omnix-command-button flex h-10 items-center gap-2 rounded-xl border border-white/5 bg-white/5 px-4 text-xs font-bold text-white transition hover:bg-white/10"
-          >
-            <RefreshCw className={cn("h-3.5 w-3.5", loadingRuntime && "animate-spin")} />
-            Sync Dashboard
-          </button>
         </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          {analysisSignals.map((signal) => (
+            <AnalysisSignalCard key={signal.label} {...signal} />
+          ))}
+        </div>
+
+        <LiveKnowledgeGraph
+          conversationCount={conversations.length}
+          memberCount={activeWorkspace?.member_count ?? activeMembers.length}
+          sourceCount={files.length}
+          workspaceCount={workspaces.length}
+          workerCount={workers.length}
+          runtimeStatus={runtimeInfo?.status ?? (runtimeError ? "limited" : "unavailable")}
+        />
 
         <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
           {realMetrics.map((metric, index) => (
@@ -314,7 +416,7 @@ function AnalyticsPageContent() {
                       <span className="truncate text-xs font-semibold text-white">{worker.name}</span>
                     </div>
                     <span className="shrink-0 text-[10px] font-medium text-[var(--omnix-text-3)]">
-                      Pulse: {new Date(worker.last_heartbeat).toLocaleTimeString()}
+                      Pulse: {formatHeartbeat(worker.last_heartbeat)}
                     </span>
                   </div>
                 ))

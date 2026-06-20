@@ -60,7 +60,7 @@ for (const label of ["Core", "Execution", "Workspace", "System"]) {
 assertIncludes(sidebarNav, "navGroups", "Sidebar grouped navigation");
 
 const landingFiles = await readdir(join(root, "components/landing"));
-assert.deepEqual(landingFiles.sort(), ["LandingExperience.tsx"], "Only the active landing experience should remain");
+assert.deepEqual(landingFiles.sort(), ["LandingExperience.tsx", "LandingHeroScene.tsx"], "Only the active landing experience files should remain");
 assertIncludes(landingPage, 'import { LandingExperience } from "@/components/landing/LandingExperience"', "Landing route");
 
 console.log("UI audit integration checks passed.");

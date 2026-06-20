@@ -15,8 +15,11 @@ import {
   Users,
   Zap,
   ArrowUpRight,
+  BrainCircuit,
   Clock,
   ChevronRight,
+  FileText,
+  Gauge,
   Layers3,
   ShieldCheck,
   UploadCloud,
@@ -37,6 +40,15 @@ type FileData = {
   id: string;
 };
 
+type BriefingCard = {
+  label: string;
+  value: string | number;
+  detail: string;
+  href: string;
+  icon: typeof Activity;
+  accent: string;
+};
+
 const pageEnterDelayClasses = [
   "omnix-page-enter-delay-1",
   "omnix-page-enter-delay-2",
@@ -48,6 +60,40 @@ const pageEnterDelayClasses = [
 
 function pageEnterDelay(index: number) {
   return pageEnterDelayClasses[Math.min(index, pageEnterDelayClasses.length - 1)];
+}
+
+function CommandBriefingCard({ item, index, onOpen }: { item: BriefingCard; index: number; onOpen: (href: string) => void }) {
+  const Icon = item.icon;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(item.href)}
+      className={cn(
+        "group relative min-h-[6.75rem] overflow-hidden rounded-[var(--omnix-radius)] border border-[var(--omnix-border)] bg-black/20 p-3 text-left shadow-inner transition-[border-color,background-color,box-shadow,transform] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[var(--omnix-surface)] hover:shadow-[var(--omnix-glow-xs)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas sm:p-4",
+        "omnix-page-enter",
+        pageEnterDelay(index + 1),
+      )}
+    >
+      <span
+        className="pointer-events-none absolute inset-0 opacity-60 transition-opacity duration-150 ease-out group-hover:opacity-90"
+        style={{ background: `linear-gradient(135deg, color-mix(in srgb, ${item.accent} 18%, transparent), transparent 44%)` }}
+      />
+      <span className="relative z-10 flex items-start justify-between gap-3">
+        <span className="min-w-0">
+          <span className="block truncate text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">{item.label}</span>
+          <span className="mt-2 block truncate text-xl font-semibold tabular-nums text-white sm:text-2xl">{item.value}</span>
+        </span>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-black/20" style={{ borderColor: item.accent, color: item.accent }}>
+          <Icon className="h-4 w-4" />
+        </span>
+      </span>
+      <span className="relative z-10 mt-2 block line-clamp-2 text-[11px] leading-5 text-[var(--omnix-text-3)] sm:text-xs">{item.detail}</span>
+      <span className="relative z-10 mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--omnix-cyan)] opacity-0 transition-opacity duration-150 ease-out group-hover:opacity-100">
+        Open <ArrowUpRight className="h-3 w-3" />
+      </span>
+    </button>
+  );
 }
 
 export default function DashboardPage() {
@@ -69,9 +115,9 @@ function DashboardPageContent() {
     intelligenceLoading,
   } = useWorkspace();
   const { activity, loadingActivity, presence } = useWorkspaceCollaboration();
-  const [, setFiles] = useState<FileData[]>([]);
-  const [, setFilesLoading] = useState(false);
-  const [, setFilesError] = useState<string | null>(null);
+  const [files, setFiles] = useState<FileData[]>([]);
+  const [filesLoading, setFilesLoading] = useState(false);
+  const [filesError, setFilesError] = useState<string | null>(null);
 
   const loadFiles = useCallback(async () => {
     setFilesLoading(true);
@@ -119,14 +165,16 @@ function DashboardPageContent() {
 
   const recent = conversations.slice(0, 4);
   const recentWorkspaces = workspaces.slice(0, 4);
+  const liveMemberCount = presence?.active_count ?? presence?.online_count ?? 0;
+  const sourceCount = activeWorkspaceIntelligence?.source_count ?? files.length;
   const workspacePulse = [
     {
       label: "Live Members",
-      value: presence?.active_count ?? presence?.online_count ?? 0,
+      value: liveMemberCount,
       detail: "connected now",
       icon: Activity,
       accent: "var(--omnix-green)",
-      fill: Math.min(((presence?.active_count ?? presence?.online_count ?? 0) / 8) * 100, 100),
+      fill: Math.min((liveMemberCount / 8) * 100, 100),
     },
     {
       label: "AI Sessions",
@@ -151,6 +199,49 @@ function DashboardPageContent() {
       icon: Layers3,
       accent: "var(--omnix-purple)",
       fill: Math.min((workspaces.length / 8) * 100, 100),
+    },
+    {
+      label: "Sources",
+      value: filesLoading ? "…" : sourceCount,
+      detail: filesError ? "needs retry" : "knowledge assets",
+      icon: FileText,
+      accent: "var(--omnix-green)",
+      fill: filesLoading ? 42 : Math.min((sourceCount / 16) * 100, 100),
+    },
+  ];
+
+  const briefingCards: BriefingCard[] = [
+    {
+      label: "Knowledge Readiness",
+      value: filesLoading ? "Sync" : sourceCount,
+      detail: filesError ?? "Source coverage available for workspace-grounded answers.",
+      href: "/sources",
+      icon: Database,
+      accent: "var(--omnix-green)",
+    },
+    {
+      label: "AI Context",
+      value: activeWorkspaceIntelligence?.recent_insights.length ?? 0,
+      detail: activeWorkspaceIntelligence?.context_summary ?? "Workspace intelligence is syncing context from files and conversations.",
+      href: "/analytics",
+      icon: BrainCircuit,
+      accent: "var(--omnix-purple)",
+    },
+    {
+      label: "Team Signal",
+      value: liveMemberCount,
+      detail: activeWorkspace?.is_shared ? "Shared workspace presence and role activity are enabled." : "Private workspace with limited live collaboration.",
+      href: "/team",
+      icon: Users,
+      accent: "var(--omnix-cyan)",
+    },
+    {
+      label: "Execution Pulse",
+      value: activity.length,
+      detail: loadingActivity ? "Activity feed is syncing recent updates." : "Recent workspace events captured in the operational timeline.",
+      href: "/workspace",
+      icon: Gauge,
+      accent: "var(--omnix-amber)",
     },
   ];
 
@@ -204,17 +295,16 @@ function DashboardPageContent() {
                 })}
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2 xl:min-w-[28rem]">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:min-w-[34rem] xl:max-w-[38rem]">
               {[
                 { label: "Role", value: workspaceRoleLabel(activeWorkspace?.current_user_role), icon: ShieldCheck },
                 { label: "Access", value: activeWorkspace?.is_shared ? "Shared" : "Private", icon: Users },
                 { label: "Roots", value: workspaces.length, icon: Layers3 },
+                { label: "Sources", value: filesLoading ? "Sync" : sourceCount, icon: FileText },
               ].map((item) => {
                 const Icon = item.icon;
                 return (
-                  <div key={item.label} className={cn(
-                    "min-w-0 rounded-xl border border-white/[0.07] bg-white/[0.035] p-2.5 transition-colors duration-150 ease-out hover:bg-white/[0.05] sm:p-3"
-                  )}>
+                  <div key={item.label} className="min-w-0 rounded-xl border border-white/[0.07] bg-white/[0.035] p-2.5 transition-colors duration-150 ease-out hover:bg-white/[0.05] sm:p-3">
                     <Icon className="h-3.5 w-3.5 text-cyan-200 sm:h-4 sm:w-4" />
                     <div className="mt-2 truncate text-[9px] uppercase tracking-[0.12em] text-[var(--omnix-text-3)] sm:mt-3 sm:text-[10px]">{item.label}</div>
                     <div className="mt-1 truncate text-sm font-semibold text-white">{item.value}</div>
@@ -225,35 +315,39 @@ function DashboardPageContent() {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           {workspacePulse.map((item, i) => {
             const Icon = item.icon;
             return (
               <button
                 key={item.label}
                 type="button"
-                onClick={() => router.push(i === 1 ? "/history" : i === 2 ? "/workspace" : "/analytics")}
+                onClick={() => router.push(i === 1 ? "/history" : i === 2 || i === 3 ? "/workspace" : i === 4 ? "/sources" : "/analytics")}
                 className={cn("omnix-dashboard-metric group/dashboard-metric omnix-page-enter text-left", pageEnterDelay(i + 1))}
                 style={{ "--metric-accent": item.accent, "--metric-fill": `${item.fill}%` } as CSSProperties}
               >
-                <span className="flex items-center justify-between gap-3">
+                <span className="flex min-w-0 items-center gap-3">
                   <span className="omnix-dashboard-metric-icon">
                     <Icon className="h-4 w-4" />
                   </span>
-                  <ArrowUpRight className="h-3.5 w-3.5 text-[var(--omnix-text-3)] transition-transform duration-150 ease-out group-hover/dashboard-metric:-translate-y-0.5 group-hover/dashboard-metric:translate-x-0.5" />
-                </span>
-                <span className="mt-4 block text-2xl font-semibold tabular-nums text-white">{item.value}</span>
-                <span className="mt-1 flex min-w-0 items-center justify-between gap-3">
-                  <span className="min-w-0">
-                    <span className="block truncate text-xs font-semibold uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">{item.label}</span>
-                    <span className="mt-1 block truncate text-xs text-[var(--omnix-text-2)]">{item.detail}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">{item.label}</span>
+                    <span className="mt-0.5 block truncate text-xs text-[var(--omnix-text-2)]">{item.detail}</span>
                   </span>
+                  <span className="shrink-0 text-xl font-semibold tabular-nums text-white">{item.value}</span>
+                  <ArrowUpRight className="hidden h-3.5 w-3.5 shrink-0 text-[var(--omnix-text-3)] transition-transform duration-150 ease-out group-hover/dashboard-metric:-translate-y-0.5 group-hover/dashboard-metric:translate-x-0.5 sm:block" />
                 </span>
                 <span className="omnix-dashboard-meter" />
               </button>
             );
           })}
         </div>
+
+        <section className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
+          {briefingCards.map((item, index) => (
+            <CommandBriefingCard key={item.label} item={item} index={index} onOpen={(href) => router.push(href)} />
+          ))}
+        </section>
 
         <WorkspaceIntelligencePanel
           profile={activeWorkspaceIntelligence}
@@ -263,8 +357,8 @@ function DashboardPageContent() {
         />
 
         {/* ── Main grid ── */}
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
-          <div className="space-y-6">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.95fr)]">
+          <div className="space-y-4">
 
             <WorkspaceActivityFeed
               activity={activity}
@@ -276,13 +370,15 @@ function DashboardPageContent() {
             <WorkspacePresenceCluster
               presence={presence}
               workspaceName={activeWorkspace?.name}
+              compact
+              className="omnix-section-card"
             />
 
-            <section className="omnix-section-card omnix-page-enter omnix-page-enter-delay-3 p-4 sm:p-6">
+            <section className="omnix-section-card omnix-page-enter omnix-page-enter-delay-3 p-3 sm:p-4">
               {/* Top beam */}
               <div className="omnix-top-line" />
-              <div className="relative z-10 mb-5 flex items-center justify-between">
-                <h2 className="flex items-center gap-2.5 text-lg font-semibold text-white">
+              <div className="relative z-10 mb-4 flex items-center justify-between">
+                <h2 className="flex items-center gap-2.5 text-base font-semibold text-white sm:text-lg">
                   <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-amber-300/25 bg-amber-300/10">
                     <Zap className="h-3.5 w-3.5 text-amber-300 drop-shadow-[0_0_6px_var(--omnix-rgba-255-184-0-8)]" />
                   </span>
@@ -290,7 +386,7 @@ function DashboardPageContent() {
                 </h2>
                 <span className="omnix-dot-badge" />
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 {actions.map((action, i) => {
                   const Icon = action.icon;
                   return (
@@ -298,7 +394,7 @@ function DashboardPageContent() {
                       key={action.label}
                       type="button"
                       onClick={() => router.push(action.href)}
-                      className={cn("omnix-command-button omnix-page-enter group relative z-10 flex items-center gap-4 p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas", pageEnterDelay(i + 3))}
+                      className={cn("omnix-command-button omnix-page-enter group relative z-10 flex items-center gap-3 p-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas", pageEnterDelay(i + 3))}
                       style={{
                         "--command-color": action.color,
                       } as CSSProperties}
@@ -308,20 +404,20 @@ function DashboardPageContent() {
                         style={{ animation: "omnix-sheen-sweep 4s cubic-bezier(0.4, 0, 0.2, 1) infinite" }}
                       />
                       <span
-                        className="rounded-xl p-2.5 transition-transform duration-150 ease-out group-hover:scale-105"
+                        className="rounded-lg p-2 transition-transform duration-150 ease-out group-hover:scale-105"
                         style={{
                           background: action.surface,
                           border: `1px solid ${action.border}`,
                           boxShadow: `0 0 10px ${action.glow}`,
                         }}
                       >
-                        <Icon className="h-5 w-5" style={{ color: action.color, filter: `drop-shadow(0 0 4px ${action.iconGlow})` }} />
+                        <Icon className="h-4 w-4" style={{ color: action.color, filter: `drop-shadow(0 0 4px ${action.iconGlow})` }} />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold text-white transition-colors group-hover:text-[var(--omnix-cyan)]">
+                        <span className="block truncate text-sm font-semibold text-white transition-colors group-hover:text-[var(--omnix-cyan)]">
                           {action.label}
                         </span>
-                        <span className="mt-0.5 block text-xs text-[var(--omnix-text-3)]">{action.desc}</span>
+                        <span className="mt-0.5 block truncate text-xs text-[var(--omnix-text-3)]">{action.desc}</span>
                       </span>
                       <ChevronRight className="h-4 w-4 shrink-0 text-[var(--omnix-text-3)] opacity-0 transition-[opacity,transform] duration-150 ease-out group-hover:translate-x-0.5 group-hover:opacity-100" />
                     </button>
@@ -371,7 +467,7 @@ function DashboardPageContent() {
                         </span>
                       </span>
                     </span>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-[var(--omnix-text-3)] opacity-0 transition group-hover:opacity-100" />
+                    <ChevronRight className="h-4 w-4 shrink-0 text-[var(--omnix-text-3)] opacity-0 transition-opacity duration-150 ease-out group-hover:opacity-100" />
                   </button>
                 )) : (
                   <div className="relative z-10 rounded-[var(--omnix-radius-sm)] border border-dashed border-[var(--omnix-border)] bg-[var(--omnix-rgba-0-255-255-0-02)] p-6 text-center">
