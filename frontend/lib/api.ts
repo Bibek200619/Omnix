@@ -46,6 +46,11 @@ type ApiErrorPayload = {
   rawMessage?: string;
 };
 
+type ApiErrorData = {
+  detail?: string | { msg?: string }[];
+  message?: string;
+};
+
 export class ApiError extends Error {
   endpoint: string;
   url: string;
@@ -67,7 +72,8 @@ export class ApiError extends Error {
     this.rawMessage = payload.rawMessage;
   }
 
-  toJSON() {
+  toJSON(options: { includeSensitive?: boolean } = {}) {
+    const includeSensitive = options.includeSensitive ?? process.env.NODE_ENV !== "production";
     return {
       name: this.name,
       message: this.message,
@@ -76,13 +82,14 @@ export class ApiError extends Error {
       method: this.method,
       status: this.status,
       statusText: this.statusText,
-      rawMessage: this.rawMessage,
-      responsePayload: this.responsePayload,
+      rawMessage: includeSensitive ? this.rawMessage : undefined,
+      responsePayload: includeSensitive ? this.responsePayload : undefined,
+      sensitiveFieldsRedacted: includeSensitive ? undefined : Boolean(this.rawMessage || this.responsePayload),
     };
   }
 }
 
-function extractErrorMessage(errorData: { detail?: string | { msg?: string }[]; message?: string }) {
+function extractErrorMessage(errorData: ApiErrorData) {
   if (typeof errorData.detail === "string") {
     return errorData.detail;
   }
@@ -94,6 +101,10 @@ function extractErrorMessage(errorData: { detail?: string | { msg?: string }[]; 
     return errorData.message;
   }
   return null;
+}
+
+async function readErrorPayload(response: Response): Promise<ApiErrorData> {
+  return (await response.json().catch(() => ({}))) as ApiErrorData;
 }
 
 function logApiError(error: ApiError) {
@@ -127,10 +138,39 @@ class ApiClient {
     return session?.access_token ?? null;
   }
 
-  async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
-    const normalizedEndpoint = normalizeEndpoint(endpoint);
-    const url = apiUrl(normalizedEndpoint);
-    const token = await this.getAuthToken();
+  private async refreshAuthToken(): Promise<string | null> {
+    if (!supabase) {
+      return null;
+    }
+
+    const {
+      data: { session: currentSession },
+      error: currentSessionError,
+    } = await supabase.auth.getSession();
+
+    if (currentSessionError || !currentSession?.refresh_token) {
+      if (currentSessionError && process.env.NODE_ENV !== "production") {
+        console.warn("Unable to inspect Supabase session for API recovery", currentSessionError);
+      }
+      return null;
+    }
+
+    const {
+      data: { session: refreshedSession },
+      error,
+    } = await supabase.auth.refreshSession();
+
+    if (error) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("Unable to refresh Supabase session for API retry", error);
+      }
+      return null;
+    }
+
+    return refreshedSession?.access_token ?? null;
+  }
+
+  private buildHeaders(options: RequestInit, token: string | null): Headers {
     const headers = new Headers(options.headers);
     const isFormData =
       typeof FormData !== "undefined" && options.body instanceof FormData;
@@ -145,10 +185,20 @@ class ApiClient {
 
     this.applyWorkspaceHeader(headers);
 
-    let response: Response;
+    return headers;
+  }
+
+  private async fetchOnce(
+    normalizedEndpoint: string,
+    url: string,
+    options: RequestInit,
+    token: string | null,
+    fallbackMethod: string,
+  ): Promise<Response> {
+    const headers = this.buildHeaders(options, token);
 
     try {
-      response = await fetch(url, {
+      return await fetch(url, {
         ...options,
         headers,
       });
@@ -156,37 +206,86 @@ class ApiClient {
       const error = new ApiError("Omnix API is unreachable.", {
         endpoint: normalizedEndpoint,
         url,
-        method: options.method ?? "GET",
+        method: options.method ?? fallbackMethod,
         rawMessage: exc instanceof Error ? exc.message : String(exc),
       });
       logApiError(error);
       throw error;
     }
+  }
 
-    if (response.status === 401) {
-      const errorData = (await response.json().catch(() => ({}))) as {
-        detail?: string | { msg?: string }[];
-        message?: string;
-      };
-      await supabase?.auth.signOut();
-      const error = new ApiError("Authentication is required.", {
-        endpoint: normalizedEndpoint,
-        url,
-        method: options.method ?? "GET",
-        status: response.status,
-        statusText: response.statusText,
-        responsePayload: errorData,
-        rawMessage: extractErrorMessage(errorData) ?? "Unauthorized",
-      });
-      logApiError(error);
-      throw error;
+  private buildAuthenticationError(
+    normalizedEndpoint: string,
+    url: string,
+    options: RequestInit,
+    response: Response,
+    errorData: ApiErrorData,
+    fallbackMethod: string,
+  ) {
+    return new ApiError("Your session needs attention. Please refresh or sign in again.", {
+      endpoint: normalizedEndpoint,
+      url,
+      method: options.method ?? fallbackMethod,
+      status: response.status,
+      statusText: response.statusText,
+      responsePayload: errorData,
+      rawMessage: extractErrorMessage(errorData) ?? "Unauthorized",
+    });
+  }
+
+  private async fetchWithAuthRecovery(
+    normalizedEndpoint: string,
+    url: string,
+    options: RequestInit,
+    fallbackMethod: string,
+  ): Promise<Response> {
+    const token = await this.getAuthToken();
+    const response = await this.fetchOnce(normalizedEndpoint, url, options, token, fallbackMethod);
+
+    if (response.status !== 401) {
+      return response;
     }
 
+    const firstErrorData = await readErrorPayload(response.clone());
+    const refreshedToken = await this.refreshAuthToken();
+
+    if (refreshedToken) {
+      const retryResponse = await this.fetchOnce(normalizedEndpoint, url, options, refreshedToken, fallbackMethod);
+      if (retryResponse.status !== 401) {
+        return retryResponse;
+      }
+      const retryErrorData = await readErrorPayload(retryResponse.clone());
+      const retryError = this.buildAuthenticationError(
+        normalizedEndpoint,
+        url,
+        options,
+        retryResponse,
+        retryErrorData,
+        fallbackMethod,
+      );
+      logApiError(retryError);
+      throw retryError;
+    }
+
+    const error = this.buildAuthenticationError(
+      normalizedEndpoint,
+      url,
+      options,
+      response,
+      firstErrorData,
+      fallbackMethod,
+    );
+    logApiError(error);
+    throw error;
+  }
+
+  async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    const normalizedEndpoint = normalizeEndpoint(endpoint);
+    const url = apiUrl(normalizedEndpoint);
+    const response = await this.fetchWithAuthRecovery(normalizedEndpoint, url, options, "GET");
+
     if (!response.ok) {
-      const errorData = (await response.json().catch(() => ({}))) as {
-        detail?: string | { msg?: string }[];
-        message?: string;
-      };
+      const errorData = await readErrorPayload(response);
 
       const error = new ApiError("Omnix API request failed.", {
         endpoint: normalizedEndpoint,
@@ -211,61 +310,11 @@ class ApiClient {
   async stream(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const normalizedEndpoint = normalizeEndpoint(endpoint);
     const url = apiUrl(normalizedEndpoint);
-    const token = await this.getAuthToken();
-    const headers = new Headers(options.headers);
-    const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
-
-    if (!headers.has("Content-Type") && !isFormData) {
-      headers.set("Content-Type", "application/json");
-    }
-
-    if (token) {
-      headers.set("Authorization", `Bearer ${token}`);
-    }
-    this.applyWorkspaceHeader(headers);
-
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        ...options,
-        headers,
-      });
-    } catch (exc) {
-      const error = new ApiError("Omnix API is unreachable.", {
-        endpoint: normalizedEndpoint,
-        url,
-        method: options.method ?? "POST",
-        rawMessage: exc instanceof Error ? exc.message : String(exc),
-      });
-      logApiError(error);
-      throw error;
-    }
-
-    if (response.status === 401) {
-      const errorData = (await response.json().catch(() => ({}))) as {
-        detail?: string | { msg?: string }[];
-        message?: string;
-      };
-      await supabase?.auth.signOut();
-      const error = new ApiError("Authentication is required.", {
-        endpoint: normalizedEndpoint,
-        url,
-        method: options.method ?? "POST",
-        status: response.status,
-        statusText: response.statusText,
-        responsePayload: errorData,
-        rawMessage: extractErrorMessage(errorData) ?? "Unauthorized",
-      });
-      logApiError(error);
-      throw error;
-    }
+    const response = await this.fetchWithAuthRecovery(normalizedEndpoint, url, options, "POST");
 
     if (!response.ok && response.status !== 200) {
       // For streaming endpoints some servers may return 200 with streaming body.
-      const errorData = (await response.json().catch(() => ({}))) as {
-        detail?: string | { msg?: string }[];
-        message?: string;
-      };
+      const errorData = await readErrorPayload(response);
 
       const error = new ApiError("Omnix API request failed.", {
         endpoint: normalizedEndpoint,
