@@ -1,12 +1,20 @@
 import pytest
 import asyncio
+from types import SimpleNamespace
 from typing import AsyncGenerator
+from app.observability import safe_logging
 from app.observability.tracing import ContextTrace
 from app.observability.streaming import StreamingRuntime
 from app.observability.runtime import ExecutionRuntime
 from app.observability.event_bus import EventBus
 from app.observability.schemas import ObservabilityEvent
 from app.observability.serializers import sanitize_dict
+
+
+@pytest.fixture(autouse=True)
+def allow_sensitive_observability_traces(monkeypatch):
+    monkeypatch.setattr(safe_logging, "get_settings", lambda: SimpleNamespace(ENV="test", DEV_MODE=True))
+
 
 @pytest.mark.asyncio
 async def test_retrieval_tracing():
