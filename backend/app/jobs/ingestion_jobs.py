@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 from datetime import datetime, timezone
@@ -10,10 +11,10 @@ from ..services.supabase_service import (
     update_one_trusted,
 )
 from ..services.document_intelligence_service import (
-    diagnostics_from_file,
     extract_document_with_diagnostics,
     extraction_columns_payload,
 )
+from ..services.document_context_service import store_extracted_text_chunks
 from ..rag.startup import get_vector_store
 from ..rag.ingestion import RAGIngestionPipeline
 
@@ -24,8 +25,58 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _metadata_with_processing(
+    file_row: dict[str, Any],
+    *,
+    processing_status: str,
+    processing_error: str | None = None,
+    updates: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    metadata = dict(file_row.get("metadata") or {})
+    metadata.update(updates or {})
+    metadata["processing_status"] = processing_status
+    if processing_error:
+        metadata["processing_error"] = processing_error
+    else:
+        metadata.pop("processing_error", None)
+    if file_row.get("processing_job_id"):
+        metadata["processing_job_id"] = str(file_row["processing_job_id"])
+    return metadata
+
+
+async def _update_file_processing_state(
+    file_id: str,
+    file_row: dict[str, Any],
+    *,
+    processing_status: str,
+    processing_error: str | None = None,
+    metadata_updates: dict[str, Any] | None = None,
+    diagnostics_payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    metadata = _metadata_with_processing(
+        file_row,
+        processing_status=processing_status,
+        processing_error=processing_error,
+        updates=metadata_updates,
+    )
+    payload = {
+        "metadata": metadata,
+        "processing_status": processing_status,
+        "processing_error": processing_error,
+        **(diagnostics_payload or {}),
+    }
+    try:
+        return await update_one_trusted("files", {"id": file_id}, payload) or {**file_row, **payload}
+    except Exception:
+        logger.warning("Unable to persist file processing columns; retrying processing state as metadata only.")
+        await update_one_trusted("files", {"id": file_id}, {"metadata": metadata})
+        return {**file_row, "metadata": metadata}
+
+
 async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
     """Process an ingestion job created after file upload. Expects payload in job_row['payload']."""
+    file_id: str | None = None
+    file_row: dict[str, Any] | None = None
     try:
         import json
         payload = job_row.get("payload")
@@ -41,11 +92,14 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
         FILE_COLUMNS = (
             "id,user_id,workspace_id,file_name,file_type,size_bytes,storage_path,metadata,"
             "page_count,extractor_used,extracted_character_count,image_page_count,text_page_count,"
-            "extraction_status,extraction_failure_reason,ocr_used,ocr_character_count,created_at"
+            "extraction_status,extraction_failure_reason,processing_status,processing_error,processing_job_id,"
+            "ocr_used,ocr_character_count,created_at"
         )
         file_row = await select_one_trusted("files", FILE_COLUMNS, {"id": file_id})
         if file_row is None:
             raise RuntimeError("File not found for ingestion")
+
+        file_row = await _update_file_processing_state(file_id, file_row, processing_status="processing")
 
         storage_path = resolve_managed_storage_path(file_row.get("storage_path"))
         filename = file_row.get("file_name") or "imported"
@@ -58,32 +112,56 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
         with storage_path.open("rb") as fh:
             data = fh.read()
 
-        extraction_result = extract_document_with_diagnostics(filename, file_type, data)
+        extraction_result = await asyncio.to_thread(extract_document_with_diagnostics, filename, file_type, data)
         normalized = extraction_result.text
         diagnostics = extraction_result.diagnostics
         metadata = dict(file_row.get("metadata") or {})
         metadata.update({"extracted_text_preview": normalized[:2000], **diagnostics.to_metadata()})
         if diagnostics.extraction_failure_reason:
             metadata["extraction_error"] = diagnostics.extraction_failure_reason
-        try:
-            file_row = await update_one_trusted(
-                "files",
-                {"id": file_id},
-                {"metadata": metadata, **extraction_columns_payload(diagnostics)},
-            ) or file_row
-        except Exception:
-            logger.warning("Unable to persist physical extraction diagnostics in ingestion worker; retrying metadata only.")
-            await update_one_trusted("files", {"id": file_id}, {"metadata": metadata})
-            file_row["metadata"] = metadata
 
-        diagnostics = diagnostics_from_file(file_row)
         if diagnostics.extraction_status != "searchable" or not normalized:
+            processing_error = diagnostics.extraction_failure_reason or "No searchable text was extracted from this file."
+            await _update_file_processing_state(
+                file_id,
+                file_row,
+                processing_status="failed",
+                processing_error=processing_error,
+                metadata_updates=metadata,
+                diagnostics_payload=extraction_columns_payload(diagnostics),
+            )
             return {
-                "status": "failed" if diagnostics.extraction_status == "extraction_failed" else "completed",
+                "status": "failed",
                 "file_status": diagnostics.extraction_status,
-                "error": diagnostics.extraction_failure_reason,
+                "processing_status": "failed",
+                "error": processing_error,
                 "chunks": [],
             }
+
+        file_row = await _update_file_processing_state(
+            file_id,
+            file_row,
+            processing_status="extracted",
+            metadata_updates=metadata,
+            diagnostics_payload=extraction_columns_payload(diagnostics),
+        )
+
+        stored_chunks = await store_extracted_text_chunks(
+            file_id=file_id,
+            user_id=user_id,
+            text=normalized,
+            workspace_id=workspace_id,
+            replace_existing=True,
+        )
+        file_row = await _update_file_processing_state(
+            file_id,
+            file_row,
+            processing_status="chunked",
+            metadata_updates={
+                "text_chunk_count": stored_chunks.chunk_count,
+                "text_chunks_truncated": stored_chunks.truncated,
+            },
+        )
 
         # Run ingestion pipeline (chunks, embeddings, DB insert)
         try:
@@ -127,8 +205,28 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
             logger.exception("Ingestion pipeline failed for file %s", file_id)
             raise
 
+        await _update_file_processing_state(
+            file_id,
+            file_row,
+            processing_status="embedded",
+            metadata_updates={
+                "embedded_chunk_count": num,
+                "embedded_chunk_ids": chunk_ids[:20],
+            },
+        )
+
         # Mark job succeeded
-        return {"status": "completed", "chunks": chunk_ids}
+        return {"status": "completed", "processing_status": "embedded", "chunks": chunk_ids}
     except Exception as exc:
         logger.exception("handle_ingest_file failed: %s", exc)
+        if file_id:
+            try:
+                await _update_file_processing_state(
+                    file_id,
+                    file_row or {"metadata": {}},
+                    processing_status="failed",
+                    processing_error=str(exc),
+                )
+            except Exception:
+                logger.exception("Failed to mark file %s processing as failed.", file_id)
         return {"status": "failed", "error": str(exc)}

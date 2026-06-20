@@ -28,7 +28,8 @@ router = APIRouter(prefix="/files", tags=["files"])
 FILE_COLUMNS = (
     "id,user_id,workspace_id,conversation_id,file_name,file_type,size_bytes,storage_path,metadata,"
     "page_count,extractor_used,extracted_character_count,image_page_count,text_page_count,"
-    "extraction_status,extraction_failure_reason,ocr_used,ocr_character_count,created_at"
+    "extraction_status,extraction_failure_reason,processing_status,processing_error,processing_job_id,"
+    "ocr_used,ocr_character_count,created_at"
 )
 DEFAULT_FILE_LIMIT = 50
 MAX_FILE_LIMIT = 100

@@ -75,6 +75,9 @@ interface FileData {
   text_page_count?: number | null;
   extraction_status?: "processing" | "searchable" | "ocr_required" | "extraction_failed" | null;
   extraction_failure_reason?: string | null;
+  processing_status?: FileProcessingStatus | null;
+  processing_error?: string | null;
+  processing_job_id?: string | null;
   ocr_used?: boolean | null;
   ocr_character_count?: number | null;
 }
@@ -253,19 +256,32 @@ const statusStyle: Record<ConnectorStatus | "not_configured", string> = {
   not_configured: "border-white/10 bg-white/[0.04] text-white/45",
 };
 
-type FileIngestionStatus = "searchable" | "processing" | "ocr_required" | "ocr_complete" | "extraction_failed";
+type FileProcessingStatus = "uploaded" | "queued" | "processing" | "extracted" | "chunked" | "embedded" | "failed";
+type FileIngestionStatus = FileProcessingStatus | "searchable" | "ocr_required" | "ocr_complete" | "extraction_failed";
 
 const fileStatusStyle: Record<FileIngestionStatus, string> = {
+  uploaded: "border-white/10 bg-white/[0.04] text-white/55",
+  queued: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
   searchable: "border-emerald-300/25 bg-emerald-300/10 text-emerald-200",
   processing: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
+  extracted: "border-sky-300/25 bg-sky-300/10 text-sky-100",
+  chunked: "border-teal-300/25 bg-teal-300/10 text-teal-100",
+  embedded: "border-emerald-300/25 bg-emerald-300/10 text-emerald-200",
+  failed: "border-rose-300/30 bg-rose-300/10 text-rose-100",
   ocr_required: "border-amber-300/25 bg-amber-300/10 text-amber-100",
   ocr_complete: "border-emerald-300/25 bg-emerald-300/10 text-emerald-200",
   extraction_failed: "border-rose-300/30 bg-rose-300/10 text-rose-100",
 };
 
 const fileStatusLabel: Record<FileIngestionStatus, string> = {
+  uploaded: "Uploaded",
+  queued: "Queued",
   searchable: "Searchable",
   processing: "Processing",
+  extracted: "Extracted",
+  chunked: "Chunked",
+  embedded: "Embedded",
+  failed: "Failed",
   ocr_required: "OCR Required",
   ocr_complete: "OCR Complete",
   extraction_failed: "Extraction Failed",
@@ -310,6 +326,19 @@ function booleanDiagnostic(file: FileData, key: keyof FileData) {
 }
 
 function fileIngestionStatus(file: FileData): FileIngestionStatus {
+  const processingStatus = stringDiagnostic(file, "processing_status");
+  if (
+    processingStatus === "uploaded" ||
+    processingStatus === "queued" ||
+    processingStatus === "processing" ||
+    processingStatus === "extracted" ||
+    processingStatus === "chunked" ||
+    processingStatus === "embedded" ||
+    processingStatus === "failed"
+  ) {
+    return processingStatus;
+  }
+
   const status = stringDiagnostic(file, "extraction_status");
   const ocrUsed = booleanDiagnostic(file, "ocr_used");
   const ocrChars = numberDiagnostic(file, "ocr_character_count") ?? 0;
@@ -320,12 +349,21 @@ function fileIngestionStatus(file: FileData): FileIngestionStatus {
 
 function fileStatusDetail(file: FileData) {
   const status = fileIngestionStatus(file);
-  const reason = stringDiagnostic(file, "extraction_failure_reason") || stringDiagnostic(file, "extraction_error");
+  const reason =
+    stringDiagnostic(file, "processing_error") ||
+    stringDiagnostic(file, "extraction_failure_reason") ||
+    stringDiagnostic(file, "extraction_error");
   if (reason && status !== "searchable" && status !== "ocr_complete") return reason;
   const extractedChars = numberDiagnostic(file, "extracted_character_count") ?? 0;
   const ocrChars = numberDiagnostic(file, "ocr_character_count") ?? 0;
   const pages = numberDiagnostic(file, "page_count");
+  if (status === "uploaded") return "The file is stored and waiting to be queued for processing.";
+  if (status === "queued") return "Processing is queued. Omnix will extract, chunk, and embed this source in the background.";
   if (status === "processing") return "Text extraction is still running.";
+  if (status === "extracted") return `Extracted ${extractedChars.toLocaleString()} characters; chunking is next.`;
+  if (status === "chunked") return `Text chunks are ready${extractedChars ? ` from ${extractedChars.toLocaleString()} characters` : ""}; embeddings are still finishing.`;
+  if (status === "embedded") return `Fully indexed for retrieval${extractedChars ? ` from ${extractedChars.toLocaleString()} characters` : ""}${pages ? ` across ${pages} pages` : ""}.`;
+  if (status === "failed") return "File processing failed.";
   if (status === "ocr_required") return "This PDF contains no readable text layer. OCR is required before it becomes searchable.";
   if (status === "extraction_failed") return "Text extraction failed for this document.";
   if (status === "ocr_complete") return `OCR extracted ${ocrChars.toLocaleString()} characters${pages ? ` across ${pages} pages` : ""}.`;

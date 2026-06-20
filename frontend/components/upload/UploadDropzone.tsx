@@ -23,8 +23,17 @@ type UploadItem = {
   file: File;
   progress: number;
   status: "idle" | "uploading" | "done" | "error";
+  processingStatus?: MessageAttachment["processing_status"];
   preview?: string;
 };
+
+function uploadProcessingStatus(file: MessageAttachment): MessageAttachment["processing_status"] {
+  const metadataStatus = file.metadata?.processing_status;
+  if (typeof metadataStatus === "string") {
+    return metadataStatus as MessageAttachment["processing_status"];
+  }
+  return file.processing_status;
+}
 
 export function UploadDropzone({ conversationId, compact = false, onUploadSuccess, onUploadComplete }: UploadDropzoneProps = {}) {
   const [items, setItems] = useState<UploadItem[]>([]);
@@ -66,9 +75,10 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
 
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        setItems((s) => s.map((it) => it.id === item.id ? { ...it, progress: 100, status: "done" } : it));
+        let processingStatus: MessageAttachment["processing_status"] = null;
         try {
           const uploaded = JSON.parse(xhr.responseText) as MessageAttachment;
+          processingStatus = uploadProcessingStatus(uploaded);
           if (uploaded?.id) {
             logger.debug("[upload] upload success", { fileId: uploaded.id, conversationId });
             onUploadSuccess?.(uploaded);
@@ -76,6 +86,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
         } catch (err) {
           console.error("Unable to parse upload response", err);
         }
+        setItems((s) => s.map((it) => it.id === item.id ? { ...it, progress: 100, status: "done", processingStatus } : it));
       } else {
         logger.debug("[upload] upload failed", { fileName: item.file.name, status: xhr.status });
         setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "error" } : it));
@@ -251,7 +262,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
               )}
             >
               <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
-                <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--omnix-border)] transition-colors", it.status === "done" ? "bg-emerald-500/10 text-emerald-400" : it.status === "error" ? "bg-rose-500/10 text-rose-400" : "bg-cyan-300/10 text-cyan-100")}>
+                <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--omnix-border)] transition-colors", it.status === "done" && it.processingStatus !== "failed" ? "bg-emerald-500/10 text-emerald-400" : it.status === "error" || it.processingStatus === "failed" ? "bg-rose-500/10 text-rose-400" : "bg-cyan-300/10 text-cyan-100")}>
                   <FileText className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -276,7 +287,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
                 {it.status === "uploading" ? (
                   <span className="text-xs font-medium text-cyan-400 w-12 text-right">{it.progress}%</span>
                 ) : it.status === "done" ? (
-                  <motion.span initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-xs font-medium text-emerald-400">Uploaded</motion.span>
+                  <motion.span initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={cn("text-xs font-medium", it.processingStatus === "failed" ? "text-rose-400" : "text-emerald-400")}>{it.processingStatus === "failed" ? "Processing issue" : it.processingStatus === "queued" ? "Queued" : "Uploaded"}</motion.span>
                 ) : it.status === "error" ? (
                   <span className="text-xs font-medium text-rose-400">Failed</span>
                 ) : (

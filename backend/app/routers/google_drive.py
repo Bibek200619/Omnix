@@ -19,14 +19,45 @@ from ..integrations.google_drive import (
     download_drive_file_bytes,
     parse_oauth_state,
 )
-from ..services.supabase_service import SupabaseServiceError, insert_one
+from ..jobs import queue as job_queue
+from ..services.document_intelligence_service import ExtractionDiagnostics, extraction_columns_payload
+from ..services.supabase_service import SupabaseServiceError, insert_one, update_one
 from ..services.file_storage import sanitize_filename, save_bytes_to_user_upload
-from ..routers.upload import _extract_text_from_bytes
-from ..rag.ingestion import RAGIngestionPipeline
-from ..rag.startup import get_vector_store
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/integrations/google_drive", tags=["integrations"])
+
+
+async def _update_import_processing_state(
+    file_row: dict[str, Any],
+    *,
+    user_id: str,
+    processing_status: str,
+    processing_error: str | None = None,
+    processing_job_id: str | None = None,
+) -> dict[str, Any]:
+    metadata = dict(file_row.get("metadata") or {})
+    metadata["processing_status"] = processing_status
+    if processing_error:
+        metadata["processing_error"] = processing_error
+    else:
+        metadata.pop("processing_error", None)
+    if processing_job_id:
+        metadata["processing_job_id"] = processing_job_id
+
+    payload = {
+        "metadata": metadata,
+        "processing_status": processing_status,
+        "processing_error": processing_error,
+        "processing_job_id": processing_job_id,
+    }
+    try:
+        updated = await update_one("files", {"id": str(file_row["id"]), "user_id": user_id}, payload)
+        return updated or {**file_row, **payload}
+    except SupabaseServiceError:
+        logger.warning("File processing columns are unavailable for Google Drive import; retrying metadata only.")
+        updated = await update_one("files", {"id": str(file_row["id"]), "user_id": user_id}, {"metadata": metadata})
+        return updated or {**file_row, "metadata": metadata}
 
 
 @router.get("/connect")
@@ -125,18 +156,8 @@ async def import_file(workspace_id: str, file_id: str, current_user: dict[str, A
         logger.exception("Failed to save downloaded file: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to store file")
 
-    # Extract text using upload helpers
-    try:
-        text = _extract_text_from_bytes(filename, file_meta.get("mimeType"), data)
-        normalized = "\n\n".join([line.strip() for line in text.splitlines() if line.strip()])
-    except Exception:
-        logger.exception("Text extraction failed; using raw bytes decode fallback")
-        try:
-            normalized = data.decode("utf-8", errors="ignore")
-        except Exception:
-            normalized = ""
-
     # Persist file metadata
+    processing_diagnostics = ExtractionDiagnostics(extraction_status="processing")
     payload = {
         "user_id": user_id,
         "workspace_id": workspace_id,
@@ -144,7 +165,16 @@ async def import_file(workspace_id: str, file_id: str, current_user: dict[str, A
         "file_type": file_meta.get("mimeType"),
         "size_bytes": len(data),
         "storage_path": storage_path,
-        "metadata": {"source": "google_drive", "drive_id": file_id, "extracted_preview": normalized[:2000]},
+        "metadata": {
+            "source": "google_drive",
+            "drive_id": file_id,
+            "processing_status": "uploaded",
+            **processing_diagnostics.to_metadata(),
+        },
+        "processing_status": "uploaded",
+        "processing_error": None,
+        "processing_job_id": None,
+        **extraction_columns_payload(processing_diagnostics),
     }
     try:
         file_row = await insert_one("files", payload)
@@ -152,12 +182,40 @@ async def import_file(workspace_id: str, file_id: str, current_user: dict[str, A
         logger.exception("Failed to persist file metadata")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to register file")
 
-    # Ingest into RAG index
     try:
-        vector_store = get_vector_store()
-        pipeline = RAGIngestionPipeline(vector_store)
-        await pipeline.ingest_text(normalized, user_id, document_id=file_row.get("id"), workspace_id=workspace_id)
+        job_id = await job_queue.enqueue_job(
+            {"type": "ingest_file", "file_id": str(file_row.get("id")), "user_id": user_id, "workspace_id": workspace_id}
+        )
+        file_row = await _update_import_processing_state(
+            file_row,
+            user_id=user_id,
+            processing_status="queued",
+            processing_job_id=job_id,
+        )
+    except job_queue.JobEnqueueError as exc:
+        if exc.persisted:
+            file_row = await _update_import_processing_state(
+                file_row,
+                user_id=user_id,
+                processing_status="queued",
+                processing_error="Background processing was queued, but the worker queue is temporarily unavailable.",
+                processing_job_id=exc.job_id,
+            )
+        else:
+            logger.exception("Failed to persist Google Drive ingestion job for file %s.", file_row.get("id"))
+            file_row = await _update_import_processing_state(
+                file_row,
+                user_id=user_id,
+                processing_status="failed",
+                processing_error="File processing could not be queued. Please retry the import.",
+            )
     except Exception:
-        logger.exception("Ingestion failed; continuing")
+        logger.exception("Failed to enqueue Google Drive ingestion job for file %s.", file_row.get("id"))
+        file_row = await _update_import_processing_state(
+            file_row,
+            user_id=user_id,
+            processing_status="failed",
+            processing_error="File processing could not be queued. Please retry the import.",
+        )
 
-    return {"status": "imported", "file": file_row}
+    return {"status": "imported", "processing_status": file_row.get("processing_status"), "file": file_row}
