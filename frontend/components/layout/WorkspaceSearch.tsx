@@ -4,11 +4,15 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEv
 import {
   ArrowUpRight,
   BadgeCheck,
+  Bell,
   ClipboardCheck,
   Compass,
+  FileText,
   Loader2,
   MessagesSquare,
   Search,
+  Settings,
+  UsersRound,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -26,6 +30,12 @@ const groups: Array<{ key: GroupKey; label: string; icon: LucideIcon }> = [
   { key: "decisions", label: "Decisions", icon: BadgeCheck },
   { key: "initiatives", label: "Initiatives", icon: Compass },
   { key: "conversations", label: "Conversations", icon: MessagesSquare },
+  { key: "files", label: "Files", icon: FileText },
+  { key: "documents", label: "Document Text", icon: FileText },
+  { key: "sources", label: "Sources", icon: FileText },
+  { key: "members", label: "Team Members", icon: UsersRound },
+  { key: "mentions", label: "Mentions", icon: Bell },
+  { key: "workspaces", label: "Workspace Metadata", icon: Settings },
 ];
 
 const emptyResults: WorkspaceSearchResponse = {
@@ -33,12 +43,24 @@ const emptyResults: WorkspaceSearchResponse = {
   tasks: [],
   initiatives: [],
   decisions: [],
+  files: [],
+  documents: [],
+  sources: [],
+  members: [],
+  mentions: [],
+  workspaces: [],
 };
 
 function resultTypeLabel(result: WorkspaceSearchResult) {
   if (result.type === "conversation") return "Conversation";
   if (result.type === "initiative") return "Initiative";
   if (result.type === "decision") return "Decision";
+  if (result.type === "file") return "File";
+  if (result.type === "document") return "Document Text";
+  if (result.type === "source") return "Source";
+  if (result.type === "member") return "Team Member";
+  if (result.type === "mention") return "Mention";
+  if (result.type === "workspace") return "Workspace";
   return "Task";
 }
 
@@ -90,7 +112,7 @@ export function WorkspaceSearch() {
         .searchWorkspace(activeWorkspaceId, trimmedQuery)
         .then((incoming) => {
           if (requestId !== requestRef.current) return;
-          setResults(incoming);
+          setResults({ ...emptyResults, ...incoming });
         })
         .catch((err) => {
           if (requestId !== requestRef.current) return;
@@ -275,7 +297,7 @@ export function WorkspaceSearch() {
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100/45">Workspace search</p>
                 <div className="mt-3 grid gap-2 text-sm text-[var(--omnix-text-2)]">
                   <div className="rounded-xl border border-[var(--omnix-border)] bg-white/[0.025] p-3">
-                    Search tasks, decisions, initiatives, and conversations inside the active workspace.
+                    Search tasks, decisions, initiatives, conversations, files, document text, sources, team members, mentions, and workspace metadata.
                   </div>
                   <div className="rounded-xl border border-[var(--omnix-border)] bg-black/10 p-3 text-xs leading-5 text-[var(--omnix-text-3)]">
                     Start with a title, owner phrase, decision reason, or message keyword.

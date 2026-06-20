@@ -59,6 +59,12 @@ const searchGroups: Array<{ key: SearchGroupKey; label: string; icon: LucideIcon
   { key: "decisions", label: "Decisions", icon: BadgeCheck },
   { key: "initiatives", label: "Initiatives", icon: Compass },
   { key: "conversations", label: "Conversations", icon: MessagesSquare },
+  { key: "files", label: "Files", icon: FileText },
+  { key: "documents", label: "Document Text", icon: FileText },
+  { key: "sources", label: "Sources", icon: FileText },
+  { key: "members", label: "Team Members", icon: UsersRound },
+  { key: "mentions", label: "Mentions", icon: Bell },
+  { key: "workspaces", label: "Workspace Metadata", icon: Settings },
 ];
 
 const emptyResults: WorkspaceSearchResponse = {
@@ -66,6 +72,12 @@ const emptyResults: WorkspaceSearchResponse = {
   tasks: [],
   initiatives: [],
   decisions: [],
+  files: [],
+  documents: [],
+  sources: [],
+  members: [],
+  mentions: [],
+  workspaces: [],
 };
 
 const quickActions: PaletteItem[] = [
@@ -194,6 +206,12 @@ function searchResultTypeLabel(result: WorkspaceSearchResult) {
   if (result.type === "conversation") return "Conversation";
   if (result.type === "initiative") return "Initiative";
   if (result.type === "decision") return "Decision";
+  if (result.type === "file") return "File";
+  if (result.type === "document") return "Document Text";
+  if (result.type === "source") return "Source";
+  if (result.type === "member") return "Team Member";
+  if (result.type === "mention") return "Mention";
+  if (result.type === "workspace") return "Workspace";
   return "Task";
 }
 
@@ -201,6 +219,10 @@ function searchResultIcon(result: WorkspaceSearchResult): LucideIcon {
   if (result.type === "conversation") return MessagesSquare;
   if (result.type === "initiative") return Compass;
   if (result.type === "decision") return BadgeCheck;
+  if (result.type === "file" || result.type === "document" || result.type === "source") return FileText;
+  if (result.type === "member") return UsersRound;
+  if (result.type === "mention") return Bell;
+  if (result.type === "workspace") return Settings;
   return ClipboardCheck;
 }
 
@@ -275,7 +297,18 @@ export function CommandPalette() {
           acc[group.key] = results[group.key].map((result) => searchResultItem(result, group.key));
           return acc;
         },
-        { conversations: [], tasks: [], initiatives: [], decisions: [] },
+        {
+          conversations: [],
+          tasks: [],
+          initiatives: [],
+          decisions: [],
+          files: [],
+          documents: [],
+          sources: [],
+          members: [],
+          mentions: [],
+          workspaces: [],
+        },
       ),
     [results],
   );
@@ -371,7 +404,7 @@ export function CommandPalette() {
         .searchWorkspace(activeWorkspaceId, trimmedQuery)
         .then((incoming) => {
           if (requestId !== requestRef.current) return;
-          setResults(incoming);
+          setResults({ ...emptyResults, ...incoming });
         })
         .catch((err) => {
           if (requestId !== requestRef.current) return;
