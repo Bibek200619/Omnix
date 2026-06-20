@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+import { fetchConversationSnapshot } from "@/components/chat/chatConversationSnapshot";
 import type { Message } from "@/components/chat/types";
 import {
   type ChatRef,
   type SenderLookup,
-  fetchConversationSnapshot,
   reconcileMessageLists,
 } from "@/components/chat/useChatMessages";
 import { logClientError } from "@/lib/errors";
