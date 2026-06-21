@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, status
 
 from ..core.security import get_current_user
+from ..services.workspace_service import require_workspace_access
 from ..schemas.workspace_decisions import (
     DecisionCandidateListRead,
     DecisionCandidateMetricCreate,
@@ -43,6 +44,7 @@ async def get_workspace_decisions(
     workspace_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await list_decisions(workspace_id=workspace_id, user_id=_user_id(current_user))
 
 
@@ -52,6 +54,7 @@ async def post_workspace_decision(
     payload: WorkspaceDecisionCreate,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await create_decision(
         workspace_id=workspace_id,
         user_id=_user_id(current_user),
@@ -71,6 +74,7 @@ async def post_workspace_decision_from_message(
     payload: WorkspaceDecisionFromMessageCreate,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await create_decision_from_message(
         workspace_id=workspace_id,
         channel_id=channel_id,
@@ -86,6 +90,7 @@ async def post_conversation_decision_candidates(
     channel_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await conversation_decision_candidates(
         workspace_id=workspace_id,
         channel_id=channel_id,
@@ -99,6 +104,7 @@ async def post_document_decision_candidates(
     file_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await document_decision_candidates(
         workspace_id=workspace_id,
         file_id=file_id,
@@ -112,6 +118,7 @@ async def post_decision_candidate_metric(
     payload: DecisionCandidateMetricCreate,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> None:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     await log_candidate_metrics(
         workspace_id=workspace_id,
         user_id=_user_id(current_user),
@@ -128,6 +135,7 @@ async def get_workspace_decision(
     decision_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await get_decision(
         workspace_id=workspace_id,
         decision_id=decision_id,
@@ -142,6 +150,7 @@ async def patch_workspace_decision_status(
     payload: WorkspaceDecisionStatusUpdate,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await update_decision_status(
         workspace_id=workspace_id,
         decision_id=decision_id,
@@ -157,6 +166,7 @@ async def post_workspace_decision_link_task(
     payload: WorkspaceDecisionLinkTask,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await link_task_to_decision(
         workspace_id=workspace_id,
         decision_id=decision_id,
@@ -172,6 +182,7 @@ async def delete_workspace_decision_link_task(
     task_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await unlink_task_from_decision(
         workspace_id=workspace_id,
         decision_id=decision_id,
@@ -187,6 +198,7 @@ async def patch_workspace_decision_initiative(
     payload: WorkspaceDecisionLinkInitiative,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await link_initiative_to_decision(
         workspace_id=workspace_id,
         decision_id=decision_id,
