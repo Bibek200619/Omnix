@@ -74,8 +74,15 @@ def test_retrieval_trace_redacts_queries_and_chunk_previews(monkeypatch) -> None
 
 
 def test_ai_provider_logging_does_not_keep_raw_prompt_or_error_body_previews() -> None:
-    chat_service = Path("backend/app/services/chat_service.py").read_text()
-    embeddings_provider = Path("backend/app/embeddings/openai_provider.py").read_text()
+    path = Path("backend/app/services/chat_service.py")
+    if not path.exists():
+        path = Path("app/services/chat_service.py")
+    chat_service = path.read_text()
+    
+    emb_path = Path("backend/app/embeddings/openai_provider.py")
+    if not emb_path.exists():
+        emb_path = Path("app/embeddings/openai_provider.py")
+    embeddings_provider = emb_path.read_text()
 
     assert '(prompt or "")[:500]' not in chat_service
     assert "exc.response.text[:500]" not in chat_service

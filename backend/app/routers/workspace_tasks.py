@@ -17,7 +17,7 @@ from ..schemas.workspace_tasks import (
     WorkspaceTaskUpdate,
 )
 from ..services.chat_service import ModelServiceError, generate_ai_response
-from ..services.workspace_service import utc_now_iso
+from ..services.workspace_service import require_workspace_access, utc_now_iso
 from ..services.workspace_task_service import (
     create_task,
     create_task_from_assistance,
@@ -48,6 +48,7 @@ async def get_tasks(
     workspace_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await list_tasks(workspace_id=workspace_id, user_id=_user_id(current_user))
 
 
@@ -57,6 +58,7 @@ async def post_task(
     payload: WorkspaceTaskCreate,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await create_task(
         workspace_id=workspace_id,
         user_id=_user_id(current_user),
@@ -69,6 +71,7 @@ async def get_momentum(
     workspace_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await task_momentum(workspace_id=workspace_id, user_id=_user_id(current_user))
 
 
@@ -80,6 +83,7 @@ async def post_task_from_message(
     payload: WorkspaceTaskFromMessageCreate,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await create_task_from_message(
         workspace_id=workspace_id,
         channel_id=channel_id,
@@ -96,6 +100,7 @@ async def post_task_from_assistance(
     payload: WorkspaceTaskFromAssistanceCreate,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await create_task_from_assistance(
         workspace_id=workspace_id,
         channel_id=channel_id,
@@ -110,6 +115,7 @@ async def assist_execution(
     request: WorkspaceTaskAssistanceRequest,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     tasks = await task_transcript_for_assistance(workspace_id=workspace_id, user_id=_user_id(current_user))
     if not tasks:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="There are no recorded tasks to assist yet.")
@@ -153,6 +159,7 @@ async def patch_task(
     payload: WorkspaceTaskUpdate,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await update_task(
         workspace_id=workspace_id,
         task_id=task_id,

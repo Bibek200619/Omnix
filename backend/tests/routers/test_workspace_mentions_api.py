@@ -19,6 +19,15 @@ def _mentions_client(current_user: dict[str, Any] | None = None) -> TestClient:
     return TestClient(app)
 
 
+import pytest
+from app.services.workspace_service import WorkspaceAccess
+
+@pytest.fixture(autouse=True)
+def _mock_workspace_access(monkeypatch):
+    async def allow_access(*args, **kwargs):
+        return WorkspaceAccess(workspace={"id": "ws-1", "user_id": "user-2"}, role="member")
+    monkeypatch.setattr(workspace_mentions, "require_workspace_access", allow_access)
+
 def test_workspace_mentions_route_is_registered_on_production_app() -> None:
     client = TestClient(production_app)
 
