@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import logging
-from typing import Any, Literal
+from typing import Any
 
 from fastapi import HTTPException, Request, status
-from starlette.concurrency import run_in_threadpool
 
-from ..db.supabase_client import get_supabase
 from .supabase_service import (
     SupabaseServiceError,
     delete_many_trusted,
@@ -18,181 +14,45 @@ from .supabase_service import (
     select_all_trusted,
     select_one_trusted,
 )
-from .profile_service import get_user_profile_map
-from .workspace_cognition import WorkspaceFocus, normalize_workspace_focus
+from .workspace_cognition import normalize_workspace_focus
+from .workspace_common import (
+    GLOBAL_SPACE_NAME,
+    HIERARCHY_WORKSPACE_COLUMNS,
+    LEGACY_WORKSPACE_COLUMNS,
+    MEMBERS_PREVIEW_LIMIT,
+    WORKSPACE_COLUMNS,
+    WORKSPACE_INVITE_COLUMNS,
+    WORKSPACE_MEMBER_COLUMNS,
+    WORKSPACE_TYPES,
+    WorkspaceAIMode,
+    WorkspaceAccess,
+    WorkspaceInviteStatus,
+    WorkspaceRole,
+    WorkspaceType,
+    database_error as _database_error,
+    is_subspace,
+    is_super_workspace,
+    normalize_ai_specialization,
+    normalize_email,
+    normalize_intelligence_preferences,
+    normalize_operational_label,
+    normalize_workspace_record,
+    normalize_workspace_role,
+    normalize_workspace_type,
+    utc_now_iso,
+    workspace_not_found as _workspace_not_found,
+    workspace_validation_error as _workspace_validation_error,
+)
+from .workspace_membership_service import (
+    assign_member_to_subspace,
+    get_profiles,
+    hydrate_member_records as _hydrate_member_records,
+    list_potential_subspace_members,
+    list_workspace_members,
+    membership_source_workspace,
+)
 
 logger = logging.getLogger(__name__)
-
-WORKSPACE_COLUMNS = (
-    "id,user_id,name,description,parent_workspace_id,workspace_type,is_global,"
-    "expertise_area,workspace_focus,ai_specialization,ai_instructions,intelligence_preferences,"
-    "created_at,updated_at"
-)
-HIERARCHY_WORKSPACE_COLUMNS = "id,user_id,name,description,parent_workspace_id,workspace_type,is_global,created_at,updated_at"
-LEGACY_WORKSPACE_COLUMNS = "id,user_id,name,description,created_at,updated_at"
-WORKSPACE_MEMBER_COLUMNS = "workspace_id,user_id,role,operational_label,created_at,updated_at"
-WORKSPACE_INVITE_COLUMNS = (
-    "id,workspace_id,email,role,status,invited_by,accepted_by_user_id,"
-    "created_at,updated_at,accepted_at"
-)
-MEMBERS_PREVIEW_LIMIT = 3
-
-WorkspaceRole = Literal["founder", "co_owner", "team_lead", "member"]
-WorkspaceInviteStatus = Literal["pending", "accepted", "declined", "revoked"]
-WorkspaceType = Literal["workspace", "super_workspace", "subworkspace", "global_workspace"]
-WorkspaceAIMode = WorkspaceFocus
-WORKSPACE_TYPES: set[str] = {"workspace", "super_workspace", "subworkspace", "global_workspace", "super", "sub"}
-WORKSPACE_AI_MODES: set[str] = {"general", "engineering", "design", "research", "strategy"}
-GLOBAL_SPACE_NAME = "Global"
-
-
-@dataclass(slots=True)
-class WorkspaceAccess:
-    workspace: dict[str, Any]
-    role: WorkspaceRole
-    membership_workspace: dict[str, Any] | None = None
-
-    @property
-    def workspace_id(self) -> str:
-        return str(self.workspace["id"])
-
-    @property
-    def membership_workspace_id(self) -> str:
-        workspace = self.membership_workspace or self.workspace
-        return str(workspace["id"])
-
-    @property
-    def is_founder(self) -> bool:
-        return self.role == "founder"
-
-    @property
-    def is_owner(self) -> bool:
-        return self.is_founder
-
-
-def normalize_workspace_role(
-    value: Any,
-    *,
-    member_user_id: str | None = None,
-    owner_user_id: str | None = None,
-) -> WorkspaceRole:
-    if owner_user_id and member_user_id and member_user_id == owner_user_id:
-        return "founder"
-
-    role = str(value or "").strip().lower().replace("-", "_")
-    if role == "founder":
-        return "founder"
-    if role == "owner":
-        return "founder" if owner_user_id and member_user_id == owner_user_id else "co_owner"
-    if role == "co_owner" or role == "sub_leader":
-        return "co_owner"
-    if role == "team_lead":
-        return "team_lead"
-    return "member"
-
-
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def normalize_email(email: str) -> str:
-    return email.strip().lower()
-
-
-def normalize_workspace_type(value: Any, *, parent_workspace_id: str | None = None) -> WorkspaceType:
-    workspace_type = str(value or "").strip().lower().replace("-", "_")
-    if workspace_type == "super":
-        return "super_workspace"
-    if workspace_type == "sub":
-        return "subworkspace"
-    if workspace_type == "global":
-        return "global_workspace"
-    if workspace_type == "workspace":
-        return "workspace"
-
-    if workspace_type in WORKSPACE_TYPES:
-        return workspace_type  # type: ignore[return-value]
-
-    if parent_workspace_id:
-        return "subworkspace"
-    return "super_workspace"
-
-
-def normalize_workspace_record(workspace: dict[str, Any]) -> dict[str, Any]:
-    normalized = dict(workspace)
-    parent_workspace_id = str(normalized.get("parent_workspace_id") or "").strip() or None
-    normalized["parent_workspace_id"] = parent_workspace_id
-    normalized["workspace_type"] = normalize_workspace_type(
-        normalized.get("workspace_type"),
-        parent_workspace_id=parent_workspace_id,
-    )
-    normalized["is_global"] = bool(normalized.get("is_global"))
-    normalized["expertise_area"] = _clean_optional_text(normalized.get("expertise_area"))
-    workspace_focus = normalize_workspace_focus(
-        normalized.get("workspace_focus") or normalized.get("ai_specialization")
-    )
-    normalized["workspace_focus"] = workspace_focus
-    # Compatibility for older clients that still read/write ai_specialization.
-    normalized["ai_specialization"] = workspace_focus
-    normalized["ai_instructions"] = _clean_optional_text(normalized.get("ai_instructions"))
-    normalized["intelligence_preferences"] = normalize_intelligence_preferences(
-        normalized.get("intelligence_preferences"),
-        is_global=normalized["is_global"],
-    )
-    return normalized
-
-
-def _clean_optional_text(value: Any) -> str | None:
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None
-
-
-def normalize_operational_label(value: Any) -> str | None:
-    label = _clean_optional_text(value)
-    return label[:80] if label else None
-
-
-def normalize_ai_specialization(value: Any) -> WorkspaceAIMode:
-    return normalize_workspace_focus(value)
-
-
-def normalize_intelligence_preferences(
-    value: Any,
-    *,
-    is_global: bool = False,
-) -> dict[str, Any]:
-    preferences = dict(value) if isinstance(value, Mapping) else {}
-    retrieval_scope = str(preferences.get("retrieval_scope") or "").strip().lower()
-    if retrieval_scope not in {"workspace", "global"}:
-        retrieval_scope = "global" if is_global else "workspace"
-    source_permissions = str(preferences.get("source_permissions") or "").strip().lower()
-    if source_permissions not in {"workspace_only", "inherit_global", "organization"}:
-        source_permissions = "organization" if is_global else "workspace_only"
-    memory_enabled = preferences.get("memory_enabled")
-    if not isinstance(memory_enabled, bool):
-        memory_enabled = True
-    return {
-        **preferences,
-        "retrieval_scope": retrieval_scope,
-        "source_permissions": source_permissions,
-        "memory_enabled": memory_enabled,
-    }
-
-
-def is_super_workspace(workspace: dict[str, Any]) -> bool:
-    normalized = normalize_workspace_record(workspace)
-    return normalized["workspace_type"] == "super_workspace" and normalized.get("parent_workspace_id") is None
-
-
-def is_subspace(workspace: dict[str, Any]) -> bool:
-    normalized = normalize_workspace_record(workspace)
-    return normalized["workspace_type"] in {"subworkspace", "global_workspace"} or normalized.get("parent_workspace_id") is not None
-
-
-def _workspace_validation_error(detail: str) -> HTTPException:
-    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
 
 
 def user_email_from_claims(current_user: Any) -> str | None:
@@ -213,20 +73,6 @@ def active_workspace_id_from_request(request: Request) -> str | None:
 
     workspace_id = raw_value.strip()
     return workspace_id or None
-
-
-def _database_error() -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Internal server error",
-    )
-
-
-def _workspace_not_found() -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Workspace not found.",
-    )
 
 
 async def _select_workspace_record(filters: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -394,358 +240,6 @@ def can_manage_workspace_resource(
     current_user_id: str,
 ) -> bool:
     return access.is_owner or (record_user_id is not None and record_user_id == current_user_id)
-
-
-def _display_name_for_user(user: Any) -> str | None:
-    metadata = getattr(user, "user_metadata", None) or {}
-    for key in ("full_name", "name"):
-        value = metadata.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return None
-
-
-def _avatar_label(full_name: str | None, email: str | None, user_id: str) -> str:
-    for candidate in (full_name, email, user_id):
-        if isinstance(candidate, str):
-            normalized = candidate.strip()
-            if normalized:
-                return normalized[0].upper()
-    return "U"
-
-
-def _lookup_profiles_sync(user_ids: list[str]) -> dict[str, dict[str, Any]]:
-    profiles: dict[str, dict[str, Any]] = {}
-    auth_admin = get_supabase().auth.admin
-
-    for user_id in sorted({value for value in user_ids if value}):
-        email: str | None = None
-        full_name: str | None = None
-
-        try:
-            user_response = auth_admin.get_user_by_id(user_id)
-            user = getattr(user_response, "user", None)
-            email = getattr(user, "email", None)
-            full_name = _display_name_for_user(user)
-        except Exception:
-            logger.exception("Failed to resolve user profile for %s.", user_id)
-
-        profiles[user_id] = {
-            "email": email,
-            "full_name": full_name,
-            "handle": None,
-            "avatar_url": None,
-            "avatar_label": _avatar_label(full_name, email, user_id),
-        }
-
-    return profiles
-
-
-async def get_profiles(user_ids: list[str]) -> dict[str, dict[str, Any]]:
-    if not user_ids:
-        return {}
-    auth_profiles = await run_in_threadpool(_lookup_profiles_sync, user_ids)
-    app_profiles = await get_user_profile_map(user_ids)
-
-    for user_id, app_profile in app_profiles.items():
-        profile = auth_profiles.setdefault(
-            user_id,
-            {
-                "email": None,
-                "full_name": None,
-                "handle": None,
-                "avatar_url": None,
-                "avatar_label": _avatar_label(None, None, user_id),
-            },
-        )
-        display_name = app_profile.get("display_name") or profile.get("full_name")
-        avatar_url = app_profile.get("avatar_url") or profile.get("avatar_url")
-        handle = app_profile.get("username") or profile.get("handle")
-        profile["full_name"] = display_name
-        profile["avatar_url"] = avatar_url
-        profile["handle"] = handle
-        profile["avatar_label"] = _avatar_label(display_name, profile.get("email") or handle, user_id)
-
-    return auth_profiles
-
-
-def _hydrate_member_records(
-    workspace: dict[str, Any],
-    member_rows: list[dict[str, Any]],
-    profiles: dict[str, dict[str, Any]],
-    *,
-    response_workspace_id: str | None = None,
-) -> list[dict[str, Any]]:
-    workspace = normalize_workspace_record(workspace)
-    owner_user_id = str(workspace.get("user_id") or "")
-    output_workspace_id = response_workspace_id or str(workspace.get("id"))
-    member_map: dict[str, dict[str, Any]] = {
-        str(row.get("user_id")): row
-        for row in member_rows
-        if row.get("user_id")
-    }
-
-    if owner_user_id and owner_user_id not in member_map:
-        member_map[owner_user_id] = {
-            "workspace_id": output_workspace_id,
-            "user_id": owner_user_id,
-            "role": "founder",
-            "created_at": workspace.get("created_at"),
-            "updated_at": workspace.get("updated_at"),
-        }
-
-    members: list[dict[str, Any]] = []
-    for member_user_id, row in member_map.items():
-        role = normalize_workspace_role(
-            row.get("role"),
-            member_user_id=member_user_id,
-            owner_user_id=owner_user_id,
-        )
-        profile = profiles.get(member_user_id, {})
-        members.append(
-            {
-                "workspace_id": output_workspace_id,
-                "user_id": member_user_id,
-                "role": role,
-                "email": profile.get("email"),
-                "full_name": profile.get("full_name"),
-                "handle": profile.get("handle"),
-                "avatar_url": profile.get("avatar_url"),
-                "avatar_label": profile.get("avatar_label") or _avatar_label(None, None, member_user_id),
-                "operational_label": normalize_operational_label(row.get("operational_label")),
-                "created_at": row.get("created_at"),
-                "updated_at": row.get("updated_at"),
-            }
-        )
-
-    members.sort(
-        key=lambda item: (
-            {"founder": 0, "co_owner": 1, "member": 2}.get(item["role"], 3),
-            (item.get("full_name") or item.get("email") or item["user_id"]).lower(),
-        )
-    )
-    return members
-
-
-async def membership_source_workspace(workspace: dict[str, Any]) -> dict[str, Any]:
-    normalized = normalize_workspace_record(workspace)
-    parent_workspace_id = normalized.get("parent_workspace_id")
-    if not parent_workspace_id:
-        return normalized
-
-    # Global workspaces inherit membership from the parent super workspace.
-    # Private subspaces return ONLY explicitly assigned members.
-    if not normalized.get("is_global"):
-        return normalized
-
-    parent_workspace = await _select_workspace_record({"id": str(parent_workspace_id)})
-
-    if parent_workspace is None:
-        return normalized
-
-    parent_workspace = normalize_workspace_record(parent_workspace)
-    return parent_workspace if is_super_workspace(parent_workspace) else normalized
-
-
-async def list_workspace_members(
-    workspace: dict[str, Any],
-) -> list[dict[str, Any]]:
-    requested_workspace = normalize_workspace_record(workspace)
-    membership_workspace = await membership_source_workspace(requested_workspace)
-    membership_workspace_id = str(membership_workspace["id"])
-
-    try:
-        member_rows = await select_all_trusted(
-            "workspace_members",
-            WORKSPACE_MEMBER_COLUMNS,
-            filters={"workspace_id": membership_workspace_id},
-            order_by="created_at",
-            desc=False,
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-
-    user_ids = [str(membership_workspace.get("user_id") or "")]
-    user_ids.extend(str(row.get("user_id") or "") for row in member_rows)
-    profiles = await get_profiles(user_ids)
-    return _hydrate_member_records(
-        membership_workspace,
-        member_rows,
-        profiles,
-        response_workspace_id=str(requested_workspace["id"]),
-    )
-
-
-async def list_potential_subspace_members(
-    workspace_id: str,
-    user_id: str,
-) -> list[dict[str, Any]]:
-    """
-    Returns organizational members (from parent super workspace) 
-    eligible for assignment into the target subspace.
-    """
-    access = await require_workspace_management_access(workspace_id, user_id)
-    workspace = normalize_workspace_record(access.workspace)
-    
-    if not is_subspace(workspace) or not workspace.get("parent_workspace_id"):
-        raise _workspace_validation_error("Potential members can only be listed for subspaces.")
-        
-    parent_workspace_id = str(workspace["parent_workspace_id"])
-    
-    # 1. Get all members of the parent super workspace
-    try:
-        parent_members = await select_all_trusted(
-            "workspace_members",
-            WORKSPACE_MEMBER_COLUMNS,
-            filters={"workspace_id": parent_workspace_id},
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-        
-    # 2. Get current members of this subspace to exclude them
-    try:
-        current_members = await select_all_trusted(
-            "workspace_members",
-            WORKSPACE_MEMBER_COLUMNS,
-            filters={"workspace_id": workspace_id},
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-        
-    current_user_ids = {str(m["user_id"]) for m in current_members}
-    
-    # 3. Filter out already assigned members
-    potential_user_ids = [
-        str(m["user_id"]) for m in parent_members 
-        if str(m["user_id"]) not in current_user_ids
-    ]
-    
-    # Also include the parent owner if not already a member
-    parent_workspace = await _select_workspace_record({"id": parent_workspace_id})
-    if parent_workspace:
-        parent_owner_id = str(parent_workspace.get("user_id") or "")
-        if parent_owner_id and parent_owner_id not in current_user_ids:
-            if parent_owner_id not in potential_user_ids:
-                potential_user_ids.append(parent_owner_id)
-
-    if not potential_user_ids:
-        return []
-        
-    profiles = await get_profiles(list(set(potential_user_ids)))
-    
-    results = []
-    for uid in potential_user_ids:
-        profile = profiles.get(uid, {})
-        results.append({
-            "user_id": uid,
-            "email": profile.get("email"),
-            "full_name": profile.get("full_name"),
-            "handle": profile.get("handle"),
-            "avatar_url": profile.get("avatar_url"),
-            "avatar_label": profile.get("avatar_label") or "U",
-        })
-        
-    # Sort by name
-    results.sort(key=lambda x: (x.get("full_name") or x.get("email") or x["user_id"]).lower())
-    return results
-
-
-async def assign_member_to_subspace(
-    workspace_id: str,
-    target_user_id: str,
-    role: str,
-    actor_user_id: str,
-) -> dict[str, Any]:
-    """
-    Assigns an existing organizational member to a private subspace.
-    """
-    # 1. Require management access
-    access = await require_workspace_management_access(workspace_id, actor_user_id)
-    workspace = normalize_workspace_record(access.workspace)
-    workspace_type = workspace.get("workspace_type") or "subworkspace"
-
-    if not is_subspace(workspace) or not workspace.get("parent_workspace_id"):
-         raise _workspace_validation_error("Members can only be assigned to subspaces.")
-
-    # 2. Permission enforcement
-    if not OrganizationalAccessAuthority.can_manage_members(access.role, workspace_type):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Insufficient permissions to assign members."
-        )
-
-    next_role = normalize_workspace_role(role)
-    if next_role == "founder":
-        raise _workspace_validation_error("Founder role cannot be assigned.")
-        
-    # Permission enforcement: can they assign leadership roles?
-    if next_role != "member" and not OrganizationalAccessAuthority.can_assign_leaders(access.role, workspace_type):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="You do not have permission to assign leadership roles in this subspace."
-        )
-
-    parent_workspace_id = str(workspace["parent_workspace_id"])
-
-    # 3. Verify target user belongs to the organization (parent super workspace)
-    try:
-        org_membership = await select_one_trusted(
-            "workspace_members",
-            "user_id",
-            {"workspace_id": parent_workspace_id, "user_id": target_user_id}
-        )
-        if not org_membership:
-             parent_ws = await select_one_trusted("workspaces", "user_id", {"id": parent_workspace_id})
-             if not parent_ws or str(parent_ws.get("user_id")) != target_user_id:
-                 raise _workspace_validation_error("Target user does not belong to the organization.")
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-
-    # 4. Check for duplicate assignment
-    try:
-        existing = await select_one_trusted(
-            "workspace_members",
-            "user_id",
-            {"workspace_id": workspace_id, "user_id": target_user_id}
-        )
-        if existing:
-            raise _workspace_validation_error("User is already a member of this subspace.")
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-
-    # 5. Insert membership
-    timestamp = utc_now_iso()
-    try:
-        await insert_one(
-            "workspace_members",
-            {
-                "workspace_id": workspace_id,
-                "user_id": target_user_id,
-                "role": next_role,
-                "created_at": timestamp,
-                "updated_at": timestamp,
-            }
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-        
-    # 6. Return hydrated record
-    profiles = await get_profiles([target_user_id])
-    profile = profiles.get(target_user_id, {})
-    
-    return {
-        "workspace_id": workspace_id,
-        "user_id": target_user_id,
-        "role": next_role,
-        "email": profile.get("email"),
-        "full_name": profile.get("full_name"),
-        "handle": profile.get("handle"),
-        "avatar_url": profile.get("avatar_url"),
-        "avatar_label": profile.get("avatar_label") or "U",
-        "operational_label": None,
-        "created_at": timestamp,
-        "updated_at": timestamp,
-    }
 
 
 async def list_user_workspaces(user_id: str) -> list[dict[str, Any]]:
@@ -962,7 +456,7 @@ def _workspace_insert_payload(
     timestamp: str,
     workspace_focus: Any = "general",
 ) -> dict[str, Any]:
-    focus = normalize_workspace_focus(workspace_focus)
+    focus = normalize_ai_specialization(workspace_focus)
     return {
         "user_id": user_id,
         "name": _normalized_workspace_name(name),
