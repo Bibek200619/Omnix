@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
+
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from ..core.security import get_current_user
 from ..schemas.chat import FileCreate, FileRead
@@ -25,6 +27,7 @@ from ..services.workspace_collaboration_service import log_workspace_activity
 from .conversations import require_conversation_access
 
 router = APIRouter(prefix="/files", tags=["files"])
+logger = logging.getLogger(__name__)
 FILE_COLUMNS = (
     "id,user_id,workspace_id,conversation_id,file_name,file_type,size_bytes,storage_path,metadata,"
     "page_count,extractor_used,extracted_character_count,image_page_count,text_page_count,"
@@ -198,11 +201,11 @@ async def download_file(
     return FileResponse(path=safe_path, filename=filename, media_type=file_type)
 
 
-@router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{file_id}")
 async def delete_file(
     file_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
-) -> None:
+) -> Any:
     user_id = _user_id_from_claims(current_user)
     file_row, workspace_access = await _require_file_access(file_id, user_id)
 
@@ -230,6 +233,7 @@ async def delete_file(
             metadata={"file_id": file_id},
         )
 
+    storage_missing = False
     storage_path = file_row.get("storage_path")
     if storage_path:
         safe_path = resolve_managed_storage_path(storage_path)
@@ -237,8 +241,17 @@ async def delete_file(
             try:
                 safe_path.unlink()
             except FileNotFoundError:
-                pass
+                logger.warning(
+                    "Physical file already missing for file_id=%s path=%s",
+                    file_id, storage_path,
+                )
+                storage_missing = True
             except Exception as exc:
                 raise _database_error() from exc
 
-    return None
+    if storage_missing:
+        return JSONResponse(
+            content={"storage_missing": True},
+            status_code=200,
+        )
+    return Response(status_code=204)

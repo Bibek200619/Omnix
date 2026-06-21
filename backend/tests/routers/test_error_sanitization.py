@@ -12,7 +12,7 @@ from app.services.chat_service import ModelServiceError
 
 class DummyRequest:
     state = SimpleNamespace(user={"sub": "user-1"})
-    headers: dict[str, str] = {}
+    headers: dict[str, str] = {"X-Omnix-Workspace": "workspace-1"}
 
 
 def assert_detail_is_sanitized(exc: HTTPException, expected: str) -> None:
@@ -27,6 +27,8 @@ async def test_actions_sanitize_runtime_errors(monkeypatch: pytest.MonkeyPatch) 
     async def broken_action(*args, **kwargs):
         raise RuntimeError("raw postgres password leaked")
 
+    async def allow_access(*args, **kwargs): return object()
+    monkeypatch.setattr(actions, "require_workspace_access", allow_access)
     monkeypatch.setattr(actions, "get_vector_store", lambda: object())
     monkeypatch.setattr(actions, "ContextEngine", lambda *args, **kwargs: object())
     monkeypatch.setattr(actions.summarize_action, "run", broken_action)
@@ -81,6 +83,8 @@ async def test_task_assistance_sanitizes_model_errors(monkeypatch: pytest.Monkey
     async def broken_model(*args, **kwargs):
         raise ModelServiceError("raw ollama endpoint failed", 503)
 
+    async def allow_access(*args, **kwargs): return object()
+    monkeypatch.setattr(workspace_tasks, "require_workspace_access", allow_access)
     monkeypatch.setattr(workspace_tasks, "task_transcript_for_assistance", fake_tasks)
     monkeypatch.setattr(workspace_tasks, "generate_ai_response", broken_model)
 

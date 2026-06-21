@@ -14,6 +14,7 @@ from ..actions import tasks as tasks_action
 from ..actions import compare as compare_action
 from ..actions import faq as faq_action
 from ..actions import notes as notes_action
+from ..services.workspace_service import require_workspace_access
 
 router = APIRouter(prefix="/actions", tags=["actions"])
 logger = logging.getLogger(__name__)
@@ -32,6 +33,11 @@ async def run_action(request: Request, body: ActionRequest) -> Any:
 
     user_id = user.get("sub")
     workspace_id = request.headers.get("X-Omnix-Workspace") or None
+
+    if not workspace_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workspace ID is required")
+
+    await require_workspace_access(workspace_id, user_id)
 
     # Build unified context engine
     vector_store = get_vector_store()
@@ -61,6 +67,9 @@ async def run_action(request: Request, body: ActionRequest) -> Any:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to perform action.") from exc
 
     # Persist action output as a workspace artifact
+    persistence_warning = None
+    ingested = True
+
     try:
         from ..services.supabase_service import insert_one as db_insert_one
         from ..rag.ingestion import RAGIngestionPipeline
@@ -81,17 +90,25 @@ async def run_action(request: Request, body: ActionRequest) -> Any:
             vector_store = get_vector_store()
             ingestion = RAGIngestionPipeline(vector_store)
             await ingestion.ingest_text(artifact_payload["content"], user_id=user_id, document_id=str(artifact["id"]), workspace_id=workspace_id)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Vector ingestion failed for action=%s workspace_id=%s user_id=%s: %s",
+                action, workspace_id, user_id, exc,
+            )
+            ingested = False
 
         # augment result with artifact reference
         if isinstance(result, dict):
             result["artifact_id"] = str(artifact.get("id"))
-    except Exception:
-        # non-fatal: if persistence fails, still return result
-        pass
+    except Exception as exc:
+        logger.warning(
+            "Artifact persistence failed for action=%s workspace_id=%s user_id=%s: %s",
+            action, workspace_id, user_id, exc,
+        )
+        persistence_warning = "Result generated but could not be saved. Please retry."
+        ingested = False
 
-    return {
+    response = {
         "status": "completed",
         "steps": [
             "Retrieving documents...",
@@ -100,4 +117,8 @@ async def run_action(request: Request, body: ActionRequest) -> Any:
             "Finalizing report...",
         ],
         "result": result,
+        "ingested": ingested,
     }
+    if persistence_warning:
+        response["warning"] = persistence_warning
+    return response

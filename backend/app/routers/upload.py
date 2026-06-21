@@ -35,6 +35,38 @@ ALLOWED_MIMES = {
 
 UPLOAD_DIR = os.environ.get("OMNIX_UPLOAD_DIR", "./uploads")
 PROCESSING_COLUMNS = {"processing_status", "processing_error", "processing_job_id"}
+EXTENSION_WHITELIST = {".pdf", ".docx", ".txt", ".md"}
+_DANGEROUS_MAGIC = [
+    b"MZ",       # PE/EXE
+    b"\x7fELF",  # ELF binary
+]
+
+
+def _validate_content_type(contents: bytes, filename: str) -> None:
+    """Reject uploads where file content does not match the declared extension."""
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in EXTENSION_WHITELIST:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported file type")
+
+    # Block dangerous binary content masquerading as safe files
+    for magic in _DANGEROUS_MAGIC:
+        if contents[: len(magic)] == magic:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File content does not match declared type.",
+            )
+
+    # Validate magic bytes for known binary formats
+    if ext == ".pdf" and not contents[:5].startswith(b"%PDF"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File content does not match declared type.",
+        )
+    if ext == ".docx" and contents[:2] != b"PK":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File content does not match declared type.",
+        )
 
 
 def _utc_now_iso() -> str:
@@ -160,6 +192,9 @@ async def upload_file(
     filename = sanitize_filename(file.filename or "unnamed")
     if file_type not in ALLOWED_MIMES and not any(filename.lower().endswith(ext) for ext in (".pdf", ".docx", ".txt", ".md")):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported file type")
+
+    # Content-based MIME validation: reject disguised executables
+    _validate_content_type(contents, filename)
 
     # Save raw file to disk
     try:
