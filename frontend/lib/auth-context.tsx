@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   ReactNode,
 } from "react";
@@ -15,7 +16,13 @@ import { isSupabaseConfigured, supabase, supabaseConfigError } from "./supabase"
 interface AuthContextType {
   session: Session | null;
   user: User | null;
+  /**
+   * @deprecated Use `getAccessToken()` instead to minimize token exposure.
+   * This field will be removed in a future release.
+   */
   accessToken: string | null;
+  /** Retrieve the current access token on demand. Prefer this over `accessToken`. */
+  getAccessToken: () => string | null;
   loading: boolean;
   isConfigured: boolean;
   authError: string | null;
@@ -32,10 +39,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
+  const tokenRef = useRef<string | null>(null);
 
   const applySession = useCallback((nextSession: Session | null) => {
     setSession(nextSession);
     setUser(nextSession?.user ?? null);
+    tokenRef.current = nextSession?.access_token ?? null;
+  }, []);
+
+  const getAccessToken = useCallback((): string | null => {
+    return tokenRef.current;
   }, []);
 
   const refreshSession = useCallback(async () => {
@@ -122,14 +135,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       user,
-      accessToken: session?.access_token ?? null,
+      accessToken: tokenRef.current,
+      getAccessToken,
       loading,
       isConfigured: isSupabaseConfigured,
       authError: supabaseConfigError,
       refreshSession,
       signOut,
     }),
-    [loading, refreshSession, session, signOut, user],
+    [getAccessToken, loading, refreshSession, session, signOut, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -142,3 +156,4 @@ export function useAuth() {
   }
   return context;
 }
+

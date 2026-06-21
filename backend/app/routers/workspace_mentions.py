@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 
 from ..core.security import get_current_user
+from ..services.workspace_service import require_workspace_access
 from ..schemas.workspace_mentions import (
     WorkspaceMentionMarkAllReadResponse,
     WorkspaceMentionMarkReadResponse,
@@ -30,6 +31,7 @@ async def get_workspace_mentions(
     workspace_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await list_mentions_for_user(workspace_id=workspace_id, user_id=_user_id(current_user))
 
 
@@ -38,6 +40,7 @@ async def get_workspace_mentions_unread_count(
     workspace_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, int]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await count_unread_mentions_for_user(workspace_id=workspace_id, user_id=_user_id(current_user))
 
 
@@ -46,6 +49,7 @@ async def mark_workspace_mentions_read(
     workspace_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await mark_all_mentions_read(workspace_id=workspace_id, user_id=_user_id(current_user))
 
 
@@ -55,4 +59,5 @@ async def mark_workspace_mention_read(
     mention_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    await require_workspace_access(workspace_id, _user_id(current_user))
     return await mark_mention_read(workspace_id=workspace_id, user_id=_user_id(current_user), mention_id=mention_id)

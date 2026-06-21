@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse, JSONResponse
 
 from ..core.security import get_current_user
+from ..services.workspace_service import require_workspace_access, resolve_workspace_access
 from ..integrations.google_drive import (
     build_oauth_authorize_url,
     build_oauth_state,
@@ -23,6 +24,7 @@ from ..jobs import queue as job_queue
 from ..services.document_intelligence_service import ExtractionDiagnostics, extraction_columns_payload
 from ..services.supabase_service import SupabaseServiceError, insert_one, update_one
 from ..services.file_storage import sanitize_filename, save_bytes_to_user_upload
+from ..services.workspace_service import require_workspace_access, resolve_workspace_access
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/integrations/google_drive", tags=["integrations"])
@@ -65,6 +67,8 @@ async def connect_google_drive(request: Request, workspace_id: str | None = None
     """Return the Google OAuth authorize URL for the client to redirect the user to."""
     user = current_user
     user_id = str(user.get("sub"))
+    if workspace_id:
+        await require_workspace_access(workspace_id, user_id)
     base = os.environ.get("OMNIX_BASE_URL") or "http://localhost:8000"
     redirect_uri = f"{base.rstrip('/')}/integrations/google_drive/callback"
     state = build_oauth_state(user_id, workspace_id)
@@ -83,6 +87,13 @@ async def oauth_callback(code: str | None = None, state: str | None = None) -> A
         logger.warning("Rejected Google OAuth callback with invalid state: %s", exc)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state") from exc
 
+    # Verify workspace access before storing tokens
+    if workspace_id:
+        access = await resolve_workspace_access(workspace_id, user_id)
+        if access is None:
+            params = urlencode({"status": "error", "detail": "workspace_access_denied"})
+            return RedirectResponse(url=f"{os.environ.get('OMNIX_FRONTEND_URL','http://localhost:3000')}/integrations?{params}")
+
     base = os.environ.get("OMNIX_BASE_URL") or "http://localhost:8000"
     redirect_uri = f"{base.rstrip('/')}/integrations/google_drive/callback"
 
@@ -100,6 +111,17 @@ async def oauth_callback(code: str | None = None, state: str | None = None) -> A
         params = urlencode({"status": "error"})
         return RedirectResponse(url=f"{os.environ.get('OMNIX_FRONTEND_URL','http://localhost:3000')}/integrations?{params}")
 
+    # Verify workspace membership if workspace_id was provided in the OAuth state
+    if workspace_id:
+        access = await resolve_workspace_access(workspace_id, user_id)
+        if access is None:
+            logger.warning(
+                "OAuth callback rejected: user_id=%s is not a member of workspace_id=%s",
+                user_id, workspace_id,
+            )
+            params = urlencode({"status": "error", "reason": "workspace_access_denied"})
+            return RedirectResponse(url=f"{os.environ.get('OMNIX_FRONTEND_URL','http://localhost:3000')}/integrations?{params}")
+
     # Redirect user back to frontend integrations page
     params = urlencode({"status": "connected"})
     return RedirectResponse(url=f"{os.environ.get('OMNIX_FRONTEND_URL','http://localhost:3000')}/integrations?{params}")
@@ -108,6 +130,8 @@ async def oauth_callback(code: str | None = None, state: str | None = None) -> A
 @router.get("/files")
 async def list_files(workspace_id: str | None = None, q: str | None = None, current_user: dict[str, Any] = Depends(get_current_user)) -> Any:
     user_id = str(current_user.get("sub"))
+    if workspace_id:
+        await require_workspace_access(workspace_id, user_id)
     token_row = await get_token_for_user(user_id, workspace_id)
     if not token_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Google Drive not connected for this user/workspace")
@@ -122,6 +146,7 @@ async def list_files(workspace_id: str | None = None, q: str | None = None, curr
 @router.post("/import")
 async def import_file(workspace_id: str, file_id: str, current_user: dict[str, Any] = Depends(get_current_user)) -> Any:
     user_id = str(current_user.get("sub"))
+    await require_workspace_access(workspace_id, user_id)
     token_row = await get_token_for_user(user_id, workspace_id)
     if not token_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Google Drive not connected for this user/workspace")

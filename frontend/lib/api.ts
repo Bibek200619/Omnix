@@ -108,7 +108,27 @@ async function readErrorPayload(response: Response): Promise<ApiErrorData> {
 }
 
 function logApiError(error: ApiError) {
-  console.error("[api] request failed", error.toJSON());
+  if (process.env.NODE_ENV === "production") {
+    // Production: only log safe, non-sensitive fields
+    console.error("[api] request failed", {
+      method: error.method,
+      url: error.url,
+      status: error.status,
+      message: error.message,
+    });
+  } else {
+    // Development: log truncated summary (strip potential tokens/PII)
+    const summary = error.toJSON({ includeSensitive: true });
+    if (typeof summary.responsePayload === "string" && summary.responsePayload.length > 200) {
+      summary.responsePayload = summary.responsePayload.slice(0, 200) + "…[truncated]";
+    } else if (summary.responsePayload && typeof summary.responsePayload === "object") {
+      const serialized = JSON.stringify(summary.responsePayload);
+      if (serialized.length > 200) {
+        summary.responsePayload = serialized.slice(0, 200) + "…[truncated]";
+      }
+    }
+    console.error("[api] request failed", summary);
+  }
 }
 
 class ApiClient {

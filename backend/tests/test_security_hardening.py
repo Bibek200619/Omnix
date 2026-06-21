@@ -180,6 +180,10 @@ async def test_google_oauth_callback_accepts_signed_state(monkeypatch: pytest.Mo
 
     monkeypatch.setattr(google_drive, "exchange_code_for_tokens", fake_exchange)
     monkeypatch.setattr(google_drive, "store_token_for_user", fake_store)
+    
+    async def fake_resolve(*args, **kwargs):
+        return object()
+    monkeypatch.setattr(google_drive, "resolve_workspace_access", fake_resolve)
 
     response = await google_drive.oauth_callback(code="oauth-code", state=state)
 
