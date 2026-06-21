@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import HTTPException
 import pytest
 
-from app.services import workspace_service
+from app.services import workspace_membership_service, workspace_service
 
 @pytest.mark.asyncio
 async def test_list_potential_subspace_members(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -43,9 +43,10 @@ async def test_list_potential_subspace_members(monkeypatch: pytest.MonkeyPatch) 
         return {uid: {"email": f"{uid}@example.com"} for uid in user_ids}
 
     monkeypatch.setattr(workspace_service, "require_workspace_management_access", fake_require_workspace_management_access)
-    monkeypatch.setattr(workspace_service, "select_all_trusted", fake_select_all_trusted)
+    monkeypatch.setattr(workspace_membership_service, "select_all_trusted", fake_select_all_trusted)
     monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(workspace_service, "get_profiles", fake_get_profiles)
+    monkeypatch.setattr(workspace_membership_service, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_membership_service, "get_profiles", fake_get_profiles)
 
     # Execute
     potentials = await workspace_service.list_potential_subspace_members(workspace_id, user_id)
@@ -91,9 +92,9 @@ async def test_assign_member_to_subspace_success(monkeypatch: pytest.MonkeyPatch
         return {uid: {} for uid in user_ids}
 
     monkeypatch.setattr(workspace_service, "require_workspace_management_access", fake_require_workspace_management_access)
-    monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(workspace_service, "insert_one", fake_insert_one)
-    monkeypatch.setattr(workspace_service, "get_profiles", fake_get_profiles)
+    monkeypatch.setattr(workspace_membership_service, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_membership_service, "insert_one", fake_insert_one)
+    monkeypatch.setattr(workspace_membership_service, "get_profiles", fake_get_profiles)
 
     # Execute
     result = await workspace_service.assign_member_to_subspace(workspace_id, target_user_id, "member", actor_user_id)
@@ -144,7 +145,7 @@ async def test_assign_member_to_subspace_duplicate(monkeypatch: pytest.MonkeyPat
         return None
 
     monkeypatch.setattr(workspace_service, "require_workspace_management_access", fake_require_workspace_management_access)
-    monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_membership_service, "select_one_trusted", fake_select_one_trusted)
 
     # Execute & Verify
     with pytest.raises(HTTPException) as exc:
@@ -177,7 +178,7 @@ async def test_assign_member_to_subspace_escalation_rejected(monkeypatch: pytest
         return None
 
     monkeypatch.setattr(workspace_service, "require_workspace_management_access", fake_require_workspace_management_access)
-    monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_membership_service, "select_one_trusted", fake_select_one_trusted)
 
     # Execute & Verify: team_lead cannot assign co_owner
     with pytest.raises(HTTPException) as exc:
@@ -219,9 +220,9 @@ async def test_private_subspace_member_listing_is_scoped(monkeypatch: pytest.Mon
     async def fake_get_profiles(user_ids):
         return {uid: {} for uid in user_ids}
 
-    monkeypatch.setattr(workspace_service, "select_all_trusted", fake_select_all_trusted)
+    monkeypatch.setattr(workspace_membership_service, "select_all_trusted", fake_select_all_trusted)
     monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(workspace_service, "get_profiles", fake_get_profiles)
+    monkeypatch.setattr(workspace_membership_service, "get_profiles", fake_get_profiles)
 
     # Execute
     members = await workspace_service.list_workspace_members({
@@ -272,9 +273,9 @@ async def test_assign_member_to_subspace_team_lead_and_sub_member(monkeypatch: p
         return {uid: {} for uid in user_ids}
 
     monkeypatch.setattr(workspace_service, "require_workspace_management_access", fake_require_workspace_management_access)
-    monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(workspace_service, "insert_one", fake_insert_one)
-    monkeypatch.setattr(workspace_service, "get_profiles", fake_get_profiles)
+    monkeypatch.setattr(workspace_membership_service, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_membership_service, "insert_one", fake_insert_one)
+    monkeypatch.setattr(workspace_membership_service, "get_profiles", fake_get_profiles)
 
     # 1. Founder assigning team_lead
     await workspace_service.assign_member_to_subspace(workspace_id, target_user_id, "team_lead", actor_user_id)
@@ -319,9 +320,9 @@ async def test_team_lead_assignment_authority(monkeypatch: pytest.MonkeyPatch) -
         return {uid: {} for uid in user_ids}
 
     monkeypatch.setattr(workspace_service, "require_workspace_management_access", fake_require_workspace_management_access)
-    monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(workspace_service, "insert_one", fake_insert_one)
-    monkeypatch.setattr(workspace_service, "get_profiles", fake_get_profiles)
+    monkeypatch.setattr(workspace_membership_service, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_membership_service, "insert_one", fake_insert_one)
+    monkeypatch.setattr(workspace_membership_service, "get_profiles", fake_get_profiles)
 
     # 1. Team lead assigning sub_member (Success)
     await workspace_service.assign_member_to_subspace(workspace_id, target_user_id, "sub_member", actor_user_id)

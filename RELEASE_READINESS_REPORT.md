@@ -6,7 +6,7 @@ Date: 2026-06-21
 
 P1 release blockers from the platform and frontend audits are resolved and covered by tests. Omnix is materially closer to release readiness, with security, upload reliability, command palette accessibility, frontend E2E/axe coverage, search breadth, provenance, AI evals, sensitive logging, and module boundaries all improved.
 
-Not every P2 maturity item is fully complete. The largest remaining risks are `workspace_service.py`, incomplete server-state modernization, and large-list pagination/virtualization beyond the tested critical flows.
+Not every P2 maturity item is fully complete. The largest remaining risks are incomplete server-state modernization, large-list pagination/virtualization beyond the tested critical flows, and the remaining FastAPI/Starlette deprecation cleanup.
 
 ## Fixed
 
@@ -23,6 +23,7 @@ Not every P2 maturity item is fully complete. The largest remaining risks are `w
 - Split workspace invite routing out of the large workspaces router.
 - Split message payload/retrieval helpers out of the large messages router.
 - Split Supabase query helper logic out of the large Supabase service.
+- Split workspace common models/normalizers and member/subspace assignment logic out of the large workspace service.
 - Split workspace provider responsibilities into separate active-workspace storage, destructive-confirmation, context-value, and effect modules.
 - Split files page model helpers, shared portal, and connector setup modal out of the large files page.
 - Split landing shared primitives and app-tour screenshots out of the large landing experience component.
@@ -35,10 +36,10 @@ Not every P2 maturity item is fully complete. The largest remaining risks are `w
 
 - Backend auth/security: `backend/app/core/admin_auth.py`, `backend/app/routers/admin.py`, `backend/app/services/workspace_connector_service.py`
 - Backend upload/jobs: `backend/app/routers/upload.py`, `backend/app/jobs/ingestion_jobs.py`, `backend/app/routers/files.py`, `supabase/migrations/0042_file_processing_status.sql`
-- Backend search/provenance/AI/logging/architecture: `backend/app/services/workspace_search_service.py`, `backend/app/schemas/workspace_search.py`, `backend/app/observability/safe_logging.py`, `backend/app/observability/prompt_trace.py`, `backend/app/observability/retrieval_trace.py`, `backend/app/routers/workspace_invites.py`, `backend/app/services/message_payload_service.py`, `backend/app/services/message_retrieval_service.py`, `backend/app/services/supabase_query_helpers.py`
+- Backend search/provenance/AI/logging/architecture: `backend/app/services/workspace_search_service.py`, `backend/app/schemas/workspace_search.py`, `backend/app/observability/safe_logging.py`, `backend/app/observability/prompt_trace.py`, `backend/app/observability/retrieval_trace.py`, `backend/app/routers/workspace_invites.py`, `backend/app/services/message_payload_service.py`, `backend/app/services/message_retrieval_service.py`, `backend/app/services/supabase_query_helpers.py`, `backend/app/services/workspace_common.py`, `backend/app/services/workspace_membership_service.py`
 - Frontend UX/accessibility/architecture: `frontend/components/layout/CommandPalette.tsx`, `frontend/lib/api.ts`, `frontend/components/provenance/RecordTraceabilityPanel.tsx`, `frontend/components/files/filesPageModel.ts`, `frontend/components/files/ConnectorSetupModal.tsx`, `frontend/components/files/DocumentPortal.tsx`, `frontend/components/landing/LandingPrimitives.tsx`, `frontend/components/landing/LandingAppScreenshots.tsx`, `frontend/lib/workspace-context-values.ts`, `frontend/lib/workspace-provider-effects.ts`
 - Frontend design/mobile: `frontend/styles/globals.css`, `frontend/components/upload/UploadDropzone.tsx`, `frontend/components/layout/PageTransition.tsx`, `frontend/components/ui/Button.tsx`, `frontend/components/ui/Toggle.tsx`
-- Tests: `backend/tests/routers/test_admin_runtime.py`, `backend/tests/services/test_workspace_connector_service.py`, `backend/tests/jobs/test_ingestion_file_processing.py`, `backend/tests/routers/test_upload_async_processing.py`, `backend/tests/frontend/*`, `backend/tests/routers/test_messages_modularity.py`, `backend/tests/services/test_supabase_query_helpers.py`, `backend/tests/retrieval/test_ai_eval_harness.py`, `backend/tests/observability/test_safe_logging.py`, `frontend/e2e/omnix-release.spec.ts`
+- Tests: `backend/tests/routers/test_admin_runtime.py`, `backend/tests/services/test_workspace_connector_service.py`, `backend/tests/jobs/test_ingestion_file_processing.py`, `backend/tests/routers/test_upload_async_processing.py`, `backend/tests/frontend/*`, `backend/tests/routers/test_messages_modularity.py`, `backend/tests/services/test_supabase_query_helpers.py`, `backend/tests/services/test_workspace_service_modularity.py`, `backend/tests/retrieval/test_ai_eval_harness.py`, `backend/tests/observability/test_safe_logging.py`, `frontend/e2e/omnix-release.spec.ts`
 
 ## Verification Evidence
 
@@ -46,7 +47,7 @@ Backend:
 
 - Clean dependency install from `backend/requirements.txt` into `/private/tmp/omnix_backend_req_target`: passed.
 - `python -m pytest --collect-only backend/tests -q`: collected successfully after dependency fix.
-- `python -m pytest backend/tests -q`: `287 passed`, with 17 remaining FastAPI/Starlette deprecation warnings.
+- `python -m pytest backend/tests -q`: `330 passed`, with 17 remaining FastAPI/Starlette deprecation warnings.
 - Admin runtime authorization tests: passed.
 - Connector SSRF/streaming tests: passed.
 - Upload/job tests: passed.
@@ -78,7 +79,8 @@ Performance/Scale:
 
 - Upload request path no longer performs extraction/chunking/OCR/embedding before response.
 - Workspace search has bounded result groups and result limits.
-- Large router/service/component risk is reduced: `workspaces.py` 1,505 -> 990 lines, `messages.py` 1,433 -> 938 lines, `supabase_service.py` 1,042 -> 964 lines, `workspace-provider.tsx` 1,093 -> 992 lines, `files/page.tsx` 1,476 -> 838 lines, `LandingExperience.tsx` 1,420 -> 959 lines.
+- Large router/service/component risk is reduced: `workspaces.py` 1,505 -> 990 lines, `messages.py` 1,433 -> 938 lines, `supabase_service.py` 1,042 -> 964 lines, `workspace_service.py` 1,376 -> 870 lines, `workspace-provider.tsx` 1,093 -> 992 lines, `files/page.tsx` 1,476 -> 838 lines, `LandingExperience.tsx` 1,420 -> 959 lines.
+- Backend app scan found no Python files over 1,000 lines after the workspace service split.
 - Frontend E2E verifies key workflows under desktop and mobile viewports.
 - Remaining scale gap: large data surfaces still need fuller pagination/virtualization pass.
 
@@ -111,7 +113,7 @@ Performance/Scale:
 
 | Area | Expected Score | Evidence |
 | --- | ---: | --- |
-| Architecture | 8/10 | P1 boundaries and major module splits landed; `workspace_service.py` remains oversized but routers/provider/files/landing/Supabase are below threshold. |
+| Architecture | 8.5/10 | P1 boundaries and major module splits landed; workspace, workspaces, messages, Supabase, provider, files, and landing modules are below the reviewability threshold. |
 | AI Systems | 8.5/10 | Retrieval eval harness, prompt-injection test, citation/source tests, document context handling, production-safe logging. |
 | Reliability | 8.5/10 | Async upload lifecycle, durable statuses, full backend tests passing, frontend E2E passing. |
 | Security | 8.5/10 | Admin auth lock, SSRF hardening, upload validation/enqueue tests, secret scan review, sensitive log redaction. |
@@ -130,7 +132,6 @@ Performance/Scale:
 
 ## Remaining Risks
 
-- Backend modules still above 1,000 lines: `backend/app/services/workspace_service.py`.
 - Server-state handling is improved but not yet migrated to a full query/cache invalidation model.
 - Large-list pagination/virtualization needs a dedicated pass across files, tasks, initiatives, decisions, team, notifications, mentions, and search.
 - Full backend test run still reports FastAPI/Starlette deprecation warnings around `on_event`/TestClient.
