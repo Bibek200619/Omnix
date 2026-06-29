@@ -19,10 +19,14 @@ def _user_id(current_user: dict[str, Any]) -> str:
 async def get_workspace_search(
     workspace_id: str,
     q: str = Query(default="", max_length=120),
+    limit: int = Query(default=8, ge=1, le=25),
+    cursor: int = Query(default=0, ge=0),
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     return await search_workspace(
         workspace_id=workspace_id,
         user_id=_user_id(current_user),
         query=q,
+        limit=limit,
+        cursor=cursor,
     )
