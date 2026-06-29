@@ -26,6 +26,9 @@ class ProviderSettings(BaseAppSettings):
     AI_MAX_CONTEXT_TOKENS: int = 2000
     AI_PROVIDER_ORDER: str = "ollama,openai,anthropic"
     AI_FAILOVER_LATENCY_THRESHOLD_SECONDS: float = 8.0
+    AI_PUBLIC_ALLOWED_MODELS: str = ""
+    AI_PUBLIC_MAX_OUTPUT_TOKENS: int = 512
+    AI_PUBLIC_MAX_TEMPERATURE: float = 0.8
     OLLAMA_BASE_URL: str = DEFAULT_OLLAMA_BASE_URL
     OLLAMA_DEFAULT_MODEL: str = "phi3:mini"
     OPENAI_API_KEY: str | None = None
