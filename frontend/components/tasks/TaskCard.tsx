@@ -1,6 +1,7 @@
 import { AlertTriangle, CalendarDays, Compass, UserRound, X } from "lucide-react";
 import { MentionText } from "@/components/mentions/MentionText";
 import { DecisionTraceabilityList } from "@/components/decisions/DecisionTraceabilityList";
+import { DecisionGraphSummary, type DecisionGraphNode } from "@/components/provenance/DecisionGraphSummary";
 import { RecordTraceabilityPanel, type TraceabilityLink } from "@/components/provenance/RecordTraceabilityPanel";
 import { cn } from "@/lib/utils";
 import type {
@@ -106,6 +107,34 @@ export function TaskCard({
         detail: linkedInitiative.description || linkedInitiative.status,
       }]
     : [];
+  const primaryDecision = task.linked_decisions[0];
+  const primaryEvidence = traceabilityEvidence[0];
+  const primarySource = traceabilityEvidence.find((item) => item.kind === "file" || item.kind === "conversation");
+  const taskDecisionGraphNodes: DecisionGraphNode[] = [
+    {
+      kind: "task",
+      title: "Current task",
+      detail: linkedInitiative ? `Initiative: ${linkedInitiative.title}` : task.status,
+    },
+    {
+      kind: "decision",
+      title: primaryDecision?.title ?? "No linked decision",
+      detail: primaryDecision?.decision_reason || primaryDecision?.status || "Link a decision to explain why this task exists.",
+      href: primaryDecision ? `/decisions?id=${primaryDecision.id}` : undefined,
+    },
+    {
+      kind: "evidence",
+      title: primaryEvidence?.label ?? "No evidence linked",
+      detail: primaryEvidence?.detail ?? "Attach conversation, file, or decision evidence for auditability.",
+      href: primaryEvidence?.href,
+    },
+    {
+      kind: "source",
+      title: primarySource?.label ?? "Source not linked",
+      detail: primarySource?.detail ?? "Source links keep task execution grounded in workspace context.",
+      href: primarySource?.href,
+    },
+  ];
 
   return (
     <article
@@ -229,6 +258,7 @@ export function TaskCard({
           Traceability
         </summary>
         <div className="px-2 pb-2">
+          <DecisionGraphSummary title="Execution graph" nodes={taskDecisionGraphNodes} compact className="mb-2 border-white/[0.05] bg-black/[0.08]" />
           <RecordTraceabilityPanel
             origin={traceabilityOrigin}
             evidence={traceabilityEvidence}

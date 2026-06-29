@@ -31,8 +31,8 @@ def test_workspace_search_route_is_registered_on_production_app() -> None:
 def test_workspace_search_route_returns_grouped_results(monkeypatch) -> None:
     captured: dict[str, Any] = {}
 
-    async def fake_search_workspace(*, workspace_id: str, user_id: str, query: str):
-        captured.update({"workspace_id": workspace_id, "user_id": user_id, "query": query})
+    async def fake_search_workspace(*, workspace_id: str, user_id: str, query: str, limit: int, cursor: int):
+        captured.update({"workspace_id": workspace_id, "user_id": user_id, "query": query, "limit": limit, "cursor": cursor})
         return {
             "conversations": [],
             "tasks": [
@@ -52,8 +52,8 @@ def test_workspace_search_route_returns_grouped_results(monkeypatch) -> None:
     monkeypatch.setattr(workspace_search, "search_workspace", fake_search_workspace)
     client = _search_client()
 
-    response = client.get("/workspaces/workspace-1/search?q=mobile")
+    response = client.get("/workspaces/workspace-1/search?q=mobile&limit=3&cursor=6")
 
     assert response.status_code == 200
-    assert captured == {"workspace_id": "workspace-1", "user_id": "user-1", "query": "mobile"}
+    assert captured == {"workspace_id": "workspace-1", "user_id": "user-1", "query": "mobile", "limit": 3, "cursor": 6}
     assert response.json()["tasks"][0]["title"] == "Fix mobile navigation"

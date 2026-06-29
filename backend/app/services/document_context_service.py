@@ -108,7 +108,13 @@ async def store_extracted_text_chunks(
     chunks = chunks[:MAX_IMMEDIATE_CHUNKS]
 
     if replace_existing:
-        await delete_many_trusted("documents", {"file_id": file_id})
+        filters: dict[str, Any] = {"file_id": file_id}
+        if workspace_id:
+            filters["workspace_id"] = workspace_id
+        else:
+            filters["user_id"] = user_id
+            filters["workspace_id"] = {"is": None}
+        await delete_many_trusted("documents", filters)
 
     timestamp = utc_now_iso()
     payloads: list[dict[str, Any]] = []

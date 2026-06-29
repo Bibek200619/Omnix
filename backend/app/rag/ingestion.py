@@ -163,7 +163,11 @@ class RAGIngestionPipeline:
             for i, emb in enumerate(embeddings):
                 db_payloads[i]["embedding"] = emb
 
-            old_chunk_ids = await self._existing_chunk_ids(document_id) if replace_existing else []
+            old_chunk_ids = await self._existing_chunk_ids(
+                document_id,
+                user_id=user_id,
+                workspace_id=workspace_id,
+            ) if replace_existing else []
 
             await self._insert_document_payloads(db_payloads)
             if old_chunk_ids:
@@ -243,14 +247,26 @@ class RAGIngestionPipeline:
                 )
 
     @staticmethod
-    async def _existing_chunk_ids(document_id: str | None) -> list[str]:
+    async def _existing_chunk_ids(
+        document_id: str | None,
+        *,
+        user_id: str,
+        workspace_id: str | None,
+    ) -> list[str]:
         if not document_id:
             return []
+
+        filters: dict[str, Any] = {"file_id": document_id}
+        if workspace_id:
+            filters["workspace_id"] = workspace_id
+        else:
+            filters["user_id"] = user_id
+            filters["workspace_id"] = {"is": None}
 
         rows = await select_all_trusted(
             "documents",
             "id",
-            filters={"file_id": document_id},
+            filters=filters,
         )
         return [str(row["id"]) for row in rows if row.get("id")]
 

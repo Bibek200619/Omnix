@@ -223,6 +223,9 @@ class ApiClient {
         headers,
       });
     } catch (exc) {
+      if (options.signal?.aborted || (exc instanceof Error && exc.name === "AbortError")) {
+        throw exc;
+      }
       const error = new ApiError("Omnix API is unreachable.", {
         endpoint: normalizedEndpoint,
         url,
@@ -387,10 +390,25 @@ class ApiClient {
     return request;
   }
 
-  async searchWorkspace(workspaceId: string, query: string): Promise<WorkspaceSearchResponse> {
-    return this.get<WorkspaceSearchResponse>(
-      `/workspaces/${workspaceId}/search?q=${encodeURIComponent(query)}`,
-    );
+  async searchWorkspace(
+    workspaceId: string,
+    query: string,
+    options: { signal?: AbortSignal; limit?: number; cursor?: number } = {},
+  ): Promise<WorkspaceSearchResponse> {
+    const params = new URLSearchParams({ q: query });
+    if (options.limit) {
+      params.set("limit", String(options.limit));
+    }
+    if (options.cursor) {
+      params.set("cursor", String(options.cursor));
+    }
+
+    const endpoint = `/workspaces/${workspaceId}/search?${params.toString()}`;
+    const response = await this.request(endpoint, {
+      method: "GET",
+      signal: options.signal,
+    });
+    return response.json() as Promise<WorkspaceSearchResponse>;
   }
 
   async listWorkspaceMentions(workspaceId: string): Promise<WorkspaceMentionInboxItem[]> {

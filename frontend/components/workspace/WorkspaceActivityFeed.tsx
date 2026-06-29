@@ -4,6 +4,7 @@ import {
   Activity,
   BrainCircuit,
   Database,
+  Download,
   FileText,
   Layers3,
   MessageSquare,
@@ -51,6 +52,19 @@ export function WorkspaceActivityFeed({
   className,
 }: WorkspaceActivityFeedProps) {
   const visibleActivity = compact ? activity.slice(0, 5) : activity;
+
+  function exportActivityLog() {
+    const payload = JSON.stringify(activity, null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `omnix-workspace-activity-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(anchor);
+  }
 
   return (
     <section className={cn(
@@ -161,8 +175,13 @@ export function WorkspaceActivityFeed({
       
       {!compact && visibleActivity.length > 0 && (
         <div className="mt-6 flex justify-center">
-          <button className="text-[10px] font-medium uppercase tracking-widest text-white/30 hover:text-cyan-300 transition-colors">
-            View all activity
+          <button
+            type="button"
+            onClick={exportActivityLog}
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-[10px] font-medium uppercase tracking-widest text-white/45 transition-colors hover:border-cyan-300/25 hover:text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export activity JSON
           </button>
         </div>
       )}

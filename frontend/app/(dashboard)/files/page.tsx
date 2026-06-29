@@ -4,7 +4,8 @@ import { Suspense } from "react";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import dynamic from "next/dynamic";
 import type { CSSProperties } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   BadgeCheck,
   Database,
@@ -25,6 +26,7 @@ import {
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { ConnectorSetupModal } from "@/components/files/ConnectorSetupModal";
+import { SourceHealthConsole } from "@/components/files/SourceHealthConsole";
 import { CreateDecisionModal } from "@/components/decisions/CreateDecisionModal";
 import { DocumentPortal } from "@/components/files/DocumentPortal";
 import { DecisionCandidatePanel } from "@/components/decisions/DecisionCandidatePanel";
@@ -97,20 +99,52 @@ function FilesPageContent() {
   const [decisionCandidates, setDecisionCandidates] = useState<DecisionCandidate[]>([]);
   const [decisionCandidatesLoading, setDecisionCandidatesLoading] = useState(false);
   const [decisionCandidatesError, setDecisionCandidatesError] = useState<string | null>(null);
-  const [decisionCandidateDraft, setDecisionCandidateDraft] = useState<{
-    title: string;
-    reason: string;
-    description: string;
-    status: WorkspaceDecisionStatus;
-  } | null>(null);
+  const [decisionCandidateDraft, setDecisionCandidateDraft] = useState<{ title: string; reason: string; description: string; status: WorkspaceDecisionStatus } | null>(null);
+  const fileResultsRef = useRef<HTMLDivElement | null>(null);
+  const [gridColumnCount, setGridColumnCount] = useState(1);
   const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
 
-  const filteredFiles = files.filter((file) => {
+  const filteredFiles = useMemo(() => files.filter((file) => {
     const name = file.file_name ?? file.filename ?? "";
     const type = file.file_type ?? file.content_type ?? "";
     const query = searchQuery.toLowerCase();
     return name.toLowerCase().includes(query) || type.toLowerCase().includes(query);
+  }), [files, searchQuery]);
+
+  const virtualFileRows = useMemo(() => {
+    if (view === "list") return filteredFiles.map((file) => [file]);
+    const columns = Math.max(gridColumnCount, 1);
+    return Array.from({ length: Math.ceil(filteredFiles.length / columns) }, (_, row) => {
+      const index = row * columns;
+      return filteredFiles.slice(index, index + columns);
+    });
+  }, [filteredFiles, gridColumnCount, view]);
+
+  const shouldVirtualizeFiles = filteredFiles.length > 40;
+  const fileVirtualizer = useVirtualizer({
+    count: virtualFileRows.length,
+    getScrollElement: () => fileResultsRef.current,
+    estimateSize: () => (view === "grid" ? 228 : 104),
+    getItemKey: (index) => virtualFileRows[index]?.map((file) => file.id).join(":") ?? index,
+    overscan: view === "grid" ? 4 : 8,
   });
+
+  useEffect(() => {
+    if (view !== "grid") {
+      setGridColumnCount(1);
+      return;
+    }
+
+    const node = fileResultsRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+
+    const updateColumns = () => setGridColumnCount(node.clientWidth >= 1280 ? 3 : node.clientWidth >= 768 ? 2 : 1);
+
+    updateColumns();
+    const observer = new ResizeObserver(updateColumns);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [view, shouldVirtualizeFiles]);
 
   const connectorCounts = useMemo(() => {
     return connectors.reduce<Record<ConnectorType, number>>(
@@ -416,6 +450,34 @@ function FilesPageContent() {
     }
   }
 
+  function renderFileCard(f: FileData) {
+    const ingestionStatus = fileIngestionStatus(f);
+    return (
+      <div key={f.id} className={view === "grid" ? "omnix-source-card flex min-h-[174px] flex-col justify-between gap-3 p-[18px]" : "omnix-source-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"}>
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_0_14px_var(--omnix-rgba-0-255-255-0-12)]">
+            <FileText className="h-[19px] w-[19px]" />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="omnix-display max-w-full truncate text-[13px] font-bold text-white">{f.file_name ?? f.filename}</p>
+              <span className={cn("rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-wider", fileStatusStyle[ingestionStatus])}>
+                {fileStatusLabel[ingestionStatus]}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-white/35">{f.file_type ?? f.content_type ?? "Document"} - {formatFileSize(f.size_bytes)}</p>
+            <p className="mt-2 max-w-3xl text-[11px] leading-5 text-white/50">{fileStatusDetail(f)}</p>
+          </div>
+        </div>
+        <div className={view === "grid" ? "grid grid-cols-2 gap-2 border-t border-white/5 pt-3 sm:flex sm:items-center" : "grid grid-cols-2 gap-2 sm:flex sm:items-center"}>
+          <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<BadgeCheck className="h-3.5 w-3.5" />} onClick={() => void scanDocumentDecisionCandidates(f)}>Decisions</Button>
+          <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
+          <Button type="button" size="sm" variant="ghost" className="min-h-11 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
+        </div>
+      </div>
+    );
+  }
+
   const setupMeta = setupType ? sourceTypes.find((item) => item.id === setupType) : null;
   const connectorSourceTypes = sourceTypes.filter(
     (type): type is (typeof sourceTypes)[number] & { id: ConnectorType } => type.id !== "file",
@@ -560,6 +622,7 @@ function FilesPageContent() {
             );
           })}
         </div>
+        <SourceHealthConsole files={files} connectors={connectors} actionConnectorId={actionConnectorId} onRetryConnector={(connector) => void handleRetryConnector(connector)} />
 
         {activeSection === "connectors" ? (
         <div className="omnix-cinematic-card p-5">
@@ -731,35 +794,35 @@ function FilesPageContent() {
               action={{ label: "Clear search", onClick: () => setSearchQuery("") }}
               className="relative z-10 mt-4 min-h-[180px] border-dashed"
             />
+          ) : shouldVirtualizeFiles ? (
+            <div
+              ref={fileResultsRef}
+              className="omnix-scrollbar relative z-10 mt-3 max-h-[min(72dvh,44rem)] overflow-y-auto pr-1"
+              data-virtualized="true"
+            >
+              <div className="relative w-full" style={{ height: fileVirtualizer.getTotalSize() }}>
+                {fileVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const row = virtualFileRows[virtualRow.index] ?? [];
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={fileVirtualizer.measureElement}
+                      className={view === "grid" ? "absolute left-0 top-0 grid w-full gap-3 pb-3 md:grid-cols-2 xl:grid-cols-3" : "absolute left-0 top-0 grid w-full gap-2 pb-2"}
+                      style={{ transform: `translateY(${virtualRow.start}px)` }}
+                    >
+                      {row.map((file) => renderFileCard(file))}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           ) : (
-            <div className={view === "grid" ? "relative z-10 mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3" : "relative z-10 mt-3 grid gap-2"}>
-              {filteredFiles.map((f) => {
-                const ingestionStatus = fileIngestionStatus(f);
-                return (
-                  <div key={f.id} className={view === "grid" ? "omnix-source-card flex min-h-[174px] flex-col justify-between gap-3 p-[18px]" : "omnix-source-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"}>
-                    <div className="flex min-w-0 items-start gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_0_14px_var(--omnix-rgba-0-255-255-0-12)]">
-                        <FileText className="h-[19px] w-[19px]" />
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="omnix-display max-w-full truncate text-[13px] font-bold text-white">{f.file_name ?? f.filename}</p>
-                          <span className={cn("rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-wider", fileStatusStyle[ingestionStatus])}>
-                            {fileStatusLabel[ingestionStatus]}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-[11px] text-white/35">{f.file_type ?? f.content_type ?? "Document"} - {formatFileSize(f.size_bytes)}</p>
-                        <p className="mt-2 max-w-3xl text-[11px] leading-5 text-white/50">{fileStatusDetail(f)}</p>
-                      </div>
-                    </div>
-                    <div className={view === "grid" ? "grid grid-cols-2 gap-2 border-t border-white/5 pt-3 sm:flex sm:items-center" : "grid grid-cols-2 gap-2 sm:flex sm:items-center"}>
-                      <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<BadgeCheck className="h-3.5 w-3.5" />} onClick={() => void scanDocumentDecisionCandidates(f)}>Decisions</Button>
-                      <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
-                      <Button type="button" size="sm" variant="ghost" className="min-h-11 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
-                    </div>
-                  </div>
-                );
-              })}
+            <div
+              ref={fileResultsRef}
+              className={view === "grid" ? "relative z-10 mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3" : "relative z-10 mt-3 grid gap-2"}
+            >
+              {filteredFiles.map((file) => renderFileCard(file))}
             </div>
           )}
         </div>
@@ -835,4 +898,3 @@ function FilesPageContent() {
     </section>
   );
 }
-

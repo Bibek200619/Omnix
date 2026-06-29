@@ -3,6 +3,7 @@
 import { BadgeCheck, CircleDot, User, Calendar, MessageSquare } from "lucide-react";
 import { WorkspaceDecision } from "@/lib/workspace-types";
 import { MentionText } from "@/components/mentions/MentionText";
+import { DecisionGraphSummary, type DecisionGraphNode } from "@/components/provenance/DecisionGraphSummary";
 import { RecordTraceabilityPanel } from "@/components/provenance/RecordTraceabilityPanel";
 import { DecisionLifecycleControls } from "./DecisionLifecycleControls";
 import { DecisionTaskLinker } from "./DecisionTaskLinker";
@@ -47,6 +48,7 @@ function decisionOrigin(decision: WorkspaceDecision) {
 }
 
 export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPanelProps) {
+  const firstLinkedTask = decision.linked_tasks[0];
   const traceabilityTasks = decision.linked_tasks.map((task) => ({
     kind: "task" as const,
     label: task.title,
@@ -75,6 +77,26 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
           detail: decision.decision_reason,
         }]
       : [];
+  const decisionGraphNodes: DecisionGraphNode[] = [
+    {
+      kind: "task",
+      title: firstLinkedTask ? `${decision.linked_tasks.length} linked task${decision.linked_tasks.length === 1 ? "" : "s"}` : "No linked tasks",
+      detail: firstLinkedTask?.title ?? "Link tasks to show execution caused by this decision.",
+      href: firstLinkedTask ? `/tasks?id=${firstLinkedTask.id}` : undefined,
+    },
+    { kind: "decision", title: decision.title, detail: decision.status },
+    {
+      kind: "evidence",
+      title: decision.decision_reason ? "Rationale recorded" : "Rationale missing",
+      detail: decision.decision_reason || "Add a reason so future teammates can inspect why this decision exists.",
+    },
+    {
+      kind: "source",
+      title: decision.source_message_id ? "Conversation source" : decision.initiative ? "Initiative context" : "Manual record",
+      detail: decision.source_message_id || decision.initiative?.title || creatorLabel(decision),
+      href: decision.source_channel_id ? `/conversations?channel=${decision.source_channel_id}` : undefined,
+    },
+  ];
 
   return (
     <div className="omnix-container-responsive omnix-scrollbar h-full overflow-y-auto p-4 sm:p-6 xl:p-8">
@@ -160,6 +182,7 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
                 initiatives={traceabilityInitiatives}
                 className="mt-6"
               />
+              <DecisionGraphSummary nodes={decisionGraphNodes} className="mt-4" />
             </section>
           </div>
 
