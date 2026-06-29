@@ -29,6 +29,7 @@ def _client(current_user: dict[str, Any] | None = None) -> TestClient:
         ("POST", "/workspaces/ws-1/automations"),
         ("POST", "/workspaces/ws-1/automations/auto-1/run"),
         ("PATCH", "/workspaces/ws-1/automations/auto-1"),
+        ("DELETE", "/workspaces/ws-1/automations/auto-1"),
     ],
 )
 def test_unauthenticated_returns_401(method: str, path: str) -> None:
@@ -47,6 +48,7 @@ def test_unauthenticated_returns_401(method: str, path: str) -> None:
         ("POST", "/workspaces/ws-1/automations"),
         ("POST", "/workspaces/ws-1/automations/auto-1/run"),
         ("PATCH", "/workspaces/ws-1/automations/auto-1"),
+        ("DELETE", "/workspaces/ws-1/automations/auto-1"),
     ],
 )
 def test_non_member_returns_404(method: str, path: str, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -95,3 +97,79 @@ def test_member_create_returns_201(monkeypatch: pytest.MonkeyPatch) -> None:
         json={"name": "test", "job_type": "daily_summary"},
     )
     assert response.status_code == 201
+
+
+def test_update_automation_scopes_update_to_route_workspace(monkeypatch: pytest.MonkeyPatch) -> None:
+    mock_access = WorkspaceAccess(workspace={"id": "ws-1", "user_id": "user-1"}, role="member")
+    captured: dict[str, Any] = {}
+
+    async def allow_access(workspace_id: str, user_id: str) -> WorkspaceAccess:
+        return mock_access
+
+    async def fake_update(table: str, filters: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+        captured["table"] = table
+        captured["filters"] = filters
+        captured["payload"] = payload
+        return {"id": "auto-1", "workspace_id": "ws-1", **payload}
+
+    monkeypatch.setattr(automations, "require_workspace_access", allow_access)
+    monkeypatch.setattr(automations, "update_one_trusted", fake_update)
+    client = _client({"sub": "user-1", "role": "authenticated"})
+
+    response = client.patch(
+        "/workspaces/ws-1/automations/auto-1",
+        json={"enabled": True, "interval_seconds": 300},
+    )
+
+    assert response.status_code == 200
+    assert captured == {
+        "table": "automations",
+        "filters": {"id": "auto-1", "workspace_id": "ws-1"},
+        "payload": {"interval_seconds": 300, "enabled": True},
+    }
+
+
+def test_update_automation_rejects_unallowlisted_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    mock_access = WorkspaceAccess(workspace={"id": "ws-1", "user_id": "user-1"}, role="member")
+
+    async def allow_access(workspace_id: str, user_id: str) -> WorkspaceAccess:
+        return mock_access
+
+    async def fail_update(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        raise AssertionError("update must not run for forbidden fields")
+
+    monkeypatch.setattr(automations, "require_workspace_access", allow_access)
+    monkeypatch.setattr(automations, "update_one_trusted", fail_update)
+    client = _client({"sub": "user-1", "role": "authenticated"})
+
+    response = client.patch(
+        "/workspaces/ws-1/automations/auto-1",
+        json={"workspace_id": "ws-2", "enabled": True},
+    )
+
+    assert response.status_code == 422
+
+
+def test_delete_automation_scopes_delete_to_route_workspace(monkeypatch: pytest.MonkeyPatch) -> None:
+    mock_access = WorkspaceAccess(workspace={"id": "ws-1", "user_id": "user-1"}, role="member")
+    captured: dict[str, Any] = {}
+
+    async def allow_access(workspace_id: str, user_id: str) -> WorkspaceAccess:
+        return mock_access
+
+    async def fake_delete(table: str, filters: dict[str, Any]) -> dict[str, Any]:
+        captured["table"] = table
+        captured["filters"] = filters
+        return {"id": "auto-1", "workspace_id": "ws-1"}
+
+    monkeypatch.setattr(automations, "require_workspace_access", allow_access)
+    monkeypatch.setattr(automations, "delete_one_trusted", fake_delete)
+    client = _client({"sub": "user-1", "role": "authenticated"})
+
+    response = client.delete("/workspaces/ws-1/automations/auto-1")
+
+    assert response.status_code == 204
+    assert captured == {
+        "table": "automations",
+        "filters": {"id": "auto-1", "workspace_id": "ws-1"},
+    }
