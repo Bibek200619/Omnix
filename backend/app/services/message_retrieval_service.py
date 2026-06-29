@@ -18,6 +18,10 @@ DOCUMENT_INTENT_RE = re.compile(
     r"\b(file|document|doc|pdf|docx|upload|attached|attachment|summari[sz]e|analy[sz]e|resume|contract|report|context|source)\b",
     re.IGNORECASE,
 )
+LIGHTWEIGHT_CONVERSATION_RE = re.compile(
+    r"^(hi|hello|hey|thanks|thank you|ok|okay|yes|no|cool|great|nice|got it|sounds good|help)\b[!.?\s]*$",
+    re.IGNORECASE,
+)
 
 BuildWebSupplementsFn = Callable[..., Awaitable[tuple[list[Any], list[dict[str, Any]], SearchDecision, dict[str, Any]]]]
 UploadedContextFn = Callable[..., Awaitable[Any]]
@@ -79,6 +83,13 @@ def should_skip_retrieval_for_prompt(message_text: str) -> bool:
         return False
 
     return len(normalized) <= 120
+
+
+def is_lightweight_conversation(message_text: str) -> bool:
+    normalized = " ".join((message_text or "").strip().split())
+    if not normalized:
+        return True
+    return bool(LIGHTWEIGHT_CONVERSATION_RE.match(normalized))
 
 
 async def build_web_supplements(
@@ -228,11 +239,21 @@ async def retrieve_prompt_context(
             debug["workspace_intelligence"] = compact_intelligence_debug(intelligence_profile)
         return prompt_message, [], debug
 
-    if (
+    skip_lightweight_prompt = (
         not has_new_attachments
         and not search_decision.needs_web
         and should_skip_retrieval_for_prompt(message_text)
-    ):
+    )
+    if skip_lightweight_prompt and workspace_id and not is_lightweight_conversation(message_text):
+        has_documents = has_retrievable_documents_fn or has_retrievable_documents
+        if await has_documents(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            scope_workspace_ids=scope_workspace_ids,
+        ):
+            skip_lightweight_prompt = False
+
+    if skip_lightweight_prompt:
         logger.info(
             "Skipping retrieval for lightweight prompt: conversation_id=%s workspace_id=%s.",
             conversation_id,

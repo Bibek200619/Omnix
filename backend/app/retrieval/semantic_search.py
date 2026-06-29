@@ -19,6 +19,18 @@ DOCUMENT_COLUMNS = "id,content,file_id,created_at,workspace_id,user_id,chunk_ind
 FILE_COLUMNS = "id,file_name,metadata,workspace_id,user_id"
 
 
+def _workspace_scope_filter(workspace_id: str | list[str] | None) -> str | list[str] | None:
+    if workspace_id is None:
+        return None
+    if isinstance(workspace_id, list):
+        scoped_ids = [str(item) for item in workspace_id if str(item or "").strip()]
+        if not scoped_ids:
+            return None
+        return scoped_ids[0] if len(scoped_ids) == 1 else scoped_ids
+    value = str(workspace_id).strip()
+    return value or None
+
+
 class SemanticSearch:
     """Provider-independent semantic search over the configured VectorStore."""
 
@@ -148,16 +160,15 @@ class SemanticSearch:
         if not chunk_ids:
             return []
 
-        if workspace_id:
-            # Use 'in' filter if it's a list, else 'eq'
-            op = "in" if isinstance(workspace_id, list) else "eq"
+        workspace_scope = _workspace_scope_filter(workspace_id)
+        if workspace_scope:
             rows = await select_all_trusted(
                 "documents",
                 DOCUMENT_COLUMNS,
-                filters={"id": chunk_ids, f"workspace_id.{op}": workspace_id},
+                filters={"id": chunk_ids, "workspace_id": workspace_scope},
             )
             
-            w_ids = set(workspace_id) if isinstance(workspace_id, list) else {workspace_id}
+            w_ids = set(workspace_scope) if isinstance(workspace_scope, list) else {workspace_scope}
             return [row for row in rows if str(row.get("workspace_id") or "") in w_ids]
 
         rows = await select_all(
@@ -177,14 +188,14 @@ class SemanticSearch:
         if not file_ids:
             return {}
 
-        if workspace_id:
-            op = "in" if isinstance(workspace_id, list) else "eq"
+        workspace_scope = _workspace_scope_filter(workspace_id)
+        if workspace_scope:
             rows = await select_all_trusted(
                 "files",
                 FILE_COLUMNS,
-                filters={"id": file_ids, f"workspace_id.{op}": workspace_id},
+                filters={"id": file_ids, "workspace_id": workspace_scope},
             )
-            w_ids = set(workspace_id) if isinstance(workspace_id, list) else {workspace_id}
+            w_ids = set(workspace_scope) if isinstance(workspace_scope, list) else {workspace_scope}
             scoped_rows = [row for row in rows if str(row.get("workspace_id") or "") in w_ids]
         else:
             rows = await select_all(
