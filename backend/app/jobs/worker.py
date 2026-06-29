@@ -22,6 +22,7 @@ _DEFAULT_JOB_TIMEOUT_SECONDS = 15 * 60
 _DEFAULT_POLL_TIMEOUT_SECONDS = 5.0
 _DEFAULT_REDIS_OPERATION_TIMEOUT_SECONDS = 7.0
 _DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 30.0
+_DEFAULT_MAX_JOB_ATTEMPTS = 3
 
 
 def _env_int(name: str, default: int, *, minimum: int = 1) -> int:
@@ -54,6 +55,68 @@ def _decode_job_id(raw_job_id: Any) -> str:
     return str(raw_job_id)
 
 
+def _max_job_attempts() -> int:
+    return _env_int("OMNIX_JOB_MAX_ATTEMPTS", _DEFAULT_MAX_JOB_ATTEMPTS)
+
+
+async def _push_retry_job(job_id: str, *, queue_name: str | None = None) -> None:
+    redis = get_redis()
+    await redis.lpush(queue_name or os.environ.get("OMNIX_JOB_QUEUE", "omnix:jobs"), job_id)
+
+
+async def _retry_or_dead_letter_job(
+    job_id: str,
+    job_row: dict[str, Any],
+    *,
+    attempt_number: int,
+    result: dict[str, Any],
+    error: str,
+) -> str:
+    max_attempts = _max_job_attempts()
+    if attempt_number < max_attempts:
+        retry_payload = {
+            "status": "queued",
+            "progress": 0,
+            "error": error,
+            "result": {
+                **result,
+                "retryable": True,
+                "attempt": attempt_number,
+                "max_attempts": max_attempts,
+            },
+        }
+        await update_one_trusted("jobs", {"id": job_id}, retry_payload)
+        try:
+            await _push_retry_job(job_id)
+        except Exception:
+            logger.exception(
+                "Failed to push retry for job %s to Redis; DB row remains queued for recovery.",
+                job_id,
+            )
+        logger.warning(
+            "Job %s failed on attempt %d/%d and was requeued.",
+            job_id,
+            attempt_number,
+            max_attempts,
+        )
+        return "queued"
+
+    dead_letter_payload = {
+        "status": "dead_lettered",
+        "progress": 100,
+        "error": error,
+        "result": {
+            **result,
+            "retryable": False,
+            "attempt": attempt_number,
+            "max_attempts": max_attempts,
+        },
+    }
+    await update_one_trusted("jobs", {"id": job_id}, dead_letter_payload)
+    logger.error("Job %s moved to dead_lettered after %d attempt(s): %s", job_id, attempt_number, error)
+    return "dead_lettered"
+
+
 async def _process_job(job_id: str):
     """Fetch job row, mark processing, run handler, update result."""
     runtime = RuntimeManager.get()
@@ -66,10 +129,11 @@ async def _process_job(job_id: str):
             return
 
         # Update status to processing and increment attempt counter
+        attempt_number = int(job_row.get("attempts") or 0) + 1
         await update_one_trusted(
             "jobs",
             {"id": job_id},
-            {"status": "processing", "attempts": job_row.get("attempts", 0) + 1},
+            {"status": "processing", "attempts": attempt_number},
         )
 
         job_type = job_row.get("type")
@@ -86,17 +150,36 @@ async def _process_job(job_id: str):
             result = {"status": "failed", "error": "unknown job type"}
 
         status = result.get("status", "failed")
-        await update_one_trusted(
-            "jobs",
-            {"id": job_id},
-            {"status": status, "progress": 100, "result": result},
-        )
+        if status == "failed" and job_type in {"ingest_file", "run_automation", "reembed_batch"}:
+            status = await _retry_or_dead_letter_job(
+                job_id,
+                job_row,
+                attempt_number=attempt_number,
+                result=result,
+                error=str(result.get("error") or "Job failed"),
+            )
+        else:
+            await update_one_trusted(
+                "jobs",
+                {"id": job_id},
+                {"status": status, "progress": 100, "result": result},
+            )
         success = status == "completed"
         logger.info("Job %s finished with status %s", job_id, status)
     except Exception as exc:
         logger.exception("Processing job %s failed: %s", job_id, exc)
         try:
-            await update_one_trusted("jobs", {"id": job_id}, {"status": "failed", "error": str(exc)})
+            retry_row = job_row if "job_row" in locals() and isinstance(job_row, dict) else {"attempts": 0}
+            retry_attempt = int(retry_row.get("attempts") or 0) + 1
+            if "attempt_number" in locals():
+                retry_attempt = int(attempt_number)
+            await _retry_or_dead_letter_job(
+                job_id,
+                retry_row,
+                attempt_number=retry_attempt,
+                result={"status": "failed", "error": str(exc)},
+                error=str(exc),
+            )
         except Exception:
             logger.exception("Failed to update job row for job %s after exception", job_id)
     finally:
@@ -110,7 +193,14 @@ async def _process_job_with_timeout(job_id: str, *, timeout_seconds: float) -> N
         error = f"Job exceeded timeout of {timeout_seconds:g}s"
         logger.error("Processing job %s timed out: %s", job_id, error)
         try:
-            await update_one_trusted("jobs", {"id": job_id}, {"status": "failed", "error": error})
+            job_row = await select_one_trusted("jobs", "*", {"id": job_id}) or {"attempts": 0}
+            await _retry_or_dead_letter_job(
+                job_id,
+                job_row,
+                attempt_number=int(job_row.get("attempts") or 0),
+                result={"status": "failed", "error": error},
+                error=error,
+            )
         except Exception:
             logger.exception("Failed to update timed-out job row for job %s", job_id)
 

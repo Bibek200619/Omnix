@@ -101,6 +101,7 @@ async def test_reingestion_inserts_new_chunks_before_deleting_old(monkeypatch: p
             return []
 
     events: list[str] = []
+    captured_filters: list[dict[str, object]] = []
 
     async def fake_embeddings(texts: list[str]) -> list[list[float]]:
         events.append("embed")
@@ -108,6 +109,7 @@ async def test_reingestion_inserts_new_chunks_before_deleting_old(monkeypatch: p
 
     async def fake_select_all_trusted(*args, **kwargs):
         events.append("select_old")
+        captured_filters.append(dict(kwargs["filters"]))
         return [{"id": "old-1"}]
 
     async def fake_insert_many(*args, **kwargs):
@@ -138,3 +140,50 @@ async def test_reingestion_inserts_new_chunks_before_deleting_old(monkeypatch: p
     )
 
     assert events.index("insert_new") < events.index("delete_old")
+    assert captured_filters == [{"file_id": "file-1", "workspace_id": "workspace-1"}]
+
+
+@pytest.mark.asyncio
+async def test_personal_reingestion_deletes_only_personal_user_chunks(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Store(VectorStore):
+        def add_embeddings(self, *args, **kwargs):
+            return None
+
+        def search(self, *args, **kwargs):
+            return []
+
+    captured_filters: list[dict[str, object]] = []
+
+    async def fake_embeddings(texts: list[str]) -> list[list[float]]:
+        return [[0.0] * 384 for _ in texts]
+
+    async def fake_select_all_trusted(*args, **kwargs):
+        captured_filters.append(dict(kwargs["filters"]))
+        return [{"id": "old-personal"}]
+
+    async def fake_insert_many(*args, **kwargs):
+        return []
+
+    async def fake_delete_many_trusted(*args, **kwargs):
+        return []
+
+    import backend.app.rag.ingestion as ingestion
+
+    monkeypatch.setattr(ingestion, "get_embeddings_async", fake_embeddings)
+    monkeypatch.setattr(ingestion, "select_all_trusted", fake_select_all_trusted)
+    monkeypatch.setattr(ingestion, "insert_many", fake_insert_many)
+    monkeypatch.setattr(ingestion, "delete_many_trusted", fake_delete_many_trusted)
+
+    pipeline = RAGIngestionPipeline(Store())
+    await pipeline.ingest_parsed_document(
+        ParsedDocument(
+            text="alpha beta gamma " * 300,
+            sections=[ParsedSection(text="alpha beta gamma " * 300)],
+            source_type="text",
+        ),
+        user_id="user-1",
+        document_id="file-1",
+        workspace_id=None,
+    )
+
+    assert captured_filters == [{"file_id": "file-1", "user_id": "user-1", "workspace_id": {"is": None}}]
