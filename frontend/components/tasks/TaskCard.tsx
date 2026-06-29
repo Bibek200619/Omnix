@@ -113,8 +113,8 @@ export function TaskCard({
   const taskDecisionGraphNodes: DecisionGraphNode[] = [
     {
       kind: "task",
-      title: task.title,
-      detail: linkedInitiative ? `Initiative: ${linkedInitiative.title}` : task.description || task.status,
+      title: "Current task",
+      detail: linkedInitiative ? `Initiative: ${linkedInitiative.title}` : task.status,
     },
     {
       kind: "decision",
