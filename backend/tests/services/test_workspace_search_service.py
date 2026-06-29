@@ -25,18 +25,100 @@ async def test_search_workspace_requires_access_for_empty_query(monkeypatch: pyt
     result = await search.search_workspace(workspace_id="workspace-1", user_id="user-1", query="   ")
 
     assert access_calls == [("workspace-1", "user-1")]
-    assert result == {
-        "conversations": [],
-        "tasks": [],
-        "initiatives": [],
-        "decisions": [],
-        "files": [],
-        "documents": [],
-        "sources": [],
-        "members": [],
-        "mentions": [],
-        "workspaces": [],
+    for group in (
+        "conversations",
+        "tasks",
+        "initiatives",
+        "decisions",
+        "files",
+        "documents",
+        "sources",
+        "automations",
+        "activity",
+        "jobs",
+        "members",
+        "mentions",
+        "workspaces",
+        "items",
+    ):
+        assert result[group] == []
+    assert result["pagination"] == {
+        "limit": search.SEARCH_GROUP_LIMIT,
+        "cursor": 0,
+        "next_cursor": None,
     }
+
+
+@pytest.mark.asyncio
+async def test_search_workspace_uses_ranked_rpc_when_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_require_workspace_access(workspace_id: str, user_id: str):
+        return SimpleNamespace(workspace={"id": workspace_id, "name": "Launch Workspace"})
+
+    async def fake_ranked_workspace(**kwargs: Any) -> list[dict[str, Any]]:
+        assert kwargs == {
+            "workspace_id": "workspace-1",
+            "query": "launch",
+            "limit": 16,
+            "cursor": 2,
+        }
+        return [
+            {
+                "id": "task-1",
+                "workspace_id": "workspace-1",
+                "type": "task",
+                "title": "Launch checklist",
+                "preview": "Finish release readiness",
+                "context": "Active",
+                "url": "/tasks?id=task-1",
+                "matched_field": "full_text",
+                "created_at": "2026-06-01T00:00:00+00:00",
+                "updated_at": "2026-06-02T00:00:00+00:00",
+            },
+            {
+                "id": "automation-1",
+                "workspace_id": "workspace-1",
+                "type": "automation",
+                "title": "Launch digest",
+                "preview": "daily_summary",
+                "context": "Enabled Automation",
+                "url": "/automations?id=automation-1",
+                "matched_field": "full_text",
+                "created_at": "2026-06-01T00:00:00+00:00",
+                "updated_at": "2026-06-02T00:00:00+00:00",
+            },
+        ]
+
+    async def fake_conversations(*args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        return []
+
+    async def fake_members(*args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        return []
+
+    async def fake_mentions(*args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        return []
+
+    async def fail_fanout(*args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        raise AssertionError("field fanout should not run when ranked search succeeds")
+
+    monkeypatch.setattr(search, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(search, "_search_ranked_workspace", fake_ranked_workspace)
+    monkeypatch.setattr(search, "_search_conversations", fake_conversations)
+    monkeypatch.setattr(search, "_search_members", fake_members)
+    monkeypatch.setattr(search, "_search_mentions", fake_mentions)
+    monkeypatch.setattr(search, "_search_table_fields", fail_fanout)
+
+    result = await search.search_workspace(
+        workspace_id="workspace-1",
+        user_id="user-1",
+        query="launch",
+        limit=2,
+        cursor=2,
+    )
+
+    assert [item["title"] for item in result["tasks"]] == ["Launch checklist"]
+    assert [item["title"] for item in result["automations"]] == ["Launch digest"]
+    assert [item["type"] for item in result["items"]] == ["task", "automation", "workspace"]
+    assert result["pagination"] == {"limit": 2, "cursor": 2, "next_cursor": 4}
 
 
 @pytest.mark.asyncio
@@ -230,7 +312,11 @@ async def test_search_workspace_groups_workspace_scoped_ilike_results(monkeypatc
             }
         ]
 
+    async def no_ranked_workspace(**kwargs: Any) -> None:
+        return None
+
     monkeypatch.setattr(search, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(search, "_search_ranked_workspace", no_ranked_workspace)
     monkeypatch.setattr(search, "select_one_trusted", fake_select_one_trusted)
     monkeypatch.setattr(search, "select_all_trusted", fake_select_all_trusted)
     monkeypatch.setattr(search, "list_workspace_members", fake_list_workspace_members)

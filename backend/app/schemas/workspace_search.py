@@ -14,6 +14,9 @@ WorkspaceSearchResultType = Literal[
     "file",
     "document",
     "source",
+    "automation",
+    "activity",
+    "job",
     "member",
     "mention",
     "workspace",
@@ -45,6 +48,11 @@ class WorkspaceSearchResponse(BaseModel):
     files: list[WorkspaceSearchResult] = Field(default_factory=list)
     documents: list[WorkspaceSearchResult] = Field(default_factory=list)
     sources: list[WorkspaceSearchResult] = Field(default_factory=list)
+    automations: list[WorkspaceSearchResult] = Field(default_factory=list)
+    activity: list[WorkspaceSearchResult] = Field(default_factory=list)
+    jobs: list[WorkspaceSearchResult] = Field(default_factory=list)
     members: list[WorkspaceSearchResult] = Field(default_factory=list)
     mentions: list[WorkspaceSearchResult] = Field(default_factory=list)
     workspaces: list[WorkspaceSearchResult] = Field(default_factory=list)
+    items: list[WorkspaceSearchResult] = Field(default_factory=list)
+    pagination: dict[str, int | None] = Field(default_factory=dict)
