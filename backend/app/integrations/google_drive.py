@@ -9,6 +9,7 @@ import logging
 import time
 from typing import Any
 
+from cryptography.fernet import Fernet, InvalidToken
 import httpx
 
 from ..services.supabase_service import (
@@ -25,6 +26,7 @@ GOOGLE_DRIVE_FILES = "https://www.googleapis.com/drive/v3/files"
 GOOGLE_DRIVE_EXPORT = "https://www.googleapis.com/drive/v3/files/{file_id}/export"
 GOOGLE_DRIVE_DOWNLOAD = "https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
 DEFAULT_OAUTH_STATE_TTL_SECONDS = 10 * 60
+TOKEN_CIPHERTEXT_PREFIX = "enc:v1:"
 
 SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly",
@@ -57,6 +59,57 @@ def _oauth_state_ttl_seconds() -> int:
     except ValueError:
         logger.warning("Invalid GOOGLE_OAUTH_STATE_TTL_SECONDS; using default.")
         return DEFAULT_OAUTH_STATE_TTL_SECONDS
+
+
+def _token_encryption_secret() -> str:
+    secret = (
+        os.environ.get("OMNIX_TOKEN_ENCRYPTION_KEY")
+        or os.environ.get("GOOGLE_TOKEN_ENCRYPTION_KEY")
+        or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        or os.environ.get("SUPABASE_SERVICE_ROLE")
+    )
+    if not secret:
+        raise RuntimeError("OMNIX_TOKEN_ENCRYPTION_KEY or SUPABASE_SERVICE_ROLE_KEY must be configured")
+    return secret
+
+
+def _token_cipher() -> Fernet:
+    digest = hashlib.sha256(_token_encryption_secret().encode("utf-8")).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def _encrypt_token(value: Any) -> str | None:
+    if value is None:
+        return None
+    token = str(value)
+    if not token:
+        return token
+    if token.startswith(TOKEN_CIPHERTEXT_PREFIX):
+        return token
+    encrypted = _token_cipher().encrypt(token.encode("utf-8")).decode("ascii")
+    return f"{TOKEN_CIPHERTEXT_PREFIX}{encrypted}"
+
+
+def _decrypt_token(value: Any) -> str | None:
+    if value is None:
+        return None
+    token = str(value)
+    if not token.startswith(TOKEN_CIPHERTEXT_PREFIX):
+        return token
+    ciphertext = token[len(TOKEN_CIPHERTEXT_PREFIX) :]
+    try:
+        return _token_cipher().decrypt(ciphertext.encode("ascii")).decode("utf-8")
+    except InvalidToken as exc:
+        raise RuntimeError("Stored Google Drive token could not be decrypted") from exc
+
+
+def _decrypt_token_row(row: dict[str, Any] | None) -> dict[str, Any] | None:
+    if row is None:
+        return None
+    decrypted = dict(row)
+    decrypted["access_token"] = _decrypt_token(decrypted.get("access_token"))
+    decrypted["refresh_token"] = _decrypt_token(decrypted.get("refresh_token"))
+    return decrypted
 
 
 def _base64url_encode(data: bytes) -> str:
@@ -172,6 +225,7 @@ async def ensure_valid_token(row: dict[str, Any]) -> dict[str, Any]:
     """Ensure access_token is valid; refresh if expired."""
     if not row:
         raise RuntimeError("No token row provided")
+    row = _decrypt_token_row(row) or row
     expires_at = row.get("expires_at")
     if expires_at and int(time.time()) < int(expires_at) - 30:
         return row
@@ -186,7 +240,15 @@ async def ensure_valid_token(row: dict[str, Any]) -> dict[str, Any]:
         raise
     # Persist new tokens
     try:
-        await update_one_trusted("google_drive_tokens", {"id": row.get("id")}, {"access_token": new.get("access_token"), "expires_at": new.get("expires_at"), "updated_at": None})
+        await update_one_trusted(
+            "google_drive_tokens",
+            {"id": row.get("id")},
+            {
+                "access_token": _encrypt_token(new.get("access_token")),
+                "expires_at": new.get("expires_at"),
+                "updated_at": None,
+            },
+        )
     except Exception:
         logger.exception("Failed to persist refreshed token")
     row["access_token"] = new.get("access_token")
@@ -236,8 +298,8 @@ async def store_token_for_user(user_id: str, workspace_id: str | None, token_res
         "user_id": user_id,
         "workspace_id": workspace_id,
         "provider": "google_drive",
-        "access_token": token_response.get("access_token"),
-        "refresh_token": token_response.get("refresh_token"),
+        "access_token": _encrypt_token(token_response.get("access_token")),
+        "refresh_token": _encrypt_token(token_response.get("refresh_token")),
         "scope": token_response.get("scope"),
         "expires_at": token_response.get("expires_at"),
     }
@@ -250,4 +312,4 @@ async def get_token_for_user(user_id: str, workspace_id: str | None = None) -> d
     if workspace_id:
         filters["workspace_id"] = workspace_id
     rows = await select_one_trusted("google_drive_tokens", "id,user_id,workspace_id,access_token,refresh_token,expires_at,scope", filters)
-    return rows
+    return _decrypt_token_row(rows)

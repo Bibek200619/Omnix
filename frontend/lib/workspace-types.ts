@@ -527,7 +527,10 @@ export type WorkspaceSearchResultType =
   | "source"
   | "member"
   | "mention"
-  | "workspace";
+  | "workspace"
+  | "automation"
+  | "activity"
+  | "job";
 
 export type WorkspaceSearchResult = {
   id: string;
@@ -555,6 +558,16 @@ export type WorkspaceSearchResponse = {
   members: WorkspaceSearchResult[];
   mentions: WorkspaceSearchResult[];
   workspaces: WorkspaceSearchResult[];
+  automations: WorkspaceSearchResult[];
+  activity: WorkspaceSearchResult[];
+  jobs: WorkspaceSearchResult[];
+  items?: WorkspaceSearchResult[];
+  pagination?: {
+    limit: number;
+    cursor: number;
+    next_cursor?: number | null;
+    total_returned: number;
+  };
 };
 
 export type WorkspaceMentionSourceType = "conversation_message" | "task" | "decision";

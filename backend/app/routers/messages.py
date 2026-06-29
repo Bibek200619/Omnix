@@ -66,6 +66,7 @@ RATE_LIMIT_REQUESTS = 5
 RATE_LIMIT_WINDOW = 60.0
 _chat_rate_limits: dict[str, list[float]] = {}
 DOCUMENT_INTENT_RE = message_retrieval_service.DOCUMENT_INTENT_RE
+PUBLIC_AI_SYSTEM_PROMPT_ERROR = "Public AI generation does not accept caller-supplied system prompts."
 
 
 def _check_rate_limit(user_id: str) -> None:
@@ -91,6 +92,49 @@ def _database_error() -> HTTPException:
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Internal server error",
     )
+
+
+def _public_allowed_models() -> set[str]:
+    settings = get_settings()
+    configured = [
+        item.strip()
+        for item in str(getattr(settings, "AI_PUBLIC_ALLOWED_MODELS", "") or "").split(",")
+        if item.strip()
+    ]
+    if configured:
+        return set(configured)
+    return {
+        item
+        for item in (
+            getattr(settings, "ollama_model", None),
+            getattr(settings, "OPENAI_CHAT_MODEL", None),
+            getattr(settings, "ANTHROPIC_CHAT_MODEL", None),
+        )
+        if isinstance(item, str) and item.strip()
+    }
+
+
+def _public_ai_generation_policy(payload: AIGenerationRequest) -> dict[str, Any]:
+    if payload.system_prompt and payload.system_prompt.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PUBLIC_AI_SYSTEM_PROMPT_ERROR)
+    if any(message.role == "system" for message in payload.context):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PUBLIC_AI_SYSTEM_PROMPT_ERROR)
+
+    allowed_models = _public_allowed_models()
+    requested_model = payload.model.strip() if payload.model else None
+    if requested_model and requested_model not in allowed_models:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Requested model is not allowed for public generation.")
+
+    settings = get_settings()
+    max_public_tokens = max(1, min(int(getattr(settings, "AI_PUBLIC_MAX_OUTPUT_TOKENS", 512)), 4096))
+    max_public_temperature = max(0.0, min(float(getattr(settings, "AI_PUBLIC_MAX_TEMPERATURE", 0.8)), 2.0))
+
+    return {
+        "context": [AIMessage(role=message.role, content=message.content) for message in payload.context],
+        "temperature": min(float(payload.temperature), max_public_temperature),
+        "model": requested_model,
+        "max_tokens": min(int(payload.max_tokens or max_public_tokens), max_public_tokens),
+    }
 
 
 def _build_context(messages: list[dict[str, Any]]) -> list[dict[str, str]]:
@@ -474,18 +518,16 @@ async def generate_ai(
 ) -> AIGenerationResponse:
     user_id = _user_id_from_claims(current_user)
     _check_rate_limit(user_id)
+    policy = _public_ai_generation_policy(payload)
 
     try:
         generation = await generate_ai_response(
             payload.prompt,
-            context=[
-                AIMessage(role=message.role, content=message.content)
-                for message in payload.context
-            ],
-            system_prompt=payload.system_prompt,
-            temperature=payload.temperature,
-            model=payload.model,
-            max_tokens=payload.max_tokens,
+            context=policy["context"],
+            system_prompt=None,
+            temperature=policy["temperature"],
+            model=policy["model"],
+            max_tokens=policy["max_tokens"],
         )
     except ModelServiceError as exc:
         logger.exception("Failed to generate AI response")

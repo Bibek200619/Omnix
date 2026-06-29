@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
+from ..db.supabase_client import get_async_supabase
 from .supabase_service import SupabaseServiceError, select_all_trusted, select_one_trusted
 from .workspace_mention_service import list_mentions_for_user
 from .workspace_service import list_workspace_members, require_workspace_access
@@ -41,10 +42,14 @@ SEARCH_GROUPS = (
     "files",
     "documents",
     "sources",
+    "automations",
+    "activity",
+    "jobs",
     "members",
     "mentions",
     "workspaces",
 )
+RANKED_SEARCH_RPC = "search_workspace_ranked"
 
 
 def _database_error() -> HTTPException:
@@ -421,8 +426,108 @@ def _workspace_result(row: Mapping[str, Any], query: str) -> dict[str, Any] | No
     }
 
 
-def _empty_response() -> dict[str, list[dict[str, Any]]]:
-    return {group: [] for group in SEARCH_GROUPS}
+def _empty_response() -> dict[str, Any]:
+    response: dict[str, Any] = {group: [] for group in SEARCH_GROUPS}
+    response["items"] = []
+    response["pagination"] = {"limit": SEARCH_GROUP_LIMIT, "cursor": 0, "next_cursor": None}
+    return response
+
+
+def _group_for_result_type(result_type: str) -> str | None:
+    return {
+        "conversation": "conversations",
+        "task": "tasks",
+        "initiative": "initiatives",
+        "decision": "decisions",
+        "file": "files",
+        "document": "documents",
+        "source": "sources",
+        "automation": "automations",
+        "activity": "activity",
+        "job": "jobs",
+        "member": "members",
+        "mention": "mentions",
+        "workspace": "workspaces",
+    }.get(result_type)
+
+
+def _flatten_response(response: Mapping[str, Any], *, limit: int, cursor: int, ranked_count: int | None = None) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for group in SEARCH_GROUPS:
+        group_items = response.get(group)
+        if isinstance(group_items, list):
+            items.extend(group_items)
+    next_cursor = cursor + limit if ranked_count is not None and ranked_count >= limit else None
+    if isinstance(response, dict):
+        response["items"] = items
+        response["pagination"] = {"limit": limit, "cursor": cursor, "next_cursor": next_cursor}
+    return items
+
+
+async def _search_ranked_workspace(
+    *,
+    workspace_id: str,
+    query: str,
+    limit: int,
+    cursor: int,
+) -> list[dict[str, Any]] | None:
+    try:
+        client = await get_async_supabase()
+        response = await client.rpc(
+            RANKED_SEARCH_RPC,
+            {
+                "p_workspace_id": workspace_id,
+                "p_query": query,
+                "p_limit": limit,
+                "p_offset": cursor,
+            },
+        ).execute()
+        return list(getattr(response, "data", None) or [])
+    except Exception as exc:
+        logger.info("Ranked workspace search RPC unavailable; falling back to field fanout: %s", exc)
+        return None
+
+
+def _ranked_result(row: Mapping[str, Any]) -> dict[str, Any] | None:
+    result_type = str(row.get("type") or "")
+    if _group_for_result_type(result_type) is None:
+        return None
+    result_id = str(row.get("id") or "")
+    workspace_id = str(row.get("workspace_id") or "")
+    title = str(row.get("title") or "").strip()
+    url = str(row.get("url") or "").strip()
+    if not result_id or not workspace_id or not title or not url:
+        return None
+    return {
+        "id": result_id,
+        "workspace_id": workspace_id,
+        "type": result_type,
+        "title": title,
+        "preview": _compact_text(row.get("preview"), limit=220),
+        "context": _compact_text(row.get("context"), limit=160),
+        "url": url,
+        "channel_id": row.get("channel_id"),
+        "message_id": row.get("message_id"),
+        "matched_field": row.get("matched_field") or "full_text",
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
+    }
+
+
+def _group_ranked_results(rows: list[dict[str, Any]], *, query: str, limit: int) -> dict[str, Any]:
+    grouped = _empty_response()
+    for row in rows:
+        result = _ranked_result(row)
+        if result is None:
+            continue
+        group = _group_for_result_type(str(result["type"]))
+        if group is None:
+            continue
+        grouped[group].append(result)
+
+    for group in SEARCH_GROUPS:
+        grouped[group] = _dedupe_results(grouped[group], query=query, limit=limit)
+    return grouped
 
 
 async def _search_members(workspace: Mapping[str, Any], query: str) -> list[dict[str, Any]]:
@@ -472,16 +577,44 @@ async def search_workspace(
     workspace_id: str,
     user_id: str,
     query: str,
-) -> dict[str, list[dict[str, Any]]]:
+    limit: int = SEARCH_GROUP_LIMIT,
+    cursor: int = 0,
+) -> dict[str, Any]:
     access = await require_workspace_access(workspace_id, user_id)
     normalized_query = _normalize_query(query)
     empty = _empty_response()
+    bounded_limit = max(1, min(int(limit), 25))
+    bounded_cursor = max(0, int(cursor))
+    empty["pagination"] = {"limit": bounded_limit, "cursor": bounded_cursor, "next_cursor": None}
     if not normalized_query:
         return empty
 
     pattern = _ilike_pattern(normalized_query)
+    ranked_rows = await _search_ranked_workspace(
+        workspace_id=workspace_id,
+        query=normalized_query,
+        limit=max(bounded_limit * 8, bounded_limit),
+        cursor=bounded_cursor,
+    )
     try:
         conversations_task = _search_conversations(workspace_id, user_id, pattern, normalized_query)
+        members_task = _search_members(access.workspace, normalized_query)
+        mentions_task = _search_mentions(workspace_id, user_id, normalized_query)
+        if ranked_rows is not None:
+            conversation_rows, member_rows, mention_rows = await asyncio.gather(
+                conversations_task,
+                members_task,
+                mentions_task,
+            )
+            ranked_response = _group_ranked_results(ranked_rows, query=normalized_query, limit=bounded_limit)
+            workspace_result = _workspace_result(access.workspace, normalized_query)
+            ranked_response["conversations"] = conversation_rows
+            ranked_response["members"] = member_rows
+            ranked_response["mentions"] = mention_rows
+            ranked_response["workspaces"] = [workspace_result] if workspace_result else []
+            _flatten_response(ranked_response, limit=bounded_limit, cursor=bounded_cursor, ranked_count=len(ranked_rows))
+            return ranked_response
+
         tasks_task = _search_table_fields(
             table="workspace_tasks",
             columns=TASK_COLUMNS,
@@ -524,8 +657,6 @@ async def search_workspace(
             fields=("display_name", "connector_type", "status"),
             pattern=pattern,
         )
-        members_task = _search_members(access.workspace, normalized_query)
-        mentions_task = _search_mentions(workspace_id, user_id, normalized_query)
         (
             conversation_rows,
             task_rows,
@@ -552,15 +683,20 @@ async def search_workspace(
         raise _database_error() from exc
 
     workspace_result = _workspace_result(access.workspace, normalized_query)
-    return {
+    response = {
         "conversations": conversation_rows,
-        "tasks": _dedupe_results([_task_result(row) for row in task_rows], query=normalized_query),
-        "initiatives": _dedupe_results([_initiative_result(row) for row in initiative_rows], query=normalized_query),
-        "decisions": _dedupe_results([_decision_result(row) for row in decision_rows], query=normalized_query),
-        "files": _dedupe_results([_file_result(row) for row in file_rows], query=normalized_query),
-        "documents": _dedupe_results([_document_result(row) for row in document_rows], query=normalized_query),
-        "sources": _dedupe_results([_source_result(row) for row in source_rows], query=normalized_query),
+        "tasks": _dedupe_results([_task_result(row) for row in task_rows], query=normalized_query, limit=bounded_limit),
+        "initiatives": _dedupe_results([_initiative_result(row) for row in initiative_rows], query=normalized_query, limit=bounded_limit),
+        "decisions": _dedupe_results([_decision_result(row) for row in decision_rows], query=normalized_query, limit=bounded_limit),
+        "files": _dedupe_results([_file_result(row) for row in file_rows], query=normalized_query, limit=bounded_limit),
+        "documents": _dedupe_results([_document_result(row) for row in document_rows], query=normalized_query, limit=bounded_limit),
+        "sources": _dedupe_results([_source_result(row) for row in source_rows], query=normalized_query, limit=bounded_limit),
+        "automations": [],
+        "activity": [],
+        "jobs": [],
         "members": member_rows,
         "mentions": mention_rows,
         "workspaces": [workspace_result] if workspace_result else [],
     }
+    _flatten_response(response, limit=bounded_limit, cursor=bounded_cursor)
+    return response

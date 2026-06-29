@@ -290,14 +290,15 @@ class TestProcessJob:
         assert self.rm._jobs_completed == 0
 
     @pytest.mark.asyncio
-    async def test_process_job_handler_raises(self):
-        """Handler exception → job DB row set to failed; RuntimeManager records failure."""
+    async def test_process_job_handler_raises_requeues_before_max_attempts(self):
+        """Handler exception → job DB row set back to queued for bounded retry."""
         import app.jobs.worker as w
 
         self.rm.register_worker(w._WORKER_ID, [], worker_type="ingestion")
 
         job_row = _make_job_row()
         update_calls: list[dict] = []
+        retries: list[str] = []
 
         async def fake_select_one(table, cols, filters):
             return job_row
@@ -309,15 +310,21 @@ class TestProcessJob:
         async def fake_handle_ingest(row):
             raise RuntimeError("vector store crashed")
 
+        async def fake_push_retry(job_id: str, *, queue_name: str | None = None):
+            retries.append(job_id)
+
         with (
             patch("app.jobs.worker.select_one_trusted", fake_select_one),
             patch("app.jobs.worker.update_one_trusted", fake_update_one),
             patch("app.jobs.worker.handle_ingest_file", fake_handle_ingest),
+            patch("app.jobs.worker._push_retry_job", fake_push_retry),
         ):
             await w._process_job("job-1")
 
-        failed_updates = [u for u in update_calls if u.get("status") == "failed"]
-        assert failed_updates, "Expected at least one DB update with status=failed"
+        retry_updates = [u for u in update_calls if u.get("status") == "queued"]
+        assert retry_updates, "Expected failed job to be requeued before max attempts"
+        assert retry_updates[-1]["result"]["retryable"] is True
+        assert retries == ["job-1"]
         assert self.rm._jobs_failed == 1
         assert self.rm._jobs_completed == 0
 
@@ -376,6 +383,42 @@ class TestProcessJob:
 
         final_update = update_calls[-1]
         assert final_update["status"] == "failed"
+
+    @pytest.mark.asyncio
+    async def test_process_job_dead_letters_after_max_attempts(self, monkeypatch: pytest.MonkeyPatch):
+        import app.jobs.worker as w
+
+        monkeypatch.setenv("OMNIX_JOB_MAX_ATTEMPTS", "3")
+        self.rm.register_worker(w._WORKER_ID, [], worker_type="ingestion")
+
+        job_row = _make_job_row(attempts=2)
+        update_calls: list[dict] = []
+
+        async def fake_select_one(table, cols, filters):
+            return job_row
+
+        async def fake_update_one(table, filters, data):
+            update_calls.append(dict(data))
+            return {**job_row, **data}
+
+        async def fake_handle_ingest(row):
+            return {"status": "failed", "error": "embedding failed"}
+
+        async def fail_push_retry(job_id: str, *, queue_name: str | None = None):
+            raise AssertionError("dead-lettered jobs must not be requeued")
+
+        with (
+            patch("app.jobs.worker.select_one_trusted", fake_select_one),
+            patch("app.jobs.worker.update_one_trusted", fake_update_one),
+            patch("app.jobs.worker.handle_ingest_file", fake_handle_ingest),
+            patch("app.jobs.worker._push_retry_job", fail_push_retry),
+        ):
+            await w._process_job("job-1")
+
+        final_update = update_calls[-1]
+        assert final_update["status"] == "dead_lettered"
+        assert final_update["result"]["retryable"] is False
+        assert final_update["result"]["attempt"] == 3
 
 
 # ===========================================================================
@@ -504,11 +547,12 @@ class TestWorkerLoopConcurrency:
         assert max_active == 2
 
     @pytest.mark.asyncio
-    async def test_process_job_timeout_marks_job_failed(self):
+    async def test_process_job_timeout_requeues_job(self):
         import app.jobs.worker as w
 
         cancelled = asyncio.Event()
         update_calls: list[dict[str, object]] = []
+        retries: list[str] = []
 
         async def slow_process_job(job_id: str):
             try:
@@ -521,9 +565,17 @@ class TestWorkerLoopConcurrency:
             update_calls.append({"table": table, "filters": filters, "payload": payload})
             return {"id": filters["id"], **payload}
 
+        async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
+            return {"id": filters["id"], "attempts": 1}
+
+        async def fake_push_retry(job_id: str, *, queue_name: str | None = None):
+            retries.append(job_id)
+
         with (
             patch("app.jobs.worker._process_job", slow_process_job),
             patch("app.jobs.worker.update_one_trusted", fake_update_one),
+            patch("app.jobs.worker.select_one_trusted", fake_select_one),
+            patch("app.jobs.worker._push_retry_job", fake_push_retry),
         ):
             await w._process_job_with_timeout("job-slow", timeout_seconds=0.01)
 
@@ -532,9 +584,21 @@ class TestWorkerLoopConcurrency:
             {
                 "table": "jobs",
                 "filters": {"id": "job-slow"},
-                "payload": {"status": "failed", "error": "Job exceeded timeout of 0.01s"},
+                "payload": {
+                    "status": "queued",
+                    "progress": 0,
+                    "error": "Job exceeded timeout of 0.01s",
+                    "result": {
+                        "status": "failed",
+                        "error": "Job exceeded timeout of 0.01s",
+                        "retryable": True,
+                        "attempt": 1,
+                        "max_attempts": 3,
+                    },
+                },
             }
         ]
+        assert retries == ["job-slow"]
 
 
 # ===========================================================================

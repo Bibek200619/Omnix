@@ -8,9 +8,11 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import {
+  Activity,
   ArrowUpRight,
   BadgeCheck,
   Bell,
+  Bot,
   ClipboardCheck,
   Command,
   Compass,
@@ -21,6 +23,7 @@ import {
   Search,
   Settings,
   UsersRound,
+  Workflow,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -33,7 +36,23 @@ import { useWorkspaceTree } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { WorkspaceSearchResponse, WorkspaceSearchResult } from "@/lib/workspace-types";
 
-type SearchGroupKey = keyof WorkspaceSearchResponse;
+const searchGroupKeys = [
+  "tasks",
+  "decisions",
+  "initiatives",
+  "conversations",
+  "files",
+  "documents",
+  "sources",
+  "members",
+  "mentions",
+  "workspaces",
+  "automations",
+  "activity",
+  "jobs",
+] as const;
+
+type SearchGroupKey = (typeof searchGroupKeys)[number];
 type PaletteItemKind = "action" | "search" | "recent";
 
 type PaletteItem = {
@@ -65,9 +84,12 @@ const searchGroups: Array<{ key: SearchGroupKey; label: string; icon: LucideIcon
   { key: "members", label: "Team Members", icon: UsersRound },
   { key: "mentions", label: "Mentions", icon: Bell },
   { key: "workspaces", label: "Workspace Metadata", icon: Settings },
+  { key: "automations", label: "Automations", icon: Workflow },
+  { key: "activity", label: "Activity", icon: Activity },
+  { key: "jobs", label: "Jobs", icon: Bot },
 ];
 
-const emptyResults: WorkspaceSearchResponse = {
+const emptySearchGroups: Record<SearchGroupKey, WorkspaceSearchResult[]> = {
   conversations: [],
   tasks: [],
   initiatives: [],
@@ -78,6 +100,14 @@ const emptyResults: WorkspaceSearchResponse = {
   members: [],
   mentions: [],
   workspaces: [],
+  automations: [],
+  activity: [],
+  jobs: [],
+};
+
+const emptyResults: WorkspaceSearchResponse = {
+  ...emptySearchGroups,
+  items: [],
 };
 
 const quickActions: PaletteItem[] = [
@@ -212,6 +242,9 @@ function searchResultTypeLabel(result: WorkspaceSearchResult) {
   if (result.type === "member") return "Team Member";
   if (result.type === "mention") return "Mention";
   if (result.type === "workspace") return "Workspace";
+  if (result.type === "automation") return "Automation";
+  if (result.type === "activity") return "Activity";
+  if (result.type === "job") return "Job";
   return "Task";
 }
 
@@ -223,6 +256,9 @@ function searchResultIcon(result: WorkspaceSearchResult): LucideIcon {
   if (result.type === "member") return UsersRound;
   if (result.type === "mention") return Bell;
   if (result.type === "workspace") return Settings;
+  if (result.type === "automation") return Workflow;
+  if (result.type === "activity") return Activity;
+  if (result.type === "job") return Bot;
   return ClipboardCheck;
 }
 
@@ -267,6 +303,7 @@ export function CommandPalette() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const requestRef = useRef(0);
+  const searchAbortRef = useRef<AbortController | null>(null);
   const trimmedQuery = query.trim();
 
   const filteredActions = useMemo(
@@ -294,21 +331,10 @@ export function CommandPalette() {
     () =>
       searchGroups.reduce<Record<SearchGroupKey, PaletteItem[]>>(
         (acc, group) => {
-          acc[group.key] = results[group.key].map((result) => searchResultItem(result, group.key));
+          acc[group.key] = (results[group.key] ?? []).map((result) => searchResultItem(result, group.key));
           return acc;
         },
-        {
-          conversations: [],
-          tasks: [],
-          initiatives: [],
-          decisions: [],
-          files: [],
-          documents: [],
-          sources: [],
-          members: [],
-          mentions: [],
-          workspaces: [],
-        },
+        Object.fromEntries(searchGroupKeys.map((key) => [key, []])) as unknown as Record<SearchGroupKey, PaletteItem[]>,
       ),
     [results],
   );
@@ -338,6 +364,15 @@ export function CommandPalette() {
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const handleOpenRequest = () => {
+      setOpen(true);
+      setQuery("");
+    };
+    window.addEventListener("omnix:open-command-palette", handleOpenRequest);
+    return () => window.removeEventListener("omnix:open-command-palette", handleOpenRequest);
   }, []);
 
   useEffect(() => {
@@ -391,6 +426,7 @@ export function CommandPalette() {
   useEffect(() => {
     const requestId = ++requestRef.current;
     setActiveIndex(0);
+    searchAbortRef.current?.abort();
     if (!open || !activeWorkspaceId || !trimmedQuery) {
       setResults(emptyResults);
       setLoading(false);
@@ -399,14 +435,17 @@ export function CommandPalette() {
     }
     setLoading(true);
     setError(null);
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
     const timer = window.setTimeout(() => {
       apiClient
-        .searchWorkspace(activeWorkspaceId, trimmedQuery)
+        .searchWorkspace(activeWorkspaceId, trimmedQuery, { signal: controller.signal, limit: 8 })
         .then((incoming) => {
           if (requestId !== requestRef.current) return;
           setResults({ ...emptyResults, ...incoming });
         })
         .catch((err) => {
+          if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) return;
           if (requestId !== requestRef.current) return;
           logClientError("Failed to search workspace from command palette", err, {
             endpoint: `/workspaces/${activeWorkspaceId}/search`,
@@ -416,9 +455,14 @@ export function CommandPalette() {
         })
         .finally(() => {
           if (requestId === requestRef.current) setLoading(false);
+          if (searchAbortRef.current === controller) searchAbortRef.current = null;
         });
     }, 240);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+      if (searchAbortRef.current === controller) searchAbortRef.current = null;
+    };
   }, [activeWorkspaceId, open, trimmedQuery]);
 
   useEffect(() => {
