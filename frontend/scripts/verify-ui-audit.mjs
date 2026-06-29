@@ -21,6 +21,7 @@ const [
   analyticsPage,
   conversationSurface,
   filesPage,
+  filesModel,
   sidebarNav,
   globalsCss,
   landingPage,
@@ -28,6 +29,7 @@ const [
   read("app/(dashboard)/analytics/page.tsx"),
   read("components/conversations/WorkspaceConversationSurface.tsx"),
   read("app/(dashboard)/files/page.tsx"),
+  read("components/files/filesPageModel.ts"),
   read("components/layout/sidebar/SidebarNav.tsx"),
   read("styles/globals.css"),
   read("app/page.tsx"),
@@ -48,7 +50,7 @@ assertIncludes(globalsCss, ".omnix-conversation-workbench", "Conversation respon
 assertIncludes(globalsCss, '@container (min-width: 48rem)', "Conversation responsive CSS");
 assertIncludes(globalsCss, 'data-thread="open"', "Conversation responsive CSS");
 
-assertIncludes(filesPage, 'type SourceSection = "files" | "connectors"', "Sources tabs");
+assertIncludes(filesModel, 'type SourceSection = "files" | "connectors"', "Sources tabs");
 assertIncludes(filesPage, "activeSection", "Sources tabs");
 assertIncludes(filesPage, "connectorSourceTypes", "Sources tabs");
 assertIncludes(filesPage, 'activeSection === "files"', "Sources tabs");
@@ -60,7 +62,11 @@ for (const label of ["Core", "Execution", "Workspace", "System"]) {
 assertIncludes(sidebarNav, "navGroups", "Sidebar grouped navigation");
 
 const landingFiles = await readdir(join(root, "components/landing"));
-assert.deepEqual(landingFiles.sort(), ["LandingExperience.tsx", "LandingHeroScene.tsx"], "Only the active landing experience files should remain");
+assert.deepEqual(
+  landingFiles.sort(),
+  ["LandingAppScreenshots.tsx", "LandingExperience.tsx", "LandingHeroScene.tsx", "LandingPrimitives.tsx"],
+  "Only the active landing experience files should remain",
+);
 assertIncludes(landingPage, 'import { LandingExperience } from "@/components/landing/LandingExperience"', "Landing route");
 
 console.log("UI audit integration checks passed.");
