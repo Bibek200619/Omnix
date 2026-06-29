@@ -26,6 +26,7 @@ import {
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { ConnectorSetupModal } from "@/components/files/ConnectorSetupModal";
+import { SourceHealthConsole } from "@/components/files/SourceHealthConsole";
 import { CreateDecisionModal } from "@/components/decisions/CreateDecisionModal";
 import { DocumentPortal } from "@/components/files/DocumentPortal";
 import { DecisionCandidatePanel } from "@/components/decisions/DecisionCandidatePanel";
@@ -621,6 +622,7 @@ function FilesPageContent() {
             );
           })}
         </div>
+        <SourceHealthConsole files={files} connectors={connectors} actionConnectorId={actionConnectorId} onRetryConnector={(connector) => void handleRetryConnector(connector)} />
 
         {activeSection === "connectors" ? (
         <div className="omnix-cinematic-card p-5">
