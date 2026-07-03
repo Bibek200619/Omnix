@@ -541,6 +541,16 @@ textarea {
   background: #00ffff;
 }
 
+.auth-otp-success-panel {
+  animation: auth-otp-panel-in 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  will-change: transform, opacity;
+}
+
+.auth-otp-success-check {
+  animation: auth-otp-check-pop 320ms cubic-bezier(0.23, 1, 0.32, 1) 80ms both;
+  will-change: transform, opacity;
+}
+
 .omnix-auth-shell::before {
   position: fixed;
   inset: var(--omnix-header-h) 0 0 var(--omnix-sidebar-w);
@@ -1711,6 +1721,39 @@ textarea {
   }
   100% {
     background-position: 64px 64px;
+  }
+}
+
+@keyframes auth-otp-panel-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes auth-otp-check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-otp-success-panel,
+  .auth-otp-success-check {
+    animation: none;
   }
 }
 
