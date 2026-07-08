@@ -1,5 +1,7 @@
 from __future__ import annotations
 import asyncio
+import importlib
+import inspect
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
@@ -110,10 +112,14 @@ async def check_ingestion_worker(*, include_stuck_jobs: bool = True) -> Dict[str
     # Stuck job detection uses trusted DB access and is reserved for authenticated
     # internal diagnostics. Public readiness checks skip it.
     stuck_10m = stuck_30m = stuck_60m = None
+    queue_recovery: dict[str, Any] = {"status": "not_checked", "reason": "internal_diagnostics_disabled"}
+    dead_lettered_jobs: int | None = None
     if include_stuck_jobs:
         stuck_10m = await _count_stuck_jobs(minutes=10)
         stuck_30m = await _count_stuck_jobs(minutes=30)
         stuck_60m = await _count_stuck_jobs(minutes=60)
+        queue_recovery = await _queue_recovery_diagnostics()
+        dead_lettered_jobs = await _count_jobs_by_status("dead_lettered")
 
     worker_status = "healthy" if metrics["active_workers"] > 0 else "no_worker"
     if metrics["active_workers"] == 0:
@@ -132,6 +138,8 @@ async def check_ingestion_worker(*, include_stuck_jobs: bool = True) -> Dict[str
             "older_than_30m": stuck_30m,
             "older_than_60m": stuck_60m,
         },
+        "queue_recovery": queue_recovery,
+        "dead_lettered_jobs": dead_lettered_jobs,
     }
 
 
@@ -156,6 +164,41 @@ async def _count_stuck_jobs(minutes: int) -> int | None:
     except Exception as exc:
         logger.warning("Could not count stuck jobs (>%dm): %s", minutes, exc)
         return None
+
+
+async def _count_jobs_by_status(status: str) -> int | None:
+    try:
+        from ..services.supabase_service import select_all_trusted
+
+        rows = await select_all_trusted(
+            "jobs",
+            "id",
+            filters={"status": status},
+        )
+        if rows is None:
+            return None
+        return len(rows)
+    except Exception as exc:
+        logger.warning("Could not count jobs with status=%s: %s", status, exc)
+        return None
+
+
+async def _queue_recovery_diagnostics() -> dict[str, Any]:
+    try:
+        queue_module = importlib.import_module("app.jobs.queue")
+        recover_missing_queued_jobs = getattr(queue_module, "recover_missing_queued_jobs", None)
+        if not inspect.iscoroutinefunction(recover_missing_queued_jobs):
+            return {"status": "unavailable", "error": "queue recovery scanner is not available"}
+
+        result = await recover_missing_queued_jobs(dry_run=True)
+        missing_jobs = int(result.get("missing_jobs") or 0)
+        return {
+            **result,
+            "status": "recovery_needed" if missing_jobs else "clear",
+        }
+    except Exception as exc:
+        logger.warning("Could not inspect queue recovery state: %s", exc)
+        return {"status": "error", "error": str(exc)}
 
 
 async def run_all_checks(*, include_internal: bool = True) -> Dict[str, Any]:
