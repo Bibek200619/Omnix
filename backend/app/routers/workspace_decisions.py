@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, status
 
 from ..core.security import get_current_user
+from .ai_rate_limits import enforce_expensive_ai_rate_limit
 from ..services.workspace_service import require_workspace_access
 from ..schemas.workspace_decisions import (
     DecisionCandidateListRead,
@@ -90,11 +91,17 @@ async def post_conversation_decision_candidates(
     channel_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
-    await require_workspace_access(workspace_id, _user_id(current_user))
+    user_id = _user_id(current_user)
+    await require_workspace_access(workspace_id, user_id)
+    await enforce_expensive_ai_rate_limit(
+        user_id=user_id,
+        workspace_id=workspace_id,
+        endpoint="workspace.decisions.candidates.conversation",
+    )
     return await conversation_decision_candidates(
         workspace_id=workspace_id,
         channel_id=channel_id,
-        user_id=_user_id(current_user),
+        user_id=user_id,
     )
 
 
@@ -104,11 +111,17 @@ async def post_document_decision_candidates(
     file_id: str,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
-    await require_workspace_access(workspace_id, _user_id(current_user))
+    user_id = _user_id(current_user)
+    await require_workspace_access(workspace_id, user_id)
+    await enforce_expensive_ai_rate_limit(
+        user_id=user_id,
+        workspace_id=workspace_id,
+        endpoint="workspace.decisions.candidates.document",
+    )
     return await document_decision_candidates(
         workspace_id=workspace_id,
         file_id=file_id,
-        user_id=_user_id(current_user),
+        user_id=user_id,
     )
 
 
