@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from ..core.security import get_current_user
+from .ai_rate_limits import enforce_expensive_ai_rate_limit
 from ..schemas.continuity import (
     WorkspaceOperationalTimelineEvent
 )
@@ -144,10 +145,11 @@ async def assist_workspace_initiative(
     request: WorkspaceInitiativeAssistanceRequest,
     user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    user_id = _user_id(user)
     initiative, messages = await initiative_evidence_for_assistance(
         workspace_id=workspace_id,
         initiative_id=initiative_id,
-        user_id=_user_id(user),
+        user_id=user_id,
     )
     tasks = initiative["linked_tasks"]
     resources = initiative["linked_resources"]
@@ -175,6 +177,11 @@ async def assist_workspace_initiative(
         f"target={initiative.get('target_date') or 'none'} | derived_momentum={initiative['momentum']['health']}\n"
         f"CONTEXT: {initiative.get('initiative_context') or initiative.get('description') or 'none'}\n"
         f"LINKED RESOURCES: {resources}\n\nTASK RECORDS:\n{task_lines}\n\nATTACHED DISCUSSION:\n{message_lines}"
+    )
+    await enforce_expensive_ai_rate_limit(
+        user_id=user_id,
+        workspace_id=workspace_id,
+        endpoint="workspace.initiatives.assist",
     )
     try:
         generation = await generate_ai_response(prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=480)
