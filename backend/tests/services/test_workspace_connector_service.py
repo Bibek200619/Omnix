@@ -417,3 +417,35 @@ async def test_connector_serialization_survives_missing_job_preview(monkeypatch:
 
     assert result["job"] is None
     assert "access_token" not in result["config"]
+
+
+@pytest.mark.asyncio
+async def test_connector_job_lookup_is_scoped_to_connector_workspace(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]) -> dict[str, object]:
+        captured.update({"table": table, "columns": columns, "filters": filters})
+        return {
+            "id": "job-1",
+            "type": "connector_setup_request",
+            "status": "queued",
+            "payload": {"workspace_id": "workspace-1", "connector_id": "connector-1"},
+        }
+
+    monkeypatch.setattr(connectors, "select_one_trusted", fake_select_one)
+
+    result = await connectors._job_for_connector(
+        {
+            "id": "connector-1",
+            "workspace_id": "workspace-1",
+            "job_id": "job-1",
+        }
+    )
+
+    assert result is not None
+    assert result["id"] == "job-1"
+    assert captured["table"] == "jobs"
+    assert captured["filters"] == {
+        "id": "job-1",
+        "payload->>workspace_id": "workspace-1",
+    }

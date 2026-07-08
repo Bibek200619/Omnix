@@ -398,10 +398,15 @@ async def _insert_setup_job(connector: dict[str, Any], user_id: str) -> dict[str
 
 async def _job_for_connector(row: dict[str, Any]) -> dict[str, Any] | None:
     job_id = row.get("job_id")
-    if not job_id:
+    workspace_id = row.get("workspace_id")
+    if not job_id or not workspace_id:
         return None
     try:
-        return await select_one_trusted("jobs", JOB_COLUMNS, {"id": str(job_id)})
+        return await select_one_trusted(
+            "jobs",
+            JOB_COLUMNS,
+            {"id": str(job_id), "payload->>workspace_id": str(workspace_id)},
+        )
     except SupabaseServiceError:
         logger.exception("Failed to load connector job %s.", job_id)
         return None
