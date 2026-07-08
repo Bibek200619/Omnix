@@ -44,10 +44,18 @@ def _metadata_with_processing(
     return metadata
 
 
+def _file_scope_filters(file_id: str, user_id: str, workspace_id: str | None) -> dict[str, Any]:
+    filters: dict[str, Any] = {"id": file_id, "user_id": user_id}
+    filters["workspace_id"] = workspace_id if workspace_id else {"is": None}
+    return filters
+
+
 async def _update_file_processing_state(
     file_id: str,
     file_row: dict[str, Any],
     *,
+    user_id: str,
+    workspace_id: str | None,
     processing_status: str,
     processing_error: str | None = None,
     metadata_updates: dict[str, Any] | None = None,
@@ -65,17 +73,20 @@ async def _update_file_processing_state(
         "processing_error": processing_error,
         **(diagnostics_payload or {}),
     }
+    filters = _file_scope_filters(file_id, user_id, workspace_id)
     try:
-        return await update_one_trusted("files", {"id": file_id}, payload) or {**file_row, **payload}
+        return await update_one_trusted("files", filters, payload) or {**file_row, **payload}
     except Exception:
         logger.warning("Unable to persist file processing columns; retrying processing state as metadata only.")
-        await update_one_trusted("files", {"id": file_id}, {"metadata": metadata})
+        await update_one_trusted("files", filters, {"metadata": metadata})
         return {**file_row, "metadata": metadata}
 
 
 async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
     """Process an ingestion job created after file upload. Expects payload in job_row['payload']."""
     file_id: str | None = None
+    user_id: str | None = None
+    workspace_id: str | None = None
     file_row: dict[str, Any] | None = None
     try:
         import json
@@ -95,11 +106,17 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
             "extraction_status,extraction_failure_reason,processing_status,processing_error,processing_job_id,"
             "ocr_used,ocr_character_count,created_at"
         )
-        file_row = await select_one_trusted("files", FILE_COLUMNS, {"id": file_id})
+        file_row = await select_one_trusted("files", FILE_COLUMNS, _file_scope_filters(file_id, user_id, workspace_id))
         if file_row is None:
             raise RuntimeError("File not found for ingestion")
 
-        file_row = await _update_file_processing_state(file_id, file_row, processing_status="processing")
+        file_row = await _update_file_processing_state(
+            file_id,
+            file_row,
+            user_id=user_id,
+            workspace_id=workspace_id,
+            processing_status="processing",
+        )
 
         storage_path = resolve_managed_storage_path(file_row.get("storage_path"))
         filename = file_row.get("file_name") or "imported"
@@ -125,6 +142,8 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
             await _update_file_processing_state(
                 file_id,
                 file_row,
+                user_id=user_id,
+                workspace_id=workspace_id,
                 processing_status="failed",
                 processing_error=processing_error,
                 metadata_updates=metadata,
@@ -141,6 +160,8 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
         file_row = await _update_file_processing_state(
             file_id,
             file_row,
+            user_id=user_id,
+            workspace_id=workspace_id,
             processing_status="extracted",
             metadata_updates=metadata,
             diagnostics_payload=extraction_columns_payload(diagnostics),
@@ -156,6 +177,8 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
         file_row = await _update_file_processing_state(
             file_id,
             file_row,
+            user_id=user_id,
+            workspace_id=workspace_id,
             processing_status="chunked",
             metadata_updates={
                 "text_chunk_count": stored_chunks.chunk_count,
@@ -208,6 +231,8 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
         await _update_file_processing_state(
             file_id,
             file_row,
+            user_id=user_id,
+            workspace_id=workspace_id,
             processing_status="embedded",
             metadata_updates={
                 "embedded_chunk_count": num,
@@ -219,11 +244,13 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
         return {"status": "completed", "processing_status": "embedded", "chunks": chunk_ids}
     except Exception as exc:
         logger.exception("handle_ingest_file failed: %s", exc)
-        if file_id:
+        if file_id and user_id is not None:
             try:
                 await _update_file_processing_state(
                     file_id,
                     file_row or {"metadata": {}},
+                    user_id=user_id,
+                    workspace_id=workspace_id,
                     processing_status="failed",
                     processing_error=str(exc),
                 )

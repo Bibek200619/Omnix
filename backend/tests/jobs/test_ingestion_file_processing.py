@@ -40,12 +40,12 @@ async def test_ingest_file_updates_processing_statuses(monkeypatch: pytest.Monke
 
     async def fake_select_one(table: str, columns: str, filters: dict[str, Any]) -> dict[str, Any] | None:
         assert table == "files"
-        assert filters == {"id": "file-1"}
+        assert filters == {"id": "file-1", "user_id": "user-1", "workspace_id": "workspace-1"}
         return dict(file_row)
 
     async def fake_update_one(table: str, filters: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
         assert table == "files"
-        assert filters == {"id": "file-1"}
+        assert filters == {"id": "file-1", "user_id": "user-1", "workspace_id": "workspace-1"}
         if "processing_status" in payload:
             statuses.append(str(payload["processing_status"]))
         file_row.update(payload)
@@ -117,9 +117,11 @@ async def test_ingest_file_marks_failed_when_extraction_fails(monkeypatch: pytes
     statuses: list[str] = []
 
     async def fake_select_one(table: str, columns: str, filters: dict[str, Any]) -> dict[str, Any] | None:
+        assert filters == {"id": "file-1", "user_id": "user-1", "workspace_id": "workspace-1"}
         return dict(file_row)
 
     async def fake_update_one(table: str, filters: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+        assert filters == {"id": "file-1", "user_id": "user-1", "workspace_id": "workspace-1"}
         if "processing_status" in payload:
             statuses.append(str(payload["processing_status"]))
         file_row.update(payload)
@@ -148,3 +150,83 @@ async def test_ingest_file_marks_failed_when_extraction_fails(monkeypatch: pytes
     assert statuses == ["processing", "failed"]
     assert file_row["processing_status"] == "failed"
     assert file_row["processing_error"] == "No readable text was extracted."
+
+
+@pytest.mark.asyncio
+async def test_ingest_file_scopes_lookup_and_failure_update_to_job_workspace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    select_filters: list[dict[str, Any]] = []
+    update_filters: list[dict[str, Any]] = []
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, Any]) -> dict[str, Any] | None:
+        assert table == "files"
+        select_filters.append(filters)
+        return None
+
+    async def fake_update_one(table: str, filters: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any] | None:
+        assert table == "files"
+        update_filters.append(filters)
+        return None
+
+    monkeypatch.setattr(ingestion_jobs, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(ingestion_jobs, "update_one_trusted", fake_update_one)
+
+    result = await ingestion_jobs.handle_ingest_file(
+        {
+            "id": "job-2",
+            "type": "ingest_file",
+            "payload": {
+                "type": "ingest_file",
+                "file_id": "file-1",
+                "user_id": "user-1",
+                "workspace_id": "workspace-2",
+            },
+        }
+    )
+
+    scoped_filters = {"id": "file-1", "user_id": "user-1", "workspace_id": "workspace-2"}
+    assert result["status"] == "failed"
+    assert "File not found" in result["error"]
+    assert select_filters == [scoped_filters]
+    assert update_filters == [scoped_filters]
+
+
+@pytest.mark.asyncio
+async def test_ingest_file_private_upload_uses_null_workspace_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    select_filters: list[dict[str, Any]] = []
+    update_filters: list[dict[str, Any]] = []
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, Any]) -> dict[str, Any] | None:
+        assert table == "files"
+        select_filters.append(filters)
+        return None
+
+    async def fake_update_one(table: str, filters: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any] | None:
+        assert table == "files"
+        update_filters.append(filters)
+        return None
+
+    monkeypatch.setattr(ingestion_jobs, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(ingestion_jobs, "update_one_trusted", fake_update_one)
+
+    result = await ingestion_jobs.handle_ingest_file(
+        {
+            "id": "job-3",
+            "type": "ingest_file",
+            "payload": {
+                "type": "ingest_file",
+                "file_id": "file-1",
+                "user_id": "user-1",
+                "workspace_id": None,
+            },
+        }
+    )
+
+    scoped_filters = {"id": "file-1", "user_id": "user-1", "workspace_id": {"is": None}}
+    assert result["status"] == "failed"
+    assert "File not found" in result["error"]
+    assert select_filters == [scoped_filters]
+    assert update_filters == [scoped_filters]
