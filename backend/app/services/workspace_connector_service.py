@@ -419,6 +419,18 @@ async def _serialize_connector(row: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
+async def _delete_connector_source_file(connector: dict[str, Any]) -> None:
+    source_file_id = connector.get("source_file_id")
+    workspace_id = connector.get("workspace_id")
+    if not source_file_id or not workspace_id:
+        return
+
+    workspace_filter = str(workspace_id)
+    source_file_filter = str(source_file_id)
+    await delete_many_trusted("documents", {"file_id": source_file_filter, "workspace_id": workspace_filter})
+    await delete_many_trusted("files", {"id": source_file_filter, "workspace_id": workspace_filter})
+
+
 async def list_workspace_connectors(workspace_id: str, user_id: str) -> list[dict[str, Any]]:
     await _require_sources_access(workspace_id, user_id)
     try:
@@ -540,12 +552,12 @@ async def delete_workspace_connector(connector_id: str, user_id: str) -> None:
             detail="Only the connector owner or workspace owner can remove this connector.",
         )
 
-    source_file_id = connector.get("source_file_id")
     try:
-        if source_file_id:
-            await delete_many_trusted("documents", {"file_id": source_file_id})
-            await delete_many_trusted("files", {"id": source_file_id})
-        await delete_many_trusted("workspace_connectors", {"id": connector_id})
+        await _delete_connector_source_file(connector)
+        await delete_many_trusted(
+            "workspace_connectors",
+            {"id": connector_id, "workspace_id": str(connector["workspace_id"])},
+        )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
@@ -592,9 +604,7 @@ async def _activate_knowledge_link(connector: dict[str, Any], user_id: str) -> d
         "extracted_text_preview": fetch_result.text[:2000],
     }
     try:
-        if connector.get("source_file_id"):
-            await delete_many_trusted("documents", {"file_id": connector["source_file_id"]})
-            await delete_many_trusted("files", {"id": connector["source_file_id"]})
+        await _delete_connector_source_file(connector)
         file_row = await insert_one(
             "files",
             {
