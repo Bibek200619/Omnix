@@ -56,10 +56,11 @@ def test_workspace_context_modules_have_guarded_hooks() -> None:
 def test_workspace_provider_delegates_storage_and_destructive_confirmation() -> None:
     provider = WORKSPACE_CONTEXT.read_text(encoding="utf-8")
     storage = read_frontend("lib/workspace-active-storage.ts")
+    active_selection = read_frontend("lib/workspace-active-selection.ts")
     confirmation = read_frontend("lib/workspace-destructive-confirmation.tsx")
     effects = read_frontend("lib/workspace-provider-effects.ts")
 
-    assert "persistActiveWorkspaceId" in provider
+    assert "useActiveWorkspaceSelection" in provider
     assert "readStoredActiveWorkspaceId" in provider
     assert "WorkspaceDestructiveConfirmationModal" in provider
     assert "useWorkspaceDestructiveConfirmation" in provider
@@ -69,6 +70,11 @@ def test_workspace_provider_delegates_storage_and_destructive_confirmation() -> 
     assert 'from "@/components/ui/Modal"' not in provider
     assert "export function persistActiveWorkspaceId" in storage
     assert "export function readStoredActiveWorkspaceId" in storage
+    assert "export function useActiveWorkspaceSelection" in active_selection
+    assert "persistActiveWorkspaceId" in active_selection
+    assert "setApiWorkspaceId" in active_selection
+    assert "persistActiveWorkspaceId" not in provider
+    assert "setApiWorkspaceId" not in provider
     assert "export function useWorkspaceDestructiveConfirmation" in confirmation
     assert "export function WorkspaceDestructiveConfirmationModal" in confirmation
     assert "export function usePendingWorkspaceInvitePolling" in effects
@@ -78,10 +84,12 @@ def test_workspace_provider_delegates_storage_and_destructive_confirmation() -> 
 
 def test_workspace_switch_clears_scoped_api_and_query_state() -> None:
     provider = WORKSPACE_CONTEXT.read_text(encoding="utf-8")
+    active_selection = read_frontend("lib/workspace-active-selection.ts")
     api = read_frontend("lib/api.ts")
 
-    assert 'import { invalidateQueries } from "./query";' in provider
-    assert "invalidateQueries();" in provider
+    assert 'import { invalidateQueries } from "./query";' in active_selection
+    assert "replaceActiveWorkspace(null, { forceInvalidate: true });" in provider
+    assert "invalidateQueries();" in active_selection
     assert "export function getApiWorkspaceId()" in api
     assert "const apiWorkspaceChangeListeners = new Set<() => void>();" in api
     assert "subscribeApiWorkspaceChange(() =>" in api

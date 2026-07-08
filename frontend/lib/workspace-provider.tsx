@@ -1,13 +1,12 @@
 "use client";
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { setApiWorkspaceId } from "./api";
 import { useAuth } from "./auth-context";
 import { logClientError } from "./errors";
 import { logger } from "./logger";
-import { invalidateQueries } from "./query";
 import { useToast } from "./toast-context";
-import { persistActiveWorkspaceId, readStoredActiveWorkspaceId } from "./workspace-active-storage";
+import { useActiveWorkspaceSelection } from "./workspace-active-selection";
+import { readStoredActiveWorkspaceId } from "./workspace-active-storage";
 import {
   useWorkspaceDestructiveConfirmation,
   WorkspaceDestructiveConfirmationModal,
@@ -99,7 +98,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const [activeMembers, setActiveMembers] = useState<WorkspaceMember[]>([]);
   const [activeInvites, setActiveInvites] = useState<WorkspaceInvite[]>([]);
   const [pendingInvites, setPendingInvites] = useState<WorkspaceInvite[]>([]);
@@ -119,7 +117,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     approveDestructiveConfirmation,
   } = useWorkspaceDestructiveConfirmation();
   
-  const requestGenerationRef = useRef(0);
+  const {
+    activeWorkspaceId,
+    activeWorkspaceIdRef,
+    requestGenerationRef,
+    replaceActiveWorkspace,
+    setActiveWorkspace,
+  } = useActiveWorkspaceSelection(userId);
   const workspaceFetchIdRef = useRef(0);
   
   const createWorkspaceInFlightRef = useRef<Map<string, Promise<Workspace>>>(new Map());
@@ -137,7 +141,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     generation: number;
     request: Promise<WorkspaceIntelligenceProfile | null>;
   } | null>(null);
-  const activeWorkspaceIdRef = useRef<string | null>(activeWorkspaceId);
   const lastWorkspaceRefreshAtRef = useRef(0);
   const lastPendingInvitesRefreshAtRef = useRef(0);
   const lastActiveWorkspaceDataRefreshAtRef = useRef(0);
@@ -151,26 +154,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     () => findRootWorkspaceById(workspaces, activeWorkspaceId),
     [activeWorkspaceId, workspaces],
   );
-
-  useEffect(() => {
-    activeWorkspaceIdRef.current = activeWorkspaceId;
-    requestGenerationRef.current += 1; // Increment generation on workspace switch
-  }, [activeWorkspaceId]);
-
-  const setActiveWorkspace = useCallback((id: string | null) => {
-    logger.debug("[workspace] set active workspace", { id });
-    if (id !== activeWorkspaceIdRef.current) {
-      requestGenerationRef.current += 1;
-      invalidateQueries();
-    }
-    setActiveWorkspaceId(id);
-    setApiWorkspaceId(id);
-    try {
-      persistActiveWorkspaceId(userId, id);
-    } catch {
-      // ignore
-    }
-  }, [userId]);
 
   const refreshWorkspaces = useCallback(async (options?: RefreshOptions) => {
     const now = Date.now();
@@ -445,7 +428,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     activeWorkspaceDataInFlightRef.current = { workspaceId: requestWorkspaceId, generation, request };
     return request;
-  }, [activeWorkspace, activeWorkspaceId]);
+  }, [activeWorkspace, activeWorkspaceId, activeWorkspaceIdRef, requestGenerationRef]);
 
   const refreshWorkspaceIntelligence = useCallback(async (options?: RefreshOptions) => {
     if (!activeWorkspaceId) {
@@ -505,7 +488,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     workspaceIntelligenceInFlightRef.current = { workspaceId: requestWorkspaceId, generation, request };
     return request;
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, activeWorkspaceIdRef, requestGenerationRef]);
 
   const updateWorkspaceIntelligence = useCallback(async (payload: WorkspaceIntelligenceUpdatePayload) => {
     if (!activeWorkspaceId) {
@@ -663,7 +646,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         await refreshActiveWorkspaceData({ force: true, silent: true });
       }
     },
-    [activeWorkspaceId, refreshActiveWorkspaceData],
+    [activeWorkspaceId, activeWorkspaceIdRef, refreshActiveWorkspaceData],
   );
 
   const removeWorkspaceMember = useCallback(
@@ -701,7 +684,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         throw err;
       }
     },
-    [activeMembers, activeWorkspace?.name, activeWorkspaceId, confirmDestructiveAction, refreshActiveWorkspaceData, refreshWorkspaces, showToast],
+    [activeMembers, activeWorkspace?.name, activeWorkspaceId, activeWorkspaceIdRef, confirmDestructiveAction, refreshActiveWorkspaceData, refreshWorkspaces, showToast],
   );
 
   const updateWorkspaceMemberRole = useCallback(
@@ -740,7 +723,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         throw err;
       }
     },
-    [activeMembers, activeWorkspaceId, refreshActiveWorkspaceData, refreshWorkspaces],
+    [activeMembers, activeWorkspaceId, activeWorkspaceIdRef, refreshActiveWorkspaceData, refreshWorkspaces],
   );
 
   const assignWorkspaceMember = useCallback(
@@ -790,7 +773,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         throw err;
       }
     },
-    [activeWorkspaceId, activeMembers, refreshActiveWorkspaceData, refreshWorkspaces],
+    [activeWorkspaceId, activeMembers, activeWorkspaceIdRef, refreshActiveWorkspaceData, refreshWorkspaces],
   );
 
   const revokeInvite = useCallback(
@@ -872,10 +855,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     lastWorkspaceRefreshAtRef.current = 0;
     lastPendingInvitesRefreshAtRef.current = 0;
     lastActiveWorkspaceDataRefreshAtRef.current = 0;
-    invalidateQueries();
     setWorkspaces([]);
-    setActiveWorkspaceId(null);
-    setApiWorkspaceId(null);
+    replaceActiveWorkspace(null, { forceInvalidate: true });
     setActiveMembers([]);
     setActiveInvites([]);
     setPendingInvites([]);
@@ -893,14 +874,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     try {
       const saved = readStoredActiveWorkspaceId(userId);
       logger.debug("[workspace] hydration read saved active workspace", { saved });
-      setApiWorkspaceId(saved);
-      if (saved) {
-        setActiveWorkspaceId(saved);
-      }
+      replaceActiveWorkspace(saved);
     } catch {
       // ignore
     }
-  }, [refreshPendingInvites, refreshWorkspaces, setActiveWorkspace, userId]);
+  }, [refreshPendingInvites, refreshWorkspaces, replaceActiveWorkspace, setActiveWorkspace, userId]);
 
   usePendingWorkspaceInvitePolling({
     userId,
