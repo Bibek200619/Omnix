@@ -228,6 +228,86 @@ class TestEnqueueJob:
         assert rec["progress"] == 0
 
 
+class TestQueueRecovery:
+    class FakeRedisList:
+        def __init__(self, items: list[str] | None = None) -> None:
+            self.items = list(items or [])
+            self.lpush_calls: list[tuple[str, str]] = []
+
+        async def lrange(self, queue: str, start: int, end: int):
+            if start == 0 and end == -1:
+                return list(self.items)
+            return self.items[start : end + 1]
+
+        async def lpush(self, queue: str, job_id: str):
+            self.lpush_calls.append((queue, job_id))
+            self.items.insert(0, job_id)
+            return len(self.items)
+
+    @pytest.mark.asyncio
+    async def test_recover_missing_queued_jobs_requeues_missing_job(self):
+        import app.jobs.queue as q
+
+        fake_redis = self.FakeRedisList()
+        fake_svc = MagicMock()
+        fake_svc.select_all_trusted = AsyncMock(
+            return_value=[
+                {"id": "job-missing", "status": "queued", "created_at": (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()}
+            ]
+        )
+
+        with (
+            patch("app.jobs.queue.get_redis", return_value=fake_redis),
+            patch.dict(sys.modules, {"app.services.supabase_service": fake_svc}),
+        ):
+            result = await q.recover_missing_queued_jobs(queue="test:jobs", min_age_seconds=0)
+
+        assert result["status"] == "ok"
+        assert result["missing_jobs"] == 1
+        assert result["requeued_jobs"] == 1
+        assert fake_redis.lpush_calls == [("test:jobs", "job-missing")]
+
+    @pytest.mark.asyncio
+    async def test_recover_missing_queued_jobs_is_idempotent(self):
+        import app.jobs.queue as q
+
+        fake_redis = self.FakeRedisList()
+        fake_svc = MagicMock()
+        fake_svc.select_all_trusted = AsyncMock(return_value=[{"id": "job-once", "status": "queued"}])
+
+        with (
+            patch("app.jobs.queue.get_redis", return_value=fake_redis),
+            patch.dict(sys.modules, {"app.services.supabase_service": fake_svc}),
+        ):
+            first = await q.recover_missing_queued_jobs(queue="test:jobs", min_age_seconds=0)
+            second = await q.recover_missing_queued_jobs(queue="test:jobs", min_age_seconds=0)
+
+        assert first["requeued_jobs"] == 1
+        assert second["requeued_jobs"] == 0
+        assert second["already_queued_jobs"] == 1
+        assert fake_redis.items.count("job-once") == 1
+        assert fake_redis.lpush_calls == [("test:jobs", "job-once")]
+
+    @pytest.mark.asyncio
+    async def test_recover_missing_queued_jobs_dry_run_does_not_push(self):
+        import app.jobs.queue as q
+
+        fake_redis = self.FakeRedisList()
+        fake_svc = MagicMock()
+        fake_svc.select_all_trusted = AsyncMock(return_value=[{"id": "job-dry-run", "status": "queued"}])
+
+        with (
+            patch("app.jobs.queue.get_redis", return_value=fake_redis),
+            patch.dict(sys.modules, {"app.services.supabase_service": fake_svc}),
+        ):
+            result = await q.recover_missing_queued_jobs(queue="test:jobs", min_age_seconds=0, dry_run=True)
+
+        assert result["status"] == "recovery_needed"
+        assert result["missing_jobs"] == 1
+        assert result["requeued_jobs"] == 0
+        assert fake_redis.items == []
+
+
 # ===========================================================================
 # Section 3: Worker _process_job
 # ===========================================================================
@@ -600,6 +680,54 @@ class TestWorkerLoopConcurrency:
         ]
         assert retries == ["job-slow"]
 
+    @pytest.mark.asyncio
+    async def test_worker_loop_recovers_missing_jobs_when_idle(self, monkeypatch: pytest.MonkeyPatch):
+        import app.jobs.worker as w
+
+        self._configure_worker_env(monkeypatch, concurrency=1)
+        monkeypatch.setenv("OMNIX_QUEUE_RECOVERY_INTERVAL_SECONDS", "0.1")
+        shutdown_event = asyncio.Event()
+        processed: list[str] = []
+        recoveries: list[str] = []
+
+        class FakeRedis:
+            def __init__(self) -> None:
+                self.items: list[tuple[str, str]] = []
+
+            async def brpop(self, queue: str, timeout: int):
+                if self.items:
+                    return self.items.pop(0)
+                await asyncio.sleep(0)
+                return None
+
+        fake_redis = FakeRedis()
+
+        async def fake_recover_missing_queued_jobs(*, queue: str | None = None):
+            recoveries.append(queue or "")
+            fake_redis.items.append((queue or "omnix:jobs", "job-recovered"))
+            return {
+                "status": "ok",
+                "requeued_jobs": 1,
+                "failed_requeue_jobs": 0,
+            }
+
+        async def fake_process_job(job_id: str):
+            processed.append(job_id)
+            shutdown_event.set()
+
+        with (
+            patch("app.jobs.worker.initialize_vector_store", AsyncMock(return_value=None)),
+            patch("app.jobs.worker.warm_up_default_provider", AsyncMock(return_value=object())),
+            patch("app.jobs.worker.get_redis", return_value=fake_redis),
+            patch("app.jobs.worker.shutdown_vector_store", AsyncMock(return_value=None)),
+            patch("app.jobs.worker.recover_missing_queued_jobs", fake_recover_missing_queued_jobs),
+            patch("app.jobs.worker._process_job", fake_process_job),
+        ):
+            await asyncio.wait_for(w._worker_loop(shutdown_event), timeout=2)
+
+        assert recoveries == ["omnix:jobs"]
+        assert processed == ["job-recovered"]
+
 
 # ===========================================================================
 # Section 5: Health checks
@@ -663,9 +791,17 @@ class TestHealthChecks:
         async def fake_count_stuck(minutes):
             return 0
 
+        async def fake_recovery_diagnostics():
+            return {"status": "clear", "missing_jobs": 0, "requeued_jobs": 0}
+
+        async def fake_count_jobs_by_status(status):
+            return 0
+
         with (
             patch("app.health.checks.get_redis", return_value=mock_redis, create=True),
             patch("app.health.checks._count_stuck_jobs", fake_count_stuck),
+            patch("app.health.checks._queue_recovery_diagnostics", fake_recovery_diagnostics),
+            patch("app.health.checks._count_jobs_by_status", fake_count_jobs_by_status),
         ):
             # Patch the inner import of get_redis in check_ingestion_worker
             import os
@@ -677,6 +813,8 @@ class TestHealthChecks:
         assert result["status"] == "no_worker"
         assert result["active_workers"] == 0
         assert result["queue_depth"] == 7
+        assert result["queue_recovery"]["status"] == "clear"
+        assert result["dead_lettered_jobs"] == 0
 
     @pytest.mark.asyncio
     async def test_check_ingestion_worker_healthy_with_counters(self):
@@ -695,12 +833,20 @@ class TestHealthChecks:
         async def fake_count_stuck(minutes):
             return 0
 
+        async def fake_recovery_diagnostics():
+            return {"status": "clear", "missing_jobs": 0, "requeued_jobs": 0}
+
+        async def fake_count_jobs_by_status(status):
+            return 0
+
         fake_jobs_queue = MagicMock()
         fake_jobs_queue.get_redis = MagicMock(return_value=mock_redis)
 
         with (
             patch.dict(sys.modules, {"app.jobs.queue": fake_jobs_queue}),
             patch("app.health.checks._count_stuck_jobs", fake_count_stuck),
+            patch("app.health.checks._queue_recovery_diagnostics", fake_recovery_diagnostics),
+            patch("app.health.checks._count_jobs_by_status", fake_count_jobs_by_status),
         ):
             result = await checks.check_ingestion_worker()
 
@@ -709,6 +855,50 @@ class TestHealthChecks:
         assert result["completed_jobs"] == 1
         assert result["failed_jobs"] == 1
         assert result["queue_depth"] == 3
+        assert result["queue_recovery"]["status"] == "clear"
+        assert result["dead_lettered_jobs"] == 0
+
+    @pytest.mark.asyncio
+    async def test_check_ingestion_worker_distinguishes_queue_states(self):
+        from app.health import checks
+
+        mock_redis = AsyncMock()
+        mock_redis.llen = AsyncMock(return_value=0)
+
+        async def fake_count_stuck(minutes):
+            return {10: 2, 30: 1, 60: 0}[minutes]
+
+        async def fake_recovery_diagnostics():
+            return {
+                "status": "recovery_needed",
+                "missing_jobs": 1,
+                "requeued_jobs": 0,
+                "dry_run": True,
+            }
+
+        async def fake_count_jobs_by_status(status):
+            assert status == "dead_lettered"
+            return 3
+
+        fake_jobs_queue = MagicMock()
+        fake_jobs_queue.get_redis = MagicMock(return_value=mock_redis)
+
+        with (
+            patch.dict(sys.modules, {"app.jobs.queue": fake_jobs_queue}),
+            patch("app.health.checks._count_stuck_jobs", fake_count_stuck),
+            patch("app.health.checks._queue_recovery_diagnostics", fake_recovery_diagnostics),
+            patch("app.health.checks._count_jobs_by_status", fake_count_jobs_by_status),
+        ):
+            result = await checks.check_ingestion_worker()
+
+        assert result["stuck_jobs"] == {
+            "older_than_10m": 2,
+            "older_than_30m": 1,
+            "older_than_60m": 0,
+        }
+        assert result["queue_recovery"]["status"] == "recovery_needed"
+        assert result["queue_recovery"]["missing_jobs"] == 1
+        assert result["dead_lettered_jobs"] == 3
 
 
 # ===========================================================================
