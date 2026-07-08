@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, getApiWorkspaceId } from "@/lib/api";
 import { logger } from "@/lib/logger";
 import type { MessageAttachment } from "@/components/chat/types";
 
@@ -115,11 +115,9 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
         }
       }
 
-      if (typeof window !== "undefined") {
-        const activeWorkspace = window.localStorage.getItem("omnix.activeWorkspaceId");
-        if (activeWorkspace) {
-          xhr.setRequestHeader("X-Omnix-Workspace", activeWorkspace);
-        }
+      const activeWorkspace = getApiWorkspaceId();
+      if (activeWorkspace) {
+        xhr.setRequestHeader("X-Omnix-Workspace", activeWorkspace);
       }
     } catch (err) {
       console.error("Failed to attach auth token to upload request", err);

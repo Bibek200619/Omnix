@@ -5,6 +5,7 @@ import { setApiWorkspaceId } from "./api";
 import { useAuth } from "./auth-context";
 import { logClientError } from "./errors";
 import { logger } from "./logger";
+import { invalidateQueries } from "./query";
 import { useToast } from "./toast-context";
 import { persistActiveWorkspaceId, readStoredActiveWorkspaceId } from "./workspace-active-storage";
 import {
@@ -160,6 +161,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     logger.debug("[workspace] set active workspace", { id });
     if (id !== activeWorkspaceIdRef.current) {
       requestGenerationRef.current += 1;
+      invalidateQueries();
     }
     setActiveWorkspaceId(id);
     setApiWorkspaceId(id);
@@ -870,6 +872,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     lastWorkspaceRefreshAtRef.current = 0;
     lastPendingInvitesRefreshAtRef.current = 0;
     lastActiveWorkspaceDataRefreshAtRef.current = 0;
+    invalidateQueries();
     setWorkspaces([]);
     setActiveWorkspaceId(null);
     setApiWorkspaceId(null);

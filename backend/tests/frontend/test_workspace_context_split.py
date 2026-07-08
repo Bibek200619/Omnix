@@ -76,6 +76,27 @@ def test_workspace_provider_delegates_storage_and_destructive_confirmation() -> 
     assert len(provider.splitlines()) <= 1_000
 
 
+def test_workspace_switch_clears_scoped_api_and_query_state() -> None:
+    provider = WORKSPACE_CONTEXT.read_text(encoding="utf-8")
+    api = read_frontend("lib/api.ts")
+
+    assert 'import { invalidateQueries } from "./query";' in provider
+    assert "invalidateQueries();" in provider
+    assert "export function getApiWorkspaceId()" in api
+    assert "const apiWorkspaceChangeListeners = new Set<() => void>();" in api
+    assert "subscribeApiWorkspaceChange(() =>" in api
+    assert "this.inFlightGets.clear();" in api
+
+
+def test_upload_uses_api_workspace_state_instead_of_legacy_storage() -> None:
+    upload = read_frontend("components/upload/UploadDropzone.tsx")
+
+    assert 'import { apiUrl, getApiWorkspaceId } from "@/lib/api";' in upload
+    assert "getApiWorkspaceId()" in upload
+    assert "X-Omnix-Workspace" in upload
+    assert 'localStorage.getItem("omnix.activeWorkspaceId")' not in upload
+
+
 def test_low_scope_consumers_use_targeted_workspace_hooks() -> None:
     consumers = {
         "lib/conversation-history-context.tsx": "useWorkspaceTree",
