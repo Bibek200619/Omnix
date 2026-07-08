@@ -105,6 +105,33 @@ def test_upload_uses_api_workspace_state_instead_of_legacy_storage() -> None:
     assert 'localStorage.getItem("omnix.activeWorkspaceId")' not in upload
 
 
+def test_app_shell_delegates_dashboard_provider_stack() -> None:
+    app_shell = read_frontend("components/layout/AppShell.tsx")
+    providers = read_frontend("components/layout/DashboardProviders.tsx")
+
+    assert 'import { DashboardProviders } from "@/components/layout/DashboardProviders";' in app_shell
+    assert "<DashboardProviders>" in app_shell
+    assert "WorkspaceProvider" not in app_shell
+    assert "WorkspaceCollaborationProvider" not in app_shell
+    assert "WorkspaceNotificationsProvider" not in app_shell
+    assert "WorkspaceContinuityProvider" not in app_shell
+    assert "ConversationHistoryProvider" not in app_shell
+    assert "dynamic(" not in app_shell
+
+    provider_order = [
+        "<WorkspaceProvider>",
+        "<WorkspaceCollaborationProvider>",
+        "<WorkspaceNotificationsProvider>",
+        "<WorkspaceContinuityProvider>",
+        "<ProfileProvider>",
+        "<ConversationHistoryProvider>",
+        "<WorkspaceOnboardingGate>",
+    ]
+    positions = [providers.index(item) for item in provider_order]
+    assert positions == sorted(positions)
+    assert "ssr: false" in providers
+
+
 def test_low_scope_consumers_use_targeted_workspace_hooks() -> None:
     consumers = {
         "lib/conversation-history-context.tsx": "useWorkspaceTree",
