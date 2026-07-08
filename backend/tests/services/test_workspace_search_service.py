@@ -260,7 +260,7 @@ async def test_search_workspace_groups_workspace_scoped_ilike_results(monkeypatc
                     "file_name": "launch-readiness.md",
                     "file_type": "text/markdown",
                     "size_bytes": 2048,
-                    "processing_status": "embedded",
+                    "processing_status": "searchable",
                     "extraction_status": "searchable",
                     "metadata": {},
                     "created_at": "2026-06-01T00:00:00+00:00",

@@ -11,6 +11,8 @@ from ..services.supabase_service import (
     update_one_trusted,
 )
 from ..services.document_intelligence_service import (
+    ExtractionDiagnostics,
+    document_likely_requires_ocr,
     extract_document_with_diagnostics,
     extraction_columns_payload,
 )
@@ -19,6 +21,18 @@ from ..rag.startup import get_vector_store
 from ..rag.ingestion import RAGIngestionPipeline
 
 logger = logging.getLogger(__name__)
+
+
+def _searchable_processing_status(diagnostics: ExtractionDiagnostics, *, chunks_truncated: bool = False) -> str:
+    if chunks_truncated:
+        return "partially_searchable"
+    return "searchable"
+
+
+def _unsearchable_processing_status(diagnostics: ExtractionDiagnostics) -> str:
+    if diagnostics.extraction_status == "ocr_required":
+        return "ocr_required"
+    return "failed"
 
 
 def _utc_now_iso() -> str:
@@ -115,7 +129,7 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
             file_row,
             user_id=user_id,
             workspace_id=workspace_id,
-            processing_status="processing",
+            processing_status="extracting",
         )
 
         filename = file_row.get("file_name") or "imported"
@@ -125,6 +139,15 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
             data = await read_bytes_from_storage(file_row.get("storage_path"))
         except StorageNotFoundError as exc:
             raise RuntimeError("Stored file not found in storage") from exc
+
+        if document_likely_requires_ocr(filename, file_type, data):
+            file_row = await _update_file_processing_state(
+                file_id,
+                file_row,
+                user_id=user_id,
+                workspace_id=workspace_id,
+                processing_status="ocr_running",
+            )
 
         extraction_result = await asyncio.to_thread(extract_document_with_diagnostics, filename, file_type, data)
         normalized = extraction_result.text
@@ -136,33 +159,24 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
 
         if diagnostics.extraction_status != "searchable" or not normalized:
             processing_error = diagnostics.extraction_failure_reason or "No searchable text was extracted from this file."
+            processing_status = _unsearchable_processing_status(diagnostics)
             await _update_file_processing_state(
                 file_id,
                 file_row,
                 user_id=user_id,
                 workspace_id=workspace_id,
-                processing_status="failed",
+                processing_status=processing_status,
                 processing_error=processing_error,
                 metadata_updates=metadata,
                 diagnostics_payload=extraction_columns_payload(diagnostics),
             )
             return {
-                "status": "failed",
+                "status": "completed" if processing_status == "ocr_required" else "failed",
                 "file_status": diagnostics.extraction_status,
-                "processing_status": "failed",
+                "processing_status": processing_status,
                 "error": processing_error,
                 "chunks": [],
             }
-
-        file_row = await _update_file_processing_state(
-            file_id,
-            file_row,
-            user_id=user_id,
-            workspace_id=workspace_id,
-            processing_status="extracted",
-            metadata_updates=metadata,
-            diagnostics_payload=extraction_columns_payload(diagnostics),
-        )
 
         stored_chunks = await store_extracted_text_chunks(
             file_id=file_id,
@@ -171,16 +185,19 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
             workspace_id=workspace_id,
             replace_existing=True,
         )
+        processing_status = _searchable_processing_status(diagnostics, chunks_truncated=stored_chunks.truncated)
         file_row = await _update_file_processing_state(
             file_id,
             file_row,
             user_id=user_id,
             workspace_id=workspace_id,
-            processing_status="chunked",
+            processing_status=processing_status,
             metadata_updates={
+                **metadata,
                 "text_chunk_count": stored_chunks.chunk_count,
                 "text_chunks_truncated": stored_chunks.truncated,
             },
+            diagnostics_payload=extraction_columns_payload(diagnostics),
         )
 
         # Run ingestion pipeline (chunks, embeddings, DB insert)
@@ -230,7 +247,7 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
             file_row,
             user_id=user_id,
             workspace_id=workspace_id,
-            processing_status="embedded",
+            processing_status=processing_status,
             metadata_updates={
                 "embedded_chunk_count": num,
                 "embedded_chunk_ids": chunk_ids[:20],
@@ -238,7 +255,7 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
         )
 
         # Mark job succeeded
-        return {"status": "completed", "processing_status": "embedded", "chunks": chunk_ids}
+        return {"status": "completed", "processing_status": processing_status, "chunks": chunk_ids}
     except Exception as exc:
         logger.exception("handle_ingest_file failed: %s", exc)
         if file_id and user_id is not None:
