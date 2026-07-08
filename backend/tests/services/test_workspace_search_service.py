@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
+from fastapi import HTTPException
 import pytest
 
 from app.services import workspace_search_service as search
@@ -47,6 +48,27 @@ async def test_search_workspace_requires_access_for_empty_query(monkeypatch: pyt
         "cursor": 0,
         "next_cursor": None,
     }
+
+
+@pytest.mark.asyncio
+async def test_search_workspace_does_not_call_ranked_rpc_when_access_is_denied(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def deny_workspace_access(workspace_id: str, user_id: str):
+        assert workspace_id == "workspace-2"
+        assert user_id == "user-1"
+        raise HTTPException(status_code=403, detail="Workspace access denied")
+
+    async def fail_ranked_workspace(**kwargs: Any) -> list[dict[str, Any]]:
+        raise AssertionError(f"ranked RPC should not be called without workspace access: {kwargs}")
+
+    monkeypatch.setattr(search, "require_workspace_access", deny_workspace_access)
+    monkeypatch.setattr(search, "_search_ranked_workspace", fail_ranked_workspace)
+
+    with pytest.raises(HTTPException) as exc:
+        await search.search_workspace(workspace_id="workspace-2", user_id="user-1", query="secret")
+
+    assert exc.value.status_code == 403
 
 
 @pytest.mark.asyncio
