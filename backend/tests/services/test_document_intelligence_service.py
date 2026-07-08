@@ -88,6 +88,13 @@ def test_ocr_success_path_becomes_searchable(monkeypatch: pytest.MonkeyPatch) ->
     assert result.diagnostics.ocr_character_count > 20
 
 
+def test_document_likely_requires_ocr_for_image_only_pdf(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_fake_pypdf(monkeypatch, [_ImagePage()])
+    monkeypatch.setattr(svc, "OCR_ENABLED", True)
+
+    assert svc.document_likely_requires_ocr("scan.pdf", "application/pdf", b"%PDF") is True
+
+
 def test_ocr_failure_path_records_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_pypdf(monkeypatch, [_ImagePage()])
     monkeypatch.setattr(svc, "OCR_ENABLED", True)
