@@ -29,7 +29,10 @@ def _client() -> TestClient:
 
 @pytest.fixture(autouse=True)
 def _clear_rate_limits(monkeypatch: pytest.MonkeyPatch) -> None:
-    messages._chat_rate_limits.clear()
+    async def allow_rate_limit(*args: Any, **kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr(messages, "_check_rate_limit", allow_rate_limit)
     monkeypatch.setattr(messages, "get_settings", lambda: _Settings())
 
 
@@ -103,4 +106,3 @@ def test_public_ai_generation_clamps_temperature_and_tokens(monkeypatch: pytest.
     assert captured["temperature"] == 0.5
     assert captured["max_tokens"] == 256
     assert captured["model"] == "phi3:mini"
-

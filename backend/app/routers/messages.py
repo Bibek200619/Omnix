@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import time
 from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -23,6 +22,7 @@ from ..services.chat_service import (
     generate_ai_response,
 )
 from ..services.document_context_service import build_uploaded_document_context, find_unavailable_uploaded_documents
+from ..services.distributed_rate_limit import RateLimitExceeded, RateLimitUnavailable, enforce_rate_limit
 from ..services.query_classifier import SearchDecision, SearchMode, classify_search_need
 from ..services.supabase_service import (
     SupabaseServiceError,
@@ -64,23 +64,38 @@ FILE_COLUMNS = (
 
 RATE_LIMIT_REQUESTS = 5
 RATE_LIMIT_WINDOW = 60.0
-_chat_rate_limits: dict[str, list[float]] = {}
+AI_GENERATE_RATE_LIMIT_ENDPOINT = "ai.generate"
+CHAT_RATE_LIMIT_ENDPOINT = "chat"
+CHAT_STREAM_RATE_LIMIT_ENDPOINT = "chat.stream"
 DOCUMENT_INTENT_RE = message_retrieval_service.DOCUMENT_INTENT_RE
 PUBLIC_AI_SYSTEM_PROMPT_ERROR = "Public AI generation does not accept caller-supplied system prompts."
 
 
-def _check_rate_limit(user_id: str) -> None:
-    now = time.time()
-    history = _chat_rate_limits.get(user_id, [])
-    history = [timestamp for timestamp in history if now - timestamp < RATE_LIMIT_WINDOW]
-    if len(history) >= RATE_LIMIT_REQUESTS:
-        _chat_rate_limits[user_id] = history
+async def _check_rate_limit(
+    user_id: str,
+    *,
+    workspace_id: str | None,
+    endpoint: str,
+) -> None:
+    try:
+        await enforce_rate_limit(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            endpoint=endpoint,
+            limit=RATE_LIMIT_REQUESTS,
+            window_seconds=RATE_LIMIT_WINDOW,
+        )
+    except RateLimitExceeded as exc:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Rate limit exceeded. Please try again later.",
-        )
-    history.append(now)
-    _chat_rate_limits[user_id] = history
+            headers={"Retry-After": str(max(1, int(exc.retry_after_seconds)))},
+        ) from exc
+    except RateLimitUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI rate limiting is temporarily unavailable.",
+        ) from exc
 
 
 def _user_id_from_claims(current_user: dict[str, Any]) -> str:
@@ -517,7 +532,7 @@ async def generate_ai(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> AIGenerationResponse:
     user_id = _user_id_from_claims(current_user)
-    _check_rate_limit(user_id)
+    await _check_rate_limit(user_id, workspace_id=None, endpoint=AI_GENERATE_RATE_LIMIT_ENDPOINT)
     policy = _public_ai_generation_policy(payload)
 
     try:
@@ -548,7 +563,6 @@ async def chat(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> ChatResponse:
     user_id = _user_id_from_claims(current_user)
-    _check_rate_limit(user_id)
     message_text = payload.message.strip()
     user_message_timestamp = utc_now_iso()
 
@@ -567,6 +581,7 @@ async def chat(
             conversation_id = payload.conversation_id
             conversation, _ = await require_conversation_access(conversation_id, user_id)
             workspace_id = str(conversation.get("workspace_id") or "") or None
+            await _check_rate_limit(user_id, workspace_id=workspace_id, endpoint=CHAT_RATE_LIMIT_ENDPOINT)
             recent_messages = await _load_recent_messages(conversation_id, user_id, workspace_id)
         else:
             conversation_payload = {
@@ -580,6 +595,7 @@ async def chat(
                 conversation_payload["workspace_id"] = workspace_access.workspace_id
                 workspace_id = workspace_access.workspace_id
 
+            await _check_rate_limit(user_id, workspace_id=workspace_id, endpoint=CHAT_RATE_LIMIT_ENDPOINT)
             conversation = await insert_one("conversations", conversation_payload)
             conversation_id = str(conversation["id"])
             recent_messages = []
@@ -749,7 +765,6 @@ async def chat_stream(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> StreamingResponse:
     user_id = _user_id_from_claims(current_user)
-    _check_rate_limit(user_id)
 
     message_text = payload.message.strip()
     if not message_text:
@@ -763,6 +778,7 @@ async def chat_stream(
             conversation_id = payload.conversation_id
             conversation, _ = await require_conversation_access(conversation_id, user_id)
             workspace_id = str(conversation.get("workspace_id") or "") or None
+            await _check_rate_limit(user_id, workspace_id=workspace_id, endpoint=CHAT_STREAM_RATE_LIMIT_ENDPOINT)
             recent_messages = await _load_recent_messages(conversation_id, user_id, workspace_id)
         else:
             created_at = utc_now_iso()
@@ -777,6 +793,7 @@ async def chat_stream(
                 conversation_payload["workspace_id"] = active_workspace_access.workspace_id
                 workspace_id = active_workspace_access.workspace_id
 
+            await _check_rate_limit(user_id, workspace_id=workspace_id, endpoint=CHAT_STREAM_RATE_LIMIT_ENDPOINT)
             conversation = await insert_one("conversations", conversation_payload)
             conversation_id = str(conversation["id"])
             recent_messages = []
