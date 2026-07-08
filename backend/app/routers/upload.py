@@ -196,12 +196,12 @@ async def upload_file(
     # Content-based MIME validation: reject disguised executables
     _validate_content_type(contents, filename)
 
-    # Save raw file to disk
+    # Save raw file through the configured storage backend.
     try:
-        storage_path = await save_bytes_to_user_upload(user_id, filename, contents, root=UPLOAD_DIR)
+        storage_path = await save_bytes_to_user_upload(user_id, filename, contents, root=UPLOAD_DIR, content_type=file_type or None)
         logger.info("Document uploaded")
     except Exception as exc:
-        logger.exception("Failed to persist uploaded file to disk: %s", exc)
+        logger.exception("Failed to persist uploaded file: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to store file")
 
     processing_diagnostics = ExtractionDiagnostics(extraction_status="processing")

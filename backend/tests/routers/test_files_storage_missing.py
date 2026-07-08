@@ -39,14 +39,13 @@ def test_delete_file_with_missing_storage_returns_storage_missing_true(monkeypat
     async def fake_delete_many(*args: Any, **kwargs: Any) -> None:
         pass
 
-    # Create a mock Path that raises FileNotFoundError on unlink
-    mock_path = MagicMock(spec=Path)
-    mock_path.exists.return_value = False
-    mock_path.unlink.side_effect = FileNotFoundError("No such file")
+    async def fake_delete_storage_object(storage_path: str) -> bool:
+        assert storage_path == "/uploads/user-1/deleted.pdf"
+        return False
 
     monkeypatch.setattr(files, "_require_file_access", fake_require_file_access)
     monkeypatch.setattr(files, "delete_many_trusted", fake_delete_many)
-    monkeypatch.setattr(files, "resolve_managed_storage_path", lambda p: mock_path)
+    monkeypatch.setattr(files, "delete_storage_object", fake_delete_storage_object)
 
     client = _files_client()
     response = client.delete("/files/file-1")
@@ -74,12 +73,13 @@ def test_delete_file_with_missing_storage_logs_warning(
     async def fake_delete_many(*args: Any, **kwargs: Any) -> None:
         pass
 
-    mock_path = MagicMock(spec=Path)
-    mock_path.unlink.side_effect = FileNotFoundError("No such file")
+    async def fake_delete_storage_object(storage_path: str) -> bool:
+        assert storage_path == "/uploads/user-1/deleted.pdf"
+        return False
 
     monkeypatch.setattr(files, "_require_file_access", fake_require_file_access)
     monkeypatch.setattr(files, "delete_many_trusted", fake_delete_many)
-    monkeypatch.setattr(files, "resolve_managed_storage_path", lambda p: mock_path)
+    monkeypatch.setattr(files, "delete_storage_object", fake_delete_storage_object)
 
     client = _files_client()
     with caplog.at_level(logging.WARNING, logger="app.routers.files"):
@@ -106,13 +106,43 @@ def test_delete_file_with_existing_storage_returns_204(monkeypatch: pytest.Monke
     async def fake_delete_many(*args: Any, **kwargs: Any) -> None:
         pass
 
-    mock_path = MagicMock(spec=Path)
-    mock_path.unlink.return_value = None  # Successful unlink
+    async def fake_delete_storage_object(storage_path: str) -> bool:
+        assert storage_path == "/uploads/user-1/exists.pdf"
+        return True
 
     monkeypatch.setattr(files, "_require_file_access", fake_require_file_access)
     monkeypatch.setattr(files, "delete_many_trusted", fake_delete_many)
-    monkeypatch.setattr(files, "resolve_managed_storage_path", lambda p: mock_path)
+    monkeypatch.setattr(files, "delete_storage_object", fake_delete_storage_object)
 
     client = _files_client()
     response = client.delete("/files/file-2")
     assert response.status_code == 204
+
+
+def test_download_file_reads_from_storage_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    file_row = {
+        "id": "file-3",
+        "user_id": "user-1",
+        "workspace_id": None,
+        "storage_path": "supabase://omnix-test/uploads/user-1/report.pdf",
+        "file_name": "report.pdf",
+        "file_type": "application/pdf",
+    }
+
+    async def fake_require_file_access(file_id: str, user_id: str) -> tuple:
+        return file_row, None
+
+    async def fake_read_bytes_from_storage(storage_path: str) -> bytes:
+        assert storage_path == "supabase://omnix-test/uploads/user-1/report.pdf"
+        return b"%PDF-1.4"
+
+    monkeypatch.setattr(files, "_require_file_access", fake_require_file_access)
+    monkeypatch.setattr(files, "read_bytes_from_storage", fake_read_bytes_from_storage)
+
+    client = _files_client()
+    response = client.get("/files/file-3/download")
+
+    assert response.status_code == 200
+    assert response.content == b"%PDF-1.4"
+    assert response.headers["content-type"] == "application/pdf"
+    assert "filename*=UTF-8''report.pdf" in response.headers["content-disposition"]

@@ -173,10 +173,10 @@ async def import_file(workspace_id: str, file_id: str, current_user: dict[str, A
         logger.exception("Failed to download file bytes: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to download file")
 
-    # Save to disk like upload flow
+    # Save through the same storage backend as direct uploads.
     filename = sanitize_filename(file_meta.get("name") or f"drive_{file_id}")
     try:
-        storage_path = await save_bytes_to_user_upload(user_id, filename, data)
+        storage_path = await save_bytes_to_user_upload(user_id, filename, data, content_type=file_meta.get("mimeType"))
     except Exception as exc:
         logger.exception("Failed to save downloaded file: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to store file")

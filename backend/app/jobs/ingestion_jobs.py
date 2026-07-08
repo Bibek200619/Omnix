@@ -5,7 +5,7 @@ import logging
 from typing import Any
 from datetime import datetime, timezone
 
-from ..services.file_storage import resolve_managed_storage_path
+from ..services.file_storage import StorageNotFoundError, read_bytes_from_storage
 from ..services.supabase_service import (
     select_one_trusted,
     update_one_trusted,
@@ -118,16 +118,13 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
             processing_status="processing",
         )
 
-        storage_path = resolve_managed_storage_path(file_row.get("storage_path"))
         filename = file_row.get("file_name") or "imported"
         file_type = file_row.get("file_type")
 
-        if storage_path is None or not storage_path.exists():
-            raise RuntimeError("Stored file not found on disk")
-
-        # Read bytes
-        with storage_path.open("rb") as fh:
-            data = fh.read()
+        try:
+            data = await read_bytes_from_storage(file_row.get("storage_path"))
+        except StorageNotFoundError as exc:
+            raise RuntimeError("Stored file not found in storage") from exc
 
         extraction_result = await asyncio.to_thread(extract_document_with_diagnostics, filename, file_type, data)
         normalized = extraction_result.text

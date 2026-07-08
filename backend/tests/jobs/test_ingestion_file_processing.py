@@ -24,15 +24,14 @@ def _job_row() -> dict[str, Any]:
 
 @pytest.mark.asyncio
 async def test_ingest_file_updates_processing_statuses(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    stored_file = tmp_path / "release-note.md"
-    stored_file.write_text("# Release note\n\nUse async ingestion.", encoding="utf-8")
+    stored_bytes = b"# Release note\n\nUse async ingestion."
     file_row: dict[str, Any] = {
         "id": "file-1",
         "user_id": "user-1",
         "workspace_id": "workspace-1",
         "file_name": "release-note.md",
         "file_type": "text/markdown",
-        "storage_path": str(stored_file),
+        "storage_path": "supabase://omnix-files/uploads/user-1/release-note.md",
         "metadata": {},
         "processing_job_id": "job-1",
     }
@@ -53,7 +52,7 @@ async def test_ingest_file_updates_processing_statuses(monkeypatch: pytest.Monke
 
     def fake_extract(filename: str, file_type: str | None, data: bytes) -> ExtractionResult:
         assert filename == "release-note.md"
-        assert data == stored_file.read_bytes()
+        assert data == stored_bytes
         return ExtractionResult(
             text="Release note\n\nUse async ingestion.",
             diagnostics=ExtractionDiagnostics(
@@ -82,9 +81,13 @@ async def test_ingest_file_updates_processing_statuses(monkeypatch: pytest.Monke
     async def fake_warm_up_provider() -> object:
         return object()
 
+    async def fake_read_bytes_from_storage(path: str) -> bytes:
+        assert path == "supabase://omnix-files/uploads/user-1/release-note.md"
+        return stored_bytes
+
     monkeypatch.setattr(ingestion_jobs, "select_one_trusted", fake_select_one)
     monkeypatch.setattr(ingestion_jobs, "update_one_trusted", fake_update_one)
-    monkeypatch.setattr(ingestion_jobs, "resolve_managed_storage_path", lambda path: stored_file)
+    monkeypatch.setattr(ingestion_jobs, "read_bytes_from_storage", fake_read_bytes_from_storage)
     monkeypatch.setattr(ingestion_jobs, "extract_document_with_diagnostics", fake_extract)
     monkeypatch.setattr(ingestion_jobs, "store_extracted_text_chunks", fake_store_chunks)
     monkeypatch.setattr(ingestion_jobs, "get_vector_store", lambda: object())
@@ -103,15 +106,13 @@ async def test_ingest_file_updates_processing_statuses(monkeypatch: pytest.Monke
 
 @pytest.mark.asyncio
 async def test_ingest_file_marks_failed_when_extraction_fails(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    stored_file = tmp_path / "blank.md"
-    stored_file.write_text("", encoding="utf-8")
     file_row: dict[str, Any] = {
         "id": "file-1",
         "user_id": "user-1",
         "workspace_id": "workspace-1",
         "file_name": "blank.md",
         "file_type": "text/markdown",
-        "storage_path": str(stored_file),
+        "storage_path": "supabase://omnix-files/uploads/user-1/blank.md",
         "metadata": {},
     }
     statuses: list[str] = []
@@ -137,9 +138,13 @@ async def test_ingest_file_marks_failed_when_extraction_fails(monkeypatch: pytes
             ),
         )
 
+    async def fake_read_bytes_from_storage(path: str) -> bytes:
+        assert path == "supabase://omnix-files/uploads/user-1/blank.md"
+        return b""
+
     monkeypatch.setattr(ingestion_jobs, "select_one_trusted", fake_select_one)
     monkeypatch.setattr(ingestion_jobs, "update_one_trusted", fake_update_one)
-    monkeypatch.setattr(ingestion_jobs, "resolve_managed_storage_path", lambda path: stored_file)
+    monkeypatch.setattr(ingestion_jobs, "read_bytes_from_storage", fake_read_bytes_from_storage)
     monkeypatch.setattr(ingestion_jobs, "extract_document_with_diagnostics", fake_extract)
 
     result = await ingestion_jobs.handle_ingest_file(_job_row())
