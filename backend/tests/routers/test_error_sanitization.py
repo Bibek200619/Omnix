@@ -127,7 +127,10 @@ async def test_ai_generation_sanitizes_model_errors(monkeypatch: pytest.MonkeyPa
     async def broken_model(*args, **kwargs):
         raise ModelServiceError("raw ollama endpoint failed", 503)
 
-    monkeypatch.setattr(messages, "_check_rate_limit", lambda user_id: None)
+    async def allow_rate_limit(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(messages, "_check_rate_limit", allow_rate_limit)
     monkeypatch.setattr(messages, "generate_ai_response", broken_model)
 
     with pytest.raises(HTTPException) as exc_info:
