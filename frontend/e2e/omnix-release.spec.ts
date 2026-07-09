@@ -360,6 +360,30 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page).toHaveURL(/\/tasks\?id=task-1/);
   });
 
+  test("command palette supports keyboard navigation and focus return", async ({ page }) => {
+    await page.goto("/dashboard");
+    const trigger = page.getByRole("button", { name: "Open command palette" }).first();
+    await trigger.focus();
+    await page.keyboard.press("Control+K");
+
+    const dialog = page.getByRole("dialog", { name: "Omnix command palette" });
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Search Omnix commands and workspace results" })).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+
+    await page.keyboard.press("Control+K");
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("ArrowDown");
+    await expect(dialog.getByRole("button", { name: /^Create Decision\./ })).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await expect(dialog.getByRole("button", { name: /^Create Task\./ })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/tasks\?create=task&palette=/);
+  });
+
   test("announces command palette no-result state", async ({ page }) => {
     await page.goto("/dashboard");
     await page.getByRole("button", { name: "Open command palette" }).first().click();

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -60,9 +61,30 @@ export function CommandPalette() {
   const dialogRef = useFocusTrap<HTMLDivElement>(open);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const openerRef = useRef<HTMLElement | null>(null);
   const requestRef = useRef(0);
   const searchAbortRef = useRef<AbortController | null>(null);
   const trimmedQuery = query.trim();
+
+  const openPalette = useCallback(() => {
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setOpen(true);
+    setQuery("");
+  }, []);
+
+  const closePalette = useCallback((options: { restoreFocus?: boolean } = {}) => {
+    const restoreFocus = options.restoreFocus ?? true;
+    const opener = openerRef.current;
+    openerRef.current = null;
+    setOpen(false);
+
+    if (!restoreFocus || !opener) return;
+    window.requestAnimationFrame(() => {
+      if (opener.isConnected) {
+        opener.focus({ preventScroll: true });
+      }
+    });
+  }, []);
 
   const filteredActions = useMemo(
     () => quickActions.filter((item) => matchesQuery(item, trimmedQuery)).slice(0, trimmedQuery ? 5 : quickActions.length),
@@ -129,22 +151,20 @@ export function CommandPalette() {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setOpen(true);
-        setQuery("");
+        openPalette();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [openPalette]);
 
   useEffect(() => {
     const handleOpenRequest = () => {
-      setOpen(true);
-      setQuery("");
+      openPalette();
     };
     window.addEventListener("omnix:open-command-palette", handleOpenRequest);
     return () => window.removeEventListener("omnix:open-command-palette", handleOpenRequest);
-  }, []);
+  }, [openPalette]);
 
   useEffect(() => {
     if (!open) return;
@@ -156,12 +176,12 @@ export function CommandPalette() {
     if (!open) return;
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpen(false);
+        closePalette();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open]);
+  }, [closePalette, open]);
 
   useEffect(() => {
     setQuery("");
@@ -249,13 +269,9 @@ export function CommandPalette() {
     itemRefs.current[item.id]?.scrollIntoView({ block: "nearest" });
   }, [activeIndex, flatItems, open]);
 
-  function closePalette() {
-    setOpen(false);
-  }
-
   function selectItem(item: PaletteItem | undefined) {
     if (!item) return;
-    closePalette();
+    closePalette({ restoreFocus: false });
     router.push(hrefWithFreshCreateToken(item));
   }
 
@@ -317,10 +333,7 @@ export function CommandPalette() {
     <>
       <button
         type="button"
-        onClick={() => {
-          setOpen(true);
-          setQuery("");
-        }}
+        onClick={openPalette}
         className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-[var(--omnix-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-0-255-255-0-04)] text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-rgba-0-255-255-0-3)] hover:bg-[var(--omnix-rgba-0-255-255-0-08)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55 md:hidden"
         aria-label="Open command palette"
         title="Open command palette"
@@ -329,10 +342,7 @@ export function CommandPalette() {
       </button>
       <button
         type="button"
-        onClick={() => {
-          setOpen(true);
-          setQuery("");
-        }}
+        onClick={openPalette}
         className="hidden h-11 w-[17rem] items-center gap-3 rounded-[10px] border border-cyan-300/10 bg-black/20 px-3 text-left text-sm text-white/45 transition hover:border-cyan-300/25 hover:bg-black/30 hover:text-white/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55 md:inline-flex lg:w-[22rem] xl:w-[28rem]"
         aria-label="Open command palette"
       >
@@ -372,7 +382,7 @@ export function CommandPalette() {
                   </div>
                   <button
                     type="button"
-                    onClick={closePalette}
+                    onClick={() => closePalette()}
                     title="Close command palette"
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03] text-white/55 hover:bg-white/[0.06] hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
                     aria-label="Close command palette"
