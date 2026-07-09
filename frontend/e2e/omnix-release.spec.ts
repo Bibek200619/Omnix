@@ -469,6 +469,20 @@ test.describe("authenticated Omnix shell", () => {
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
   });
 
+  test("touch tablet task cards keep hover-revealed controls visible", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "mobile project only");
+    await page.setViewportSize({ width: 820, height: 900 });
+    await page.goto("/tasks");
+
+    const secondaryControls = page.getByTestId("task-card-secondary-controls").first();
+    const blockerControls = page.getByTestId("task-card-blocker-controls").first();
+
+    await expect(secondaryControls).toBeVisible();
+    await expect(blockerControls).toBeVisible();
+    await expect(secondaryControls).toHaveCSS("opacity", "1");
+    await expect(blockerControls).toHaveCSS("opacity", "1");
+  });
+
   for (const route of ["/dashboard", "/files", "/tasks", "/decisions", "/notifications"]) {
     test(`has no critical or serious axe violations on ${route}`, async ({ page }) => {
       await page.goto(route);

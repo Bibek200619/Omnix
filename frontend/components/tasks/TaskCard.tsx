@@ -215,7 +215,10 @@ export function TaskCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 opacity-100 transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover:opacity-100">
+        <div
+          data-testid="task-card-secondary-controls"
+          className="omnix-touch-reveal flex items-center gap-3 opacity-100 transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+        >
           <div className="flex items-center gap-1.5 text-[11px] text-[var(--omnix-text-3)]">
             <Compass className="h-3 w-3" />
             <select
@@ -270,7 +273,10 @@ export function TaskCard({
         </div>
       </details>
 
-      <div className="mt-2.5 border-t border-white/[0.04] pt-2.5 opacity-100 transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover:opacity-100">
+      <div
+        data-testid="task-card-blocker-controls"
+        className="omnix-touch-reveal mt-2.5 border-t border-white/[0.04] pt-2.5 opacity-100 transition-opacity focus-within:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+      >
         <input
           value={blockerDraft}
           onChange={(event) => onBlockerDraftChange(task.id, event.target.value)}
