@@ -46,6 +46,14 @@ def test_global_motion_and_touch_standards_are_declared() -> None:
     assert ".omnix-streaming-dot::after" in source
 
 
+def test_mobile_task_create_form_does_not_use_raw_autofocus() -> None:
+    source = read_frontend("components/tasks/TaskCreateForm.tsx")
+
+    assert "autoFocus" not in source
+    assert 'matchMedia("(hover: hover) and (pointer: fine)")' in source
+    assert "focus({ preventScroll: true })" in source
+
+
 def test_major_framer_motion_surfaces_respect_reduced_motion() -> None:
     upload = read_frontend("components/upload/UploadDropzone.tsx")
     page_transition = read_frontend("components/layout/PageTransition.tsx")
