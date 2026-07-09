@@ -384,6 +384,21 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page).toHaveURL(/\/tasks\?create=task&palette=/);
   });
 
+  test("keyboard shortcuts modal restores focus on close", async ({ page }) => {
+    await page.goto("/dashboard");
+    const trigger = page.getByRole("button", { name: "Open command palette" }).first();
+    await trigger.focus();
+    await page.keyboard.type("?");
+
+    const dialog = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Close keyboard shortcuts" })).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
   test("announces command palette no-result state", async ({ page }) => {
     await page.goto("/dashboard");
     await page.getByRole("button", { name: "Open command palette" }).first().click();
