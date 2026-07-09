@@ -79,7 +79,7 @@ def test_workspace_provider_delegates_storage_and_destructive_confirmation() -> 
     assert "export function WorkspaceDestructiveConfirmationModal" in confirmation
     assert "export function usePendingWorkspaceInvitePolling" in effects
     assert "export function useActiveWorkspaceReconciliation" in effects
-    assert len(provider.splitlines()) <= 950
+    assert len(provider.splitlines()) <= 650
 
 
 def test_workspace_provider_delegates_intelligence_state() -> None:
@@ -101,6 +101,31 @@ def test_workspace_provider_delegates_intelligence_state() -> None:
     assert "workspaceIntelligenceInFlightRef.current?.generation === generation" in intelligence_state
     assert "setWorkspaces((current)" in intelligence_state
     assert "patchWorkspaceInTree" in intelligence_state
+
+
+def test_workspace_provider_delegates_membership_state_and_optimistic_updates() -> None:
+    provider = WORKSPACE_CONTEXT.read_text(encoding="utf-8")
+    membership_state = read_frontend("lib/workspace-membership-state.ts")
+
+    assert "useWorkspaceMembershipState" in provider
+    assert 'from "./workspace-membership-state"' in provider
+    assert "activeWorkspaceDataInFlightRef" not in provider
+    assert "pendingInvitesInFlightRef" not in provider
+    assert "fetchWorkspaceMembers" not in provider
+    assert "fetchWorkspaceInvites" not in provider
+    assert "fetchPendingWorkspaceInvites" not in provider
+    assert "assignWorkspaceMemberRequest" not in provider
+    assert "removeWorkspaceMemberRequest" not in provider
+    assert "updateWorkspaceMemberRoleRequest" not in provider
+    assert "export function useWorkspaceMembershipState" in membership_state
+    assert "activeWorkspaceDataInFlightRef" in membership_state
+    assert "pendingInvitesInFlightRef" in membership_state
+    assert "workspace.member_count + 1" in membership_state
+    assert "Math.max(0, workspace.member_count - 1)" in membership_state
+    assert "previousMembers" in membership_state
+    assert "activeWorkspaceIdRef.current === requestWorkspaceId" in membership_state
+    assert "requestGenerationRef.current === generation" in membership_state
+    assert "activeWorkspaceDataInFlightRef.current?.generation === generation" in membership_state
 
 
 def test_workspace_switch_clears_scoped_api_and_query_state() -> None:
