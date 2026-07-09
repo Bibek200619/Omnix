@@ -442,6 +442,19 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page.getByText("Queued").first()).toBeVisible();
   });
 
+  test("mobile file upload surface queues a selected file", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "mobile project only");
+    await page.goto("/files");
+    await expect(page.getByText("Workspace files")).toBeVisible();
+    const fileInput = page.locator('input[type="file"]').first();
+    await fileInput.setInputFiles({
+      name: "mobile-upload.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Mobile upload\n\nQueued from a touch viewport."),
+    });
+    await expect(page.getByText("Queued").first()).toBeVisible();
+  });
+
   test("mobile navigation renders core routes and command palette", async ({ page, isMobile }) => {
     test.skip(!isMobile, "mobile project only");
     await page.goto("/dashboard");
