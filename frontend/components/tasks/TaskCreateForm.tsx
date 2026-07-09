@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import { useEffect, useRef, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { MentionTextarea } from "@/components/mentions/MentionTextarea";
@@ -39,6 +39,10 @@ type TaskCreateFormProps = {
   onInitiativeChange: (value: string) => void;
 };
 
+function shouldFocusTitleInput() {
+  return typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+}
+
 export function TaskCreateForm({
   title,
   description,
@@ -63,14 +67,24 @@ export function TaskCreateForm({
   onInitialBlockerChange,
   onInitiativeChange,
 }: TaskCreateFormProps) {
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!shouldFocusTitleInput()) return;
+    const frame = window.requestAnimationFrame(() => {
+      titleInputRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
   return (
     <form onSubmit={onSubmit} className="mb-4 grid gap-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.035] p-3 sm:grid-cols-2">
       <Input
+        ref={titleInputRef}
         value={title}
         onChange={(event) => onTitleChange(event.target.value)}
         placeholder="Operational next step"
         className="h-10 text-sm sm:col-span-2"
-        autoFocus
       />
       <div className="sm:col-span-2">
         <MentionTextarea

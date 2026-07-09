@@ -469,6 +469,16 @@ test.describe("authenticated Omnix shell", () => {
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
   });
 
+  test("mobile task creation does not autofocus the title field", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "mobile project only");
+    await page.goto("/tasks");
+    await page.getByRole("button", { name: "Record Task" }).click();
+    const titleInput = page.getByPlaceholder("Operational next step");
+
+    await expect(titleInput).toBeVisible();
+    await expect(titleInput).not.toBeFocused();
+  });
+
   test("touch tablet task cards keep hover-revealed controls visible", async ({ page, isMobile }) => {
     test.skip(!isMobile, "mobile project only");
     await page.setViewportSize({ width: 820, height: 900 });
