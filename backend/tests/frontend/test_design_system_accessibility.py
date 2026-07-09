@@ -29,10 +29,16 @@ def test_generated_design_tokens_are_not_duplicated_or_malformed() -> None:
 
 def test_global_motion_and_touch_standards_are_declared() -> None:
     source = read_frontend("styles/globals.css")
+    task_card = read_frontend("components/tasks/TaskCard.tsx")
 
     assert "@media (pointer: coarse)" in source
     assert "min-width: 44px;" in source
     assert "min-height: 44px;" in source
+    assert ".omnix-touch-reveal" in source
+    assert "opacity: 1 !important;" in source
+    assert "omnix-touch-reveal" in task_card
+    assert 'data-testid="task-card-secondary-controls"' in task_card
+    assert 'data-testid="task-card-blocker-controls"' in task_card
     assert "@media (prefers-reduced-motion: reduce)" in source
     assert "animation-delay: 0ms !important;" in source
     assert "transition-delay: 0ms !important;" in source
