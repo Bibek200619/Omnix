@@ -356,11 +356,14 @@ test.describe("authenticated Omnix shell", () => {
     await expect(search).toBeVisible();
     await search.fill("latency");
     await expect(page.getByRole("button", { name: /Reduce upload latency/ })).toBeVisible();
+    await search.focus();
+    await expect(search).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/tasks\?id=task-1/);
   });
 
-  test("command palette supports keyboard navigation and focus return", async ({ page }) => {
+  test("command palette supports keyboard navigation and focus return", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop hardware keyboard flow only");
     await page.goto("/dashboard");
     const trigger = page.getByRole("button", { name: "Open command palette" }).first();
     await trigger.focus();
