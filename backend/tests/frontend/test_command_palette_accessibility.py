@@ -4,6 +4,7 @@ from pathlib import Path
 
 
 COMMAND_PALETTE = Path(__file__).resolve().parents[3] / "frontend/components/layout/CommandPalette.tsx"
+COMMAND_PALETTE_ITEM = COMMAND_PALETTE.parent / "command-palette" / "CommandPaletteItem.tsx"
 COMMAND_PALETTE_MODEL = COMMAND_PALETTE.parent / "command-palette" / "commandPaletteModel.ts"
 
 
@@ -58,3 +59,19 @@ def test_command_palette_extracts_static_search_model() -> None:
     assert "export function searchResultItem" in model
     assert "export function hrefWithFreshCreateToken" in model
     assert len(source.splitlines()) <= 620
+
+
+def test_command_palette_extracts_accessible_result_item() -> None:
+    source = COMMAND_PALETTE.read_text(encoding="utf-8")
+    item = COMMAND_PALETTE_ITEM.read_text(encoding="utf-8")
+
+    assert "CommandPaletteItem" in source
+    assert "setItemRef={(node)" in source
+    assert "onActiveChange={() => setActiveIndex(index)}" in source
+    assert "onActivate={() => selectItem(item)}" in source
+    assert "export function CommandPaletteItem" in item
+    assert 'type="button"' in item
+    assert "aria-current={active ? \"true\" : undefined}" in item
+    assert "aria-label={`${item.label}. ${item.description}`}" in item
+    assert "focus-visible:ring-2" in item
+    assert "onFocus={onActiveChange}" in item
