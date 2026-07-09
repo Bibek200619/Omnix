@@ -418,6 +418,33 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page.getByText("Notifications").first()).toBeVisible();
   });
 
+  test("mobile shell lets dense task forms scroll", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "mobile project only");
+    await page.setViewportSize({ width: 390, height: 520 });
+    await page.goto("/tasks");
+    await page.getByRole("button", { name: "Record Task" }).click();
+
+    await expect(page.locator("#main-content")).toBeVisible();
+
+    const metrics = await page.evaluate(() => {
+      const shell = document.querySelector(".omnix-auth-shell") as HTMLElement | null;
+      const main = document.querySelector("#main-content") as HTMLElement | null;
+      return {
+        documentScrollHeight: document.scrollingElement?.scrollHeight ?? 0,
+        mainOverflowY: main ? window.getComputedStyle(main).overflowY : "",
+        shellOverflowY: shell ? window.getComputedStyle(shell).overflowY : "",
+        viewportHeight: window.innerHeight,
+      };
+    });
+
+    expect(metrics.shellOverflowY).not.toBe("hidden");
+    expect(metrics.mainOverflowY).not.toBe("hidden");
+    expect(metrics.documentScrollHeight).toBeGreaterThan(metrics.viewportHeight);
+
+    await page.evaluate(() => window.scrollTo(0, 320));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  });
+
   for (const route of ["/dashboard", "/files", "/tasks", "/decisions", "/notifications"]) {
     test(`has no critical or serious axe violations on ${route}`, async ({ page }) => {
       await page.goto(route);

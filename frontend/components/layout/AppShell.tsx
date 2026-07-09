@@ -87,7 +87,7 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <DashboardProviders>
-      <div className="omnix-app-bg omnix-auth-shell relative h-[100dvh] overflow-hidden text-white sm:h-screen">
+      <div className="omnix-app-bg omnix-auth-shell relative min-h-[100svh] overflow-x-hidden text-white lg:h-screen lg:min-h-0 lg:overflow-hidden">
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[9999] focus:rounded-lg focus:bg-[var(--omnix-cyan)] focus:px-4 focus:py-2 focus:font-bold focus:text-[var(--omnix-bg)] focus:shadow-[var(--omnix-glow-md)]"
@@ -109,7 +109,7 @@ export function AppShell({ children }: AppShellProps) {
         />
         <div
           className={cn(
-            "relative z-[1] flex h-full min-h-0 flex-col transition-[padding] duration-200 ease-out",
+            "relative z-[1] flex min-h-[100svh] flex-col transition-[padding] duration-200 ease-out lg:h-full lg:min-h-0",
             isSidebarCollapsed ? "lg:pl-0" : "lg:pl-[var(--omnix-sidebar-w)]",
           )}
         >
@@ -120,7 +120,7 @@ export function AppShell({ children }: AppShellProps) {
           />
           <main
             id="main-content"
-            className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4.25rem_+_env(safe-area-inset-bottom))] lg:pb-0"
+            className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain pb-[calc(4.25rem_+_env(safe-area-inset-bottom))] lg:overflow-hidden lg:pb-0"
           >
             <PageTransition className="flex min-h-0 flex-1 flex-col">{children}</PageTransition>
           </main>
