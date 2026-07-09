@@ -35,6 +35,7 @@ import { useFocusTrap } from "@/lib/use-focus-trap";
 import { useWorkspaceTree } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { WorkspaceSearchResponse, WorkspaceSearchResult } from "@/lib/workspace-types";
+import { useCommandPaletteAnnouncement } from "./command-palette/useCommandPaletteAnnouncement";
 
 const searchGroupKeys = [
   "tasks",
@@ -349,6 +350,19 @@ export function CommandPalette() {
   );
 
   const hasSearchResults = searchGroups.some((group) => searchItemsByGroup[group.key].length > 0);
+  const searchResultCount = useMemo(
+    () => searchGroups.reduce((count, group) => count + searchItemsByGroup[group.key].length, 0),
+    [searchItemsByGroup],
+  );
+  const statusMessage = useCommandPaletteAnnouncement({
+    open,
+    query: trimmedQuery,
+    loading,
+    error,
+    quickActionCount: filteredActions.length,
+    searchResultCount,
+    recentCount: recentItems.length,
+  });
 
   useEffect(() => {
     setCommandShortcut(shortcutLabel());
@@ -645,6 +659,7 @@ export function CommandPalette() {
                     onChange={(event) => setQuery(event.target.value.slice(0, 120))}
                     placeholder="Type a task, decision, page, or command…"
                     aria-label="Search Omnix commands and workspace results"
+                    aria-describedby="omnix-command-palette-status"
                     autoComplete="off"
                     className="h-12 w-full rounded-xl border border-cyan-300/12 bg-black/25 pl-9 pr-11 text-base text-white outline-none placeholder:text-white/25 focus:border-cyan-300/35 focus:shadow-[var(--omnix-glow-xs)] focus-visible:ring-2 focus-visible:ring-cyan-300/45"
                   />
@@ -660,6 +675,15 @@ export function CommandPalette() {
                       <X aria-hidden="true" className="h-4 w-4" />
                     </button>
                   ) : null}
+                  <p
+                    id="omnix-command-palette-status"
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    className="sr-only"
+                  >
+                    {statusMessage}
+                  </p>
                 </div>
               </div>
 
