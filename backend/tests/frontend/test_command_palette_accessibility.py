@@ -4,6 +4,7 @@ from pathlib import Path
 
 
 COMMAND_PALETTE = Path(__file__).resolve().parents[3] / "frontend/components/layout/CommandPalette.tsx"
+COMMAND_PALETTE_MODEL = COMMAND_PALETTE.parent / "command-palette" / "commandPaletteModel.ts"
 
 
 def test_command_palette_uses_tabbable_results_and_labelled_search_input() -> None:
@@ -42,3 +43,18 @@ def test_command_palette_announces_search_status_changes() -> None:
     assert "No command or workspace results" in announcement_hook
     assert "workspace result" in announcement_hook
     assert "quick action" in announcement_hook
+
+
+def test_command_palette_extracts_static_search_model() -> None:
+    source = COMMAND_PALETTE.read_text(encoding="utf-8")
+    model = COMMAND_PALETTE_MODEL.read_text(encoding="utf-8")
+
+    assert "commandPaletteModel" in source
+    assert "const quickActions" not in source
+    assert "const searchGroups" not in source
+    assert "function searchResultItem" not in source
+    assert "export const quickActions" in model
+    assert "export const searchGroups" in model
+    assert "export function searchResultItem" in model
+    assert "export function hrefWithFreshCreateToken" in model
+    assert len(source.splitlines()) <= 620
