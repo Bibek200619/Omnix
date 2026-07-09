@@ -79,7 +79,28 @@ def test_workspace_provider_delegates_storage_and_destructive_confirmation() -> 
     assert "export function WorkspaceDestructiveConfirmationModal" in confirmation
     assert "export function usePendingWorkspaceInvitePolling" in effects
     assert "export function useActiveWorkspaceReconciliation" in effects
-    assert len(provider.splitlines()) <= 1_000
+    assert len(provider.splitlines()) <= 950
+
+
+def test_workspace_provider_delegates_intelligence_state() -> None:
+    provider = WORKSPACE_CONTEXT.read_text(encoding="utf-8")
+    intelligence_state = read_frontend("lib/workspace-intelligence-state.ts")
+
+    assert "useWorkspaceIntelligenceState" in provider
+    assert 'from "./workspace-intelligence-state"' in provider
+    assert "workspaceIntelligenceInFlightRef" not in provider
+    assert "fetchWorkspaceIntelligenceProfile" not in provider
+    assert "updateWorkspaceIntelligenceProfile" not in provider
+    assert "applyWorkspaceIntelligenceProfile" not in provider
+    assert "export function useWorkspaceIntelligenceState" in intelligence_state
+    assert "workspaceIntelligenceInFlightRef" in intelligence_state
+    assert "clearWorkspaceIntelligenceRequest" in intelligence_state
+    assert "resetWorkspaceIntelligenceState" in intelligence_state
+    assert "activeWorkspaceIdRef.current === requestWorkspaceId" in intelligence_state
+    assert "requestGenerationRef.current === generation" in intelligence_state
+    assert "workspaceIntelligenceInFlightRef.current?.generation === generation" in intelligence_state
+    assert "setWorkspaces((current)" in intelligence_state
+    assert "patchWorkspaceInTree" in intelligence_state
 
 
 def test_workspace_switch_clears_scoped_api_and_query_state() -> None:
