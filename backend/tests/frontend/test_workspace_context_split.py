@@ -178,6 +178,17 @@ def test_app_shell_delegates_dashboard_provider_stack() -> None:
     assert "ssr: false" in providers
 
 
+def test_app_shell_mobile_layout_does_not_lock_document_scroll() -> None:
+    app_shell = read_frontend("components/layout/AppShell.tsx")
+
+    assert "h-[100dvh] overflow-hidden" not in app_shell
+    assert "min-h-[100svh]" in app_shell
+    assert "overflow-x-hidden text-white lg:h-screen" in app_shell
+    assert "lg:overflow-hidden" in app_shell
+    assert "overflow-x-hidden overflow-y-auto overscroll-y-contain" in app_shell
+    assert "pb-[calc(4.25rem_+_env(safe-area-inset-bottom))]" in app_shell
+
+
 def test_low_scope_consumers_use_targeted_workspace_hooks() -> None:
     consumers = {
         "lib/conversation-history-context.tsx": "useWorkspaceTree",
