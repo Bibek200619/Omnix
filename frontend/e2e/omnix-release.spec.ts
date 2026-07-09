@@ -263,19 +263,33 @@ async function mockApi(page: Page) {
     }
     const searchMatch = path.match(/^\/workspaces\/([^/]+)\/search$/);
     if (searchMatch) {
+      const query = url.searchParams.get("q")?.toLowerCase() || "";
+      const taskResults = query.includes("latency")
+        ? [
+            {
+              id: "task-1",
+              type: "task",
+              title: "Reduce upload latency",
+              preview: "Move extraction to background workers.",
+              url: "/tasks?id=task-1",
+            },
+          ]
+        : [];
       return fulfillJson(route, {
         conversations: [],
-        tasks: [
-          {
-            id: "task-1",
-            type: "task",
-            title: "Reduce upload latency",
-            preview: "Move extraction to background workers.",
-            url: "/tasks?id=task-1",
-          },
-        ],
+        tasks: taskResults,
         initiatives: [],
         decisions: [],
+        files: [],
+        documents: [],
+        sources: [],
+        members: [],
+        mentions: [],
+        workspaces: [],
+        automations: [],
+        activity: [],
+        jobs: [],
+        items: taskResults,
       });
     }
     if (path === "/files" && method === "GET") return fulfillJson(route, files);
@@ -344,6 +358,15 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page.getByRole("button", { name: /Reduce upload latency/ })).toBeVisible();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/tasks\?id=task-1/);
+  });
+
+  test("announces command palette no-result state", async ({ page }) => {
+    await page.goto("/dashboard");
+    await page.getByRole("button", { name: "Open command palette" }).first().click();
+    const search = page.getByRole("textbox", { name: "Search Omnix commands and workspace results" });
+    await search.fill("unmatched-release-query");
+    await expect(page.getByText("No command or workspace match.")).toBeVisible();
+    await expect(page.locator("#omnix-command-palette-status")).toContainText("No command or workspace results");
   });
 
   test("switches workspace from the sidebar", async ({ page, isMobile }) => {
