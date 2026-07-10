@@ -66,6 +66,23 @@ class InitiativeMomentumRead(BaseModel):
     last_movement_at: datetime | None = None
 
 
+class InitiativeProvenanceSummaryRead(BaseModel):
+    origin: str = "manual"
+    has_context: bool = False
+    has_provenance: bool = False
+    needs_repair: bool = True
+    missing: list[str] = Field(default_factory=lambda: ["source_context"])
+    source_types: list[str] = Field(default_factory=list)
+    task_count: int = 0
+    decision_count: int = 0
+    conversation_count: int = 0
+    resource_count: int = 0
+    summary: str = (
+        "No source context is linked yet. Add mission context, link a task or decision, "
+        "or attach a conversation/source."
+    )
+
+
 class WorkspaceInitiativeRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -92,6 +109,7 @@ class WorkspaceInitiativeRead(BaseModel):
     linked_channels: list[InitiativeChannelRead] = Field(default_factory=list)
     linked_decisions: list[dict[str, Any]] = Field(default_factory=list)
     momentum: InitiativeMomentumRead
+    provenance_summary: InitiativeProvenanceSummaryRead = Field(default_factory=InitiativeProvenanceSummaryRead)
 
 
 class WorkspaceInitiativeAssistanceRequest(BaseModel):

@@ -164,6 +164,99 @@ async def test_hydration_aggregates_only_matching_task_and_visible_channel(monke
 
 
 @pytest.mark.asyncio
+async def test_hydration_provenance_summary_explains_linked_task_and_decision(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_base_records(workspace_id: str, user_id: str):
+        return (
+            [
+                {
+                    "id": "task-linked",
+                    "title": "Stabilize importer",
+                    "initiative_id": "initiative-1",
+                    "status": "active",
+                    "blockers": [],
+                }
+            ],
+            [],
+            [],
+        )
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    async def fake_select_all(table: str, columns: str, filters: dict[str, object], **kwargs):
+        assert table == "workspace_decisions"
+        assert filters == {"initiative_id": "initiative-1", "workspace_id": "workspace-1"}
+        return [
+            {
+                "id": "decision-1",
+                "title": "Use shared import queue",
+                "status": "accepted",
+                "decision_reason": "The queue keeps recovery deterministic.",
+                "created_at": "2026-06-04T10:00:00+00:00",
+            }
+        ]
+
+    monkeypatch.setattr(initiatives, "_base_records", fake_base_records)
+    monkeypatch.setattr(initiatives, "get_profiles", fake_profiles)
+    monkeypatch.setattr(initiatives, "select_all_trusted", fake_select_all)
+
+    hydrated = await initiatives._hydrate_initiatives(
+        [
+            {
+                "id": "initiative-1",
+                "status": "active",
+                "initiative_context": "Launched from the import queue decision.",
+                "linked_resources": [],
+                "activity_metadata": {"origin": "decision"},
+            }
+        ],
+        workspace_id="workspace-1",
+        user_id="user-1",
+    )
+
+    summary = hydrated[0]["provenance_summary"]
+    assert summary["origin"] == "decision"
+    assert summary["has_provenance"] is True
+    assert summary["needs_repair"] is False
+    assert summary["source_types"] == ["mission_context", "task", "decision"]
+    assert summary["task_count"] == 1
+    assert summary["decision_count"] == 1
+    assert "1 linked task" in summary["summary"]
+    assert "1 linked decision" in summary["summary"]
+
+
+@pytest.mark.asyncio
+async def test_hydration_provenance_summary_marks_missing_context_actionable(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_base_records(workspace_id: str, user_id: str):
+        return [], [], []
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    async def fake_select_all(table: str, columns: str, filters: dict[str, object], **kwargs):
+        assert table == "workspace_decisions"
+        return []
+
+    monkeypatch.setattr(initiatives, "_base_records", fake_base_records)
+    monkeypatch.setattr(initiatives, "get_profiles", fake_profiles)
+    monkeypatch.setattr(initiatives, "select_all_trusted", fake_select_all)
+
+    hydrated = await initiatives._hydrate_initiatives(
+        [{"id": "initiative-1", "status": "active", "linked_resources": [], "activity_metadata": {}}],
+        workspace_id="workspace-1",
+        user_id="user-1",
+    )
+
+    summary = hydrated[0]["provenance_summary"]
+    assert summary["origin"] == "manual"
+    assert summary["has_provenance"] is False
+    assert summary["needs_repair"] is True
+    assert summary["missing"] == ["source_context"]
+    assert "Add mission context" in summary["summary"]
+    assert "link a task or decision" in summary["summary"]
+
+
+@pytest.mark.asyncio
 async def test_list_initiatives_falls_back_to_legacy_columns(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
 

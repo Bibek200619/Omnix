@@ -115,8 +115,10 @@ export function InitiativeDetailPanel({
   const traceabilityOrigin = selected
     ? {
         kind: "origin" as const,
-        label: `${readableOrigin(selected.activity_metadata?.origin)} initiative`,
-        detail: selected.creator_name ? `Recorded by ${selected.creator_name}` : selected.created_at ? `Recorded ${new Date(selected.created_at).toLocaleDateString()}` : null,
+        label: `${readableOrigin(selected.provenance_summary?.origin ?? selected.activity_metadata?.origin)} initiative`,
+        detail:
+          selected.provenance_summary?.summary ??
+          (selected.creator_name ? `Recorded by ${selected.creator_name}` : selected.created_at ? `Recorded ${new Date(selected.created_at).toLocaleDateString()}` : null),
       }
     : null;
   const traceabilityEvidence = selected?.initiative_context
@@ -152,6 +154,13 @@ export function InitiativeDetailPanel({
           href: resourceHref(resource),
           detail: resource.resource_type.replace("_", " "),
         })),
+        ...(selected.provenance_summary?.needs_repair
+          ? [{
+              kind: "source" as const,
+              label: "Missing source context",
+              detail: selected.provenance_summary.summary,
+            }]
+          : []),
       ]
     : [];
 

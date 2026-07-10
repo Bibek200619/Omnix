@@ -241,6 +241,75 @@ def _momentum(initiative: Mapping[str, Any], tasks: list[dict[str, Any]], channe
     }
 
 
+def _count_label(count: int, singular: str, plural: str | None = None) -> str:
+    if count == 1:
+        return f"1 {singular}"
+    return f"{count} {plural or singular + 's'}"
+
+
+def _join_labels(labels: list[str]) -> str:
+    if len(labels) == 1:
+        return labels[0]
+    if len(labels) == 2:
+        return f"{labels[0]} and {labels[1]}"
+    return f"{', '.join(labels[:-1])}, and {labels[-1]}"
+
+
+def _initiative_provenance_summary(
+    initiative: Mapping[str, Any],
+    tasks: list[dict[str, Any]],
+    channels: list[dict[str, Any]],
+    decisions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    activity_metadata = initiative.get("activity_metadata") if isinstance(initiative.get("activity_metadata"), dict) else {}
+    origin = _clean_text(activity_metadata.get("origin")) or "manual"
+    resources = _normalize_resources(initiative.get("linked_resources"))
+    has_context = bool(_clean_text(initiative.get("initiative_context")))
+    source_types: list[str] = []
+    labels: list[str] = []
+
+    if has_context:
+        source_types.append("mission_context")
+        labels.append("mission context")
+    if tasks:
+        source_types.append("task")
+        labels.append(_count_label(len(tasks), "linked task"))
+    if decisions:
+        source_types.append("decision")
+        labels.append(_count_label(len(decisions), "linked decision"))
+    if channels:
+        source_types.append("conversation")
+        labels.append(_count_label(len(channels), "attached conversation"))
+    if resources:
+        source_types.append("resource")
+        labels.append(_count_label(len(resources), "attached source"))
+
+    has_provenance = bool(source_types)
+    if has_provenance:
+        summary = f"This initiative traces to {_join_labels(labels)}."
+        missing: list[str] = []
+    else:
+        summary = (
+            "No source context is linked yet. Add mission context, link a task or decision, "
+            "or attach a conversation/source."
+        )
+        missing = ["source_context"]
+
+    return {
+        "origin": origin,
+        "has_context": has_context,
+        "has_provenance": has_provenance,
+        "needs_repair": not has_provenance,
+        "missing": missing,
+        "source_types": source_types,
+        "task_count": len(tasks),
+        "decision_count": len(decisions),
+        "conversation_count": len(channels),
+        "resource_count": len(resources),
+        "summary": summary,
+    }
+
+
 async def _validate_owner(workspace: dict[str, Any], owner_user_id: str | None) -> None:
     if not owner_user_id:
         return
@@ -335,6 +404,12 @@ async def _hydrate_initiatives(
                 "linked_channels": linked_channels,
                 "linked_decisions": linked_decisions,
                 "momentum": _momentum(row, linked_tasks, linked_channels),
+                "provenance_summary": _initiative_provenance_summary(
+                    row,
+                    linked_tasks,
+                    linked_channels,
+                    linked_decisions,
+                ),
             }
         )
     return hydrated
