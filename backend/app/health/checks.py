@@ -197,6 +197,63 @@ async def check_ollama() -> Dict[str, Any]:
     }
 
 
+def _configured_chat_providers(settings: Any) -> list[str]:
+    raw_order = getattr(settings, "AI_PROVIDER_ORDER", "ollama,openai,anthropic")
+    names = raw_order.split(",") if isinstance(raw_order, str) else list(raw_order)
+    available = {"ollama"}
+    if getattr(settings, "OPENAI_API_KEY", None):
+        available.add("openai")
+    if getattr(settings, "ANTHROPIC_API_KEY", None):
+        available.add("anthropic")
+
+    configured: list[str] = []
+    for raw_name in names:
+        name = str(raw_name).strip().lower()
+        if name in available and name not in configured:
+            configured.append(name)
+    configured.extend(name for name in sorted(available) if name not in configured)
+    return configured
+
+
+async def check_chat_providers() -> Dict[str, Any]:
+    settings = get_settings()
+    configured = _configured_chat_providers(settings)
+    ollama = await check_ollama()
+    ollama_healthy = ollama.get("status") == "healthy"
+    providers: Dict[str, Any] = {
+        "ollama": {
+            "status": "healthy" if ollama_healthy else "failed",
+            "probe": "live",
+            "model": ollama.get("model") or ollama.get("expected_model"),
+        }
+    }
+    for name in configured:
+        if name != "ollama":
+            providers[name] = {"status": "configured", "probe": "configuration"}
+
+    primary = configured[0] if configured else "ollama"
+    if primary != "ollama":
+        status = "warning"
+        reason = "primary_connectivity_not_probed"
+    elif ollama_healthy:
+        status = "healthy"
+        reason = None
+    elif len(configured) > 1:
+        status = "degraded"
+        reason = "primary_unavailable_failover_configured"
+    else:
+        status = "failed"
+        reason = "no_chat_provider_available"
+
+    return {
+        "status": status,
+        "primary": primary,
+        "configured": configured,
+        "providers": providers,
+        "reason": reason,
+    }
+
+
 async def check_ingestion_worker(*, include_stuck_jobs: bool = True) -> Dict[str, Any]:
     """
     Report ingestion worker health from RuntimeManager (in-process counters)
@@ -317,7 +374,7 @@ async def run_all_checks(*, include_internal: bool = True) -> Dict[str, Any]:
         check_workspace_schema_health(),
         check_vector_store(),
         check_redis(),
-        check_ollama(),
+        check_chat_providers(),
         check_ingestion_worker(include_stuck_jobs=include_internal),
         return_exceptions=True,
     )
@@ -415,7 +472,7 @@ def build_operational_health(
         ),
         "chat_provider": _operational_component(
             checks.get("ollama") or {"status": "error"},
-            fields=("model", "expected_model"),
+            fields=("primary", "configured", "providers", "reason"),
         ),
         "api_logging": _operational_component(
             api_logging,
