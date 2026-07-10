@@ -225,6 +225,20 @@ export type WorkspaceInitiativeMomentum = {
   last_movement_at?: string | null;
 };
 
+export type WorkspaceInitiativeProvenanceSummary = {
+  origin: string;
+  has_context: boolean;
+  has_provenance: boolean;
+  needs_repair: boolean;
+  missing: string[];
+  source_types: string[];
+  task_count: number;
+  decision_count: number;
+  conversation_count: number;
+  resource_count: number;
+  summary: string;
+};
+
 export type WorkspaceInitiative = {
   id: string;
   workspace_id: string;
@@ -255,6 +269,7 @@ export type WorkspaceInitiative = {
     created_at?: string | null;
   }>;
   momentum: WorkspaceInitiativeMomentum;
+  provenance_summary?: WorkspaceInitiativeProvenanceSummary;
 };
 
 export type WorkspaceInitiativeAssistance = {
