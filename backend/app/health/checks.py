@@ -3,7 +3,10 @@ import asyncio
 import importlib
 import inspect
 import logging
+import os
 from datetime import datetime, timezone, timedelta
+from importlib.util import find_spec
+from pathlib import Path
 from typing import Dict, Any
 from urllib.parse import urlparse
 import httpx
@@ -31,6 +34,113 @@ async def check_vector_store() -> Dict[str, Any]:
     except Exception as e:
         logger.error("Vector store health check failed: %s", e)
         return {"status": "unhealthy", "error": str(e)}
+
+
+async def check_embedding_provider() -> Dict[str, Any]:
+    provider: Any | None = None
+    try:
+        from ..embeddings.provider import get_default_provider
+
+        provider = get_default_provider()
+        provider_type = provider.__class__.__name__
+        if provider_type == "LocalEmbeddingProvider" and find_spec("sentence_transformers") is None:
+            return {
+                "status": "failed",
+                "provider": provider_type,
+                "reason": "sentence_transformers_dependency_missing",
+            }
+
+        result: Dict[str, Any] = {
+            "status": "healthy",
+            "provider": provider_type,
+            "probe": "configuration",
+        }
+        for attribute in ("model_name", "model", "embedding_dim", "expected_dim"):
+            value = getattr(provider, attribute, None)
+            if value is not None:
+                result[attribute] = value
+        return result
+    except Exception as exc:
+        logger.exception("Embedding provider health check failed.")
+        return {
+            "status": "failed",
+            "reason": "embedding_provider_configuration_error",
+            "error_type": type(exc).__name__,
+        }
+    finally:
+        close = getattr(provider, "close", None)
+        if callable(close):
+            try:
+                close_result = close()
+                if inspect.isawaitable(close_result):
+                    await close_result
+            except Exception:
+                logger.warning("Embedding provider health-check client cleanup failed.", exc_info=True)
+
+
+def _nearest_existing_path(path: Path) -> Path:
+    candidate = path
+    while not candidate.exists() and candidate.parent != candidate:
+        candidate = candidate.parent
+    return candidate
+
+
+async def check_file_storage() -> Dict[str, Any]:
+    from ..services.file_storage import storage_backend_name, upload_root
+
+    backend = storage_backend_name()
+    if backend == "local":
+        root = upload_root()
+        probe_path = _nearest_existing_path(root)
+        if root.exists() and not root.is_dir():
+            return {
+                "status": "failed",
+                "backend": backend,
+                "reason": "upload_path_is_not_directory",
+            }
+        if not probe_path.exists() or not os.access(probe_path, os.W_OK | os.X_OK):
+            return {
+                "status": "failed",
+                "backend": backend,
+                "reason": "upload_path_not_writable",
+            }
+
+        production = str(getattr(get_settings(), "ENV", "")).strip().lower() == "production"
+        return {
+            "status": "warning" if production else "healthy",
+            "backend": backend,
+            "shared": False,
+            "root_exists": root.exists(),
+            "reason": "local_storage_not_shared" if production else None,
+        }
+
+    if backend == "supabase":
+        bucket = os.environ.get("OMNIX_FILE_STORAGE_BUCKET", "omnix-files")
+        try:
+            storage_bucket = get_supabase().storage.from_(bucket)
+            await asyncio.to_thread(storage_bucket.list)
+            return {
+                "status": "healthy",
+                "backend": backend,
+                "shared": True,
+                "bucket": bucket,
+            }
+        except Exception as exc:
+            logger.exception("Shared file storage health check failed.")
+            return {
+                "status": "failed",
+                "backend": backend,
+                "shared": True,
+                "bucket": bucket,
+                "reason": "storage_probe_failed",
+                "error_type": type(exc).__name__,
+            }
+
+    return {
+        "status": "failed",
+        "backend": backend,
+        "reason": "unsupported_storage_backend",
+    }
 
 
 async def check_redis() -> Dict[str, Any]:
@@ -220,3 +330,140 @@ async def run_all_checks(*, include_internal: bool = True) -> Dict[str, Any]:
         "ollama": results[4] if not isinstance(results[4], Exception) else {"status": "error", "error": str(results[4])},
         "ingestion_worker": results[5] if not isinstance(results[5], Exception) else {"status": "error", "error": str(results[5])},
     }
+
+
+_OPERATIONAL_STATUS_MAP = {
+    "healthy": "healthy",
+    "clear": "healthy",
+    "warning": "warning",
+    "no_worker": "warning",
+    "not_checked": "warning",
+    "degraded": "degraded",
+    "recovery_needed": "degraded",
+    "failed": "failed",
+    "unhealthy": "failed",
+    "error": "failed",
+    "unavailable": "failed",
+}
+_OPERATIONAL_STATUS_ORDER = {"healthy": 0, "warning": 1, "degraded": 2, "failed": 3}
+
+
+def _operational_component(
+    result: Dict[str, Any],
+    *,
+    fields: tuple[str, ...] = (),
+    status: str | None = None,
+) -> Dict[str, Any]:
+    observed_status = str(result.get("status") or "error")
+    normalized_status = status or _OPERATIONAL_STATUS_MAP.get(observed_status, "failed")
+    component: Dict[str, Any] = {
+        "status": normalized_status,
+        "observed_status": observed_status,
+    }
+    for field in fields:
+        if field in result:
+            component[field] = result[field]
+    return component
+
+
+def build_operational_health(
+    checks: Dict[str, Any],
+    *,
+    embedding_provider: Dict[str, Any],
+    file_storage: Dict[str, Any],
+    api_logging: Dict[str, Any],
+) -> Dict[str, Any]:
+    worker = checks.get("ingestion_worker") or {"status": "error"}
+    queue_depth = worker.get("queue_depth")
+    worker_status = None
+    if worker.get("status") == "no_worker" and isinstance(queue_depth, int) and queue_depth > 0:
+        worker_status = "degraded"
+
+    queue_recovery = worker.get("queue_recovery") or {"status": "not_checked"}
+    dead_letter_count = worker.get("dead_lettered_jobs")
+    if dead_letter_count is None:
+        dead_letter_status = "warning"
+    elif int(dead_letter_count) > 0:
+        dead_letter_status = "degraded"
+    else:
+        dead_letter_status = "healthy"
+
+    components = {
+        "database": _operational_component(checks.get("supabase") or {"status": "error"}),
+        "workspace_schema": _operational_component(
+            checks.get("workspace_schema") or {"status": "error"},
+            fields=("summary",),
+        ),
+        "redis": _operational_component(checks.get("redis") or {"status": "error"}, fields=("ping",)),
+        "workers": _operational_component(
+            worker,
+            status=worker_status,
+            fields=("active_workers", "queue_depth", "processing_jobs", "completed_jobs", "failed_jobs"),
+        ),
+        "vector_store": _operational_component(
+            checks.get("vector_store") or {"status": "error"},
+            fields=("type",),
+        ),
+        "embedding_provider": _operational_component(
+            embedding_provider,
+            fields=("provider", "probe", "model_name", "model", "embedding_dim", "expected_dim", "reason"),
+        ),
+        "file_storage": _operational_component(
+            file_storage,
+            fields=("backend", "shared", "bucket", "root_exists", "reason"),
+        ),
+        "chat_provider": _operational_component(
+            checks.get("ollama") or {"status": "error"},
+            fields=("model", "expected_model"),
+        ),
+        "api_logging": _operational_component(
+            api_logging,
+            fields=(
+                "pending_tasks",
+                "max_pending_tasks",
+                "enqueued_total",
+                "written_total",
+                "failed_total",
+                "dropped_total",
+                "last_failure_at",
+                "last_drop_at",
+            ),
+        ),
+        "queue_recovery": _operational_component(
+            queue_recovery,
+            fields=("missing_jobs", "requeued_jobs", "scanned_jobs", "dry_run", "reason"),
+        ),
+        "dead_letters": {
+            "status": dead_letter_status,
+            "count": dead_letter_count,
+        },
+    }
+    counts = {status: 0 for status in _OPERATIONAL_STATUS_ORDER}
+    for component in components.values():
+        counts[str(component["status"])] += 1
+    overall_status = max(
+        counts,
+        key=lambda candidate: _OPERATIONAL_STATUS_ORDER[candidate] if counts[candidate] else -1,
+    )
+    return {
+        "status": overall_status,
+        "summary": counts,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "components": components,
+    }
+
+
+async def run_operational_checks() -> Dict[str, Any]:
+    from ..bootstrap.middleware import get_api_logging_health
+
+    checks, embedding_provider, file_storage = await asyncio.gather(
+        run_all_checks(include_internal=True),
+        check_embedding_provider(),
+        check_file_storage(),
+    )
+    return build_operational_health(
+        checks,
+        embedding_provider=embedding_provider,
+        file_storage=file_storage,
+        api_logging=get_api_logging_health(),
+    )
