@@ -58,8 +58,8 @@ export function CommandPalette() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const dialogRef = useFocusTrap<HTMLDivElement>(open);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const dialogRef = useFocusTrap<HTMLDivElement>(open, inputRef);
   const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const openerRef = useRef<HTMLElement | null>(null);
   const requestRef = useRef(0);
@@ -165,12 +165,6 @@ export function CommandPalette() {
     window.addEventListener("omnix:open-command-palette", handleOpenRequest);
     return () => window.removeEventListener("omnix:open-command-palette", handleOpenRequest);
   }, [openPalette]);
-
-  useEffect(() => {
-    if (!open) return;
-    const timer = window.setTimeout(() => inputRef.current?.focus(), 0);
-    return () => window.clearTimeout(timer);
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;

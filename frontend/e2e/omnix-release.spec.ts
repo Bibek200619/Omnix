@@ -379,6 +379,7 @@ test.describe("authenticated Omnix shell", () => {
 
     await page.keyboard.press("Control+K");
     await expect(dialog).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Search Omnix commands and workspace results" })).toBeFocused();
     await page.keyboard.press("ArrowDown");
     await expect(dialog.getByRole("button", { name: /^Create Decision\./ })).toBeFocused();
     await page.keyboard.press("ArrowUp");

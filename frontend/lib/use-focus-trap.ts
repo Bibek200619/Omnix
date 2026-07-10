@@ -1,9 +1,12 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, type RefObject } from "react";
 
 const focusableSelector =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
-export function useFocusTrap<T extends HTMLElement = HTMLElement>(active: boolean) {
+export function useFocusTrap<T extends HTMLElement = HTMLElement>(
+  active: boolean,
+  initialFocusRef?: RefObject<HTMLElement | null>,
+) {
   const containerRef = useRef<T>(null);
 
   useLayoutEffect(() => {
@@ -14,11 +17,14 @@ export function useFocusTrap<T extends HTMLElement = HTMLElement>(active: boolea
 
     const focusInitialElement = () => {
       const container = containerRef.current;
-      if (!container) {
+      if (!container || (initialFocusRef && !initialFocusRef.current)) {
         focusFrame = window.requestAnimationFrame(focusInitialElement);
         return;
       }
-      const first = container.querySelector<HTMLElement>(focusableSelector);
+      const preferred = initialFocusRef?.current;
+      const first = preferred && container.contains(preferred)
+        ? preferred
+        : container.querySelector<HTMLElement>(focusableSelector);
 
       first?.focus({ preventScroll: true });
     };
@@ -56,7 +62,7 @@ export function useFocusTrap<T extends HTMLElement = HTMLElement>(active: boolea
       document.removeEventListener("keydown", handleKeyDown);
       previouslyFocused?.focus({ preventScroll: true });
     };
-  }, [active]);
+  }, [active, initialFocusRef]);
 
   return containerRef;
 }
