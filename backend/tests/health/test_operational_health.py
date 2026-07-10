@@ -41,16 +41,28 @@ def _api_logging_health() -> dict[str, Any]:
     }
 
 
+def _startup_health() -> dict[str, Any]:
+    return {
+        "status": "healthy",
+        "summary": {"healthy": 4, "failed": 0},
+        "components": {
+            name: {"status": "healthy"}
+            for name in ("redis", "observability", "vector_store", "workers")
+        },
+    }
+
+
 def test_operational_health_contains_required_components() -> None:
     result = checks.build_operational_health(
         _base_checks(),
         embedding_provider={"status": "healthy", "provider": "LocalEmbeddingProvider"},
         file_storage={"status": "healthy", "backend": "local", "shared": False},
         api_logging=_api_logging_health(),
+        startup=_startup_health(),
     )
 
     assert result["status"] == "healthy"
-    assert result["summary"] == {"healthy": 11, "warning": 0, "degraded": 0, "failed": 0}
+    assert result["summary"] == {"healthy": 12, "warning": 0, "degraded": 0, "failed": 0}
     assert {
         "redis",
         "workers",
@@ -73,11 +85,17 @@ def test_operational_health_distinguishes_warning_and_degraded_states() -> None:
         "dead_lettered_jobs": 1,
     }
 
+    startup = _startup_health()
+    startup["status"] = "degraded"
+    startup["summary"] = {"healthy": 3, "failed": 1}
+    startup["components"]["redis"] = {"status": "failed", "error_type": "ConnectionError"}
+
     result = checks.build_operational_health(
         raw_checks,
         embedding_provider={"status": "healthy", "provider": "LocalEmbeddingProvider"},
         file_storage={"status": "warning", "backend": "local", "reason": "local_storage_not_shared"},
         api_logging=_api_logging_health(),
+        startup=startup,
     )
 
     assert result["status"] == "degraded"
@@ -85,6 +103,7 @@ def test_operational_health_distinguishes_warning_and_degraded_states() -> None:
     assert result["components"]["queue_recovery"]["status"] == "degraded"
     assert result["components"]["dead_letters"] == {"status": "degraded", "count": 1}
     assert result["components"]["file_storage"]["status"] == "warning"
+    assert result["components"]["startup"]["status"] == "degraded"
 
 
 def test_operational_health_marks_failed_dependencies() -> None:
@@ -96,6 +115,7 @@ def test_operational_health_marks_failed_dependencies() -> None:
         embedding_provider={"status": "healthy", "provider": "LocalEmbeddingProvider"},
         file_storage={"status": "healthy", "backend": "supabase", "shared": True},
         api_logging=_api_logging_health(),
+        startup=_startup_health(),
     )
 
     assert result["status"] == "failed"

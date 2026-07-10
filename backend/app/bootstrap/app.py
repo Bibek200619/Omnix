@@ -162,20 +162,36 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     async def startup_event():
         logger.info("Bootstrap: Starting system initialization...")
-        RuntimeManager.get().set_status("booting")
-        
-        try:
-            await redis.initialize_redis()
-            await observability.initialize()
-            await vector_store.initialize()
-            await workers.initialize()
-            
-            RuntimeManager.get().set_status("running")
+        runtime = RuntimeManager.get()
+        runtime.begin_startup()
+        runtime.set_status("booting")
+
+        failed_components: list[str] = []
+        initializers = (
+            ("redis", redis.initialize_redis),
+            ("observability", observability.initialize),
+            ("vector_store", vector_store.initialize),
+            ("workers", workers.initialize),
+        )
+        for component, initializer in initializers:
+            try:
+                await initializer()
+                runtime.record_startup_component(component, "healthy")
+            except Exception as exc:
+                failed_components.append(component)
+                runtime.record_startup_component(component, "failed", error_type=type(exc).__name__)
+                logger.exception("Bootstrap component initialization failed | component=%s", component)
+
+        if failed_components:
+            runtime.set_status("degraded")
+            logger.error(
+                "Bootstrap: System initialization degraded | failed_components=%s",
+                failed_components,
+            )
+        else:
+            runtime.set_status("running")
             logger.info("Bootstrap: System initialized successfully.")
-        except Exception as e:
-            RuntimeManager.get().set_status("degraded")
-            logger.error(f"Bootstrap: System initialization failed: {e}")
-            
+
     @app.on_event("shutdown")
     async def shutdown_event():
         await shutdown.graceful_shutdown()
