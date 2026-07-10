@@ -3,7 +3,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
-from .checks import run_all_checks, check_ingestion_worker
+from .checks import run_all_checks, run_operational_checks, check_ingestion_worker
+from ..core.admin_auth import require_runtime_admin
 from ..services.workspace_schema_health_service import check_workspace_schema_health
 from ..runtime.manager import RuntimeManager
 from ..core.security import get_current_user
@@ -56,3 +57,7 @@ async def ingestion_worker_health(current_user: dict[str, Any] = Depends(get_cur
 @router.get("/providers")
 async def provider_health(current_user: dict[str, Any] = Depends(get_current_user)):
     return {"active_providers": RuntimeManager.get().active_providers}
+
+@router.get("/operational")
+async def operational_health(current_user: dict[str, Any] = Depends(require_runtime_admin)):
+    return await run_operational_checks()
