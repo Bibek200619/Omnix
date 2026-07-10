@@ -70,6 +70,52 @@ async def test_create_from_message_preserves_discussion_provenance(monkeypatch: 
 
 
 @pytest.mark.asyncio
+async def test_create_from_assistance_preserves_ai_extraction_provenance(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_channel_access(**kwargs):
+        return {"id": kwargs["channel_id"], "name": "release-room"}, object()
+
+    captured: dict[str, object] = {}
+
+    async def fake_create_task(**kwargs):
+        captured.update(kwargs)
+        return {"id": "task-1"}
+
+    monkeypatch.setattr(tasks, "_require_channel_access", fake_channel_access)
+    monkeypatch.setattr(tasks, "create_task", fake_create_task)
+
+    result = await tasks.create_task_from_assistance(
+        workspace_id="workspace-1",
+        channel_id="channel-1",
+        user_id="user-1",
+        payload={
+            "title": "Write rollout checklist",
+            "description": None,
+            "assistance_text": "AI extracted a rollout checklist action from the discussion.",
+            "thread_root_id": "message-root",
+            "status": "idea",
+        },
+    )
+
+    assert result["id"] == "task-1"
+    assert captured["origin"] == "ai_action_extraction"
+    payload = captured["payload"]
+    assert isinstance(payload, dict)
+    assert payload["description"] == "AI extracted a rollout checklist action from the discussion."
+    assert payload["linked_context"][0] == {
+        "context_type": "ai_action_extraction",
+        "context_id": "channel-1",
+        "label": "Selected action extraction",
+        "metadata": {"thread_root_id": "message-root"},
+    }
+    assert payload["linked_context"][1] == {
+        "context_type": "channel",
+        "context_id": "channel-1",
+        "label": "release-room",
+        "metadata": {},
+    }
+
+
+@pytest.mark.asyncio
 async def test_create_task_serializes_due_date_before_insert(monkeypatch: pytest.MonkeyPatch) -> None:
     due_date = date(2026, 6, 3)
     captured: dict[str, object] = {}
