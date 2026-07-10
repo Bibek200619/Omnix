@@ -372,6 +372,7 @@ def build_operational_health(
     embedding_provider: Dict[str, Any],
     file_storage: Dict[str, Any],
     api_logging: Dict[str, Any],
+    startup: Dict[str, Any],
 ) -> Dict[str, Any]:
     worker = checks.get("ingestion_worker") or {"status": "error"}
     queue_depth = worker.get("queue_depth")
@@ -429,6 +430,10 @@ def build_operational_health(
                 "last_drop_at",
             ),
         ),
+        "startup": _operational_component(
+            startup,
+            fields=("summary", "components"),
+        ),
         "queue_recovery": _operational_component(
             queue_recovery,
             fields=("missing_jobs", "requeued_jobs", "scanned_jobs", "dry_run", "reason"),
@@ -455,6 +460,7 @@ def build_operational_health(
 
 async def run_operational_checks() -> Dict[str, Any]:
     from ..bootstrap.middleware import get_api_logging_health
+    from ..runtime.manager import RuntimeManager
 
     checks, embedding_provider, file_storage = await asyncio.gather(
         run_all_checks(include_internal=True),
@@ -466,4 +472,5 @@ async def run_operational_checks() -> Dict[str, Any]:
         embedding_provider=embedding_provider,
         file_storage=file_storage,
         api_logging=get_api_logging_health(),
+        startup=RuntimeManager.get().get_startup_health(),
     )
