@@ -125,11 +125,16 @@ async def test_create_decision_requires_rationale_without_source(monkeypatch: py
 
 
 @pytest.mark.asyncio
-async def test_create_decision_allows_source_reference_without_rationale(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_create_decision_allows_document_source_reference_without_rationale(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
 
     async def fake_require_workspace_access(*args, **kwargs):
         return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
+        assert table == "files"
+        assert filters == {"id": "file-1", "workspace_id": "workspace-1"}
+        return {"id": "file-1"}
 
     async def fake_prepare_mentions(**kwargs):
         return []
@@ -146,6 +151,7 @@ async def test_create_decision_allows_source_reference_without_rationale(monkeyp
         return {}
 
     monkeypatch.setattr(decisions, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(decisions, "select_one_trusted", fake_select_one)
     monkeypatch.setattr(decisions, "prepare_mentions_for_workspace", fake_prepare_mentions)
     monkeypatch.setattr(decisions, "insert_one_trusted", fake_insert)
     monkeypatch.setattr(decisions, "log_workspace_activity", fake_activity)
@@ -154,17 +160,94 @@ async def test_create_decision_allows_source_reference_without_rationale(monkeyp
     result = await decisions.create_decision(
         workspace_id="workspace-1",
         user_id="user-1",
-        payload={"title": "Use the conversation decision", "status": "accepted"},
-        origin="conversation_message",
-        source_channel_id="channel-1",
-        source_message_id="message-1",
+        payload={"title": "Use the document decision", "status": "accepted", "source_type": "document", "source_id": "file-1"},
+        origin="decision_candidate",
     )
 
     assert captured["decision_reason"] is None
+    assert captured["source_type"] == "document"
+    assert captured["source_id"] == "file-1"
+    assert result["source_type"] == "document"
+    assert result["source_id"] == "file-1"
+
+
+@pytest.mark.asyncio
+async def test_create_decision_maps_conversation_source_to_channel(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_channel_access(**kwargs):
+        assert kwargs == {"workspace_id": "workspace-1", "channel_id": "channel-1", "user_id": "user-1"}
+        return {"id": "channel-1"}, object()
+
+    async def fake_prepare_mentions(**kwargs):
+        return []
+
+    async def fake_insert(table: str, payload: dict[str, object]):
+        assert table == "workspace_decisions"
+        captured.update(payload)
+        return {"id": "decision-1", "workspace_id": "workspace-1", "created_by": "user-1", **payload}
+
+    async def fake_activity(**kwargs):
+        return None
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    monkeypatch.setattr(decisions, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(decisions, "_require_channel_access", fake_channel_access)
+    monkeypatch.setattr(decisions, "prepare_mentions_for_workspace", fake_prepare_mentions)
+    monkeypatch.setattr(decisions, "insert_one_trusted", fake_insert)
+    monkeypatch.setattr(decisions, "log_workspace_activity", fake_activity)
+    monkeypatch.setattr(decisions, "get_profiles", fake_profiles)
+
+    result = await decisions.create_decision(
+        workspace_id="workspace-1",
+        user_id="user-1",
+        payload={"title": "Use the candidate decision", "status": "accepted", "source_type": "conversation", "source_id": "channel-1"},
+        origin="decision_candidate",
+    )
+
+    assert captured["source_type"] == "conversation"
+    assert captured["source_id"] == "channel-1"
     assert captured["source_channel_id"] == "channel-1"
-    assert captured["source_message_id"] == "message-1"
     assert result["source_channel_id"] == "channel-1"
-    assert result["source_message_id"] == "message-1"
+
+
+@pytest.mark.asyncio
+async def test_create_decision_rejects_document_source_outside_workspace(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
+        assert table == "files"
+        assert filters == {"id": "file-other", "workspace_id": "workspace-1"}
+        return None
+
+    async def fail_insert(*args, **kwargs):
+        raise AssertionError("invalid source should not be inserted")
+
+    monkeypatch.setattr(decisions, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(decisions, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(decisions, "insert_one_trusted", fail_insert)
+
+    with pytest.raises(Exception) as exc_info:
+        await decisions.create_decision(
+            workspace_id="workspace-1",
+            user_id="user-1",
+            payload={
+                "title": "Use the external document",
+                "status": "accepted",
+                "source_type": "document",
+                "source_id": "file-other",
+            },
+            origin="decision_candidate",
+        )
+
+    assert getattr(exc_info.value, "status_code", None) == 400
+    assert getattr(exc_info.value, "detail", None) == "Decision source document is not in this workspace."
 
 
 @pytest.mark.asyncio

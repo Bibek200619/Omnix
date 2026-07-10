@@ -60,6 +60,8 @@ async def post_workspace_decision(
         workspace_id=workspace_id,
         user_id=_user_id(current_user),
         payload=payload.model_dump(),
+        source_type=payload.source_type,
+        source_id=payload.source_id,
     )
 
 

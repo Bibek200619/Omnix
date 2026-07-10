@@ -24,12 +24,13 @@ from .workspace_mention_service import (
 from .workspace_service import get_profiles, require_workspace_access, utc_now_iso
 
 DECISION_COLUMNS = (
-    "id,workspace_id,title,description,decision_reason,status,source_message_id,"
+    "id,workspace_id,title,description,decision_reason,status,source_type,source_id,source_message_id,"
     "source_channel_id,initiative_id,created_by,created_at,updated_at"
 )
 TASK_PREVIEW_COLUMNS = "id,title,status,owner_user_id"
 INITIATIVE_PREVIEW_COLUMNS = "id,title,status,momentum_state"
 DECISION_STATUSES = ("proposed", "accepted", "rejected", "superseded")
+DECISION_SOURCE_TYPES = {"conversation", "conversation_message", "document"}
 logger = logging.getLogger(__name__)
 
 
@@ -132,6 +133,78 @@ def _normalize_status(value: Any) -> str:
     if decision_status not in DECISION_STATUSES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported decision status.")
     return decision_status
+
+
+def _normalize_source_type(value: Any) -> str | None:
+    source_type = _clean_text(value)
+    if source_type is None:
+        return None
+    if source_type not in DECISION_SOURCE_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported decision source type.")
+    return source_type
+
+
+async def _resolve_source_reference(
+    *,
+    workspace_id: str,
+    user_id: str,
+    source_type: Any,
+    source_id: Any,
+    source_channel_id: str | None,
+    source_message_id: str | None,
+) -> tuple[str | None, str | None, str | None, str | None]:
+    resolved_type = _normalize_source_type(source_type)
+    resolved_id = _clean_text(source_id)
+    resolved_channel_id = _clean_text(source_channel_id)
+    resolved_message_id = _clean_text(source_message_id)
+
+    if resolved_id and len(resolved_id) > 160:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Decision source identifier is too long.")
+    if resolved_type and not resolved_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Decision source identifier is required.")
+    if resolved_id and not resolved_type:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Decision source type is required.")
+
+    if resolved_type is None:
+        if resolved_message_id:
+            resolved_type = "conversation_message"
+            resolved_id = resolved_message_id
+        elif resolved_channel_id:
+            resolved_type = "conversation"
+            resolved_id = resolved_channel_id
+
+    if resolved_type is None:
+        return None, None, resolved_channel_id, resolved_message_id
+
+    if resolved_type == "conversation":
+        await _require_channel_access(workspace_id=workspace_id, channel_id=str(resolved_id), user_id=user_id)
+        return resolved_type, resolved_id, resolved_id, resolved_message_id
+
+    if resolved_type == "conversation_message":
+        if not resolved_channel_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Conversation message decision sources require a source channel.",
+            )
+        try:
+            message = await select_one_trusted(
+                "workspace_channel_messages",
+                "id",
+                {"id": resolved_id, "workspace_id": workspace_id, "channel_id": resolved_channel_id},
+            )
+        except SupabaseServiceError as exc:
+            raise _database_error() from exc
+        if message is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Decision source message is not in this workspace.")
+        return resolved_type, resolved_id, resolved_channel_id, resolved_id
+
+    try:
+        file_row = await select_one_trusted("files", "id", {"id": resolved_id, "workspace_id": workspace_id})
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+    if file_row is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Decision source document is not in this workspace.")
+    return resolved_type, resolved_id, resolved_channel_id, resolved_message_id
 
 
 async def list_decisions(*, workspace_id: str, user_id: str) -> list[dict[str, Any]]:
@@ -288,6 +361,8 @@ async def create_decision(
     user_id: str,
     payload: Mapping[str, Any],
     origin: str = "manual",
+    source_type: str | None = None,
+    source_id: str | None = None,
     source_channel_id: str | None = None,
     source_message_id: str | None = None,
 ) -> dict[str, Any]:
@@ -295,8 +370,16 @@ async def create_decision(
     title = _clean_text(payload.get("title"))
     if not title:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Decision title cannot be empty.")
+    resolved_source_type, resolved_source_id, resolved_source_channel_id, resolved_source_message_id = await _resolve_source_reference(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        source_type=source_type if source_type is not None else payload.get("source_type"),
+        source_id=source_id if source_id is not None else payload.get("source_id"),
+        source_channel_id=source_channel_id,
+        source_message_id=source_message_id,
+    )
     decision_reason = _clean_text(payload.get("decision_reason"))
-    if not decision_reason and not (source_channel_id or source_message_id):
+    if not decision_reason and not (resolved_source_type and resolved_source_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Decision rationale or source evidence is required.",
@@ -313,8 +396,10 @@ async def create_decision(
         "description": _clean_text(payload.get("description")),
         "decision_reason": decision_reason,
         "status": _normalize_status(payload.get("status")),
-        "source_message_id": source_message_id,
-        "source_channel_id": source_channel_id,
+        "source_type": resolved_source_type,
+        "source_id": resolved_source_id,
+        "source_message_id": resolved_source_message_id,
+        "source_channel_id": resolved_source_channel_id,
         "created_by": user_id,
         "updated_at": timestamp,
     }
@@ -338,8 +423,10 @@ async def create_decision(
             "decision_id": created.get("id"),
             "status": record["status"],
             "origin": origin,
-            "source_channel_id": source_channel_id,
-            "source_message_id": source_message_id,
+            "source_type": resolved_source_type,
+            "source_id": resolved_source_id,
+            "source_channel_id": resolved_source_channel_id,
+            "source_message_id": resolved_source_message_id,
         },
     )
     return (await _hydrate_decisions([created]))[0]
@@ -380,6 +467,8 @@ async def create_decision_from_message(
         user_id=user_id,
         payload=decision_payload,
         origin="conversation_message",
+        source_type="conversation_message",
+        source_id=message_id,
         source_channel_id=channel_id,
         source_message_id=message_id,
     )

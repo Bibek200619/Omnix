@@ -477,6 +477,7 @@ export type WorkspaceTaskAssistance = {
 };
 
 export type WorkspaceDecisionStatus = "proposed" | "accepted" | "rejected" | "superseded";
+export type WorkspaceDecisionSourceType = "conversation" | "conversation_message" | "document";
 
 export type WorkspaceDecision = {
   id: string;
@@ -485,6 +486,8 @@ export type WorkspaceDecision = {
   description?: string | null;
   decision_reason?: string | null;
   status: WorkspaceDecisionStatus;
+  source_type?: WorkspaceDecisionSourceType | null;
+  source_id?: string | null;
   source_message_id?: string | null;
   source_channel_id?: string | null;
   initiative_id?: string | null;
