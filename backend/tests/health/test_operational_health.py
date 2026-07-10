@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -13,7 +14,13 @@ def _base_checks() -> dict[str, Any]:
         "workspace_schema": {"status": "healthy", "summary": "Schema verified."},
         "redis": {"status": "healthy", "ping": "True"},
         "vector_store": {"status": "healthy", "type": "PgVectorStore"},
-        "ollama": {"status": "healthy", "model": "phi3:mini"},
+        "ollama": {
+            "status": "healthy",
+            "primary": "ollama",
+            "configured": ["ollama"],
+            "providers": {"ollama": {"status": "healthy", "probe": "live", "model": "phi3:mini"}},
+            "reason": None,
+        },
         "ingestion_worker": {
             "status": "healthy",
             "active_workers": 1,
@@ -134,3 +141,94 @@ async def test_operational_health_route_returns_structured_result(monkeypatch: p
     monkeypatch.setattr(router, "run_operational_checks", fake_operational_checks)
 
     assert await router.operational_health(current_user={"sub": "admin-1"}) == expected
+
+
+@pytest.mark.asyncio
+async def test_chat_provider_health_reports_configured_failover_as_degraded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def failed_ollama() -> dict[str, Any]:
+        return {"status": "unhealthy", "error": "connection refused", "expected_model": "phi3:mini"}
+
+    monkeypatch.setattr(checks, "check_ollama", failed_ollama)
+    monkeypatch.setattr(
+        checks,
+        "get_settings",
+        lambda: SimpleNamespace(
+            AI_PROVIDER_ORDER="ollama,openai,anthropic",
+            OPENAI_API_KEY="configured",
+            ANTHROPIC_API_KEY=None,
+        ),
+    )
+
+    result = await checks.check_chat_providers()
+
+    assert result["status"] == "degraded"
+    assert result["configured"] == ["ollama", "openai"]
+    assert result["providers"]["ollama"]["status"] == "failed"
+    assert "connection refused" not in str(result)
+
+
+@pytest.mark.asyncio
+async def test_chat_provider_health_fails_without_configured_failover(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def failed_ollama() -> dict[str, Any]:
+        return {"status": "unhealthy", "error": "connection refused", "expected_model": "phi3:mini"}
+
+    monkeypatch.setattr(checks, "check_ollama", failed_ollama)
+    monkeypatch.setattr(
+        checks,
+        "get_settings",
+        lambda: SimpleNamespace(
+            AI_PROVIDER_ORDER="ollama,openai,anthropic",
+            OPENAI_API_KEY=None,
+            ANTHROPIC_API_KEY=None,
+        ),
+    )
+
+    result = await checks.check_chat_providers()
+
+    assert result["status"] == "failed"
+    assert result["reason"] == "no_chat_provider_available"
+
+
+@pytest.mark.asyncio
+async def test_chat_provider_health_warns_for_unprobed_remote_primary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def healthy_ollama() -> dict[str, Any]:
+        return {"status": "healthy", "model": "phi3:mini"}
+
+    monkeypatch.setattr(checks, "check_ollama", healthy_ollama)
+    monkeypatch.setattr(
+        checks,
+        "get_settings",
+        lambda: SimpleNamespace(
+            AI_PROVIDER_ORDER="openai,ollama",
+            OPENAI_API_KEY="configured",
+            ANTHROPIC_API_KEY=None,
+        ),
+    )
+
+    result = await checks.check_chat_providers()
+
+    assert result["status"] == "warning"
+    assert result["primary"] == "openai"
+    assert result["reason"] == "primary_connectivity_not_probed"
+
+
+@pytest.mark.asyncio
+async def test_readiness_allows_explicit_warning_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.health import router
+
+    async def warning_checks(*, include_internal: bool) -> dict[str, Any]:
+        assert include_internal is False
+        return {"chat_provider": {"status": "warning"}}
+
+    monkeypatch.setattr(router, "run_all_checks", warning_checks)
+
+    assert await router.readiness_check() == {
+        "status": "ready",
+        "checks": {"chat_provider": {"status": "warning"}},
+    }
