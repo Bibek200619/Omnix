@@ -99,6 +99,75 @@ async def test_list_decisions_hydrates_creator_without_deriving_state(monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_create_decision_requires_rationale_without_source(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fail_prepare_mentions(**kwargs):
+        raise AssertionError("mentions should not be prepared for an invalid decision")
+
+    async def fail_insert(*args, **kwargs):
+        raise AssertionError("invalid decision should not be inserted")
+
+    monkeypatch.setattr(decisions, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(decisions, "prepare_mentions_for_workspace", fail_prepare_mentions)
+    monkeypatch.setattr(decisions, "insert_one_trusted", fail_insert)
+
+    with pytest.raises(Exception) as exc_info:
+        await decisions.create_decision(
+            workspace_id="workspace-1",
+            user_id="user-1",
+            payload={"title": "Adopt the rollout plan", "status": "accepted"},
+        )
+
+    assert getattr(exc_info.value, "status_code", None) == 400
+    assert getattr(exc_info.value, "detail", None) == "Decision rationale or source evidence is required."
+
+
+@pytest.mark.asyncio
+async def test_create_decision_allows_source_reference_without_rationale(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_prepare_mentions(**kwargs):
+        return []
+
+    async def fake_insert(table: str, payload: dict[str, object]):
+        assert table == "workspace_decisions"
+        captured.update(payload)
+        return {"id": "decision-1", "workspace_id": "workspace-1", "created_by": "user-1", **payload}
+
+    async def fake_activity(**kwargs):
+        return None
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    monkeypatch.setattr(decisions, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(decisions, "prepare_mentions_for_workspace", fake_prepare_mentions)
+    monkeypatch.setattr(decisions, "insert_one_trusted", fake_insert)
+    monkeypatch.setattr(decisions, "log_workspace_activity", fake_activity)
+    monkeypatch.setattr(decisions, "get_profiles", fake_profiles)
+
+    result = await decisions.create_decision(
+        workspace_id="workspace-1",
+        user_id="user-1",
+        payload={"title": "Use the conversation decision", "status": "accepted"},
+        origin="conversation_message",
+        source_channel_id="channel-1",
+        source_message_id="message-1",
+    )
+
+    assert captured["decision_reason"] is None
+    assert captured["source_channel_id"] == "channel-1"
+    assert captured["source_message_id"] == "message-1"
+    assert result["source_channel_id"] == "channel-1"
+    assert result["source_message_id"] == "message-1"
+
+
+@pytest.mark.asyncio
 async def test_create_decision_persists_structured_mentions(monkeypatch: pytest.MonkeyPatch) -> None:
     mention_metadata = [{"user_id": "user-2", "label": "Bibek", "display_name": "Bibek", "avatar_label": "B"}]
     captured_sync: dict[str, object] = {}

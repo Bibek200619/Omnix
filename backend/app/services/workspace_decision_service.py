@@ -295,6 +295,12 @@ async def create_decision(
     title = _clean_text(payload.get("title"))
     if not title:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Decision title cannot be empty.")
+    decision_reason = _clean_text(payload.get("decision_reason"))
+    if not decision_reason and not (source_channel_id or source_message_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Decision rationale or source evidence is required.",
+        )
     mentions = await prepare_mentions_for_workspace(
         workspace=access.workspace,
         mentions=payload.get("mentions"),
@@ -305,7 +311,7 @@ async def create_decision(
         "workspace_id": workspace_id,
         "title": title,
         "description": _clean_text(payload.get("description")),
-        "decision_reason": _clean_text(payload.get("decision_reason")),
+        "decision_reason": decision_reason,
         "status": _normalize_status(payload.get("status")),
         "source_message_id": source_message_id,
         "source_channel_id": source_channel_id,
