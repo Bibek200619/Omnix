@@ -9,6 +9,7 @@ from .workspace_mentions import WorkspaceMentionInput, WorkspaceMentionMetadata
 
 
 DecisionStatus = Literal["proposed", "accepted", "rejected", "superseded"]
+DecisionSourceType = Literal["conversation", "conversation_message", "document"]
 DecisionCandidateSourceType = Literal["conversation", "document"]
 DecisionCandidateConfidence = Literal["low", "medium", "high"]
 DecisionCandidateMetricAction = Literal["accept", "dismiss"]
@@ -19,6 +20,8 @@ class WorkspaceDecisionCreate(BaseModel):
     description: str | None = Field(default=None, max_length=4000)
     decision_reason: str | None = Field(default=None, max_length=6000)
     status: DecisionStatus = "accepted"
+    source_type: DecisionSourceType | None = None
+    source_id: str | None = Field(default=None, max_length=160)
     mentions: list[WorkspaceMentionInput] = Field(default_factory=list, max_length=50)
 
 
@@ -64,6 +67,8 @@ class WorkspaceDecisionRead(BaseModel):
     description: str | None = None
     decision_reason: str | None = None
     status: DecisionStatus
+    source_type: DecisionSourceType | None = None
+    source_id: str | None = None
     source_message_id: str | None = None
     source_channel_id: str | None = None
     initiative_id: str | None = None
