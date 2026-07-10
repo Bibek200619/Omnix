@@ -6,6 +6,7 @@ from pathlib import Path
 COMMAND_PALETTE = Path(__file__).resolve().parents[3] / "frontend/components/layout/CommandPalette.tsx"
 COMMAND_PALETTE_ITEM = COMMAND_PALETTE.parent / "command-palette" / "CommandPaletteItem.tsx"
 COMMAND_PALETTE_MODEL = COMMAND_PALETTE.parent / "command-palette" / "commandPaletteModel.ts"
+FOCUS_TRAP = Path(__file__).resolve().parents[3] / "frontend/lib/use-focus-trap.ts"
 
 
 def test_command_palette_uses_tabbable_results_and_labelled_search_input() -> None:
@@ -75,3 +76,14 @@ def test_command_palette_extracts_accessible_result_item() -> None:
     assert "aria-label={`${item.label}. ${item.description}`}" in item
     assert "focus-visible:ring-2" in item
     assert "onFocus={onActiveChange}" in item
+
+
+def test_command_palette_uses_focus_trap_initial_target_without_competing_timer() -> None:
+    source = COMMAND_PALETTE.read_text(encoding="utf-8")
+    focus_trap = FOCUS_TRAP.read_text(encoding="utf-8")
+
+    assert "useFocusTrap<HTMLDivElement>(open, inputRef)" in source
+    assert "setTimeout(() => inputRef.current?.focus()" not in source
+    assert "initialFocusRef?: RefObject<HTMLElement | null>" in focus_trap
+    assert "initialFocusRef && !initialFocusRef.current" in focus_trap
+    assert "container.contains(preferred)" in focus_trap
