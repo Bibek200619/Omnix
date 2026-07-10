@@ -85,6 +85,12 @@ export function DecisionFromMessageModal({
         description: description.trim() || null,
         decision_reason: reason.trim() || null,
         status,
+        ...(source.kind === "candidate"
+          ? {
+              source_type: source.candidate.source_type,
+              source_id: source.candidate.source_id,
+            }
+          : {}),
         mentions: mentionPayload(mentions, `${reason}\n${description}`),
       };
       const created =

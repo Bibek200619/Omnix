@@ -417,3 +417,109 @@ async def test_connector_serialization_survives_missing_job_preview(monkeypatch:
 
     assert result["job"] is None
     assert "access_token" not in result["config"]
+
+
+@pytest.mark.asyncio
+async def test_connector_job_lookup_is_scoped_to_connector_workspace(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]) -> dict[str, object]:
+        captured.update({"table": table, "columns": columns, "filters": filters})
+        return {
+            "id": "job-1",
+            "type": "connector_setup_request",
+            "status": "queued",
+            "payload": {"workspace_id": "workspace-1", "connector_id": "connector-1"},
+        }
+
+    monkeypatch.setattr(connectors, "select_one_trusted", fake_select_one)
+
+    result = await connectors._job_for_connector(
+        {
+            "id": "connector-1",
+            "workspace_id": "workspace-1",
+            "job_id": "job-1",
+        }
+    )
+
+    assert result is not None
+    assert result["id"] == "job-1"
+    assert captured["table"] == "jobs"
+    assert captured["filters"] == {
+        "id": "job-1",
+        "payload->>workspace_id": "workspace-1",
+    }
+
+
+@pytest.mark.asyncio
+async def test_connector_source_file_cleanup_is_scoped_to_connector_workspace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deleted: list[tuple[str, dict[str, object]]] = []
+
+    async def fake_delete_many(table: str, filters: dict[str, object]) -> list[dict[str, object]]:
+        deleted.append((table, filters))
+        return []
+
+    monkeypatch.setattr(connectors, "delete_many_trusted", fake_delete_many)
+
+    await connectors._delete_connector_source_file(
+        {
+            "id": "connector-1",
+            "workspace_id": "workspace-1",
+            "source_file_id": "file-from-other-workspace",
+        }
+    )
+
+    assert deleted == [
+        (
+            "documents",
+            {"file_id": "file-from-other-workspace", "workspace_id": "workspace-1"},
+        ),
+        (
+            "files",
+            {"id": "file-from-other-workspace", "workspace_id": "workspace-1"},
+        ),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_delete_connector_scopes_connector_row_delete_to_workspace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deleted: list[tuple[str, dict[str, object]]] = []
+
+    async def fake_get_connector(connector_id: str, user_id: str):
+        assert connector_id == "connector-1"
+        assert user_id == "user-1"
+        return (
+            {
+                "id": "connector-1",
+                "workspace_id": "workspace-1",
+                "user_id": "user-1",
+                "connector_type": "knowledge_link",
+                "display_name": "Policy",
+                "source_file_id": None,
+            },
+            _access("workspace-1"),
+        )
+
+    async def fake_delete_many(table: str, filters: dict[str, object]) -> list[dict[str, object]]:
+        deleted.append((table, filters))
+        return []
+
+    async def fake_activity(**kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr(connectors, "get_workspace_connector", fake_get_connector)
+    monkeypatch.setattr(connectors, "delete_many_trusted", fake_delete_many)
+    monkeypatch.setattr(connectors, "log_workspace_activity", fake_activity)
+
+    await connectors.delete_workspace_connector("connector-1", "user-1")
+
+    assert deleted == [
+        (
+            "workspace_connectors",
+            {"id": "connector-1", "workspace_id": "workspace-1"},
+        )
+    ]

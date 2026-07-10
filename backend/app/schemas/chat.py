@@ -10,7 +10,16 @@ WorkspaceType = Literal["workspace", "super_workspace", "subworkspace", "global_
 WorkspaceFocus = Literal["general", "engineering", "design", "research", "strategy"]
 WorkspaceRole = Literal["founder", "co_owner", "member", "team_lead", "sub_leader", "sub_member"]
 WorkspaceAssignableRole = Literal["co_owner", "member", "team_lead", "sub_leader", "sub_member"]
-FileProcessingStatus = Literal["uploaded", "queued", "processing", "extracted", "chunked", "embedded", "failed"]
+FileProcessingStatus = Literal[
+    "uploaded",
+    "queued",
+    "extracting",
+    "ocr_required",
+    "ocr_running",
+    "searchable",
+    "failed",
+    "partially_searchable",
+]
 WorkspaceFocusInput = Literal[
     "general",
     "engineering",

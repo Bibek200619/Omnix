@@ -14,6 +14,7 @@ class RuntimeManager:
         self.active_providers: List[str] = []
         self.streaming_sessions: Dict[str, Any] = {}
         self.status = "initializing"
+        self.startup_components: Dict[str, Dict[str, Any]] = {}
         # Ingestion worker counters (in-process only; reset on restart)
         self._jobs_processing: int = 0
         self._jobs_completed: int = 0
@@ -77,6 +78,42 @@ class RuntimeManager:
         self.status = status
         logger.info("Runtime status changed to: %s", status)
 
+    def begin_startup(self) -> None:
+        self.startup_components = {}
+
+    def record_startup_component(
+        self,
+        component: str,
+        status: str,
+        *,
+        error_type: str | None = None,
+    ) -> None:
+        result: Dict[str, Any] = {
+            "status": status,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if error_type:
+            result["error_type"] = error_type
+        self.startup_components[component] = result
+
+    def get_startup_health(self) -> Dict[str, Any]:
+        components = {name: dict(result) for name, result in self.startup_components.items()}
+        failed = sum(1 for result in components.values() if result.get("status") == "failed")
+        if failed:
+            status = "degraded"
+        elif components:
+            status = "healthy"
+        else:
+            status = "warning"
+        return {
+            "status": status,
+            "summary": {
+                "healthy": len(components) - failed,
+                "failed": failed,
+            },
+            "components": components,
+        }
+
     def get_ingestion_worker_metrics(self) -> Dict[str, Any]:
         """Return in-process job counters. Queue depth is resolved separately from Redis."""
         ingestion_workers = {
@@ -106,5 +143,6 @@ class RuntimeManager:
             "active_workers_count": len(self.active_workers),
             "active_providers": self.active_providers,
             "streaming_sessions_count": len(self.streaming_sessions),
+            "startup": self.get_startup_health(),
             "start_time": self.start_time.isoformat(),
         }

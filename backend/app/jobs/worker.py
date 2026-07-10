@@ -6,7 +6,7 @@ import os
 from collections.abc import Iterable
 from typing import Any
 
-from .queue import get_redis
+from .queue import get_redis, recover_missing_queued_jobs
 from .ingestion_jobs import handle_ingest_file
 from .automation_jobs import handle_run_automation
 from ..services.supabase_service import update_one_trusted, select_one_trusted
@@ -23,6 +23,7 @@ _DEFAULT_POLL_TIMEOUT_SECONDS = 5.0
 _DEFAULT_REDIS_OPERATION_TIMEOUT_SECONDS = 7.0
 _DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 30.0
 _DEFAULT_MAX_JOB_ATTEMPTS = 3
+_DEFAULT_QUEUE_RECOVERY_INTERVAL_SECONDS = 60.0
 
 
 def _env_int(name: str, default: int, *, minimum: int = 1) -> int:
@@ -62,6 +63,28 @@ def _max_job_attempts() -> int:
 async def _push_retry_job(job_id: str, *, queue_name: str | None = None) -> None:
     redis = get_redis()
     await redis.lpush(queue_name or os.environ.get("OMNIX_JOB_QUEUE", "omnix:jobs"), job_id)
+
+
+async def _recover_missing_queued_jobs_once(queue_name: str) -> dict[str, Any] | None:
+    try:
+        result = await recover_missing_queued_jobs(queue=queue_name)
+    except Exception as exc:
+        logger.warning("Queued job recovery scan failed for %s: %s", queue_name, exc)
+        return None
+
+    if result.get("requeued_jobs"):
+        logger.warning(
+            "Recovered %s queued job(s) missing from Redis queue %s.",
+            result["requeued_jobs"],
+            queue_name,
+        )
+    if result.get("failed_requeue_jobs"):
+        logger.error(
+            "Queue recovery failed to requeue %s job(s) for %s.",
+            result["failed_requeue_jobs"],
+            queue_name,
+        )
+    return result
 
 
 async def _retry_or_dead_letter_job(
@@ -272,6 +295,10 @@ async def _worker_loop(shutdown_event: asyncio.Event):
             poll_timeout_seconds + 1.0,
             _env_float("OMNIX_REDIS_OPERATION_TIMEOUT_SECONDS", _DEFAULT_REDIS_OPERATION_TIMEOUT_SECONDS),
         )
+        recovery_interval_seconds = _env_float(
+            "OMNIX_QUEUE_RECOVERY_INTERVAL_SECONDS",
+            _DEFAULT_QUEUE_RECOVERY_INTERVAL_SECONDS,
+        )
         shutdown_timeout_seconds = _env_float(
             "OMNIX_WORKER_SHUTDOWN_TIMEOUT_SECONDS",
             _DEFAULT_SHUTDOWN_TIMEOUT_SECONDS,
@@ -292,6 +319,7 @@ async def _worker_loop(shutdown_event: asyncio.Event):
 
     semaphore = asyncio.Semaphore(concurrency)
     in_flight: set[asyncio.Task[None]] = set()
+    last_recovery_scan = 0.0
 
     try:
         # Poll loop
@@ -309,6 +337,10 @@ async def _worker_loop(shutdown_event: asyncio.Event):
                     timeout=redis_operation_timeout_seconds,
                 )
                 if not item:
+                    now = asyncio.get_running_loop().time()
+                    if now - last_recovery_scan >= recovery_interval_seconds:
+                        last_recovery_scan = now
+                        await _recover_missing_queued_jobs_once(queue_name)
                     await asyncio.sleep(0.1)
                     continue
                 _, raw_job_id = item

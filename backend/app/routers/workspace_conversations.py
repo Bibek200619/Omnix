@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from ..core.security import get_current_user
+from .ai_rate_limits import enforce_expensive_ai_rate_limit
 from ..schemas.workspace_conversations import (
     WorkspaceChannelCreate,
     WorkspaceChannelMessageCreate,
@@ -113,14 +114,20 @@ async def assist_channel_discussion(
     request: WorkspaceConversationAssistanceRequest,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    user_id = _user_id(current_user)
     messages = await channel_transcript_for_assistance(
         workspace_id=workspace_id,
         channel_id=channel_id,
-        user_id=_user_id(current_user),
+        user_id=user_id,
         thread_root_id=request.thread_root_id,
     )
     if not messages:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="There is no discussion to assist yet.")
+    await enforce_expensive_ai_rate_limit(
+        user_id=user_id,
+        workspace_id=workspace_id,
+        endpoint="workspace.channels.assist",
+    )
 
     transcript = "\n".join(
         f"{message.get('author_name') or message.get('author_email') or 'Teammate'}: {message.get('content', '')}"

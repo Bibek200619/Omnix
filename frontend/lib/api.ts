@@ -31,9 +31,37 @@ export function apiUrl(endpoint: string) {
 export type ApiStatus = "idle" | "loading" | "success" | "error";
 
 let _activeWorkspaceId: string | null = null;
+const apiWorkspaceChangeListeners = new Set<() => void>();
+
+function normalizeWorkspaceId(id: string | null): string | null {
+  const normalized = id?.trim();
+  return normalized || null;
+}
+
+function notifyApiWorkspaceChanged() {
+  for (const listener of apiWorkspaceChangeListeners) {
+    listener();
+  }
+}
 
 export function setApiWorkspaceId(id: string | null): void {
-  _activeWorkspaceId = id;
+  const normalizedId = normalizeWorkspaceId(id);
+  if (_activeWorkspaceId === normalizedId) {
+    return;
+  }
+  _activeWorkspaceId = normalizedId;
+  notifyApiWorkspaceChanged();
+}
+
+export function getApiWorkspaceId(): string | null {
+  return _activeWorkspaceId;
+}
+
+function subscribeApiWorkspaceChange(listener: () => void): () => void {
+  apiWorkspaceChangeListeners.add(listener);
+  return () => {
+    apiWorkspaceChangeListeners.delete(listener);
+  };
 }
 
 type ApiErrorPayload = {
@@ -133,6 +161,12 @@ function logApiError(error: ApiError) {
 
 class ApiClient {
   private inFlightGets = new Map<string, Promise<unknown>>();
+
+  constructor() {
+    subscribeApiWorkspaceChange(() => {
+      this.inFlightGets.clear();
+    });
+  }
 
   private applyWorkspaceHeader(headers: Headers) {
     if (_activeWorkspaceId) {

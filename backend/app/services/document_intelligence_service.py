@@ -111,6 +111,33 @@ def extract_document_with_diagnostics(
         return ExtractionResult(text="", diagnostics=diagnostics)
 
 
+def document_likely_requires_ocr(filename: str, file_type: str | None, data: bytes) -> bool:
+    if not OCR_ENABLED or not _is_pdf(filename, file_type):
+        return False
+
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return False
+
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        page_texts: list[str] = []
+        image_page_count = 0
+        for page in reader.pages:
+            try:
+                page_texts.append(page.extract_text() or "")
+            except Exception:
+                pass
+            if _page_has_image_xobject(page):
+                image_page_count += 1
+        extracted_text = normalize_extracted_text("\n\n".join(page_texts))
+        return len(extracted_text) < MIN_EXTRACTED_CHARACTERS and image_page_count > 0
+    except Exception:
+        logger.debug("Unable to preflight OCR requirement for %s.", filename, exc_info=True)
+        return False
+
+
 def _extract_docx(data: bytes) -> str:
     try:
         import docx

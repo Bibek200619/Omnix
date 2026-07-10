@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
+from fastapi import HTTPException
 import pytest
 
 from app.services import workspace_search_service as search
@@ -47,6 +48,27 @@ async def test_search_workspace_requires_access_for_empty_query(monkeypatch: pyt
         "cursor": 0,
         "next_cursor": None,
     }
+
+
+@pytest.mark.asyncio
+async def test_search_workspace_does_not_call_ranked_rpc_when_access_is_denied(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def deny_workspace_access(workspace_id: str, user_id: str):
+        assert workspace_id == "workspace-2"
+        assert user_id == "user-1"
+        raise HTTPException(status_code=403, detail="Workspace access denied")
+
+    async def fail_ranked_workspace(**kwargs: Any) -> list[dict[str, Any]]:
+        raise AssertionError(f"ranked RPC should not be called without workspace access: {kwargs}")
+
+    monkeypatch.setattr(search, "require_workspace_access", deny_workspace_access)
+    monkeypatch.setattr(search, "_search_ranked_workspace", fail_ranked_workspace)
+
+    with pytest.raises(HTTPException) as exc:
+        await search.search_workspace(workspace_id="workspace-2", user_id="user-1", query="secret")
+
+    assert exc.value.status_code == 403
 
 
 @pytest.mark.asyncio
@@ -149,7 +171,8 @@ async def test_search_workspace_groups_workspace_scoped_ilike_results(monkeypatc
         **kwargs: Any,
     ) -> list[dict[str, Any]]:
         assert filters is not None
-        assert filters["workspace_id"] == "workspace-1"
+        workspace_filter = filters.get("workspace_id") or filters.get("payload->>workspace_id")
+        assert workspace_filter == "workspace-1"
         seen_filters.append((table, filters))
 
         if table == "workspace_channels" and "name" not in filters and "last_message_preview" not in filters:
@@ -238,7 +261,7 @@ async def test_search_workspace_groups_workspace_scoped_ilike_results(monkeypatc
                     "file_name": "launch-readiness.md",
                     "file_type": "text/markdown",
                     "size_bytes": 2048,
-                    "processing_status": "embedded",
+                    "processing_status": "searchable",
                     "extraction_status": "searchable",
                     "metadata": {},
                     "created_at": "2026-06-01T00:00:00+00:00",
@@ -272,6 +295,50 @@ async def test_search_workspace_groups_workspace_scoped_ilike_results(monkeypatc
                     "last_synced_at": "2026-06-03T00:00:00+00:00",
                     "created_at": "2026-06-01T00:00:00+00:00",
                     "updated_at": "2026-06-03T00:00:00+00:00",
+                }
+            ]
+        if table == "automations" and "name" in filters:
+            return [
+                {
+                    "id": "automation-1",
+                    "workspace_id": "workspace-1",
+                    "name": "Launch digest",
+                    "job_type": "daily_summary",
+                    "schedule": "0 8 * * *",
+                    "interval_seconds": 86400,
+                    "enabled": True,
+                    "user_id": "user-1",
+                    "created_at": "2026-06-01T00:00:00+00:00",
+                    "updated_at": "2026-06-03T00:00:00+00:00",
+                }
+            ]
+        if table == "workspace_activity_events" and "summary" in filters:
+            return [
+                {
+                    "id": "activity-1",
+                    "workspace_id": "workspace-1",
+                    "actor_user_id": "user-2",
+                    "event_type": "workspace.launch",
+                    "summary": "Launch review completed",
+                    "metadata": {"source": "release"},
+                    "created_at": "2026-06-03T00:00:00+00:00",
+                }
+            ]
+        if table == "jobs" and "type" in filters:
+            assert filters["payload->>workspace_id"] == "workspace-1"
+            return [
+                {
+                    "id": "job-1",
+                    "type": "launch_file_ingestion",
+                    "status": "completed",
+                    "payload": {"workspace_id": "workspace-1", "file_name": "launch-readiness.md"},
+                    "progress": 100,
+                    "attempts": 1,
+                    "error": None,
+                    "result": {"summary": "launch indexed"},
+                    "created_at": "2026-06-01T00:00:00+00:00",
+                    "started_at": "2026-06-01T00:05:00+00:00",
+                    "completed_at": "2026-06-01T00:06:00+00:00",
                 }
             ]
         return []
@@ -331,6 +398,9 @@ async def test_search_workspace_groups_workspace_scoped_ilike_results(monkeypatc
     assert [item["title"] for item in result["files"]] == ["launch-readiness.md"]
     assert [item["title"] for item in result["documents"]] == ["launch-readiness.md"]
     assert [item["title"] for item in result["sources"]] == ["Launch Handbook"]
+    assert [item["title"] for item in result["automations"]] == ["Launch digest"]
+    assert [item["title"] for item in result["activity"]] == ["Launch review completed"]
+    assert [item["title"] for item in result["jobs"]] == ["launch_file_ingestion"]
     assert [item["title"] for item in result["members"]] == ["Launch Operator"]
     assert [item["title"] for item in result["mentions"]] == ["Launch mobile navigation"]
     assert [item["title"] for item in result["workspaces"]] == ["Launch Workspace"]
@@ -341,8 +411,14 @@ async def test_search_workspace_groups_workspace_scoped_ilike_results(monkeypatc
     assert result["files"][0]["url"] == "/files?id=file-1"
     assert result["documents"][0]["url"] == "/files?id=file-1"
     assert result["sources"][0]["url"] == "/files?source=connector-1"
+    assert result["automations"][0]["url"] == "/automations?id=automation-1"
+    assert result["activity"][0]["url"] == "/workspace/activity?id=activity-1"
+    assert result["jobs"][0]["url"] == "/files?job=job-1"
     assert result["mentions"][0]["context"] == "Unread Task mention"
-    assert all(filters["workspace_id"] == "workspace-1" for _, filters in seen_filters)
+    assert all(
+        (filters.get("workspace_id") or filters.get("payload->>workspace_id")) == "workspace-1"
+        for _, filters in seen_filters
+    )
 
 
 @pytest.mark.asyncio

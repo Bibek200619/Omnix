@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..core.security import get_current_user
+from .ai_rate_limits import enforce_expensive_ai_rate_limit
 from ..schemas.workspace_tasks import (
     WorkspaceTaskAssistanceRead,
     WorkspaceTaskAssistanceRequest,
@@ -115,10 +116,16 @@ async def assist_execution(
     request: WorkspaceTaskAssistanceRequest,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
-    await require_workspace_access(workspace_id, _user_id(current_user))
-    tasks = await task_transcript_for_assistance(workspace_id=workspace_id, user_id=_user_id(current_user))
+    user_id = _user_id(current_user)
+    await require_workspace_access(workspace_id, user_id)
+    tasks = await task_transcript_for_assistance(workspace_id=workspace_id, user_id=user_id)
     if not tasks:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="There are no recorded tasks to assist yet.")
+    await enforce_expensive_ai_rate_limit(
+        user_id=user_id,
+        workspace_id=workspace_id,
+        endpoint="workspace.tasks.assist",
+    )
     transcript = "\n".join(
         (
             f"Task: {task.get('title')} | status={task.get('status')} | "

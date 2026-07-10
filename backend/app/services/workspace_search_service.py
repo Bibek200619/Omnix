@@ -34,6 +34,12 @@ CONNECTOR_COLUMNS = (
     "id,workspace_id,connector_type,display_name,status,last_error,source_file_id,"
     "last_synced_at,created_at,updated_at"
 )
+AUTOMATION_COLUMNS = (
+    "id,workspace_id,name,job_type,schedule,interval_seconds,enabled,user_id,"
+    "created_at,updated_at"
+)
+ACTIVITY_COLUMNS = "id,workspace_id,actor_user_id,event_type,summary,metadata,created_at"
+JOB_COLUMNS = "id,type,status,payload,progress,attempts,error,result,created_at,started_at,completed_at"
 SEARCH_GROUPS = (
     "conversations",
     "tasks",
@@ -123,12 +129,13 @@ async def _search_table_fields(
     workspace_id: str,
     fields: tuple[str, ...],
     pattern: str,
+    workspace_filter: str = "workspace_id",
     extra_filters: Mapping[str, Any] | None = None,
     order_by: str = "updated_at",
 ) -> list[dict[str, Any]]:
     async def query_field(field: str) -> list[dict[str, Any]]:
         filters: dict[str, Any] = {
-            "workspace_id": workspace_id,
+            workspace_filter: workspace_id,
             field: {"ilike": pattern},
         }
         if extra_filters:
@@ -358,6 +365,61 @@ def _source_result(row: Mapping[str, Any]) -> dict[str, Any]:
         "matched_field": row.get("_matched_field"),
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at") or row.get("last_synced_at"),
+    }
+
+
+def _automation_result(row: Mapping[str, Any]) -> dict[str, Any]:
+    automation_id = str(row["id"])
+    enabled = bool(row.get("enabled"))
+    job_type = str(row.get("job_type") or "automation").replace("_", " ").title()
+    return {
+        "id": automation_id,
+        "workspace_id": str(row["workspace_id"]),
+        "type": "automation",
+        "title": str(row.get("name") or "Automation"),
+        "preview": _compact_text(str(row.get("job_type") or row.get("schedule") or ""), limit=160),
+        "context": "Enabled Automation" if enabled else "Disabled Automation",
+        "url": f"/automations?id={automation_id}",
+        "matched_field": row.get("_matched_field"),
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
+    } | ({"preview": job_type} if not row.get("job_type") and not row.get("schedule") else {})
+
+
+def _activity_result(row: Mapping[str, Any]) -> dict[str, Any]:
+    activity_id = str(row["id"])
+    event_type = str(row.get("event_type") or "Activity").replace("_", " ").title()
+    metadata = row.get("metadata")
+    return {
+        "id": activity_id,
+        "workspace_id": str(row["workspace_id"]),
+        "type": "activity",
+        "title": str(row.get("summary") or event_type),
+        "preview": _compact_text(str(metadata), limit=160) if metadata else None,
+        "context": event_type,
+        "url": f"/workspace/activity?id={activity_id}",
+        "matched_field": row.get("_matched_field"),
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("created_at"),
+    }
+
+
+def _job_result(row: Mapping[str, Any]) -> dict[str, Any]:
+    job_id = str(row["id"])
+    payload = row.get("payload") if isinstance(row.get("payload"), Mapping) else {}
+    workspace_id = str(payload.get("workspace_id") or row.get("workspace_id") or "")
+    preview_source = row.get("error") or row.get("result") or row.get("payload")
+    return {
+        "id": job_id,
+        "workspace_id": workspace_id,
+        "type": "job",
+        "title": str(row.get("type") or "Background job"),
+        "preview": _compact_text(str(preview_source), limit=160) if preview_source else None,
+        "context": str(row.get("status") or "Job").replace("_", " ").title(),
+        "url": f"/files?job={job_id}",
+        "matched_field": row.get("_matched_field"),
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("completed_at") or row.get("started_at") or row.get("created_at"),
     }
 
 
@@ -657,6 +719,30 @@ async def search_workspace(
             fields=("display_name", "connector_type", "status"),
             pattern=pattern,
         )
+        automations_task = _search_table_fields(
+            table="automations",
+            columns=AUTOMATION_COLUMNS,
+            workspace_id=workspace_id,
+            fields=("name", "job_type", "schedule"),
+            pattern=pattern,
+        )
+        activity_task = _search_table_fields(
+            table="workspace_activity_events",
+            columns=ACTIVITY_COLUMNS,
+            workspace_id=workspace_id,
+            fields=("event_type", "summary"),
+            pattern=pattern,
+            order_by="created_at",
+        )
+        jobs_task = _search_table_fields(
+            table="jobs",
+            columns=JOB_COLUMNS,
+            workspace_id=workspace_id,
+            workspace_filter="payload->>workspace_id",
+            fields=("type", "status", "error"),
+            pattern=pattern,
+            order_by="created_at",
+        )
         (
             conversation_rows,
             task_rows,
@@ -665,6 +751,9 @@ async def search_workspace(
             file_rows,
             document_rows,
             source_rows,
+            automation_rows,
+            activity_rows,
+            job_rows,
             member_rows,
             mention_rows,
         ) = await asyncio.gather(
@@ -675,6 +764,9 @@ async def search_workspace(
             files_task,
             documents_task,
             sources_task,
+            automations_task,
+            activity_task,
+            jobs_task,
             members_task,
             mentions_task,
         )
@@ -691,9 +783,9 @@ async def search_workspace(
         "files": _dedupe_results([_file_result(row) for row in file_rows], query=normalized_query, limit=bounded_limit),
         "documents": _dedupe_results([_document_result(row) for row in document_rows], query=normalized_query, limit=bounded_limit),
         "sources": _dedupe_results([_source_result(row) for row in source_rows], query=normalized_query, limit=bounded_limit),
-        "automations": [],
-        "activity": [],
-        "jobs": [],
+        "automations": _dedupe_results([_automation_result(row) for row in automation_rows], query=normalized_query, limit=bounded_limit),
+        "activity": _dedupe_results([_activity_result(row) for row in activity_rows], query=normalized_query, limit=bounded_limit),
+        "jobs": _dedupe_results([_job_result(row) for row in job_rows], query=normalized_query, limit=bounded_limit),
         "members": member_rows,
         "mentions": mention_rows,
         "workspaces": [workspace_result] if workspace_result else [],

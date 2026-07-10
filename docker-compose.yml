@@ -12,6 +12,7 @@ services:
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - REDIS_URL=redis://redis:6379/0
+      - OMNIX_ROLE=api
       - ENV=dev
     depends_on:
       - redis
@@ -27,18 +28,41 @@ services:
     networks:
       - omnix-network
 
-  worker:
+  ingestion-worker:
     build:
       context: ./backend
       dockerfile: Dockerfile.backend
-    command: ["python", "-m", "app.automation.scheduler"] # Placeholder for worker command
+    command: ["python", "-m", "app.jobs.worker"]
     environment:
+      - OMNIX_ROLE=ingestion_worker
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - redis
       - backend
+    volumes:
+      - ./backend:/app
+    networks:
+      - omnix-network
+
+  automation-scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    command: ["python", "-m", "app.automation.scheduler"]
+    environment:
+      - OMNIX_ROLE=automation_scheduler
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - backend
+    volumes:
+      - ./backend:/app
     networks:
       - omnix-network
 
