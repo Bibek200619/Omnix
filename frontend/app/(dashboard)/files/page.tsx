@@ -39,7 +39,7 @@ import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStac
 import { workspaceRoleLabel } from "@/lib/workspace-roles";
 import { cn } from "@/lib/utils";
 import type { MessageAttachment } from "@/components/chat/types";
-import type { DecisionCandidate, DecisionCandidateList, WorkspaceDecisionSourceType, WorkspaceDecisionStatus } from "@/lib/workspace-types";
+import type { DecisionCandidate, DecisionCandidateList, WorkspaceDecisionStatus } from "@/lib/workspace-types";
 import {
   connectorAccent,
   connectorIcon,
@@ -99,14 +99,7 @@ function FilesPageContent() {
   const [decisionCandidates, setDecisionCandidates] = useState<DecisionCandidate[]>([]);
   const [decisionCandidatesLoading, setDecisionCandidatesLoading] = useState(false);
   const [decisionCandidatesError, setDecisionCandidatesError] = useState<string | null>(null);
-  const [decisionCandidateDraft, setDecisionCandidateDraft] = useState<{
-    title: string;
-    reason: string;
-    description: string;
-    status: WorkspaceDecisionStatus;
-    source_type: WorkspaceDecisionSourceType;
-    source_id: string;
-  } | null>(null);
+  const [decisionCandidateDraft, setDecisionCandidateDraft] = useState<{ title: string; reason: string; description: string; status: WorkspaceDecisionStatus; source_type: DecisionCandidate["source_type"]; source_id: string } | null>(null);
   const fileResultsRef = useRef<HTMLDivElement | null>(null);
   const [gridColumnCount, setGridColumnCount] = useState(1);
   const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
@@ -283,9 +276,7 @@ function FilesPageContent() {
       title: candidate.title,
       reason: candidate.reason,
       description: `Supporting evidence:\n${candidate.supporting_evidence.join("\n")}`,
-      status: "proposed",
-      source_type: candidate.source_type,
-      source_id: candidate.source_id,
+      status: "proposed", source_type: candidate.source_type, source_id: candidate.source_id,
     });
     try {
       await apiClient.post(`/workspaces/${activeWorkspaceId}/decisions/candidates/metrics`, {
