@@ -40,6 +40,22 @@ function decisionOrigin(decision: WorkspaceDecision) {
       detail: `Source message ${decision.source_message_id}`,
     };
   }
+  if (decision.source_type === "document" && decision.source_id) {
+    return {
+      kind: "origin" as const,
+      label: "Document-derived decision",
+      href: `/files?id=${decision.source_id}`,
+      detail: `Source document ${decision.source_id}`,
+    };
+  }
+  if (decision.source_type === "conversation" && decision.source_id) {
+    return {
+      kind: "origin" as const,
+      label: "Conversation-derived decision",
+      href: `/conversations?channel=${decision.source_id}`,
+      detail: `Source conversation ${decision.source_id}`,
+    };
+  }
   return {
     kind: "origin" as const,
     label: "Recorded decision",
@@ -70,6 +86,20 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
         href: decision.source_channel_id ? `/conversations?channel=${decision.source_channel_id}` : "/conversations",
         detail: decision.decision_reason || "Decision extracted from workspace conversation context",
       }]
+    : decision.source_type === "document" && decision.source_id
+      ? [{
+          kind: "file" as const,
+          label: "Source document",
+          href: `/files?id=${decision.source_id}`,
+          detail: decision.decision_reason || "Decision extracted from document evidence",
+        }]
+      : decision.source_type === "conversation" && decision.source_id
+        ? [{
+            kind: "conversation" as const,
+            label: "Source conversation",
+            href: `/conversations?channel=${decision.source_id}`,
+            detail: decision.decision_reason || "Decision extracted from conversation evidence",
+          }]
     : decision.decision_reason
       ? [{
           kind: "evidence" as const,
@@ -77,6 +107,20 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
           detail: decision.decision_reason,
         }]
       : [];
+  const graphSourceTitle =
+    decision.source_type === "document"
+      ? "Document source"
+      : decision.source_message_id || decision.source_type === "conversation"
+        ? "Conversation source"
+        : decision.initiative
+          ? "Initiative context"
+          : "Manual record";
+  const graphSourceHref =
+    decision.source_type === "document" && decision.source_id
+      ? `/files?id=${decision.source_id}`
+      : decision.source_channel_id || (decision.source_type === "conversation" && decision.source_id)
+        ? `/conversations?channel=${decision.source_channel_id || decision.source_id}`
+        : undefined;
   const decisionGraphNodes: DecisionGraphNode[] = [
     {
       kind: "task",
@@ -92,9 +136,9 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
     },
     {
       kind: "source",
-      title: decision.source_message_id ? "Conversation source" : decision.initiative ? "Initiative context" : "Manual record",
-      detail: decision.source_message_id || decision.initiative?.title || creatorLabel(decision),
-      href: decision.source_channel_id ? `/conversations?channel=${decision.source_channel_id}` : undefined,
+      title: graphSourceTitle,
+      detail: decision.source_id || decision.source_message_id || decision.initiative?.title || creatorLabel(decision),
+      href: graphSourceHref,
     },
   ];
 

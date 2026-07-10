@@ -84,7 +84,9 @@ async def test_task_assistance_sanitizes_model_errors(monkeypatch: pytest.Monkey
         raise ModelServiceError("raw ollama endpoint failed", 503)
 
     async def allow_access(*args, **kwargs): return object()
+    async def allow_rate_limit(*args, **kwargs): return None
     monkeypatch.setattr(workspace_tasks, "require_workspace_access", allow_access)
+    monkeypatch.setattr(workspace_tasks, "enforce_expensive_ai_rate_limit", allow_rate_limit)
     monkeypatch.setattr(workspace_tasks, "task_transcript_for_assistance", fake_tasks)
     monkeypatch.setattr(workspace_tasks, "generate_ai_response", broken_model)
 
@@ -107,6 +109,8 @@ async def test_conversation_assistance_sanitizes_model_errors(monkeypatch: pytes
     async def broken_model(*args, **kwargs):
         raise ModelServiceError("raw ollama endpoint failed", 503)
 
+    async def allow_rate_limit(*args, **kwargs): return None
+    monkeypatch.setattr(workspace_conversations, "enforce_expensive_ai_rate_limit", allow_rate_limit)
     monkeypatch.setattr(workspace_conversations, "channel_transcript_for_assistance", fake_messages)
     monkeypatch.setattr(workspace_conversations, "generate_ai_response", broken_model)
 
@@ -127,7 +131,10 @@ async def test_ai_generation_sanitizes_model_errors(monkeypatch: pytest.MonkeyPa
     async def broken_model(*args, **kwargs):
         raise ModelServiceError("raw ollama endpoint failed", 503)
 
-    monkeypatch.setattr(messages, "_check_rate_limit", lambda user_id: None)
+    async def allow_rate_limit(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(messages, "_check_rate_limit", allow_rate_limit)
     monkeypatch.setattr(messages, "generate_ai_response", broken_model)
 
     with pytest.raises(HTTPException) as exc_info:

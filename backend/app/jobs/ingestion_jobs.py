@@ -5,12 +5,14 @@ import logging
 from typing import Any
 from datetime import datetime, timezone
 
-from ..services.file_storage import resolve_managed_storage_path
+from ..services.file_storage import StorageNotFoundError, read_bytes_from_storage
 from ..services.supabase_service import (
     select_one_trusted,
     update_one_trusted,
 )
 from ..services.document_intelligence_service import (
+    ExtractionDiagnostics,
+    document_likely_requires_ocr,
     extract_document_with_diagnostics,
     extraction_columns_payload,
 )
@@ -19,6 +21,18 @@ from ..rag.startup import get_vector_store
 from ..rag.ingestion import RAGIngestionPipeline
 
 logger = logging.getLogger(__name__)
+
+
+def _searchable_processing_status(diagnostics: ExtractionDiagnostics, *, chunks_truncated: bool = False) -> str:
+    if chunks_truncated:
+        return "partially_searchable"
+    return "searchable"
+
+
+def _unsearchable_processing_status(diagnostics: ExtractionDiagnostics) -> str:
+    if diagnostics.extraction_status == "ocr_required":
+        return "ocr_required"
+    return "failed"
 
 
 def _utc_now_iso() -> str:
@@ -44,10 +58,18 @@ def _metadata_with_processing(
     return metadata
 
 
+def _file_scope_filters(file_id: str, user_id: str, workspace_id: str | None) -> dict[str, Any]:
+    filters: dict[str, Any] = {"id": file_id, "user_id": user_id}
+    filters["workspace_id"] = workspace_id if workspace_id else {"is": None}
+    return filters
+
+
 async def _update_file_processing_state(
     file_id: str,
     file_row: dict[str, Any],
     *,
+    user_id: str,
+    workspace_id: str | None,
     processing_status: str,
     processing_error: str | None = None,
     metadata_updates: dict[str, Any] | None = None,
@@ -65,17 +87,20 @@ async def _update_file_processing_state(
         "processing_error": processing_error,
         **(diagnostics_payload or {}),
     }
+    filters = _file_scope_filters(file_id, user_id, workspace_id)
     try:
-        return await update_one_trusted("files", {"id": file_id}, payload) or {**file_row, **payload}
+        return await update_one_trusted("files", filters, payload) or {**file_row, **payload}
     except Exception:
         logger.warning("Unable to persist file processing columns; retrying processing state as metadata only.")
-        await update_one_trusted("files", {"id": file_id}, {"metadata": metadata})
+        await update_one_trusted("files", filters, {"metadata": metadata})
         return {**file_row, "metadata": metadata}
 
 
 async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
     """Process an ingestion job created after file upload. Expects payload in job_row['payload']."""
     file_id: str | None = None
+    user_id: str | None = None
+    workspace_id: str | None = None
     file_row: dict[str, Any] | None = None
     try:
         import json
@@ -95,22 +120,34 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
             "extraction_status,extraction_failure_reason,processing_status,processing_error,processing_job_id,"
             "ocr_used,ocr_character_count,created_at"
         )
-        file_row = await select_one_trusted("files", FILE_COLUMNS, {"id": file_id})
+        file_row = await select_one_trusted("files", FILE_COLUMNS, _file_scope_filters(file_id, user_id, workspace_id))
         if file_row is None:
             raise RuntimeError("File not found for ingestion")
 
-        file_row = await _update_file_processing_state(file_id, file_row, processing_status="processing")
+        file_row = await _update_file_processing_state(
+            file_id,
+            file_row,
+            user_id=user_id,
+            workspace_id=workspace_id,
+            processing_status="extracting",
+        )
 
-        storage_path = resolve_managed_storage_path(file_row.get("storage_path"))
         filename = file_row.get("file_name") or "imported"
         file_type = file_row.get("file_type")
 
-        if storage_path is None or not storage_path.exists():
-            raise RuntimeError("Stored file not found on disk")
+        try:
+            data = await read_bytes_from_storage(file_row.get("storage_path"))
+        except StorageNotFoundError as exc:
+            raise RuntimeError("Stored file not found in storage") from exc
 
-        # Read bytes
-        with storage_path.open("rb") as fh:
-            data = fh.read()
+        if document_likely_requires_ocr(filename, file_type, data):
+            file_row = await _update_file_processing_state(
+                file_id,
+                file_row,
+                user_id=user_id,
+                workspace_id=workspace_id,
+                processing_status="ocr_running",
+            )
 
         extraction_result = await asyncio.to_thread(extract_document_with_diagnostics, filename, file_type, data)
         normalized = extraction_result.text
@@ -122,29 +159,24 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
 
         if diagnostics.extraction_status != "searchable" or not normalized:
             processing_error = diagnostics.extraction_failure_reason or "No searchable text was extracted from this file."
+            processing_status = _unsearchable_processing_status(diagnostics)
             await _update_file_processing_state(
                 file_id,
                 file_row,
-                processing_status="failed",
+                user_id=user_id,
+                workspace_id=workspace_id,
+                processing_status=processing_status,
                 processing_error=processing_error,
                 metadata_updates=metadata,
                 diagnostics_payload=extraction_columns_payload(diagnostics),
             )
             return {
-                "status": "failed",
+                "status": "completed" if processing_status == "ocr_required" else "failed",
                 "file_status": diagnostics.extraction_status,
-                "processing_status": "failed",
+                "processing_status": processing_status,
                 "error": processing_error,
                 "chunks": [],
             }
-
-        file_row = await _update_file_processing_state(
-            file_id,
-            file_row,
-            processing_status="extracted",
-            metadata_updates=metadata,
-            diagnostics_payload=extraction_columns_payload(diagnostics),
-        )
 
         stored_chunks = await store_extracted_text_chunks(
             file_id=file_id,
@@ -153,14 +185,19 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
             workspace_id=workspace_id,
             replace_existing=True,
         )
+        processing_status = _searchable_processing_status(diagnostics, chunks_truncated=stored_chunks.truncated)
         file_row = await _update_file_processing_state(
             file_id,
             file_row,
-            processing_status="chunked",
+            user_id=user_id,
+            workspace_id=workspace_id,
+            processing_status=processing_status,
             metadata_updates={
+                **metadata,
                 "text_chunk_count": stored_chunks.chunk_count,
                 "text_chunks_truncated": stored_chunks.truncated,
             },
+            diagnostics_payload=extraction_columns_payload(diagnostics),
         )
 
         # Run ingestion pipeline (chunks, embeddings, DB insert)
@@ -208,7 +245,9 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
         await _update_file_processing_state(
             file_id,
             file_row,
-            processing_status="embedded",
+            user_id=user_id,
+            workspace_id=workspace_id,
+            processing_status=processing_status,
             metadata_updates={
                 "embedded_chunk_count": num,
                 "embedded_chunk_ids": chunk_ids[:20],
@@ -216,14 +255,16 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
         )
 
         # Mark job succeeded
-        return {"status": "completed", "processing_status": "embedded", "chunks": chunk_ids}
+        return {"status": "completed", "processing_status": processing_status, "chunks": chunk_ids}
     except Exception as exc:
         logger.exception("handle_ingest_file failed: %s", exc)
-        if file_id:
+        if file_id and user_id is not None:
             try:
                 await _update_file_processing_state(
                     file_id,
                     file_row or {"metadata": {}},
+                    user_id=user_id,
+                    workspace_id=workspace_id,
                     processing_status="failed",
                     processing_error=str(exc),
                 )

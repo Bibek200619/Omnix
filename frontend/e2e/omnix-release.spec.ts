@@ -263,19 +263,33 @@ async function mockApi(page: Page) {
     }
     const searchMatch = path.match(/^\/workspaces\/([^/]+)\/search$/);
     if (searchMatch) {
+      const query = url.searchParams.get("q")?.toLowerCase() || "";
+      const taskResults = query.includes("latency")
+        ? [
+            {
+              id: "task-1",
+              type: "task",
+              title: "Reduce upload latency",
+              preview: "Move extraction to background workers.",
+              url: "/tasks?id=task-1",
+            },
+          ]
+        : [];
       return fulfillJson(route, {
         conversations: [],
-        tasks: [
-          {
-            id: "task-1",
-            type: "task",
-            title: "Reduce upload latency",
-            preview: "Move extraction to background workers.",
-            url: "/tasks?id=task-1",
-          },
-        ],
+        tasks: taskResults,
         initiatives: [],
         decisions: [],
+        files: [],
+        documents: [],
+        sources: [],
+        members: [],
+        mentions: [],
+        workspaces: [],
+        automations: [],
+        activity: [],
+        jobs: [],
+        items: taskResults,
       });
     }
     if (path === "/files" && method === "GET") return fulfillJson(route, files);
@@ -342,8 +356,60 @@ test.describe("authenticated Omnix shell", () => {
     await expect(search).toBeVisible();
     await search.fill("latency");
     await expect(page.getByRole("button", { name: /Reduce upload latency/ })).toBeVisible();
+    await search.focus();
+    await expect(search).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/tasks\?id=task-1/);
+  });
+
+  test("command palette supports keyboard navigation and focus return", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop hardware keyboard flow only");
+    await page.goto("/dashboard");
+    const trigger = page.getByRole("button", { name: "Open command palette" }).first();
+    await trigger.focus();
+    await page.keyboard.press("Control+K");
+
+    const dialog = page.getByRole("dialog", { name: "Omnix command palette" });
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Search Omnix commands and workspace results" })).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+
+    await page.keyboard.press("Control+K");
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Search Omnix commands and workspace results" })).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(dialog.getByRole("button", { name: /^Create Decision\./ })).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await expect(dialog.getByRole("button", { name: /^Create Task\./ })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/tasks\?create=task&palette=/);
+  });
+
+  test("keyboard shortcuts modal restores focus on close", async ({ page }) => {
+    await page.goto("/dashboard");
+    const trigger = page.getByRole("button", { name: "Open command palette" }).first();
+    await trigger.focus();
+    await page.keyboard.type("?");
+
+    const dialog = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Close keyboard shortcuts" })).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  test("announces command palette no-result state", async ({ page }) => {
+    await page.goto("/dashboard");
+    await page.getByRole("button", { name: "Open command palette" }).first().click();
+    const search = page.getByRole("textbox", { name: "Search Omnix commands and workspace results" });
+    await search.fill("unmatched-release-query");
+    await expect(page.getByText("No command or workspace match.")).toBeVisible();
+    await expect(page.locator("#omnix-command-palette-status")).toContainText("No command or workspace results");
   });
 
   test("switches workspace from the sidebar", async ({ page, isMobile }) => {
@@ -380,6 +446,19 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page.getByText("Queued").first()).toBeVisible();
   });
 
+  test("mobile file upload surface queues a selected file", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "mobile project only");
+    await page.goto("/files");
+    await expect(page.getByText("Workspace files")).toBeVisible();
+    const fileInput = page.locator('input[type="file"]').first();
+    await fileInput.setInputFiles({
+      name: "mobile-upload.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Mobile upload\n\nQueued from a touch viewport."),
+    });
+    await expect(page.getByText("Queued").first()).toBeVisible();
+  });
+
   test("mobile navigation renders core routes and command palette", async ({ page, isMobile }) => {
     test.skip(!isMobile, "mobile project only");
     await page.goto("/dashboard");
@@ -393,6 +472,57 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page.getByRole("heading", { name: "Workspace Decisions" })).toBeVisible();
     await page.goto("/notifications");
     await expect(page.getByText("Notifications").first()).toBeVisible();
+  });
+
+  test("mobile shell lets dense task forms scroll", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "mobile project only");
+    await page.setViewportSize({ width: 390, height: 520 });
+    await page.goto("/tasks");
+    await page.getByRole("button", { name: "Record Task" }).click();
+
+    await expect(page.locator("#main-content")).toBeVisible();
+
+    const metrics = await page.evaluate(() => {
+      const shell = document.querySelector(".omnix-auth-shell") as HTMLElement | null;
+      const main = document.querySelector("#main-content") as HTMLElement | null;
+      return {
+        documentScrollHeight: document.scrollingElement?.scrollHeight ?? 0,
+        mainOverflowY: main ? window.getComputedStyle(main).overflowY : "",
+        shellOverflowY: shell ? window.getComputedStyle(shell).overflowY : "",
+        viewportHeight: window.innerHeight,
+      };
+    });
+
+    expect(metrics.shellOverflowY).not.toBe("hidden");
+    expect(metrics.mainOverflowY).not.toBe("hidden");
+    expect(metrics.documentScrollHeight).toBeGreaterThan(metrics.viewportHeight);
+
+    await page.evaluate(() => window.scrollTo(0, 320));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  });
+
+  test("mobile task creation does not autofocus the title field", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "mobile project only");
+    await page.goto("/tasks");
+    await page.getByRole("button", { name: "Record Task" }).click();
+    const titleInput = page.getByPlaceholder("Operational next step");
+
+    await expect(titleInput).toBeVisible();
+    await expect(titleInput).not.toBeFocused();
+  });
+
+  test("touch tablet task cards keep hover-revealed controls visible", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "mobile project only");
+    await page.setViewportSize({ width: 820, height: 900 });
+    await page.goto("/tasks");
+
+    const secondaryControls = page.getByTestId("task-card-secondary-controls").first();
+    const blockerControls = page.getByTestId("task-card-blocker-controls").first();
+
+    await expect(secondaryControls).toBeVisible();
+    await expect(blockerControls).toBeVisible();
+    await expect(secondaryControls).toHaveCSS("opacity", "1");
+    await expect(blockerControls).toHaveCSS("opacity", "1");
   });
 
   for (const route of ["/dashboard", "/files", "/tasks", "/decisions", "/notifications"]) {

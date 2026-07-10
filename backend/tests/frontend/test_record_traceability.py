@@ -25,14 +25,27 @@ def test_traceability_panel_is_shared_across_core_records() -> None:
 def test_traceability_links_reuse_existing_provenance_fields() -> None:
     task_card = read_frontend("components/tasks/TaskCard.tsx")
     decision_panel = read_frontend("components/decisions/DecisionContextPanel.tsx")
+    decision_modal = read_frontend("components/decisions/CreateDecisionModal.tsx")
+    decision_from_message_modal = read_frontend("components/conversations/DecisionFromMessageModal.tsx")
+    files_page = read_frontend("app/(dashboard)/files/page.tsx")
     initiative_panel = read_frontend("components/initiatives/InitiativeDetailPanel.tsx")
+    workspace_types = read_frontend("lib/workspace-types.ts")
 
     assert "task.linked_context.map" in task_card
     assert "task.linked_decisions.map" in task_card
     assert "task.initiative_id" in task_card
     assert "decision.source_message_id" in decision_panel
+    assert "decision.source_type === \"document\"" in decision_panel
+    assert "Source document" in decision_panel
     assert "decision.linked_tasks.map" in decision_panel
     assert "decision.initiative" in decision_panel
+    assert "source_type: initialValues?.source_type" in decision_modal
+    assert "source_type: source.candidate.source_type" in decision_from_message_modal
+    assert "source_type: candidate.source_type" in files_page
     assert "selected.linked_resources.map" in initiative_panel
     assert "selected.linked_channels.map" in initiative_panel
     assert "selected.linked_tasks.map" in initiative_panel
+    assert "WorkspaceInitiativeProvenanceSummary" in workspace_types
+    assert "selected.provenance_summary?.summary" in initiative_panel
+    assert "selected.provenance_summary?.needs_repair" in initiative_panel
+    assert "Missing source context" in initiative_panel

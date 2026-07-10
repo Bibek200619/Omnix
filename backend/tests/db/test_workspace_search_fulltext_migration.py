@@ -4,6 +4,12 @@ from pathlib import Path
 
 
 MIGRATION = Path(__file__).resolve().parents[3] / "supabase" / "migrations" / "0043_workspace_search_fulltext.sql"
+HARDENING_MIGRATION = (
+    Path(__file__).resolve().parents[3]
+    / "supabase"
+    / "migrations"
+    / "0044_workspace_search_membership_boundary.sql"
+)
 
 
 def test_workspace_search_fulltext_migration_defines_ranked_rpc_and_indexes() -> None:
@@ -27,3 +33,21 @@ def test_workspace_search_fulltext_migration_defines_ranked_rpc_and_indexes() ->
         assert f"CREATE INDEX IF NOT EXISTS {index_name}" in sql
         assert "WITH (fastupdate = on, gin_pending_list_limit = 16384);" in sql
 
+
+def test_workspace_search_ranked_rpc_requires_workspace_membership_boundary() -> None:
+    sql = HARDENING_MIGRATION.read_text(encoding="utf-8")
+
+    assert "CREATE OR REPLACE FUNCTION public.search_workspace_ranked" in sql
+    assert "workspace_access AS" in sql
+    assert "(select auth.role()) = 'service_role'" in sql
+    assert "public.omnix_has_workspace_task_access(p_workspace_id)" in sql
+    assert "FROM ranked, workspace_access" in sql
+    assert "WHERE workspace_access.allowed" in sql
+    assert (
+        "REVOKE ALL ON FUNCTION public.search_workspace_ranked(uuid, text, integer, integer) FROM PUBLIC;"
+        in sql
+    )
+    assert (
+        "GRANT EXECUTE ON FUNCTION public.search_workspace_ranked(uuid, text, integer, integer) TO authenticated;"
+        in sql
+    )

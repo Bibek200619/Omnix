@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -8,24 +9,11 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import {
-  Activity,
   ArrowUpRight,
-  BadgeCheck,
-  Bell,
-  Bot,
-  ClipboardCheck,
   Command,
-  Compass,
-  FileText,
   Loader2,
-  MessagesSquare,
-  Plus,
   Search,
-  Settings,
-  UsersRound,
-  Workflow,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { Portal } from "@/components/ui/Portal";
@@ -33,258 +21,29 @@ import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { useWorkspaceTree } from "@/lib/workspace-context";
-import { cn } from "@/lib/utils";
-import type { WorkspaceSearchResponse, WorkspaceSearchResult } from "@/lib/workspace-types";
-
-const searchGroupKeys = [
-  "tasks",
-  "decisions",
-  "initiatives",
-  "conversations",
-  "files",
-  "documents",
-  "sources",
-  "members",
-  "mentions",
-  "workspaces",
-  "automations",
-  "activity",
-  "jobs",
-] as const;
-
-type SearchGroupKey = (typeof searchGroupKeys)[number];
-type PaletteItemKind = "action" | "search" | "recent";
-
-type PaletteItem = {
-  id: string;
-  kind: PaletteItemKind;
-  label: string;
-  description: string;
-  href: string;
-  icon: LucideIcon;
-  group?: SearchGroupKey;
-  createType?: "task" | "decision" | "initiative";
-};
-
-type RecentDestination = {
-  href: string;
-  label: string;
-  description: string;
-  visitedAt: number;
-};
-
-const searchGroups: Array<{ key: SearchGroupKey; label: string; icon: LucideIcon }> = [
-  { key: "tasks", label: "Tasks", icon: ClipboardCheck },
-  { key: "decisions", label: "Decisions", icon: BadgeCheck },
-  { key: "initiatives", label: "Initiatives", icon: Compass },
-  { key: "conversations", label: "Conversations", icon: MessagesSquare },
-  { key: "files", label: "Files", icon: FileText },
-  { key: "documents", label: "Document Text", icon: FileText },
-  { key: "sources", label: "Sources", icon: FileText },
-  { key: "members", label: "Team Members", icon: UsersRound },
-  { key: "mentions", label: "Mentions", icon: Bell },
-  { key: "workspaces", label: "Workspace Metadata", icon: Settings },
-  { key: "automations", label: "Automations", icon: Workflow },
-  { key: "activity", label: "Activity", icon: Activity },
-  { key: "jobs", label: "Jobs", icon: Bot },
-];
-
-const emptySearchGroups: Record<SearchGroupKey, WorkspaceSearchResult[]> = {
-  conversations: [],
-  tasks: [],
-  initiatives: [],
-  decisions: [],
-  files: [],
-  documents: [],
-  sources: [],
-  members: [],
-  mentions: [],
-  workspaces: [],
-  automations: [],
-  activity: [],
-  jobs: [],
-};
-
-const emptyResults: WorkspaceSearchResponse = {
-  ...emptySearchGroups,
-  items: [],
-};
-
-const quickActions: PaletteItem[] = [
-  {
-    id: "action:create-task",
-    kind: "action",
-    label: "Create Task",
-    description: "Open the existing task creation flow.",
-    href: "/tasks?create=task",
-    icon: Plus,
-    createType: "task",
-  },
-  {
-    id: "action:create-decision",
-    kind: "action",
-    label: "Create Decision",
-    description: "Open the existing decision creation flow.",
-    href: "/decisions?create=decision",
-    icon: Plus,
-    createType: "decision",
-  },
-  {
-    id: "action:create-initiative",
-    kind: "action",
-    label: "Create Initiative",
-    description: "Open the existing initiative creation flow.",
-    href: "/initiatives?create=initiative",
-    icon: Plus,
-    createType: "initiative",
-  },
-  {
-    id: "action:open-conversations",
-    kind: "action",
-    label: "Open Conversations",
-    description: "Go to workspace conversations.",
-    href: "/conversations",
-    icon: MessagesSquare,
-  },
-  {
-    id: "action:open-tasks",
-    kind: "action",
-    label: "Open Tasks",
-    description: "Go to shared execution.",
-    href: "/tasks",
-    icon: ClipboardCheck,
-  },
-  {
-    id: "action:open-decisions",
-    kind: "action",
-    label: "Open Decisions",
-    description: "Go to decision memory.",
-    href: "/decisions",
-    icon: BadgeCheck,
-  },
-  {
-    id: "action:open-initiatives",
-    kind: "action",
-    label: "Open Initiatives",
-    description: "Go to shared operational direction.",
-    href: "/initiatives",
-    icon: Compass,
-  },
-  {
-    id: "action:open-notifications",
-    kind: "action",
-    label: "Open Notifications",
-    description: "Review in-app mentions.",
-    href: "/notifications",
-    icon: Bell,
-  },
-  {
-    id: "action:open-team",
-    kind: "action",
-    label: "Open Team",
-    description: "Go to workspace members.",
-    href: "/team",
-    icon: UsersRound,
-  },
-  {
-    id: "action:open-files",
-    kind: "action",
-    label: "Open Files",
-    description: "Go to workspace files.",
-    href: "/files",
-    icon: FileText,
-  },
-  {
-    id: "action:open-settings",
-    kind: "action",
-    label: "Open Settings",
-    description: "Go to workspace settings.",
-    href: "/settings",
-    icon: Settings,
-  },
-];
-
-const destinations: Record<string, Omit<RecentDestination, "visitedAt">> = {
-  "/dashboard": { href: "/dashboard", label: "Dashboard", description: "Workspace overview" },
-  "/conversations": { href: "/conversations", label: "Conversations", description: "Operational discussion" },
-  "/tasks": { href: "/tasks", label: "Tasks", description: "Shared execution" },
-  "/decisions": { href: "/decisions", label: "Decisions", description: "Decision memory" },
-  "/initiatives": { href: "/initiatives", label: "Initiatives", description: "Operational direction" },
-  "/notifications": { href: "/notifications", label: "Notifications", description: "In-app mentions" },
-  "/team": { href: "/team", label: "Team", description: "Workspace members" },
-  "/files": { href: "/files", label: "Files", description: "Workspace files" },
-  "/sources": { href: "/sources", label: "Sources", description: "Knowledge sources" },
-  "/settings": { href: "/settings", label: "Settings", description: "Account and workspace controls" },
-  "/workspace": { href: "/workspace", label: "Workspaces", description: "Workspace hierarchy" },
-};
-
-function recentStorageKey(workspaceId: string | null | undefined) {
-  return `omnix.commandPalette.recent.${workspaceId || "global"}`;
-}
-
-function normalize(text: string) {
-  return text.trim().toLowerCase();
-}
-
-function matchesQuery(item: Pick<PaletteItem, "label" | "description">, query: string) {
-  const value = normalize(query);
-  if (!value) return true;
-  return `${item.label} ${item.description}`.toLowerCase().includes(value);
-}
-
-function searchResultTypeLabel(result: WorkspaceSearchResult) {
-  if (result.type === "conversation") return "Conversation";
-  if (result.type === "initiative") return "Initiative";
-  if (result.type === "decision") return "Decision";
-  if (result.type === "file") return "File";
-  if (result.type === "document") return "Document Text";
-  if (result.type === "source") return "Source";
-  if (result.type === "member") return "Team Member";
-  if (result.type === "mention") return "Mention";
-  if (result.type === "workspace") return "Workspace";
-  if (result.type === "automation") return "Automation";
-  if (result.type === "activity") return "Activity";
-  if (result.type === "job") return "Job";
-  return "Task";
-}
-
-function searchResultIcon(result: WorkspaceSearchResult): LucideIcon {
-  if (result.type === "conversation") return MessagesSquare;
-  if (result.type === "initiative") return Compass;
-  if (result.type === "decision") return BadgeCheck;
-  if (result.type === "file" || result.type === "document" || result.type === "source") return FileText;
-  if (result.type === "member") return UsersRound;
-  if (result.type === "mention") return Bell;
-  if (result.type === "workspace") return Settings;
-  if (result.type === "automation") return Workflow;
-  if (result.type === "activity") return Activity;
-  if (result.type === "job") return Bot;
-  return ClipboardCheck;
-}
-
-function searchResultItem(result: WorkspaceSearchResult, group: SearchGroupKey): PaletteItem {
-  return {
-    id: `search:${result.type}:${result.id}:${result.message_id || "record"}`,
-    kind: "search",
-    label: result.title,
-    description: result.preview || result.context || searchResultTypeLabel(result),
-    href: result.url,
-    icon: searchResultIcon(result),
-    group,
-  };
-}
+import type { WorkspaceSearchResponse } from "@/lib/workspace-types";
+import {
+  destinations,
+  emptyResults,
+  hrefWithFreshCreateToken,
+  matchesQuery,
+  quickActions,
+  recentStorageKey,
+  searchGroups,
+  searchGroupKeys,
+  searchResultItem,
+  type PaletteItem,
+  type RecentDestination,
+  type SearchGroupKey,
+} from "./command-palette/commandPaletteModel";
+import { CommandPaletteItem } from "./command-palette/CommandPaletteItem";
+import { useCommandPaletteAnnouncement } from "./command-palette/useCommandPaletteAnnouncement";
 
 function shortcutLabel() {
   if (typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform)) {
     return "⌘K";
   }
   return "Ctrl K";
-}
-
-function hrefWithFreshCreateToken(item: PaletteItem) {
-  if (!item.createType) return item.href;
-  const separator = item.href.includes("?") ? "&" : "?";
-  return `${item.href}${separator}palette=${Date.now()}`;
 }
 
 export function CommandPalette() {
@@ -299,12 +58,33 @@ export function CommandPalette() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const dialogRef = useFocusTrap<HTMLDivElement>(open);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const dialogRef = useFocusTrap<HTMLDivElement>(open, inputRef);
   const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const openerRef = useRef<HTMLElement | null>(null);
   const requestRef = useRef(0);
   const searchAbortRef = useRef<AbortController | null>(null);
   const trimmedQuery = query.trim();
+
+  const openPalette = useCallback(() => {
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setOpen(true);
+    setQuery("");
+  }, []);
+
+  const closePalette = useCallback((options: { restoreFocus?: boolean } = {}) => {
+    const restoreFocus = options.restoreFocus ?? true;
+    const opener = openerRef.current;
+    openerRef.current = null;
+    setOpen(false);
+
+    if (!restoreFocus || !opener) return;
+    window.requestAnimationFrame(() => {
+      if (opener.isConnected) {
+        opener.focus({ preventScroll: true });
+      }
+    });
+  }, []);
 
   const filteredActions = useMemo(
     () => quickActions.filter((item) => matchesQuery(item, trimmedQuery)).slice(0, trimmedQuery ? 5 : quickActions.length),
@@ -349,6 +129,19 @@ export function CommandPalette() {
   );
 
   const hasSearchResults = searchGroups.some((group) => searchItemsByGroup[group.key].length > 0);
+  const searchResultCount = useMemo(
+    () => searchGroups.reduce((count, group) => count + searchItemsByGroup[group.key].length, 0),
+    [searchItemsByGroup],
+  );
+  const statusMessage = useCommandPaletteAnnouncement({
+    open,
+    query: trimmedQuery,
+    loading,
+    error,
+    quickActionCount: filteredActions.length,
+    searchResultCount,
+    recentCount: recentItems.length,
+  });
 
   useEffect(() => {
     setCommandShortcut(shortcutLabel());
@@ -358,39 +151,31 @@ export function CommandPalette() {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setOpen(true);
-        setQuery("");
+        openPalette();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [openPalette]);
 
   useEffect(() => {
     const handleOpenRequest = () => {
-      setOpen(true);
-      setQuery("");
+      openPalette();
     };
     window.addEventListener("omnix:open-command-palette", handleOpenRequest);
     return () => window.removeEventListener("omnix:open-command-palette", handleOpenRequest);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const timer = window.setTimeout(() => inputRef.current?.focus(), 0);
-    return () => window.clearTimeout(timer);
-  }, [open]);
+  }, [openPalette]);
 
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpen(false);
+        closePalette();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open]);
+  }, [closePalette, open]);
 
   useEffect(() => {
     setQuery("");
@@ -478,13 +263,9 @@ export function CommandPalette() {
     itemRefs.current[item.id]?.scrollIntoView({ block: "nearest" });
   }, [activeIndex, flatItems, open]);
 
-  function closePalette() {
-    setOpen(false);
-  }
-
   function selectItem(item: PaletteItem | undefined) {
     if (!item) return;
-    closePalette();
+    closePalette({ restoreFocus: false });
     router.push(hrefWithFreshCreateToken(item));
   }
 
@@ -525,44 +306,18 @@ export function CommandPalette() {
   }
 
   function renderItem(item: PaletteItem, index: number) {
-    const Icon = item.icon;
     const active = index === activeIndex;
     return (
-      <button
+      <CommandPaletteItem
         key={item.id}
-        ref={(node) => {
+        item={item}
+        active={active}
+        setItemRef={(node) => {
           itemRefs.current[item.id] = node;
         }}
-        type="button"
-        onMouseEnter={() => setActiveIndex(index)}
-        onFocus={() => setActiveIndex(index)}
-        onClick={() => selectItem(item)}
-        aria-current={active ? "true" : undefined}
-        className={cn(
-          "group flex min-h-[4.25rem] w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition active:scale-[0.995] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55 sm:min-h-[3.9rem] sm:py-2.5",
-          active
-            ? "border-cyan-300/35 bg-cyan-300/[0.08] shadow-[var(--omnix-glow-xs)]"
-            : "border-transparent bg-white/[0.018] hover:border-cyan-300/18 hover:bg-white/[0.04]",
-        )}
-      >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-300/10 bg-cyan-300/[0.045] text-cyan-100/70">
-          <Icon aria-hidden="true" className="h-4 w-4" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-sm font-semibold text-white">{item.label}</span>
-            {item.kind === "search" ? (
-              <span className="shrink-0 rounded-md border border-white/8 bg-white/[0.04] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] text-white/35">
-                Search
-              </span>
-            ) : null}
-          </span>
-          <span className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--omnix-text-2)]">
-            {item.description}
-          </span>
-        </span>
-        <ArrowUpRight aria-hidden="true" className="h-4 w-4 shrink-0 text-white/25 transition group-hover:text-cyan-100/70" />
-      </button>
+        onActiveChange={() => setActiveIndex(index)}
+        onActivate={() => selectItem(item)}
+      />
     );
   }
 
@@ -572,10 +327,7 @@ export function CommandPalette() {
     <>
       <button
         type="button"
-        onClick={() => {
-          setOpen(true);
-          setQuery("");
-        }}
+        onClick={openPalette}
         className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-[var(--omnix-rgba-0-255-255-0-1)] bg-[var(--omnix-rgba-0-255-255-0-04)] text-[var(--omnix-text-2)] transition hover:border-[var(--omnix-rgba-0-255-255-0-3)] hover:bg-[var(--omnix-rgba-0-255-255-0-08)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55 md:hidden"
         aria-label="Open command palette"
         title="Open command palette"
@@ -584,10 +336,7 @@ export function CommandPalette() {
       </button>
       <button
         type="button"
-        onClick={() => {
-          setOpen(true);
-          setQuery("");
-        }}
+        onClick={openPalette}
         className="hidden h-11 w-[17rem] items-center gap-3 rounded-[10px] border border-cyan-300/10 bg-black/20 px-3 text-left text-sm text-white/45 transition hover:border-cyan-300/25 hover:bg-black/30 hover:text-white/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55 md:inline-flex lg:w-[22rem] xl:w-[28rem]"
         aria-label="Open command palette"
       >
@@ -627,7 +376,7 @@ export function CommandPalette() {
                   </div>
                   <button
                     type="button"
-                    onClick={closePalette}
+                    onClick={() => closePalette()}
                     title="Close command palette"
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03] text-white/55 hover:bg-white/[0.06] hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/55"
                     aria-label="Close command palette"
@@ -645,6 +394,7 @@ export function CommandPalette() {
                     onChange={(event) => setQuery(event.target.value.slice(0, 120))}
                     placeholder="Type a task, decision, page, or command…"
                     aria-label="Search Omnix commands and workspace results"
+                    aria-describedby="omnix-command-palette-status"
                     autoComplete="off"
                     className="h-12 w-full rounded-xl border border-cyan-300/12 bg-black/25 pl-9 pr-11 text-base text-white outline-none placeholder:text-white/25 focus:border-cyan-300/35 focus:shadow-[var(--omnix-glow-xs)] focus-visible:ring-2 focus-visible:ring-cyan-300/45"
                   />
@@ -660,6 +410,15 @@ export function CommandPalette() {
                       <X aria-hidden="true" className="h-4 w-4" />
                     </button>
                   ) : null}
+                  <p
+                    id="omnix-command-palette-status"
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    className="sr-only"
+                  >
+                    {statusMessage}
+                  </p>
                 </div>
               </div>
 

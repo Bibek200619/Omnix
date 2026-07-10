@@ -214,10 +214,10 @@ async def test_file_upload_ingestion_rag_chat_and_decision_extraction(monkeypatc
         workspace_id=workspace_id,
         replace_existing=True,
     )
-    state["files"][0]["processing_status"] = "chunked"
+    state["files"][0]["processing_status"] = "searchable"
     state["files"][0]["metadata"].update(
         {
-            "processing_status": "chunked",
+            "processing_status": "searchable",
             "text_chunk_count": stored_chunks.chunk_count,
             "text_chunks_truncated": stored_chunks.truncated,
         }

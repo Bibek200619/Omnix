@@ -11,6 +11,7 @@ import { useWorkspaceMembership } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { 
   WorkspaceDecision, 
+  WorkspaceDecisionSourceType,
   WorkspaceDecisionStatus, 
   WorkspaceInitiative, 
   WorkspaceMentionMetadata,
@@ -26,6 +27,8 @@ interface CreateDecisionModalProps {
     reason?: string;
     description?: string;
     status?: WorkspaceDecisionStatus;
+    source_type?: WorkspaceDecisionSourceType;
+    source_id?: string;
   };
 }
 
@@ -91,6 +94,8 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
           decision_reason: reason.trim(),
           description: description.trim() || null,
           status,
+          source_type: initialValues?.source_type ?? null,
+          source_id: initialValues?.source_id ?? null,
           mentions: mentionPayload(mentions, `${reason}\n${description}`),
         }
       );

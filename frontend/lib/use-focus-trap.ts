@@ -1,23 +1,43 @@
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef, type RefObject } from "react";
 
 const focusableSelector =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
-export function useFocusTrap<T extends HTMLElement = HTMLElement>(active: boolean) {
+export function useFocusTrap<T extends HTMLElement = HTMLElement>(
+  active: boolean,
+  initialFocusRef?: RefObject<HTMLElement | null>,
+) {
   const containerRef = useRef<T>(null);
 
-  useEffect(() => {
-    if (!active || !containerRef.current) return;
+  useLayoutEffect(() => {
+    if (!active) return;
 
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const focusable = containerRef.current.querySelectorAll<HTMLElement>(focusableSelector);
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
+    let focusFrame: number | null = null;
 
-    first?.focus();
+    const focusInitialElement = () => {
+      const container = containerRef.current;
+      if (!container || (initialFocusRef && !initialFocusRef.current)) {
+        focusFrame = window.requestAnimationFrame(focusInitialElement);
+        return;
+      }
+      const preferred = initialFocusRef?.current;
+      const first = preferred && container.contains(preferred)
+        ? preferred
+        : container.querySelector<HTMLElement>(focusableSelector);
+
+      first?.focus({ preventScroll: true });
+    };
+    focusInitialElement();
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== "Tab") return;
+      const container = containerRef.current;
+      if (!container) return;
+      const focusable = container.querySelectorAll<HTMLElement>(focusableSelector);
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
       if (!first || !last) {
         event.preventDefault();
         return;
@@ -36,10 +56,13 @@ export function useFocusTrap<T extends HTMLElement = HTMLElement>(active: boolea
 
     document.addEventListener("keydown", handleKeyDown);
     return () => {
+      if (focusFrame !== null) {
+        window.cancelAnimationFrame(focusFrame);
+      }
       document.removeEventListener("keydown", handleKeyDown);
-      previouslyFocused?.focus();
+      previouslyFocused?.focus({ preventScroll: true });
     };
-  }, [active]);
+  }, [active, initialFocusRef]);
 
   return containerRef;
 }

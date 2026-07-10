@@ -225,6 +225,20 @@ export type WorkspaceInitiativeMomentum = {
   last_movement_at?: string | null;
 };
 
+export type WorkspaceInitiativeProvenanceSummary = {
+  origin: string;
+  has_context: boolean;
+  has_provenance: boolean;
+  needs_repair: boolean;
+  missing: string[];
+  source_types: string[];
+  task_count: number;
+  decision_count: number;
+  conversation_count: number;
+  resource_count: number;
+  summary: string;
+};
+
 export type WorkspaceInitiative = {
   id: string;
   workspace_id: string;
@@ -255,6 +269,7 @@ export type WorkspaceInitiative = {
     created_at?: string | null;
   }>;
   momentum: WorkspaceInitiativeMomentum;
+  provenance_summary?: WorkspaceInitiativeProvenanceSummary;
 };
 
 export type WorkspaceInitiativeAssistance = {
@@ -462,6 +477,7 @@ export type WorkspaceTaskAssistance = {
 };
 
 export type WorkspaceDecisionStatus = "proposed" | "accepted" | "rejected" | "superseded";
+export type WorkspaceDecisionSourceType = "conversation" | "conversation_message" | "document";
 
 export type WorkspaceDecision = {
   id: string;
@@ -470,6 +486,8 @@ export type WorkspaceDecision = {
   description?: string | null;
   decision_reason?: string | null;
   status: WorkspaceDecisionStatus;
+  source_type?: WorkspaceDecisionSourceType | null;
+  source_id?: string | null;
   source_message_id?: string | null;
   source_channel_id?: string | null;
   initiative_id?: string | null;
