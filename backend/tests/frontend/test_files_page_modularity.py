@@ -8,6 +8,8 @@ FILES_PAGE = FRONTEND_ROOT / "app" / "(dashboard)" / "files" / "page.tsx"
 FILES_MODEL = FRONTEND_ROOT / "components" / "files" / "filesPageModel.ts"
 CONNECTOR_SETUP_MODAL = FRONTEND_ROOT / "components" / "files" / "ConnectorSetupModal.tsx"
 DOCUMENT_PORTAL = FRONTEND_ROOT / "components" / "files" / "DocumentPortal.tsx"
+CHAT_TYPES = FRONTEND_ROOT / "components" / "chat" / "types.ts"
+SOURCE_HEALTH_CONSOLE = FRONTEND_ROOT / "components" / "files" / "SourceHealthConsole.tsx"
 
 
 def test_files_page_delegates_pure_model_helpers() -> None:
@@ -42,3 +44,17 @@ def test_files_page_stays_below_reviewable_size_threshold() -> None:
     assert len(page_lines) <= 900
     assert len(model_lines) <= 450
     assert len(modal_lines) <= 350
+
+
+def test_file_processing_states_distinguish_indexing_from_partial_searchability() -> None:
+    model = FILES_MODEL.read_text(encoding="utf-8")
+    chat_types = CHAT_TYPES.read_text(encoding="utf-8")
+    source_health = SOURCE_HEALTH_CONSOLE.read_text(encoding="utf-8")
+
+    for status in ("extracting", "chunking", "embedding", "partially_searchable", "ocr_running"):
+        assert f'"{status}"' in model
+        assert f'"{status}"' in chat_types
+
+    assert "function isFileIngestionStatus" in model
+    assert "vector indexing is incomplete" in model
+    assert '"partially_searchable"' in source_health

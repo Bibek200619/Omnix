@@ -22,11 +22,10 @@ from ..rag.ingestion import RAGIngestionPipeline
 
 logger = logging.getLogger(__name__)
 
-
-def _searchable_processing_status(diagnostics: ExtractionDiagnostics, *, chunks_truncated: bool = False) -> str:
-    if chunks_truncated:
-        return "partially_searchable"
-    return "searchable"
+_PARTIAL_INDEXING_ERROR = (
+    "Text extraction succeeded, but vector indexing is temporarily unavailable. "
+    "The source is only partially searchable and will be retried."
+)
 
 
 def _unsearchable_processing_status(diagnostics: ExtractionDiagnostics) -> str:
@@ -178,6 +177,15 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
                 "chunks": [],
             }
 
+        file_row = await _update_file_processing_state(
+            file_id,
+            file_row,
+            user_id=user_id,
+            workspace_id=workspace_id,
+            processing_status="chunking",
+            metadata_updates=metadata,
+            diagnostics_payload=extraction_columns_payload(diagnostics),
+        )
         stored_chunks = await store_extracted_text_chunks(
             file_id=file_id,
             user_id=user_id,
@@ -185,17 +193,17 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
             workspace_id=workspace_id,
             replace_existing=True,
         )
-        processing_status = _searchable_processing_status(diagnostics, chunks_truncated=stored_chunks.truncated)
         file_row = await _update_file_processing_state(
             file_id,
             file_row,
             user_id=user_id,
             workspace_id=workspace_id,
-            processing_status=processing_status,
+            processing_status="embedding",
             metadata_updates={
                 **metadata,
                 "text_chunk_count": stored_chunks.chunk_count,
                 "text_chunks_truncated": stored_chunks.truncated,
+                "vector_index_status": "pending",
             },
             diagnostics_payload=extraction_columns_payload(diagnostics),
         )
@@ -240,6 +248,29 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
             logger.info("Ingestion produced %d chunks for file %s", num, file_id)
         except Exception:
             logger.exception("Ingestion pipeline failed for file %s", file_id)
+            if stored_chunks.chunk_count:
+                await _update_file_processing_state(
+                    file_id,
+                    file_row,
+                    user_id=user_id,
+                    workspace_id=workspace_id,
+                    processing_status="partially_searchable",
+                    processing_error=_PARTIAL_INDEXING_ERROR,
+                    metadata_updates={
+                        "text_chunk_count": stored_chunks.chunk_count,
+                        "text_chunks_truncated": stored_chunks.truncated,
+                        "embedded_chunk_count": 0,
+                        "embedded_chunk_ids": [],
+                        "vector_index_status": "failed",
+                    },
+                    diagnostics_payload=extraction_columns_payload(diagnostics),
+                )
+                return {
+                    "status": "failed",
+                    "processing_status": "partially_searchable",
+                    "error": _PARTIAL_INDEXING_ERROR,
+                    "chunks": stored_chunks.chunk_ids,
+                }
             raise
 
         await _update_file_processing_state(
@@ -247,15 +278,16 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
             file_row,
             user_id=user_id,
             workspace_id=workspace_id,
-            processing_status=processing_status,
+            processing_status="searchable",
             metadata_updates={
                 "embedded_chunk_count": num,
                 "embedded_chunk_ids": chunk_ids[:20],
+                "vector_index_status": "ready",
             },
         )
 
         # Mark job succeeded
-        return {"status": "completed", "processing_status": processing_status, "chunks": chunk_ids}
+        return {"status": "completed", "processing_status": "searchable", "chunks": chunk_ids}
     except Exception as exc:
         logger.exception("handle_ingest_file failed: %s", exc)
         if file_id and user_id is not None:

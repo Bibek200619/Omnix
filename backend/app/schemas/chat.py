@@ -14,6 +14,8 @@ FileProcessingStatus = Literal[
     "uploaded",
     "queued",
     "extracting",
+    "chunking",
+    "embedding",
     "ocr_required",
     "ocr_running",
     "searchable",
