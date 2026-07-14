@@ -31,11 +31,11 @@ export function SourceHealthConsole({
   onRetryConnector,
 }: SourceHealthConsoleProps) {
   const searchableCount = statusCount(files, ["searchable", "embedded", "ocr_complete"]);
-  const activeCount = statusCount(files, ["uploaded", "queued", "processing", "extracted", "chunked"]);
-  const failedFiles = files.filter((file) => ["failed", "extraction_failed", "ocr_required"].includes(fileIngestionStatus(file)));
+  const activeCount = statusCount(files, ["uploaded", "queued", "processing", "extracting", "extracted", "chunking", "chunked", "embedding", "ocr_running"]);
+  const attentionFiles = files.filter((file) => ["failed", "extraction_failed", "ocr_required", "partially_searchable"].includes(fileIngestionStatus(file)));
   const failedConnectors = connectors.filter((connector) => connector.status === "failed" || connector.status === "needs_authentication");
   const healthyConnectorCount = connectors.filter((connector) => connector.status === "live" || connector.status === "connected").length;
-  const needsAttention = failedFiles.length + failedConnectors.length;
+  const needsAttention = attentionFiles.length + failedConnectors.length;
 
   return (
     <section className="omnix-cinematic-card p-5" data-source-health-console>
@@ -75,7 +75,7 @@ export function SourceHealthConsole({
 
       {needsAttention ? (
         <div className="relative z-10 mt-4 grid gap-2">
-          {failedFiles.slice(0, 3).map((file) => {
+          {attentionFiles.slice(0, 3).map((file) => {
             const status = fileIngestionStatus(file);
             return (
               <div key={file.id} className="flex flex-col gap-2 rounded-xl border border-white/[0.06] bg-black/15 p-3 sm:flex-row sm:items-center sm:justify-between">

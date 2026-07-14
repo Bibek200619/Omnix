@@ -99,7 +99,7 @@ async def test_ingest_file_updates_processing_statuses(monkeypatch: pytest.Monke
 
     assert result["status"] == "completed"
     assert result["processing_status"] == "searchable"
-    assert statuses == ["extracting", "searchable", "searchable"]
+    assert statuses == ["extracting", "chunking", "embedding", "searchable"]
     assert file_row["processing_status"] == "searchable"
     assert file_row["metadata"]["text_chunk_count"] == 1
     assert file_row["metadata"]["embedded_chunk_count"] == 1
@@ -271,7 +271,7 @@ async def test_ingest_file_exposes_ocr_running_before_success(monkeypatch: pytes
 
     assert result["status"] == "completed"
     assert result["processing_status"] == "searchable"
-    assert statuses == ["extracting", "ocr_running", "searchable", "searchable"]
+    assert statuses == ["extracting", "ocr_running", "chunking", "embedding", "searchable"]
 
 
 @pytest.mark.asyncio
