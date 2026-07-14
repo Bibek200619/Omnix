@@ -16,6 +16,7 @@ _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]+")
 DEFAULT_UPLOAD_DIR = "./uploads"
 DEFAULT_STORAGE_BUCKET = "omnix-files"
+_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 
 
 class StorageError(RuntimeError):
@@ -38,6 +39,18 @@ def upload_root(root: str | os.PathLike[str] | None = None) -> Path:
 
 def storage_backend_name() -> str:
     return os.environ.get("OMNIX_FILE_STORAGE_BACKEND", "local").strip().lower() or "local"
+
+
+def storage_is_shared() -> bool:
+    """Return whether the configured storage is visible to every worker replica.
+
+    Supabase storage is inherently shared. Local storage requires an explicit
+    deployment declaration because a container-local upload directory is not
+    visible to a separately scheduled worker.
+    """
+    if storage_backend_name() == "supabase":
+        return True
+    return os.environ.get("OMNIX_FILE_STORAGE_SHARED", "").strip().lower() in _TRUE_VALUES
 
 
 def sanitize_filename(filename: str | None, *, fallback: str = "unnamed") -> str:

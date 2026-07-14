@@ -20,10 +20,14 @@ services:
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--proxy-headers"]
     environment:
       OMNIX_ROLE: api
+      OMNIX_UPLOAD_DIR: /app/uploads
+      OMNIX_FILE_STORAGE_SHARED: "true"
     env_file:
       - .env.production
     expose:
       - "8000"
+    volumes:
+      - omnix_uploads:/app/uploads
     networks:
       - omnix-network
     healthcheck:
@@ -41,12 +45,16 @@ services:
     command: ["python", "-m", "app.jobs.worker"]
     environment:
       OMNIX_ROLE: ingestion_worker
+      OMNIX_UPLOAD_DIR: /app/uploads
+      OMNIX_FILE_STORAGE_SHARED: "true"
     env_file:
       - .env.production
     depends_on:
       backend:
         condition: service_healthy
     restart: on-failure
+    volumes:
+      - omnix_uploads:/app/uploads
     networks:
       - omnix-network
 
@@ -70,3 +78,6 @@ services:
 networks:
   omnix-network:
     driver: bridge
+
+volumes:
+  omnix_uploads:

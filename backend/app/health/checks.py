@@ -86,7 +86,7 @@ def _nearest_existing_path(path: Path) -> Path:
 
 
 async def check_file_storage() -> Dict[str, Any]:
-    from ..services.file_storage import storage_backend_name, upload_root
+    from ..services.file_storage import storage_backend_name, storage_is_shared, upload_root
 
     backend = storage_backend_name()
     if backend == "local":
@@ -105,13 +105,22 @@ async def check_file_storage() -> Dict[str, Any]:
                 "reason": "upload_path_not_writable",
             }
 
-        production = str(getattr(get_settings(), "ENV", "")).strip().lower() == "production"
+        production = str(getattr(get_settings(), "ENV", "")).strip().lower() in {"prod", "production"}
+        shared = storage_is_shared()
+        if production and not shared:
+            return {
+                "status": "failed",
+                "backend": backend,
+                "shared": False,
+                "root_exists": root.exists(),
+                "reason": "local_storage_not_shared",
+            }
         return {
-            "status": "warning" if production else "healthy",
+            "status": "healthy",
             "backend": backend,
-            "shared": False,
+            "shared": shared,
             "root_exists": root.exists(),
-            "reason": "local_storage_not_shared" if production else None,
+            "reason": None,
         }
 
     if backend == "supabase":
@@ -376,6 +385,7 @@ async def run_all_checks(*, include_internal: bool = True) -> Dict[str, Any]:
         check_redis(),
         check_chat_providers(),
         check_ingestion_worker(include_stuck_jobs=include_internal),
+        check_file_storage(),
         return_exceptions=True,
     )
 
@@ -386,6 +396,7 @@ async def run_all_checks(*, include_internal: bool = True) -> Dict[str, Any]:
         "redis": results[3] if not isinstance(results[3], Exception) else {"status": "error", "error": str(results[3])},
         "ollama": results[4] if not isinstance(results[4], Exception) else {"status": "error", "error": str(results[4])},
         "ingestion_worker": results[5] if not isinstance(results[5], Exception) else {"status": "error", "error": str(results[5])},
+        "file_storage": results[6] if not isinstance(results[6], Exception) else {"status": "error", "error": str(results[6])},
     }
 
 
