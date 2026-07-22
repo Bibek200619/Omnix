@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm run backend\" \"npm run frontend\""
   },
   "devDependencies": {
-    "concurrently": "^9.0.0",
+    "concurrently": "^9.2.4",
     "supabase": "^2.107.0"
   },
   "dependencies": {
