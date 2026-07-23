@@ -6,7 +6,7 @@ import os
 from collections.abc import Iterable
 from typing import Any
 
-from .queue import get_redis, recover_missing_queued_jobs
+from .queue import get_redis, queue_name_for_payload, recover_missing_queued_jobs, worker_queue_name
 from .ingestion_jobs import handle_ingest_file
 from .automation_jobs import handle_run_automation
 from ..services.supabase_service import update_one_trusted, select_one_trusted
@@ -24,6 +24,8 @@ _DEFAULT_REDIS_OPERATION_TIMEOUT_SECONDS = 7.0
 _DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 30.0
 _DEFAULT_MAX_JOB_ATTEMPTS = 3
 _DEFAULT_QUEUE_RECOVERY_INTERVAL_SECONDS = 60.0
+_DEFAULT_OCR_WORKER_CONCURRENCY = 1
+_DEFAULT_OCR_JOB_TIMEOUT_SECONDS = 30 * 60
 
 
 def _env_int(name: str, default: int, *, minimum: int = 1) -> int:
@@ -60,9 +62,29 @@ def _max_job_attempts() -> int:
     return _env_int("OMNIX_JOB_MAX_ATTEMPTS", _DEFAULT_MAX_JOB_ATTEMPTS)
 
 
+def _is_ocr_worker() -> bool:
+    return os.environ.get("OMNIX_ROLE") == "ocr_worker"
+
+
+def _worker_id() -> str:
+    return os.environ.get("OMNIX_WORKER_ID", _WORKER_ID)
+
+
+def _worker_concurrency() -> int:
+    if _is_ocr_worker():
+        return _env_int("OMNIX_OCR_WORKER_CONCURRENCY", _DEFAULT_OCR_WORKER_CONCURRENCY)
+    return _env_int("OMNIX_WORKER_CONCURRENCY", _DEFAULT_WORKER_CONCURRENCY)
+
+
+def _job_timeout_seconds() -> float:
+    if _is_ocr_worker():
+        return _env_float("OMNIX_OCR_JOB_TIMEOUT_SECONDS", _DEFAULT_OCR_JOB_TIMEOUT_SECONDS)
+    return _env_float("OMNIX_JOB_TIMEOUT_SECONDS", _DEFAULT_JOB_TIMEOUT_SECONDS)
+
+
 async def _push_retry_job(job_id: str, *, queue_name: str | None = None) -> None:
     redis = get_redis()
-    await redis.lpush(queue_name or os.environ.get("OMNIX_JOB_QUEUE", "omnix:jobs"), job_id)
+    await redis.lpush(queue_name or worker_queue_name(), job_id)
 
 
 async def _recover_missing_queued_jobs_once(queue_name: str) -> dict[str, Any] | None:
@@ -110,7 +132,7 @@ async def _retry_or_dead_letter_job(
         }
         await update_one_trusted("jobs", {"id": job_id}, retry_payload)
         try:
-            await _push_retry_job(job_id)
+            await _push_retry_job(job_id, queue_name=queue_name_for_payload(job_row.get("payload")))
         except Exception:
             logger.exception(
                 "Failed to push retry for job %s to Redis; DB row remains queued for recovery.",
@@ -143,7 +165,7 @@ async def _retry_or_dead_letter_job(
 async def _process_job(job_id: str):
     """Fetch job row, mark processing, run handler, update result."""
     runtime = RuntimeManager.get()
-    runtime.record_job_started(_WORKER_ID)
+    runtime.record_job_started(_worker_id())
     success = False
     try:
         job_row = await select_one_trusted("jobs", "*", {"id": job_id})
@@ -206,7 +228,7 @@ async def _process_job(job_id: str):
         except Exception:
             logger.exception("Failed to update job row for job %s after exception", job_id)
     finally:
-        runtime.record_job_completed(_WORKER_ID, success=success)
+        runtime.record_job_completed(_worker_id(), success=success)
 
 
 async def _process_job_with_timeout(job_id: str, *, timeout_seconds: float) -> None:
@@ -287,9 +309,9 @@ async def _worker_loop(shutdown_event: asyncio.Event):
     # Connect to Redis
     try:
         redis = get_redis()
-        queue_name = os.environ.get("OMNIX_JOB_QUEUE", "omnix:jobs")
-        concurrency = _env_int("OMNIX_WORKER_CONCURRENCY", _DEFAULT_WORKER_CONCURRENCY)
-        job_timeout_seconds = _env_float("OMNIX_JOB_TIMEOUT_SECONDS", _DEFAULT_JOB_TIMEOUT_SECONDS)
+        queue_name = worker_queue_name()
+        concurrency = _worker_concurrency()
+        job_timeout_seconds = _job_timeout_seconds()
         poll_timeout_seconds = _env_float("OMNIX_WORKER_POLL_TIMEOUT_SECONDS", _DEFAULT_POLL_TIMEOUT_SECONDS)
         redis_operation_timeout_seconds = max(
             poll_timeout_seconds + 1.0,
@@ -314,7 +336,10 @@ async def _worker_loop(shutdown_event: asyncio.Event):
         return
 
     # Register with RuntimeManager
-    runtime.register_worker(_WORKER_ID, capabilities=["ingest_file", "run_automation", "reembed_batch"], worker_type="ingestion")
+    capabilities = ["ingest_file", "run_automation", "reembed_batch"]
+    if _is_ocr_worker():
+        capabilities.append("ocr")
+    runtime.register_worker(_worker_id(), capabilities=capabilities, worker_type="ingestion")
     runtime.set_status("running")
 
     semaphore = asyncio.Semaphore(concurrency)

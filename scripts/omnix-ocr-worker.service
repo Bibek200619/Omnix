@@ -1,0 +1,20 @@
+[Unit]
+Description=Omnix bounded OCR worker
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Omnix/backend
+Environment=OMNIX_ROLE=ocr_worker
+Environment=OMNIX_WORKER_ID=ocr_worker_main
+EnvironmentFile=/home/ubuntu/Omnix/.env.production
+ExecStart=/home/ubuntu/Omnix/backend/venv/bin/python -m app.jobs.worker
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=omnix-ocr-worker
+
+[Install]
+WantedBy=multi-user.target

@@ -86,6 +86,7 @@ async def test_upload_returns_queued_state_without_document_extraction(monkeypat
             "file_id": "file-1",
             "user_id": "user-1",
             "workspace_id": "workspace-1",
+            "_queue": "omnix:jobs",
         }
     ]
 
