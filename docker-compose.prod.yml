@@ -58,6 +58,28 @@ services:
     networks:
       - omnix-network
 
+  # Dedicated, bounded PDF/OCR capacity. The worker role selects OMNIX_OCR_JOB_QUEUE.
+  ocr-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    command: ["python", "-m", "app.jobs.worker"]
+    environment:
+      OMNIX_ROLE: ocr_worker
+      OMNIX_WORKER_ID: ocr_worker_main
+      OMNIX_UPLOAD_DIR: /app/uploads
+      OMNIX_FILE_STORAGE_SHARED: "true"
+    env_file:
+      - .env.production
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: on-failure
+    volumes:
+      - omnix_uploads:/app/uploads
+    networks:
+      - omnix-network
+
   # Automation scheduler: runs periodic workspace automations (presence cleanup, etc.)
   automation-scheduler:
     build:

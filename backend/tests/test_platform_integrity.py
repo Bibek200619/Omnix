@@ -204,6 +204,7 @@ async def test_file_upload_ingestion_rag_chat_and_decision_extraction(monkeypatc
             "file_id": "file-platform",
             "user_id": user_id,
             "workspace_id": workspace_id,
+            "_queue": "omnix:jobs",
         }
     ]
 
