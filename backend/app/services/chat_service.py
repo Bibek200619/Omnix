@@ -10,6 +10,7 @@ import httpx
 from fastapi import status
 
 from ..core.config import get_settings
+from .prompt_trust import append_untrusted_content_policy
 from ..observability.safe_logging import allow_sensitive_logging, safe_text_preview
 from ..rag.token_utils import count_tokens, tail_tokens
 
@@ -112,7 +113,7 @@ class OllamaChatService:
         system_prompt: str | None = None,
     ) -> list[dict[str, str]]:
         messages: list[AIMessage] = []
-        effective_system_prompt = (system_prompt or self.system_prompt).strip()
+        effective_system_prompt = append_untrusted_content_policy(system_prompt or self.system_prompt)
         if effective_system_prompt:
             messages.append(AIMessage(role="system", content=effective_system_prompt))
 

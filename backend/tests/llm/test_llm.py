@@ -15,6 +15,7 @@ os.environ["AI_MAX_CONTEXT_MESSAGES"] = "4"
 from app.routers import messages as messages_router
 from app.schemas.chat import AIGenerationResponse
 from app.services import chat_service
+from app.services.prompt_trust import TRUST_BOUNDARY_MARKER
 from app.services.chat_service import AIMessage, AIGeneration, OllamaChatService, ProviderManager
 
 
@@ -39,6 +40,27 @@ def test_build_payload_uses_phi3_and_preserves_context():
         "content": "The workspace was updated.",
     }
     assert payload["messages"][-1] == {"role": "user", "content": "What changed?"}
+
+
+def test_build_payload_adds_untrusted_content_policy_once():
+    service = OllamaChatService()
+
+    payload = service._build_payload(
+        "What changed?",
+        system_prompt="You are the workspace assistant.",
+    )
+    system_content = payload["messages"][0]["content"]
+
+    assert "You are the workspace assistant." in system_content
+    assert TRUST_BOUNDARY_MARKER in system_content
+    assert system_content.count(TRUST_BOUNDARY_MARKER) == 1
+
+    payload = service._build_payload(
+        "What changed?",
+        system_prompt=system_content,
+    )
+
+    assert payload["messages"][0]["content"].count(TRUST_BOUNDARY_MARKER) == 1
 
 
 def test_build_payload_limits_history_to_recent_messages():

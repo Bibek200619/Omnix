@@ -8,6 +8,7 @@ os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "service")
 
 from backend.app.retrieval.context_builder import ContextBuilder, ContextSupplement
 from backend.app.settings import get_settings
+from backend.app.services.prompt_trust import BEGIN_UNTRUSTED_SOURCE_DATA
 from backend.app.services.chat_service import OllamaChatService
 from backend.app.services.query_classifier import classify_search_need
 from backend.app.services.web_search import TavilySearchService
@@ -56,6 +57,9 @@ def test_context_builder_accepts_web_supplements() -> None:
     )
 
     assert "WEB SEARCH RESULTS" in built.prompt
+    assert BEGIN_UNTRUSTED_SOURCE_DATA in built.prompt
+    assert '"classification": "untrusted_data"' in built.prompt
+    assert '"kind": "web_result"' in built.prompt
     assert "\n\nDOCUMENT CONTEXT:" not in built.prompt
     assert "Live web context" in built.prompt
     assert built.sources[0]["type"] == "web"
