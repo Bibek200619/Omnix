@@ -160,7 +160,6 @@ def test_app_shell_delegates_dashboard_provider_stack() -> None:
     assert "WorkspaceProvider" not in app_shell
     assert "WorkspaceCollaborationProvider" not in app_shell
     assert "WorkspaceNotificationsProvider" not in app_shell
-    assert "WorkspaceContinuityProvider" not in app_shell
     assert "ConversationHistoryProvider" not in app_shell
     assert "dynamic(" not in app_shell
 
@@ -168,7 +167,6 @@ def test_app_shell_delegates_dashboard_provider_stack() -> None:
         "<WorkspaceProvider>",
         "<WorkspaceCollaborationProvider>",
         "<WorkspaceNotificationsProvider>",
-        "<WorkspaceContinuityProvider>",
         "<ProfileProvider>",
         "<ConversationHistoryProvider>",
         "<WorkspaceOnboardingGate>",
@@ -176,6 +174,22 @@ def test_app_shell_delegates_dashboard_provider_stack() -> None:
     positions = [providers.index(item) for item in provider_order]
     assert positions == sorted(positions)
     assert "ssr: false" in providers
+
+
+def test_workspace_continuity_is_scoped_to_its_only_consumer() -> None:
+    providers = read_frontend("components/layout/DashboardProviders.tsx")
+    workspace_page = read_frontend("app/(dashboard)/workspace/page.tsx")
+    continuity = read_frontend("lib/workspace-continuity-context.tsx")
+
+    assert "WorkspaceContinuityProvider" not in providers
+    assert "WorkspaceContinuityProvider, useWorkspaceContinuity" in workspace_page
+    assert "<WorkspaceContinuityProvider>" in workspace_page
+    assert "</WorkspaceContinuityProvider>" in workspace_page
+    assert "useWorkspaceContinuity()" in workspace_page
+    assert "useWorkspaceTree" in continuity
+    assert "/initiatives" in continuity
+    assert "/timeline" in continuity
+    assert "/continuity/unresolved" in continuity
 
 
 def test_app_shell_mobile_layout_does_not_lock_document_scroll() -> None:

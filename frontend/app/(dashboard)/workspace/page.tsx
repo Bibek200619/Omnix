@@ -36,7 +36,7 @@ import { WorkspaceActivityFeed } from "@/components/workspace/WorkspaceActivityF
 import { WorkspaceOperationalTimeline } from "@/components/workspace/WorkspaceOperationalTimeline";
 import { logClientError } from "@/lib/errors";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
-import { useWorkspaceContinuity } from "@/lib/workspace-continuity-context";
+import { WorkspaceContinuityProvider, useWorkspaceContinuity } from "@/lib/workspace-continuity-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import {
@@ -104,9 +104,11 @@ function selectedWorkspace(workspaces: Workspace[], selectedId: string | null, f
 
 export default function WorkspacePage() {
   return (
-    <Suspense fallback={<PageSkeleton />}>
-      <WorkspacePageContent />
-    </Suspense>
+    <WorkspaceContinuityProvider>
+      <Suspense fallback={<PageSkeleton />}>
+        <WorkspacePageContent />
+      </Suspense>
+    </WorkspaceContinuityProvider>
   );
 }
 
