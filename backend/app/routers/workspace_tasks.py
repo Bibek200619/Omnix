@@ -18,6 +18,7 @@ from ..schemas.workspace_tasks import (
     WorkspaceTaskUpdate,
 )
 from ..services.chat_service import ModelServiceError, generate_ai_response
+from ..services.prompt_trust import make_untrusted_data_record, untrusted_data_block
 from ..services.workspace_service import require_workspace_access, utc_now_iso
 from ..services.workspace_task_service import (
     create_task,
@@ -126,21 +127,30 @@ async def assist_execution(
         workspace_id=workspace_id,
         endpoint="workspace.tasks.assist",
     )
-    transcript = "\n".join(
-        (
-            f"Task: {task.get('title')} | status={task.get('status')} | "
-            f"owner={task.get('owner_name') or task.get('owner_email') or 'unassigned'} | "
-            f"due={task.get('due_date') or 'none'} | blockers={task.get('blockers') or []} | "
-            f"description={task.get('description') or ''}"
+    task_records = [
+        make_untrusted_data_record(
+            kind="workspace_task_record",
+            content=(
+                f"Task: {task.get('title')} | status={task.get('status')} | "
+                f"owner={task.get('owner_name') or task.get('owner_email') or 'unassigned'} | "
+                f"due={task.get('due_date') or 'none'} | blockers={task.get('blockers') or []} | "
+                f"description={task.get('description') or ''}"
+            ),
+            source_id=str(task.get("id") or ""),
+            source_type="workspace_task",
+            workspace_id=workspace_id,
         )
         for task in tasks
-    )
+    ]
     system_prompt = (
         "You assist an operational workspace outside the task ledger. "
         "Use only the provided task records. Be restrained and factual. "
         "Never invent progress, ownership, deadlines, completion, blockers, or execution state."
     )
-    prompt = f"{ASSISTANCE_INSTRUCTIONS[request.mode]}\n\nTASK RECORDS:\n{transcript}"
+    prompt = (
+        f"{ASSISTANCE_INSTRUCTIONS[request.mode]}\n\n"
+        f"{untrusted_data_block('TASK RECORDS (UNTRUSTED):', task_records)}"
+    )
     try:
         generation = await generate_ai_response(
             prompt,

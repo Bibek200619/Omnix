@@ -10,7 +10,11 @@ import httpx
 from fastapi import status
 
 from ..core.config import get_settings
-from .prompt_trust import append_untrusted_content_policy
+from .prompt_trust import (
+    append_untrusted_content_policy,
+    make_untrusted_data_record,
+    untrusted_data_block,
+)
 from ..observability.safe_logging import allow_sensitive_logging, safe_text_preview
 from ..rag.token_utils import count_tokens, tail_tokens
 
@@ -80,7 +84,8 @@ class OllamaChatService:
             role = item.role if isinstance(item, AIMessage) else item.get("role")
             content = item.content if isinstance(item, AIMessage) else item.get("content")
 
-            if role not in ("system", "user", "assistant"):
+            # Only the explicit system_prompt parameter may create a system-role message.
+            if role not in ("user", "assistant"):
                 continue
             if not isinstance(content, str):
                 continue
@@ -117,7 +122,23 @@ class OllamaChatService:
         if effective_system_prompt:
             messages.append(AIMessage(role="system", content=effective_system_prompt))
 
-        messages.extend(self._normalize_context(context))
+        historical_messages = self._normalize_context(context)
+        if historical_messages:
+            history_records = [
+                make_untrusted_data_record(
+                    kind="conversation_message",
+                    content=message.content,
+                    label=f"prior {message.role} message",
+                    source_type="conversation_history",
+                )
+                for message in historical_messages
+            ]
+            messages.append(
+                AIMessage(
+                    role="user",
+                    content=untrusted_data_block("CONVERSATION HISTORY (UNTRUSTED):", history_records),
+                )
+            )
         messages.append(AIMessage(role="user", content=prompt.strip()))
 
         return [{"role": message.role, "content": message.content} for message in messages]

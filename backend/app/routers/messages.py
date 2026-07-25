@@ -23,6 +23,7 @@ from ..services.chat_service import (
 )
 from ..services.document_context_service import build_uploaded_document_context, find_unavailable_uploaded_documents
 from ..services.distributed_rate_limit import RateLimitExceeded, RateLimitUnavailable, enforce_rate_limit
+from ..services.prompt_trust import untrusted_user_request_block
 from ..services.query_classifier import SearchDecision, SearchMode, classify_search_need
 from ..services.supabase_service import (
     SupabaseServiceError,
@@ -537,7 +538,7 @@ async def generate_ai(
 
     try:
         generation = await generate_ai_response(
-            payload.prompt,
+            untrusted_user_request_block(payload.prompt),
             context=policy["context"],
             system_prompt=None,
             temperature=policy["temperature"],

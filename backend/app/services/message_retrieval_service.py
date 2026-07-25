@@ -7,6 +7,7 @@ from typing import Any
 
 from ..observability.safe_logging import safe_text_preview
 from .document_context_service import build_uploaded_document_context, find_unavailable_uploaded_documents
+from .prompt_trust import untrusted_user_request_block
 from .query_classifier import SearchDecision, SearchMode, classify_search_need
 from .supabase_service import select_all, select_all_trusted
 from .web_search import WebSearchResponse, get_web_search_service
@@ -209,7 +210,7 @@ async def retrieve_prompt_context(
     has_retrievable_documents_fn: HasRetrievableDocumentsFn | None = None,
     document_unavailable_answer_fn: Callable[[list[dict[str, Any]]], str] = document_unavailable_answer,
 ) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
-    prompt_message = message_text
+    prompt_message = untrusted_user_request_block(message_text)
     scope_workspace_ids = (
         [
             str(item)

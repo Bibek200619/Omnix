@@ -17,6 +17,7 @@ from ..schemas.workspace_initiatives import (
     WorkspaceInitiativeUpdate,
 )
 from ..services.chat_service import ModelServiceError, generate_ai_response
+from ..services.prompt_trust import make_untrusted_data_record, untrusted_data_block
 from ..services.workspace_initiative_service import (
     attach_channel,
     attach_task,
@@ -153,18 +154,54 @@ async def assist_workspace_initiative(
     )
     tasks = initiative["linked_tasks"]
     resources = initiative["linked_resources"]
-    task_lines = "\n".join(
-        (
-            f"Task: {task.get('title')} | status={task.get('status')} | "
-            f"owner={task.get('owner_name') or task.get('owner_email') or 'unassigned'} | "
-            f"due={task.get('due_date') or 'none'} | blockers={task.get('blockers') or []}"
+    evidence_records = [
+        make_untrusted_data_record(
+            kind="workspace_initiative_record",
+            content=(
+                f"Initiative: {initiative['title']} | status={initiative['status']} | "
+                f"owner={initiative.get('owner_name') or initiative.get('owner_email') or 'unassigned'} | "
+                f"target={initiative.get('target_date') or 'none'} | "
+                f"derived_momentum={initiative['momentum']['health']} | "
+                f"context={initiative.get('initiative_context') or initiative.get('description') or 'none'}"
+            ),
+            source_id=str(initiative.get("id") or initiative_id),
+            source_type="workspace_initiative",
+            workspace_id=workspace_id,
+        ),
+        make_untrusted_data_record(
+            kind="initiative_linked_resources",
+            content=str(resources),
+            source_type="workspace_resource",
+            workspace_id=workspace_id,
+        ),
+    ]
+    evidence_records.extend(
+        make_untrusted_data_record(
+            kind="workspace_task_record",
+            content=(
+                f"Task: {task.get('title')} | status={task.get('status')} | "
+                f"owner={task.get('owner_name') or task.get('owner_email') or 'unassigned'} | "
+                f"due={task.get('due_date') or 'none'} | blockers={task.get('blockers') or []}"
+            ),
+            source_id=str(task.get("id") or ""),
+            source_type="workspace_task",
+            workspace_id=workspace_id,
         )
         for task in tasks
-    ) or "No linked task records."
-    message_lines = "\n".join(
-        f"{message.get('author_name') or message.get('author_email') or 'Teammate'}: {message.get('content', '')}"
+    )
+    evidence_records.extend(
+        make_untrusted_data_record(
+            kind="workspace_conversation_message",
+            content=(
+                f"{message.get('author_name') or message.get('author_email') or 'Teammate'}: "
+                f"{message.get('content', '')}"
+            ),
+            source_id=str(message.get("id") or ""),
+            source_type="workspace_channel_message",
+            workspace_id=workspace_id,
+        )
         for message in messages
-    ) or "No attached discussion messages."
+    )
     system_prompt = (
         "You assist an operational initiative outside its records. "
         "Use only the supplied initiative, task, resource, and conversation evidence. "
@@ -172,11 +209,7 @@ async def assist_workspace_initiative(
     )
     prompt = (
         f"{ASSISTANCE_INSTRUCTIONS[request.mode]}\n\n"
-        f"INITIATIVE: {initiative['title']} | status={initiative['status']} | "
-        f"owner={initiative.get('owner_name') or initiative.get('owner_email') or 'unassigned'} | "
-        f"target={initiative.get('target_date') or 'none'} | derived_momentum={initiative['momentum']['health']}\n"
-        f"CONTEXT: {initiative.get('initiative_context') or initiative.get('description') or 'none'}\n"
-        f"LINKED RESOURCES: {resources}\n\nTASK RECORDS:\n{task_lines}\n\nATTACHED DISCUSSION:\n{message_lines}"
+        f"{untrusted_data_block('INITIATIVE EVIDENCE (UNTRUSTED):', evidence_records)}"
     )
     await enforce_expensive_ai_rate_limit(
         user_id=user_id,
