@@ -20,6 +20,8 @@ function assertExcludes(source, unexpected, label) {
 const [
   analyticsPage,
   conversationSurface,
+  conversationSender,
+  conversationUtils,
   filesPage,
   filesModel,
   sidebarNav,
@@ -29,6 +31,8 @@ const [
 ] = await Promise.all([
   read("app/(dashboard)/analytics/page.tsx"),
   read("components/conversations/WorkspaceConversationSurface.tsx"),
+  read("components/conversations/useWorkspaceConversationSender.ts"),
+  read("components/conversations/conversationUtils.ts"),
   read("app/(dashboard)/files/page.tsx"),
   read("components/files/filesPageModel.ts"),
   read("components/layout/sidebar/SidebarNav.tsx"),
@@ -51,6 +55,18 @@ assertIncludes(conversationSurface, "data-view", "Conversation responsive layout
 assertIncludes(globalsCss, ".omnix-conversation-workbench", "Conversation responsive CSS");
 assertIncludes(globalsCss, '@container (min-width: 48rem)', "Conversation responsive CSS");
 assertIncludes(globalsCss, 'data-thread="open"', "Conversation responsive CSS");
+assertIncludes(conversationSurface, "applyChannelRealtimeChange", "Conversation realtime reconciliation");
+assertIncludes(conversationSurface, "}, applyChannelRealtimeChange)", "Conversation realtime callback");
+assertIncludes(conversationSurface, "channelStateRevisionRef", "Conversation realtime snapshot freshness");
+assertIncludes(conversationSurface, "isCurrentWorkspaceChannelChange(payload, activeWorkspaceId, workspaceRef.current)", "Conversation realtime workspace isolation");
+assertIncludes(conversationSurface, "isCurrentWorkspaceChannelLoad({", "Conversation realtime snapshot freshness");
+assertIncludes(conversationSurface, "void loadChannelsRef.current?.()", "Conversation stale snapshot recovery");
+assertIncludes(conversationSender, "onChannelMessageCreated(created)", "Conversation sender summary projection");
+assertExcludes(conversationSender, "loadChannels", "Conversation sender channel reload");
+assertIncludes(conversationUtils, "reconcileWorkspaceChannelChange", "Conversation realtime helper");
+assertIncludes(conversationUtils, "mergeWorkspaceChannelMessage", "Conversation message summary helper");
+assertIncludes(conversationUtils, "isCurrentWorkspaceChannelChange", "Conversation realtime workspace helper");
+assertIncludes(conversationUtils, "isCurrentWorkspaceChannelLoad", "Conversation realtime snapshot helper");
 
 assertIncludes(filesModel, 'type SourceSection = "files" | "connectors"', "Sources tabs");
 assertIncludes(filesPage, "activeSection", "Sources tabs");

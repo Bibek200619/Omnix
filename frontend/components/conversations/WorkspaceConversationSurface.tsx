@@ -16,7 +16,13 @@ import {
   type DisplayMessage,
   type TaskSource,
   canCreateOperationalChannel,
+  isCurrentWorkspaceChannelChange,
+  isCurrentWorkspaceChannelLoad,
+  mergeWorkspaceChannelMessage,
   mergeMessage,
+  reconcileWorkspaceChannelChange,
+  sortWorkspaceChannels,
+  type WorkspaceChannelRealtimeChange,
 } from "@/components/conversations/conversationUtils";
 import { useWorkspaceConversationSender } from "@/components/conversations/useWorkspaceConversationSender";
 import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
@@ -68,6 +74,8 @@ function WorkspaceConversationSurfaceContent() {
   const workspaceRef = useRef(activeWorkspaceId);
   const selectedChannelRef = useRef(selectedChannelId);
   const channelRequestRef = useRef(0);
+  const channelStateRevisionRef = useRef(0);
+  const loadChannelsRef = useRef<(() => Promise<void>) | null>(null);
   const messageRequestRef = useRef(0);
   const threadRequestRef = useRef(0);
   const threadRootRef = useRef(threadRoot);
@@ -90,11 +98,28 @@ function WorkspaceConversationSurfaceContent() {
       return;
     }
     const requestId = ++channelRequestRef.current;
+    const stateRevision = channelStateRevisionRef.current;
     setChannelsLoading(true);
     try {
       const incoming = await apiClient.get<WorkspaceChannel[]>(`/workspaces/${activeWorkspaceId}/channels`);
-      if (requestId !== channelRequestRef.current || workspaceRef.current !== activeWorkspaceId) return;
-      setChannels(incoming);
+      if (!isCurrentWorkspaceChannelLoad({
+        requestId,
+        latestRequestId: channelRequestRef.current,
+        requestWorkspaceId: activeWorkspaceId,
+        activeWorkspaceId: workspaceRef.current,
+        stateRevision,
+        currentStateRevision: channelStateRevisionRef.current,
+      })) {
+        if (
+          requestId === channelRequestRef.current
+          && workspaceRef.current === activeWorkspaceId
+          && stateRevision !== channelStateRevisionRef.current
+        ) {
+          void loadChannelsRef.current?.();
+        }
+        return;
+      }
+      setChannels(sortWorkspaceChannels(incoming));
       setSelectedChannelId((existing) => {
         if (routeChannelId && incoming.some((channel) => channel.id === routeChannelId)) return routeChannelId;
         return incoming.some((channel) => channel.id === existing) ? existing : incoming[0]?.id ?? null;
@@ -104,14 +129,21 @@ function WorkspaceConversationSurfaceContent() {
       }
       setError(null);
     } catch (err) {
-      if (requestId === channelRequestRef.current) {
+      const isCurrentRequest = requestId === channelRequestRef.current && workspaceRef.current === activeWorkspaceId;
+      if (isCurrentRequest && stateRevision !== channelStateRevisionRef.current) {
+        void loadChannelsRef.current?.();
+        return;
+      }
+      if (isCurrentRequest) {
         logClientError("Failed to load workspace conversations", err, { endpoint: `/workspaces/${activeWorkspaceId}/channels` });
         setError("Unable to load conversations. Check your connection and try again.");
       }
     } finally {
-      if (requestId === channelRequestRef.current) setChannelsLoading(false);
+      if (requestId === channelRequestRef.current && workspaceRef.current === activeWorkspaceId) setChannelsLoading(false);
     }
   }, [activeWorkspaceId, routeChannelId]);
+
+  loadChannelsRef.current = loadChannels;
 
   const loadMessages = useCallback(async (channelId: string) => {
     if (!activeWorkspaceId) return;
@@ -159,6 +191,22 @@ function WorkspaceConversationSurfaceContent() {
     if (threadRootRef.current) void loadThread(channelId, threadRootRef.current);
   }, [loadMessages, loadThread]);
 
+  const applyChannelMessageSummary = useCallback((message: WorkspaceChannelMessage) => {
+    if (!message.workspace_id || message.workspace_id !== workspaceRef.current) return;
+    channelStateRevisionRef.current += 1;
+    setChannels((current) => mergeWorkspaceChannelMessage(current, message));
+  }, []);
+
+  const applyChannelRealtimeChange = useCallback((payload: WorkspaceChannelRealtimeChange) => {
+    if (!isCurrentWorkspaceChannelChange(payload, activeWorkspaceId, workspaceRef.current)) return;
+
+    channelStateRevisionRef.current += 1;
+    setChannels((current) => reconcileWorkspaceChannelChange(current, payload));
+    if (payload.eventType === "DELETE" || payload.new?.is_archived) {
+      void loadChannels();
+    }
+  }, [activeWorkspaceId, loadChannels]);
+
   const sender = useWorkspaceConversationSender({
     activeWorkspaceId,
     identity: {
@@ -169,9 +217,9 @@ function WorkspaceConversationSurfaceContent() {
       role: currentMember?.role,
       workspaceRole: activeWorkspace?.current_user_role,
     },
-    loadChannels,
     loadMessages,
     mayPost,
+    onChannelMessageCreated: applyChannelMessageSummary,
     selectedChannelId,
     sendTypingSignal,
     setError,
@@ -195,10 +243,10 @@ function WorkspaceConversationSurfaceContent() {
   useEffect(() => {
     if (!activeWorkspaceId || !session?.user.id) return;
     realtimeRegistry.subscribe({ type: "channels", workspaceId: activeWorkspaceId }, (channel) =>
-      channel.on("postgres_changes", { event: "*", schema: "public", table: "workspace_channels", filter: `workspace_id=eq.${activeWorkspaceId}` }, () => void loadChannels()),
+      channel.on("postgres_changes", { event: "*", schema: "public", table: "workspace_channels", filter: `workspace_id=eq.${activeWorkspaceId}` }, applyChannelRealtimeChange),
     );
     return () => realtimeRegistry.unsubscribe({ type: "channels", workspaceId: activeWorkspaceId });
-  }, [activeWorkspaceId, loadChannels, session?.user.id]);
+  }, [activeWorkspaceId, applyChannelRealtimeChange, session?.user.id]);
 
   useEffect(() => {
     setThreadRoot(null);
@@ -260,7 +308,9 @@ function WorkspaceConversationSurfaceContent() {
         visibility: "workspace",
         posting_policy: "members",
       });
-      setChannels((current) => [...current.filter((channel) => channel.id !== created.id), created]);
+      if (workspaceRef.current !== activeWorkspaceId) return;
+      channelStateRevisionRef.current += 1;
+      setChannels((current) => reconcileWorkspaceChannelChange(current, { eventType: "INSERT", new: created }));
       setSelectedChannelId(created.id);
       setMobileConversationView("messages");
       setChannelName("");

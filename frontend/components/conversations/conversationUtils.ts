@@ -1,5 +1,6 @@
 import type {
   DecisionCandidate,
+  WorkspaceChannel,
   WorkspaceChannelMessage,
   WorkspaceConversationAssistance,
   WorkspaceDecisionStatus,
@@ -16,6 +17,21 @@ export type TaskSource =
 export type DecisionSource =
   | { kind: "message"; message: WorkspaceChannelMessage }
   | { kind: "candidate"; candidate: DecisionCandidate };
+
+export type WorkspaceChannelRealtimeChange = {
+  eventType: "INSERT" | "UPDATE" | "DELETE";
+  new?: Partial<WorkspaceChannel> | null;
+  old?: Partial<WorkspaceChannel> | null;
+};
+
+type WorkspaceChannelLoadState = {
+  requestId: number;
+  latestRequestId: number;
+  requestWorkspaceId: string | null;
+  activeWorkspaceId: string | null;
+  stateRevision: number;
+  currentStateRevision: number;
+};
 
 export const decisionStatusLabels: Record<WorkspaceDecisionStatus, string> = {
   proposed: "Proposed",
@@ -37,6 +53,86 @@ export function mergeMessage(current: DisplayMessage[], incoming: WorkspaceChann
       !(incoming.client_nonce && message.client_nonce === incoming.client_nonce),
   );
   return chronological([...filtered, incoming]);
+}
+
+export function sortWorkspaceChannels(channels: WorkspaceChannel[]) {
+  return [...channels].sort((left, right) => {
+    const channelTypeOrder = Number(left.channel_type !== "announcement") - Number(right.channel_type !== "announcement");
+    if (channelTypeOrder) return channelTypeOrder;
+    const leftName = left.name.toLowerCase();
+    const rightName = right.name.toLowerCase();
+    return leftName < rightName ? -1 : leftName > rightName ? 1 : 0;
+  });
+}
+
+export function isCurrentWorkspaceChannelChange(
+  change: WorkspaceChannelRealtimeChange,
+  subscribedWorkspaceId: string | null,
+  activeWorkspaceId: string | null,
+) {
+  const payloadWorkspaceId = String(change.new?.workspace_id ?? change.old?.workspace_id ?? "");
+  return Boolean(subscribedWorkspaceId)
+    && subscribedWorkspaceId === activeWorkspaceId
+    && (!payloadWorkspaceId || payloadWorkspaceId === activeWorkspaceId);
+}
+
+export function isCurrentWorkspaceChannelLoad({
+  requestId,
+  latestRequestId,
+  requestWorkspaceId,
+  activeWorkspaceId,
+  stateRevision,
+  currentStateRevision,
+}: WorkspaceChannelLoadState) {
+  return requestId === latestRequestId
+    && requestWorkspaceId === activeWorkspaceId
+    && stateRevision === currentStateRevision;
+}
+
+export function reconcileWorkspaceChannelChange(
+  current: WorkspaceChannel[],
+  change: WorkspaceChannelRealtimeChange,
+) {
+  const changed = change.new;
+  const channelId = String(changed?.id || change.old?.id || "");
+  if (!channelId) return current;
+
+  if (change.eventType === "DELETE" || changed?.is_archived) {
+    return current.filter((channel) => channel.id !== channelId);
+  }
+  if (!changed) return current;
+
+  const existing = current.find((channel) => channel.id === channelId);
+  const nextChannel = existing ? { ...existing, ...changed } : changed as WorkspaceChannel;
+  return sortWorkspaceChannels([...current.filter((channel) => channel.id !== channelId), nextChannel]);
+}
+
+function channelPreview(content: string) {
+  const normalized = content.trim().replace(/\s+/g, " ");
+  return normalized.length <= 110 ? normalized : `${normalized.slice(0, 107)}...`;
+}
+
+export function mergeWorkspaceChannelMessage(
+  current: WorkspaceChannel[],
+  incoming: WorkspaceChannelMessage,
+) {
+  const incomingTimestamp = Date.parse(incoming.created_at || "");
+  return current.map((channel) => {
+    if (channel.id !== incoming.channel_id) return channel;
+
+    const currentTimestamp = Date.parse(channel.last_message_at || "");
+    if (Number.isFinite(currentTimestamp) && Number.isFinite(incomingTimestamp) && currentTimestamp >= incomingTimestamp) {
+      return channel;
+    }
+
+    // The database-triggered channel event remains authoritative for message_count.
+    return {
+      ...channel,
+      last_message_preview: channelPreview(incoming.content),
+      last_message_at: incoming.created_at || channel.last_message_at,
+      updated_at: incoming.created_at || channel.updated_at,
+    };
+  });
 }
 
 export function messageAuthor(message: WorkspaceChannelMessage) {
