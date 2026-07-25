@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.app.routers import messages
+from backend.app.services.prompt_trust import BEGIN_UNTRUSTED_SOURCE_DATA
 from backend.app.services.query_classifier import SearchDecision
 
 
@@ -133,6 +134,9 @@ async def test_short_greeting_still_skips_retrieval() -> None:
         has_retrievable_documents_fn=fail_has_documents,
     )
 
-    assert prompt == "thanks"
+    assert "CURRENT USER REQUEST (UNTRUSTED):" in prompt
+    assert BEGIN_UNTRUSTED_SOURCE_DATA in prompt
+    assert '"kind": "user_message"' in prompt
+    assert "thanks" in prompt
     assert sources == []
     assert debug["strategy"] == "lightweight_prompt"
