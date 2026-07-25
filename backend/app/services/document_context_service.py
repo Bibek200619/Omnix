@@ -23,7 +23,7 @@ from ..services.workspace_service import utc_now_iso
 
 logger = logging.getLogger(__name__)
 
-DOCUMENT_COLUMNS = "id,content,file_id,created_at,workspace_id,user_id,chunk_index"
+DOCUMENT_COLUMNS = "id,content,file_id,created_at,updated_at,workspace_id,user_id,chunk_index,metadata"
 FILE_COLUMNS = (
     "id,user_id,workspace_id,conversation_id,file_name,file_type,metadata,"
     "page_count,extractor_used,extracted_character_count,image_page_count,text_page_count,"

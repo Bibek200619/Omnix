@@ -70,7 +70,7 @@ export function DecisionFromMessageModal({
     }
     setTitle(source.candidate.title);
     setReason(source.candidate.reason);
-    setDescription(`Supporting evidence:\n${source.candidate.supporting_evidence.join("\n")}`);
+    setDescription(`Supporting evidence:\n${source.candidate.supporting_evidence.map((evidence) => evidence.quote).join("\n")}`);
     setMentions([]);
     setStatus("proposed");
   }, [source]);
@@ -89,6 +89,8 @@ export function DecisionFromMessageModal({
           ? {
               source_type: source.candidate.source_type,
               source_id: source.candidate.source_id,
+              candidate_id: source.candidate.id,
+              source_evidence: source.candidate.supporting_evidence,
             }
           : {}),
         mentions: mentionPayload(mentions, `${reason}\n${description}`),
@@ -99,7 +101,7 @@ export function DecisionFromMessageModal({
               `/workspaces/${activeWorkspaceId}/decisions/from-message/${selectedChannelId}/${source.message.id}`,
               payload,
             )
-          : await apiClient.post<WorkspaceDecision>(`/workspaces/${activeWorkspaceId}/decisions`, payload);
+          : await apiClient.post<WorkspaceDecision>(`/workspaces/${activeWorkspaceId}/decisions/candidates/accept`, payload);
       onCreated(`Decision recorded: ${created.title}`);
       onClose();
     } catch (err) {

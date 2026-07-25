@@ -11,6 +11,7 @@ import { useWorkspaceMembership } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { 
   WorkspaceDecision, 
+  DecisionEvidence,
   WorkspaceDecisionSourceType,
   WorkspaceDecisionStatus, 
   WorkspaceInitiative, 
@@ -29,6 +30,8 @@ interface CreateDecisionModalProps {
     status?: WorkspaceDecisionStatus;
     source_type?: WorkspaceDecisionSourceType;
     source_id?: string;
+    candidate_id?: string;
+    source_evidence?: DecisionEvidence[];
   };
 }
 
@@ -86,9 +89,10 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
 
     setCreating(true);
     try {
+      const isCandidateAcceptance = Boolean(initialValues?.candidate_id && initialValues.source_evidence?.length);
       // 1. Create decision
       const decision = await apiClient.post<WorkspaceDecision>(
-        `/workspaces/${workspaceId}/decisions`,
+        `/workspaces/${workspaceId}/decisions${isCandidateAcceptance ? "/candidates/accept" : ""}`,
         {
           title: title.trim(),
           decision_reason: reason.trim(),
@@ -96,6 +100,12 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
           status,
           source_type: initialValues?.source_type ?? null,
           source_id: initialValues?.source_id ?? null,
+          ...(isCandidateAcceptance
+            ? {
+                candidate_id: initialValues?.candidate_id,
+                source_evidence: initialValues?.source_evidence,
+              }
+            : {}),
           mentions: mentionPayload(mentions, `${reason}\n${description}`),
         }
       );

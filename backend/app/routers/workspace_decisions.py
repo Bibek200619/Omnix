@@ -10,6 +10,7 @@ from ..services.workspace_service import require_workspace_access
 from ..schemas.workspace_decisions import (
     DecisionCandidateListRead,
     DecisionCandidateMetricCreate,
+    WorkspaceDecisionCandidateCreate,
     WorkspaceDecisionCreate,
     WorkspaceDecisionFromMessageCreate,
     WorkspaceDecisionLinkInitiative,
@@ -19,6 +20,7 @@ from ..schemas.workspace_decisions import (
 )
 from ..services.workspace_decision_service import (
     create_decision,
+    create_decision_from_candidate,
     create_decision_from_message,
     get_decision,
     link_initiative_to_decision,
@@ -26,6 +28,7 @@ from ..services.workspace_decision_service import (
     list_decisions,
     unlink_task_from_decision,
     update_decision_status,
+    validate_candidate_metric_source,
 )
 from ..services.decision_candidate_service import (
     conversation_decision_candidates,
@@ -62,6 +65,21 @@ async def post_workspace_decision(
         payload=payload.model_dump(),
         source_type=payload.source_type,
         source_id=payload.source_id,
+    )
+
+
+@router.post("/candidates/accept", response_model=WorkspaceDecisionRead, status_code=status.HTTP_201_CREATED)
+async def post_workspace_decision_candidate(
+    workspace_id: str,
+    payload: WorkspaceDecisionCandidateCreate,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id(current_user)
+    await require_workspace_access(workspace_id, user_id)
+    return await create_decision_from_candidate(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        payload=payload.model_dump(),
     )
 
 
@@ -133,10 +151,17 @@ async def post_decision_candidate_metric(
     payload: DecisionCandidateMetricCreate,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> None:
-    await require_workspace_access(workspace_id, _user_id(current_user))
+    user_id = _user_id(current_user)
+    await require_workspace_access(workspace_id, user_id)
+    await validate_candidate_metric_source(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        source_type=payload.source_type,
+        source_id=payload.source_id,
+    )
     await log_candidate_metrics(
         workspace_id=workspace_id,
-        user_id=_user_id(current_user),
+        user_id=user_id,
         source_type=payload.source_type,
         source_id=payload.source_id,
         action=payload.action,

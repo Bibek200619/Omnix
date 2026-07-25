@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { BadgeCheck, ChevronDown, ChevronRight, Loader2, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-import type { DecisionCandidate } from "@/lib/workspace-types";
+import type { DecisionCandidate, DecisionEvidence } from "@/lib/workspace-types";
 
 type DecisionCandidatePanelProps = {
   title?: string;
@@ -23,6 +24,26 @@ const confidenceStyle: Record<DecisionCandidate["confidence"], string> = {
   medium: "border-cyan-300/20 bg-cyan-300/10 text-cyan-100",
   low: "border-amber-300/25 bg-amber-300/10 text-amber-100",
 };
+
+function evidenceLabel(evidence: DecisionEvidence) {
+  if (evidence.kind === "conversation_message") {
+    return `Verified message ${evidence.message_id ?? "source"}`;
+  }
+  const chunk = evidence.chunk_index === null || evidence.chunk_index === undefined
+    ? "Document chunk"
+    : `Document chunk ${evidence.chunk_index + 1}`;
+  return evidence.page ? `${chunk} · page ${evidence.page}` : chunk;
+}
+
+function evidenceHref(evidence: DecisionEvidence) {
+  if (evidence.kind === "conversation_message" && evidence.channel_id) {
+    return `/conversations?channel=${evidence.channel_id}`;
+  }
+  if (evidence.kind === "document_chunk" && evidence.file_id) {
+    return `/files?id=${evidence.file_id}`;
+  }
+  return undefined;
+}
 
 export function DecisionCandidatePanel({
   title = "Potential Decisions",
@@ -97,11 +118,21 @@ export function DecisionCandidatePanel({
                     </span>
                   </div>
                   <div className="mt-3 space-y-1.5">
-                    {candidate.supporting_evidence.map((evidence, index) => (
-                      <p key={`${candidate.id}-${index}`} className="rounded-md border border-white/7 bg-white/[0.025] px-2 py-1.5 text-[11px] leading-5 text-white/55">
-                        {evidence}
-                      </p>
-                    ))}
+                    {candidate.supporting_evidence.map((evidence, index) => {
+                      const href = evidenceHref(evidence);
+                      return (
+                        <div key={`${candidate.id}-${index}`} className="rounded-md border border-white/7 bg-white/[0.025] px-2 py-1.5 text-[11px] leading-5 text-white/55">
+                          <p>“{evidence.quote}”</p>
+                          {href ? (
+                            <Link href={href} className="mt-1 inline-flex text-[10px] font-semibold text-cyan-200/70 hover:text-cyan-100">
+                              {evidenceLabel(evidence)}
+                            </Link>
+                          ) : (
+                            <span className="mt-1 inline-flex text-[10px] font-semibold text-cyan-200/55">{evidenceLabel(evidence)}</span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                   <div className="mt-3 flex flex-wrap justify-end gap-2">
                     <Button
