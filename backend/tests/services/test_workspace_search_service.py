@@ -108,6 +108,18 @@ async def test_search_workspace_uses_ranked_rpc_when_available(monkeypatch: pyte
                 "created_at": "2026-06-01T00:00:00+00:00",
                 "updated_at": "2026-06-02T00:00:00+00:00",
             },
+            {
+                "id": "job-1",
+                "workspace_id": "workspace-1",
+                "type": "job",
+                "title": "ingestion",
+                "preview": "internal error: bearer token should not be searchable",
+                "context": "Failed",
+                "url": "/files?job=job-1",
+                "matched_field": "full_text",
+                "created_at": "2026-06-01T00:00:00+00:00",
+                "updated_at": "2026-06-02T00:00:00+00:00",
+            },
         ]
 
     async def fake_conversations(*args: Any, **kwargs: Any) -> list[dict[str, Any]]:
@@ -140,6 +152,8 @@ async def test_search_workspace_uses_ranked_rpc_when_available(monkeypatch: pyte
     assert [item["title"] for item in result["tasks"]] == ["Launch checklist"]
     assert [item["title"] for item in result["automations"]] == ["Launch digest"]
     assert [item["type"] for item in result["items"]] == ["task", "automation", "workspace"]
+    assert result["jobs"] == []
+    assert "bearer token" not in str(result)
     assert result["pagination"] == {"limit": 2, "cursor": 2, "next_cursor": 4}
 
 
@@ -379,41 +393,22 @@ async def test_search_workspace_groups_workspace_scoped_ilike_results(monkeypatc
             }
         ]
 
-    async def no_ranked_workspace(**kwargs: Any) -> None:
-        return None
+    async def empty_ranked_workspace(**kwargs: Any) -> list[dict[str, Any]]:
+        return []
 
     monkeypatch.setattr(search, "require_workspace_access", fake_require_workspace_access)
-    monkeypatch.setattr(search, "_search_ranked_workspace", no_ranked_workspace)
-    monkeypatch.setattr(search, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(search, "_search_ranked_workspace", empty_ranked_workspace)
     monkeypatch.setattr(search, "select_all_trusted", fake_select_all_trusted)
     monkeypatch.setattr(search, "list_workspace_members", fake_list_workspace_members)
     monkeypatch.setattr(search, "list_mentions_for_user", fake_list_mentions_for_user)
 
     result = await search.search_workspace(workspace_id="workspace-1", user_id="user-1", query=" launch ")
 
-    assert [item["title"] for item in result["tasks"]] == ["Launch mobile navigation"]
-    assert [item["title"] for item in result["decisions"]] == ["Prioritize collaboration"]
-    assert [item["title"] for item in result["initiatives"]] == ["Workspace Intelligence"]
     assert [item["title"] for item in result["conversations"]] == ["Launch Planning"]
-    assert [item["title"] for item in result["files"]] == ["launch-readiness.md"]
-    assert [item["title"] for item in result["documents"]] == ["launch-readiness.md"]
-    assert [item["title"] for item in result["sources"]] == ["Launch Handbook"]
-    assert [item["title"] for item in result["automations"]] == ["Launch digest"]
-    assert [item["title"] for item in result["activity"]] == ["Launch review completed"]
-    assert [item["title"] for item in result["jobs"]] == ["launch_file_ingestion"]
     assert [item["title"] for item in result["members"]] == ["Launch Operator"]
     assert [item["title"] for item in result["mentions"]] == ["Launch mobile navigation"]
     assert [item["title"] for item in result["workspaces"]] == ["Launch Workspace"]
-    assert result["tasks"][0]["url"] == "/tasks?id=task-1"
-    assert result["decisions"][0]["url"] == "/decisions?id=decision-1"
-    assert result["initiatives"][0]["url"] == "/initiatives?id=initiative-1"
     assert result["conversations"][0]["url"] == "/conversations?channel=channel-1"
-    assert result["files"][0]["url"] == "/files?id=file-1"
-    assert result["documents"][0]["url"] == "/files?id=file-1"
-    assert result["sources"][0]["url"] == "/files?source=connector-1"
-    assert result["automations"][0]["url"] == "/automations?id=automation-1"
-    assert result["activity"][0]["url"] == "/workspace/activity?id=activity-1"
-    assert result["jobs"][0]["url"] == "/files?job=job-1"
     assert result["mentions"][0]["context"] == "Unread Task mention"
     assert all(
         (filters.get("workspace_id") or filters.get("payload->>workspace_id")) == "workspace-1"
@@ -424,14 +419,7 @@ async def test_search_workspace_groups_workspace_scoped_ilike_results(monkeypatc
 @pytest.mark.asyncio
 async def test_search_workspace_filters_private_channels_before_message_search(monkeypatch: pytest.MonkeyPatch) -> None:
     searched_message_channels: list[list[str]] = []
-
-    async def fake_require_workspace_access(workspace_id: str, user_id: str):
-        return SimpleNamespace(workspace={"id": workspace_id})
-
-    async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, Any]):
-        assert table == "workspace_channel_members"
-        assert filters == {"channel_id": "channel-hidden", "user_id": "user-1"}
-        return None
+    membership_filters: list[dict[str, Any]] = []
 
     async def fake_select_all_trusted(
         table: str,
@@ -451,6 +439,22 @@ async def test_search_workspace_filters_private_channels_before_message_search(m
                     "is_archived": False,
                 },
                 {
+                    "id": "channel-member",
+                    "workspace_id": "workspace-1",
+                    "created_by": "user-2",
+                    "name": "Product",
+                    "visibility": "private",
+                    "is_archived": False,
+                },
+                {
+                    "id": "channel-owner",
+                    "workspace_id": "workspace-1",
+                    "created_by": "user-1",
+                    "name": "Founder Notes",
+                    "visibility": "private",
+                    "is_archived": False,
+                },
+                {
                     "id": "channel-hidden",
                     "workspace_id": "workspace-1",
                     "created_by": "user-2",
@@ -459,23 +463,53 @@ async def test_search_workspace_filters_private_channels_before_message_search(m
                     "is_archived": False,
                 },
             ]
+        if table == "workspace_channel_members":
+            membership_filters.append(filters)
+            return [{"channel_id": "channel-member"}]
         if table == "workspace_channel_messages":
             searched_message_channels.append(filters["channel_id"])
             return []
         return []
+    monkeypatch.setattr(search, "select_all_trusted", fake_select_all_trusted)
 
-    async def fake_list_workspace_members(_workspace: dict[str, Any]) -> list[dict[str, Any]]:
-        return []
+    await search._search_conversations(
+        workspace_id="workspace-1",
+        user_id="user-1",
+        pattern="%roadmap%",
+        query="roadmap",
+    )
 
-    async def fake_list_mentions_for_user(**_kwargs: Any) -> list[dict[str, Any]]:
-        return []
+    assert membership_filters == [
+        {
+            "channel_id": ["channel-member", "channel-owner", "channel-hidden"],
+            "user_id": "user-1",
+        }
+    ]
+    assert searched_message_channels == [["channel-visible", "channel-member", "channel-owner"]]
+
+
+@pytest.mark.asyncio
+async def test_search_workspace_returns_availability_error_without_field_fanout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_require_workspace_access(workspace_id: str, user_id: str):
+        return SimpleNamespace(workspace={"id": workspace_id})
+
+    async def unavailable_ranked_search(**_kwargs: Any) -> None:
+        return None
+
+    async def fail_if_called(*_args: Any, **_kwargs: Any) -> list[dict[str, Any]]:
+        raise AssertionError("unavailable ranked search must not trigger a table fan-out")
 
     monkeypatch.setattr(search, "require_workspace_access", fake_require_workspace_access)
-    monkeypatch.setattr(search, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(search, "select_all_trusted", fake_select_all_trusted)
-    monkeypatch.setattr(search, "list_workspace_members", fake_list_workspace_members)
-    monkeypatch.setattr(search, "list_mentions_for_user", fake_list_mentions_for_user)
+    monkeypatch.setattr(search, "_search_ranked_workspace", unavailable_ranked_search)
+    monkeypatch.setattr(search, "_search_table_fields", fail_if_called)
+    monkeypatch.setattr(search, "_search_conversations", fail_if_called)
+    monkeypatch.setattr(search, "_search_members", fail_if_called)
+    monkeypatch.setattr(search, "_search_mentions", fail_if_called)
 
-    await search.search_workspace(workspace_id="workspace-1", user_id="user-1", query="roadmap")
+    with pytest.raises(HTTPException) as exc_info:
+        await search.search_workspace(workspace_id="workspace-1", user_id="user-1", query="roadmap")
 
-    assert searched_message_channels == [["channel-visible"]]
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail == "Workspace search is temporarily unavailable. Please try again."
