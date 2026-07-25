@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import HTTPException, status
 
 from ..db.supabase_client import get_async_supabase
-from .supabase_service import SupabaseServiceError, select_all_trusted, select_one_trusted
+from .supabase_service import SupabaseServiceError, select_all_trusted
 from .workspace_mention_service import list_mentions_for_user
 from .workspace_service import list_workspace_members, require_workspace_access
 
@@ -24,7 +24,7 @@ MESSAGE_COLUMNS = "id,workspace_id,channel_id,content,created_at,updated_at"
 TASK_COLUMNS = "id,workspace_id,title,description,status,created_at,updated_at"
 INITIATIVE_COLUMNS = "id,workspace_id,title,description,status,created_at,updated_at"
 DECISION_COLUMNS = "id,workspace_id,title,description,decision_reason,status,created_at,updated_at"
-CHANNEL_MEMBER_COLUMNS = "channel_id,user_id,role,created_at"
+CHANNEL_MEMBER_COLUMNS = "channel_id"
 FILE_COLUMNS = (
     "id,workspace_id,user_id,file_name,file_type,size_bytes,processing_status,"
     "extraction_status,metadata,created_at,updated_at"
@@ -39,7 +39,6 @@ AUTOMATION_COLUMNS = (
     "created_at,updated_at"
 )
 ACTIVITY_COLUMNS = "id,workspace_id,actor_user_id,event_type,summary,metadata,created_at"
-JOB_COLUMNS = "id,type,status,payload,progress,attempts,error,result,created_at,started_at,completed_at"
 SEARCH_GROUPS = (
     "conversations",
     "tasks",
@@ -60,6 +59,13 @@ RANKED_SEARCH_RPC = "search_workspace_ranked"
 
 def _database_error() -> HTTPException:
     return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
+
+def _ranked_search_unavailable() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Workspace search is temporarily unavailable. Please try again.",
+    )
 
 
 def _normalize_query(query: str) -> str:
@@ -161,6 +167,21 @@ async def _visible_channels(workspace_id: str, user_id: str) -> list[dict[str, A
         filters={"workspace_id": workspace_id, "is_archived": False},
         order_by="created_at",
     )
+    private_channel_ids = [
+        str(channel["id"])
+        for channel in channels
+        if channel.get("visibility") != "workspace" and channel.get("id")
+    ]
+    memberships = await select_all_trusted(
+        "workspace_channel_members",
+        CHANNEL_MEMBER_COLUMNS,
+        filters={"channel_id": private_channel_ids, "user_id": user_id},
+    ) if private_channel_ids else []
+    member_channel_ids = {
+        str(membership.get("channel_id") or "")
+        for membership in memberships
+        if membership.get("channel_id")
+    }
     visible: list[dict[str, Any]] = []
     for channel in channels:
         if channel.get("visibility") == "workspace":
@@ -169,12 +190,7 @@ async def _visible_channels(workspace_id: str, user_id: str) -> list[dict[str, A
         channel_id = str(channel.get("id") or "")
         if not channel_id:
             continue
-        membership = await select_one_trusted(
-            "workspace_channel_members",
-            CHANNEL_MEMBER_COLUMNS,
-            {"channel_id": channel_id, "user_id": user_id},
-        )
-        if membership is not None or str(channel.get("created_by") or "") == user_id:
+        if channel_id in member_channel_ids or str(channel.get("created_by") or "") == user_id:
             visible.append(channel)
     return visible
 
@@ -404,25 +420,6 @@ def _activity_result(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _job_result(row: Mapping[str, Any]) -> dict[str, Any]:
-    job_id = str(row["id"])
-    payload = row.get("payload") if isinstance(row.get("payload"), Mapping) else {}
-    workspace_id = str(payload.get("workspace_id") or row.get("workspace_id") or "")
-    preview_source = row.get("error") or row.get("result") or row.get("payload")
-    return {
-        "id": job_id,
-        "workspace_id": workspace_id,
-        "type": "job",
-        "title": str(row.get("type") or "Background job"),
-        "preview": _compact_text(str(preview_source), limit=160) if preview_source else None,
-        "context": str(row.get("status") or "Job").replace("_", " ").title(),
-        "url": f"/files?job={job_id}",
-        "matched_field": row.get("_matched_field"),
-        "created_at": row.get("created_at"),
-        "updated_at": row.get("completed_at") or row.get("started_at") or row.get("created_at"),
-    }
-
-
 def _member_result(row: Mapping[str, Any]) -> dict[str, Any]:
     user_id = str(row.get("user_id") or "")
     title = str(row.get("full_name") or row.get("handle") or row.get("email") or "Workspace member")
@@ -506,7 +503,6 @@ def _group_for_result_type(result_type: str) -> str | None:
         "source": "sources",
         "automation": "automations",
         "activity": "activity",
-        "job": "jobs",
         "member": "members",
         "mention": "mentions",
         "workspace": "workspaces",
@@ -545,8 +541,8 @@ async def _search_ranked_workspace(
             },
         ).execute()
         return list(getattr(response, "data", None) or [])
-    except Exception as exc:
-        logger.info("Ranked workspace search RPC unavailable; falling back to field fanout: %s", exc)
+    except Exception:
+        logger.warning("Ranked workspace search RPC unavailable")
         return None
 
 
@@ -658,115 +654,15 @@ async def search_workspace(
         limit=max(bounded_limit * 8, bounded_limit),
         cursor=bounded_cursor,
     )
+    if ranked_rows is None:
+        raise _ranked_search_unavailable()
+
     try:
         conversations_task = _search_conversations(workspace_id, user_id, pattern, normalized_query)
         members_task = _search_members(access.workspace, normalized_query)
         mentions_task = _search_mentions(workspace_id, user_id, normalized_query)
-        if ranked_rows is not None:
-            conversation_rows, member_rows, mention_rows = await asyncio.gather(
-                conversations_task,
-                members_task,
-                mentions_task,
-            )
-            ranked_response = _group_ranked_results(ranked_rows, query=normalized_query, limit=bounded_limit)
-            workspace_result = _workspace_result(access.workspace, normalized_query)
-            ranked_response["conversations"] = conversation_rows
-            ranked_response["members"] = member_rows
-            ranked_response["mentions"] = mention_rows
-            ranked_response["workspaces"] = [workspace_result] if workspace_result else []
-            _flatten_response(ranked_response, limit=bounded_limit, cursor=bounded_cursor, ranked_count=len(ranked_rows))
-            return ranked_response
-
-        tasks_task = _search_table_fields(
-            table="workspace_tasks",
-            columns=TASK_COLUMNS,
-            workspace_id=workspace_id,
-            fields=("title", "description"),
-            pattern=pattern,
-        )
-        initiatives_task = _search_table_fields(
-            table="workspace_initiatives",
-            columns=INITIATIVE_COLUMNS,
-            workspace_id=workspace_id,
-            fields=("title", "description"),
-            pattern=pattern,
-        )
-        decisions_task = _search_table_fields(
-            table="workspace_decisions",
-            columns=DECISION_COLUMNS,
-            workspace_id=workspace_id,
-            fields=("title", "decision_reason", "description"),
-            pattern=pattern,
-        )
-        files_task = _search_table_fields(
-            table="files",
-            columns=FILE_COLUMNS,
-            workspace_id=workspace_id,
-            fields=("file_name", "file_type"),
-            pattern=pattern,
-        )
-        documents_task = _search_table_fields(
-            table="documents",
-            columns=DOCUMENT_COLUMNS,
-            workspace_id=workspace_id,
-            fields=("content",),
-            pattern=pattern,
-        )
-        sources_task = _search_table_fields(
-            table="workspace_connectors",
-            columns=CONNECTOR_COLUMNS,
-            workspace_id=workspace_id,
-            fields=("display_name", "connector_type", "status"),
-            pattern=pattern,
-        )
-        automations_task = _search_table_fields(
-            table="automations",
-            columns=AUTOMATION_COLUMNS,
-            workspace_id=workspace_id,
-            fields=("name", "job_type", "schedule"),
-            pattern=pattern,
-        )
-        activity_task = _search_table_fields(
-            table="workspace_activity_events",
-            columns=ACTIVITY_COLUMNS,
-            workspace_id=workspace_id,
-            fields=("event_type", "summary"),
-            pattern=pattern,
-            order_by="created_at",
-        )
-        jobs_task = _search_table_fields(
-            table="jobs",
-            columns=JOB_COLUMNS,
-            workspace_id=workspace_id,
-            workspace_filter="payload->>workspace_id",
-            fields=("type", "status", "error"),
-            pattern=pattern,
-            order_by="created_at",
-        )
-        (
-            conversation_rows,
-            task_rows,
-            initiative_rows,
-            decision_rows,
-            file_rows,
-            document_rows,
-            source_rows,
-            automation_rows,
-            activity_rows,
-            job_rows,
-            member_rows,
-            mention_rows,
-        ) = await asyncio.gather(
+        conversation_rows, member_rows, mention_rows = await asyncio.gather(
             conversations_task,
-            tasks_task,
-            initiatives_task,
-            decisions_task,
-            files_task,
-            documents_task,
-            sources_task,
-            automations_task,
-            activity_task,
-            jobs_task,
             members_task,
             mentions_task,
         )
@@ -774,21 +670,11 @@ async def search_workspace(
         logger.exception("Workspace search failed | workspace_id=%s", workspace_id)
         raise _database_error() from exc
 
+    ranked_response = _group_ranked_results(ranked_rows, query=normalized_query, limit=bounded_limit)
     workspace_result = _workspace_result(access.workspace, normalized_query)
-    response = {
-        "conversations": conversation_rows,
-        "tasks": _dedupe_results([_task_result(row) for row in task_rows], query=normalized_query, limit=bounded_limit),
-        "initiatives": _dedupe_results([_initiative_result(row) for row in initiative_rows], query=normalized_query, limit=bounded_limit),
-        "decisions": _dedupe_results([_decision_result(row) for row in decision_rows], query=normalized_query, limit=bounded_limit),
-        "files": _dedupe_results([_file_result(row) for row in file_rows], query=normalized_query, limit=bounded_limit),
-        "documents": _dedupe_results([_document_result(row) for row in document_rows], query=normalized_query, limit=bounded_limit),
-        "sources": _dedupe_results([_source_result(row) for row in source_rows], query=normalized_query, limit=bounded_limit),
-        "automations": _dedupe_results([_automation_result(row) for row in automation_rows], query=normalized_query, limit=bounded_limit),
-        "activity": _dedupe_results([_activity_result(row) for row in activity_rows], query=normalized_query, limit=bounded_limit),
-        "jobs": _dedupe_results([_job_result(row) for row in job_rows], query=normalized_query, limit=bounded_limit),
-        "members": member_rows,
-        "mentions": mention_rows,
-        "workspaces": [workspace_result] if workspace_result else [],
-    }
-    _flatten_response(response, limit=bounded_limit, cursor=bounded_cursor)
-    return response
+    ranked_response["conversations"] = conversation_rows
+    ranked_response["members"] = member_rows
+    ranked_response["mentions"] = mention_rows
+    ranked_response["workspaces"] = [workspace_result] if workspace_result else []
+    _flatten_response(ranked_response, limit=bounded_limit, cursor=bounded_cursor, ranked_count=len(ranked_rows))
+    return ranked_response
