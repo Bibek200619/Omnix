@@ -43,7 +43,7 @@ postgrest==2.31.0
 prompt_toolkit==3.0.52
 propcache==0.5.2
 protobuf==7.35.1
-pyasn1==0.6.3
+pyasn1==0.6.4
 pyasn1_modules==0.4.2
 pycparser==3.0
 pydantic==2.13.4
@@ -52,7 +52,7 @@ pydantic_core==2.46.4
 pyglet==2.1.14
 Pygments==2.20.0
 PyJWT==2.13.0
-pypdf==6.13.3
+pypdf==6.14.2
 pypdfium2==5.10.1
 pytest==9.0.3
 pytest-asyncio==1.4.0
