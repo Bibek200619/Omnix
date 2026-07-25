@@ -270,6 +270,7 @@ _should_skip_retrieval_for_prompt = message_retrieval_service.should_skip_retrie
 _merge_sources = message_retrieval_service.merge_sources
 _web_only_context = message_retrieval_service.web_only_context
 _compact_intelligence_debug = message_retrieval_service.compact_intelligence_debug
+_should_bypass_model_for_retrieval = message_retrieval_service.should_bypass_model_for_retrieval
 
 _compact_text = message_payload_service.compact_text
 _compact_sources_for_payload = message_payload_service.compact_sources_for_payload
@@ -279,6 +280,7 @@ _with_sources_payload = message_payload_service.with_sources_payload
 _mode_from_retrieval_debug = message_payload_service.mode_from_retrieval_debug
 _assistant_message_payload = message_payload_service.assistant_message_payload
 _has_persistable_payload = message_payload_service.has_persistable_payload
+_public_retrieval_payload = message_payload_service.public_retrieval_payload
 
 
 async def _persist_assistant_payload(
@@ -664,7 +666,8 @@ async def chat(
         retrieval_debug=retrieval_debug,
     )
 
-    if retrieval_debug.get("strategy") == "document_unavailable":
+    retrieval_payload = _public_retrieval_payload(retrieval_debug, sources)
+    if _should_bypass_model_for_retrieval(retrieval_debug):
         assistant_response = prompt_message
     else:
         try:
@@ -737,6 +740,7 @@ async def chat(
                 "conversation_id": conversation_id,
                 "assistant_message_id": str(completed_assistant_message["id"]),
                 "source_count": len(sources),
+                "retrieval_outcome": (retrieval_payload or {}).get("outcome"),
                 "search_mode": payload.search_mode,
                 "workspace_focus": (intelligence_profile or {}).get("workspace_focus"),
                 "ai_specialization": (intelligence_profile or {}).get("ai_specialization"),
@@ -753,11 +757,11 @@ async def chat(
         assistant_message_id=str(completed_assistant_message["id"]),
         response=assistant_response,
         sources=sources,
+        retrieval=retrieval_payload,
         conversation=hydrated_conversation,
         user_message=user_message,
         assistant_message=_with_sources_payload(completed_assistant_message),
     )
-
 
 @router.post("/chat/stream")
 async def chat_stream(
@@ -840,6 +844,7 @@ async def chat_stream(
         prompt_message = message_text
         sources: list[dict[str, Any]] = []
         retrieval_debug = _empty_retrieval_debug("pending")
+        retrieval_payload: dict[str, Any] | None = None
 
         init_payload = {
             "type": "init",
@@ -863,15 +868,11 @@ async def chat_stream(
                 payload.search_mode,
                 intelligence_profile,
             )
-            sources_payload = {
-                "type": "sources",
-                "sources": sources,
-                "retrieval": retrieval_debug,
-                "workspace_intelligence": _compact_intelligence_debug(intelligence_profile),
-            }
+            retrieval_payload = _public_retrieval_payload(retrieval_debug, sources)
+            sources_payload = {"type": "sources", "sources": sources, "retrieval": retrieval_payload, "workspace_intelligence": _compact_intelligence_debug(intelligence_profile)}
             yield f"data: {json.dumps(sources_payload)}\n\n"
 
-            status_payload = {"type": "status", "status": "retrieved", "count": len(sources)}
+            status_payload = {"type": "status", "status": "retrieved", "count": len(sources), "retrieval": retrieval_payload}
             yield f"data: {json.dumps(status_payload)}\n\n"
 
             try:
@@ -894,7 +895,7 @@ async def chat_stream(
                 prompt=prompt_message,
                 retrieval_debug=retrieval_debug,
             )
-            if retrieval_debug.get("strategy") == "document_unavailable":
+            if _should_bypass_model_for_retrieval(retrieval_debug):
                 assistant_parts.append(prompt_message)
                 yield f"data: {json.dumps({'type': 'token', 'text': prompt_message})}\n\n"
             else:
@@ -986,6 +987,7 @@ async def chat_stream(
                     "conversation_id": conversation_id,
                     "assistant_message_id": str(assistant_message["id"]),
                     "source_count": len(sources),
+                    "retrieval_outcome": (retrieval_payload or {}).get("outcome"),
                     "search_mode": payload.search_mode,
                     "workspace_focus": (intelligence_profile or {}).get("workspace_focus"),
                     "ai_specialization": (intelligence_profile or {}).get("ai_specialization"),

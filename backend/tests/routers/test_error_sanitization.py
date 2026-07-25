@@ -7,6 +7,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.routers import actions, continuity, insights, messages, workspace_conversations, workspace_tasks
+from app.context.engine import ContextRetrievalUnavailableError
 from app.services.chat_service import ModelServiceError
 
 
@@ -38,6 +39,26 @@ async def test_actions_sanitize_runtime_errors(monkeypatch: pytest.MonkeyPatch) 
 
     assert exc_info.value.status_code == 500
     assert_detail_is_sanitized(exc_info.value, "Unable to perform action.")
+
+
+@pytest.mark.asyncio
+async def test_actions_do_not_generate_when_workspace_retrieval_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def unavailable_action(*args, **kwargs):
+        raise ContextRetrievalUnavailableError()
+
+    async def allow_access(*args, **kwargs):
+        return object()
+
+    monkeypatch.setattr(actions, "require_workspace_access", allow_access)
+    monkeypatch.setattr(actions, "get_vector_store", lambda: object())
+    monkeypatch.setattr(actions, "ContextEngine", lambda *args, **kwargs: object())
+    monkeypatch.setattr(actions.summarize_action, "run", unavailable_action)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await actions.run_action(DummyRequest(), actions.ActionRequest(action="summarize"))
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail == "Workspace source retrieval is temporarily unavailable. Please retry shortly."
 
 
 @pytest.mark.asyncio

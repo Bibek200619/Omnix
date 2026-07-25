@@ -7,7 +7,7 @@ from typing import Any
 from ..core.security import get_current_user
 from ..services.workspace_service import require_workspace_access
 from ..services.supabase_service import insert_one, SupabaseServiceError
-from ..context.engine import ContextEngine
+from ..context.engine import ContextEngine, ContextRetrievalUnavailableError
 from ..insights import (
     workspace_summary,
     topic_detection,
@@ -42,6 +42,11 @@ async def generate_insights(request: Request, workspace_id: str, current_user: d
         topics = await topic_detection.run(engine, user_id, workspace_id)
         actions = await action_item_detector.run(engine, user_id, workspace_id)
         conflicts = await conflict_detector.run(engine, user_id, workspace_id)
+    except ContextRetrievalUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Workspace source retrieval is temporarily unavailable. Please retry shortly.",
+        ) from exc
     except Exception as exc:
         logger.exception("Failed to generate insights")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to generate workspace insights.") from exc

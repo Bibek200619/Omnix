@@ -49,6 +49,7 @@ export function reconcileMessageLists(currentMessages: Message[], serverMessages
       ...serverMessage,
       attachments: mergeAttachments(current.attachments, serverMessage.attachments),
       sources: serverMessage.sources?.length ? serverMessage.sources : current.sources,
+      retrieval: serverMessage.retrieval ?? current.retrieval,
     };
     if (
       current.status === "streaming" &&

@@ -1,5 +1,12 @@
 import type { WorkspaceRole } from "@/lib/workspace-types";
 
+export type RetrievalState = {
+  outcome: "not_requested" | "sources_found" | "no_relevant_sources" | "partial" | "failed" | "source_unavailable";
+  source_count: number;
+  failed_channels?: string[];
+  reason?: string;
+};
+
 export type Message = {
   id: string;
   role: "user" | "assistant";
@@ -23,6 +30,7 @@ export type Message = {
   sourceMode?: SearchMode;
   webSearchUsed?: boolean;
   citations?: string[];
+  retrieval?: RetrievalState;
   // optional sources attached to assistant responses
   sources?: Array<{
     id?: string;
@@ -103,6 +111,7 @@ export type ChatApiResponse = {
   assistant_message_id: string;
   response: string;
   sources?: Array<Record<string, unknown>>;
+  retrieval?: RetrievalState;
   conversation?: ConversationSummary | null;
   user_message?: ApiMessage | null;
   assistant_message?: ApiMessage | null;

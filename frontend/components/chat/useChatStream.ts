@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import { createOptimisticUserMessage, mergeStreamInitMessages } from "@/components/chat/chatStreamMessages";
 import { readChatStream, type StreamEvent } from "@/components/chat/chatStreamProtocol";
 import type { Message, MessageAttachment, SearchMode } from "@/components/chat/types";
+import { normalizeRetrievalState } from "@/components/chat/chatMessageUtils";
 import { type ChatRef, type RefreshConversations, type SenderLookup } from "@/components/chat/useChatMessages";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
@@ -171,6 +172,7 @@ export function useChatStream({
       if (!reader) throw new Error("Streaming not supported by this browser.");
 
       const handleStreamEvent = (obj: StreamEvent) => {
+        const retrieval = normalizeRetrievalState(obj.retrieval);
         if (obj.type === "init") {
           if (obj.conversation_id) {
             streamConversationId = obj.conversation_id;
@@ -182,14 +184,20 @@ export function useChatStream({
           persistedUserMessageId = obj.user_message_id ?? null;
           assistantId = obj.assistant_message_id ?? crypto.randomUUID();
           setMessages((current) =>
-            mergeStreamInitMessages(current, messageId, persistedUserMessageId, assistantId as string, obj.sources),
+            mergeStreamInitMessages(current, messageId, persistedUserMessageId, assistantId as string, obj.sources, retrieval),
           );
           return;
         }
-        if (obj.type === "status") return;
+        if (obj.type === "status") {
+          if (!assistantId || !retrieval) return;
+          setMessages((current) => current.map((message) => (message.id === assistantId ? { ...message, retrieval } : message)));
+          return;
+        }
         if (obj.type === "sources") {
           if (!assistantId) return;
-          setMessages((current) => current.map((message) => (message.id === assistantId ? { ...message, sources: obj.sources ?? [] } : message)));
+          setMessages((current) => current.map((message) => (
+            message.id === assistantId ? { ...message, sources: obj.sources ?? [], retrieval: retrieval ?? message.retrieval } : message
+          )));
           return;
         }
         if (obj.type === "token") {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable
 from dataclasses import dataclass, field
 import logging
 import time
@@ -12,6 +13,7 @@ from ..rag.startup import get_vector_store
 from ..rag.vector_store_base import VectorStore
 from .context_builder import BuiltContext, ContextBuilder
 from .keyword_search import KeywordSearch
+from .outcomes import RetrievalChannelError
 from .reranker import Reranker, ScoreBasedReranker
 from .scoring import (
     DEFAULT_KEYWORD_WEIGHT,
@@ -38,6 +40,7 @@ class HybridSearchConfig:
     semantic_distance_threshold: float | None = None
     context_token_budget: int = 2600
     context_max_chunk_tokens: int = 650
+    channel_timeout_seconds: float = 12.0
     dev_diagnostics: bool = True
 
     @classmethod
@@ -59,6 +62,10 @@ class HybridSearchConfig:
             semantic_distance_threshold=getattr(settings, "SIMILARITY_THRESHOLD", None),
             context_token_budget=int(getattr(settings, "HYBRID_CONTEXT_TOKEN_BUDGET", 2600)),
             context_max_chunk_tokens=int(getattr(settings, "HYBRID_MAX_CHUNK_TOKENS", 650)),
+            channel_timeout_seconds=max(
+                0.1,
+                min(float(getattr(settings, "HYBRID_CHANNEL_TIMEOUT_SECONDS", 12.0)), 60.0),
+            ),
             dev_diagnostics=bool(getattr(settings, "DEV_MODE", False)),
         )
 
@@ -77,6 +84,24 @@ class HybridSearchResponse:
             "analysis": self.analysis.to_dict(),
             "diagnostics": self.diagnostics,
         }
+
+
+@dataclass(slots=True)
+class _ChannelOutcome:
+    status: str
+    results: list[RetrievalResult]
+    latency_ms: float
+    error_code: str | None = None
+
+    def to_diagnostics(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "status": self.status,
+            "result_count": len(self.results),
+            "latency_ms": round(self.latency_ms, 2),
+        }
+        if self.error_code:
+            payload["error_code"] = self.error_code
+        return payload
 
 
 class HybridSearchEngine:
@@ -129,36 +154,63 @@ class HybridSearchEngine:
         else:
             semantic_weight, keyword_weight = normalize_weights(self.config.semantic_weight, self.config.keyword_weight)
 
-        semantic_task = self.semantic_search.search(
-            query,
-            user_id=user_id,
-            workspace_id=workspace_id,
-            top_k=semantic_top_k,
-            distance_threshold=self.config.semantic_distance_threshold,
-        )
-        keyword_task = self.keyword_search.search(
-            query,
-            user_id=user_id,
-            workspace_id=workspace_id,
-            top_k=keyword_top_k,
-        )
-        semantic_result, keyword_result = await asyncio.gather(
-            semantic_task,
-            keyword_task,
-            return_exceptions=True,
+        semantic_outcome, keyword_outcome = await asyncio.gather(
+            self._run_channel(
+                "semantic",
+                self.semantic_search.search(
+                    query,
+                    user_id=user_id,
+                    workspace_id=workspace_id,
+                    top_k=semantic_top_k,
+                    distance_threshold=self.config.semantic_distance_threshold,
+                ),
+            ),
+            self._run_channel(
+                "keyword",
+                self.keyword_search.search(
+                    query,
+                    user_id=user_id,
+                    workspace_id=workspace_id,
+                    top_k=keyword_top_k,
+                ),
+            ),
         )
 
-        semantic_results = self._coerce_results("semantic", semantic_result)
-        keyword_results = self._coerce_results("keyword", keyword_result)
+        semantic_results = semantic_outcome.results
+        keyword_results = keyword_outcome.results
         merged = self._merge_results(
             semantic_results,
             keyword_results,
             semantic_weight=semantic_weight,
             keyword_weight=keyword_weight,
         )
-        reranked = await self.reranker.rerank(query, merged, analysis=analysis)
-        final_results = reranked[:final_top_k]
+        reranker_outcome: _ChannelOutcome | None = None
+        try:
+            reranked = await self.reranker.rerank(query, merged, analysis=analysis)
+            final_results = reranked[:final_top_k]
+        except Exception:
+            logger.exception("Reranker failed during hybrid search.")
+            reranker_outcome = _ChannelOutcome(
+                status="failed",
+                results=[],
+                latency_ms=0.0,
+                error_code="reranker_unavailable",
+            )
+            final_results = []
         latency_ms = (time.perf_counter() - started_at) * 1000
+
+        channels: dict[str, _ChannelOutcome] = {
+            "semantic": semantic_outcome,
+            "keyword": keyword_outcome,
+        }
+        if reranker_outcome:
+            channels["reranker"] = reranker_outcome
+        retrieval_outcome, retrieval_reason = self._retrieval_outcome(channels, final_results)
+        failed_channels = [
+            name
+            for name, outcome in channels.items()
+            if outcome.status in {"failed", "timed_out"}
+        ]
 
         diagnostics = {
             "latency_ms": round(latency_ms, 2),
@@ -169,6 +221,15 @@ class HybridSearchEngine:
             "semantic_weight": semantic_weight,
             "keyword_weight": keyword_weight,
             "analysis": analysis.to_dict(),
+            "retrieval": {
+                "outcome": retrieval_outcome,
+                "reason": retrieval_reason,
+                "failed_channels": failed_channels,
+                "channels": {
+                    name: outcome.to_diagnostics()
+                    for name, outcome in channels.items()
+                },
+            },
             "semantic": [self._diagnostic_row(result) for result in semantic_results],
             "keyword": [self._diagnostic_row(result) for result in keyword_results],
             "merged": [self._diagnostic_row(result) for result in merged],
@@ -192,20 +253,87 @@ class HybridSearchEngine:
         top_k: int | None = None,
     ) -> tuple[HybridSearchResponse, BuiltContext]:
         response = await self.search(query, user_id=user_id, workspace_id=workspace_id, top_k=top_k)
-        built = self.context_builder.build(query, response.results, workspace_id=workspace_id)
+        built = self.context_builder.build(
+            query,
+            response.results,
+            workspace_id=workspace_id,
+            retrieval_outcome=str(response.diagnostics.get("retrieval", {}).get("outcome") or "sources_found"),
+        )
         response.diagnostics["context"] = built.diagnostics
         return response, built
 
-    @staticmethod
-    def _coerce_results(channel: str, result: list[RetrievalResult] | BaseException) -> list[RetrievalResult]:
-        if isinstance(result, BaseException):
+    async def _run_channel(
+        self,
+        channel: str,
+        operation: Awaitable[list[RetrievalResult]],
+    ) -> _ChannelOutcome:
+        started_at = time.perf_counter()
+        try:
+            results = await asyncio.wait_for(
+                operation,
+                timeout=max(0.1, float(self.config.channel_timeout_seconds)),
+            )
+        except TimeoutError:
+            latency_ms = (time.perf_counter() - started_at) * 1000
+            logger.warning("%s retrieval timed out after %.2fms.", channel, latency_ms)
+            return _ChannelOutcome(
+                status="timed_out",
+                results=[],
+                latency_ms=latency_ms,
+                error_code="timeout",
+            )
+        except RetrievalChannelError as exc:
+            latency_ms = (time.perf_counter() - started_at) * 1000
             logger.error(
                 "%s retrieval failed during hybrid search.",
                 channel,
-                exc_info=(type(result), result, result.__traceback__),
+                exc_info=(type(exc), exc, exc.__traceback__),
             )
-            return []
-        return result
+            return _ChannelOutcome(
+                status="failed",
+                results=[],
+                latency_ms=latency_ms,
+                error_code=exc.code,
+            )
+        except Exception as exc:
+            latency_ms = (time.perf_counter() - started_at) * 1000
+            logger.error(
+                "%s retrieval failed during hybrid search.",
+                channel,
+                exc_info=(type(exc), exc, exc.__traceback__),
+            )
+            return _ChannelOutcome(
+                status="failed",
+                results=[],
+                latency_ms=latency_ms,
+                error_code="unexpected_error",
+            )
+
+        latency_ms = (time.perf_counter() - started_at) * 1000
+        if not isinstance(results, list):
+            logger.error("%s retrieval returned an invalid result payload.", channel)
+            return _ChannelOutcome(
+                status="failed",
+                results=[],
+                latency_ms=latency_ms,
+                error_code="invalid_result",
+            )
+        return _ChannelOutcome(
+            status="ok" if results else "empty",
+            results=results,
+            latency_ms=latency_ms,
+        )
+
+    @staticmethod
+    def _retrieval_outcome(
+        channels: dict[str, _ChannelOutcome],
+        final_results: list[RetrievalResult],
+    ) -> tuple[str, str]:
+        failures = [outcome for outcome in channels.values() if outcome.status in {"failed", "timed_out"}]
+        if failures:
+            reason = "channel_timeout" if any(outcome.status == "timed_out" for outcome in failures) else "channel_failure"
+            return ("partial", reason) if final_results else ("failed", reason)
+        return ("sources_found", "sources_found") if final_results else ("no_relevant_sources", "no_matches")
 
     @staticmethod
     def _merge_results(
@@ -283,10 +411,11 @@ class HybridSearchEngine:
         if not logger.isEnabledFor(log_level):
             return
         diagnostics = response.diagnostics
+        retrieval = diagnostics.get("retrieval") if isinstance(diagnostics.get("retrieval"), dict) else {}
         logger.log(
             log_level,
             "Hybrid retrieval diagnostics: query=%r semantic=%d keyword=%d merged=%d returned=%d "
-            "weights=(semantic=%.2f keyword=%.2f) latency_ms=%.2f reasons=%s",
+            "weights=(semantic=%.2f keyword=%.2f) latency_ms=%.2f outcome=%s failed_channels=%s reasons=%s",
             safe_text_preview(response.query, max_chars=240),
             diagnostics.get("semantic_matches", 0),
             diagnostics.get("keyword_matches", 0),
@@ -295,6 +424,8 @@ class HybridSearchEngine:
             diagnostics.get("semantic_weight", 0.0),
             diagnostics.get("keyword_weight", 0.0),
             diagnostics.get("latency_ms", 0.0),
+            retrieval.get("outcome", "unknown"),
+            retrieval.get("failed_channels", []),
             response.analysis.reasons,
         )
         logger.log(log_level, "Hybrid semantic matches: %s", diagnostics.get("semantic", []))

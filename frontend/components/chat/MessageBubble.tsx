@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 import { memo, useState } from "react";
 import { Check, Copy, RotateCcw, FileText, ChevronDown, ChevronUp, ExternalLink, Globe2, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { Message } from "@/components/chat/types";
+import type { Message, RetrievalState } from "@/components/chat/types";
 import { MarkdownRenderer, StreamingTextRenderer } from "@/components/chat/MarkdownRenderer";
 import { Button } from "@/components/ui/Button";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -23,6 +23,38 @@ type MessageBubbleProps = {
   onRegenerate?: (assistantMessageId: string) => void;
 };
 
+type RetrievalNotice = {
+  message: string;
+  tone: string;
+};
+
+function retrievalNoticeFor(retrieval?: RetrievalState): RetrievalNotice | null {
+  switch (retrieval?.outcome) {
+    case "failed":
+      return {
+        message: "Workspace source retrieval was unavailable. This response is not source-grounded.",
+        tone: "border-rose-300/20 bg-rose-400/10 text-rose-100/90",
+      };
+    case "partial":
+      return {
+        message: "Workspace source retrieval was incomplete. Source coverage may be limited.",
+        tone: "border-amber-300/20 bg-amber-400/10 text-amber-50/90",
+      };
+    case "no_relevant_sources":
+      return {
+        message: "No relevant workspace sources were found for this question.",
+        tone: "border-sky-300/15 bg-sky-300/10 text-sky-50/85",
+      };
+    case "source_unavailable":
+      return {
+        message: "Workspace sources are not available yet. This response is not source-grounded.",
+        tone: "border-amber-300/20 bg-amber-400/10 text-amber-50/90",
+      };
+    default:
+      return null;
+  }
+}
+
 export const MessageBubble = memo(function MessageBubble({ message, onRetry, onRegenerate }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [gaveFeedback, setGaveFeedback] = useState<null | "up" | "down">(null);
@@ -38,6 +70,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
   const senderName = message.senderName || (isUser ? (isOwn ? "You" : "Teammate") : "Omnix AI");
   const senderRole = message.senderRole || (isUser ? "member" : "assistant");
   const sources = message.sources ?? [];
+  const retrievalNotice = !isUser ? retrievalNoticeFor(message.retrieval) : null;
   const senderRoleKey = String(senderRole);
   const roleColor =
     senderRoleKey === "owner" || senderRoleKey === "founder" || senderRoleKey === "super_founder"
@@ -209,6 +242,18 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onR
         ) : (
           <div className="relative z-10 break-words"><MarkdownRenderer content={message.content} compact /></div>
         )}
+
+        {retrievalNotice ? (
+          <div
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            className={cn("relative z-10 mt-3 flex min-w-0 items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-5", retrievalNotice.tone)}
+          >
+            <Globe2 aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <p className="min-w-0 break-words">{retrievalNotice.message}</p>
+          </div>
+        ) : null}
 
         {isUser && message.attachments && message.attachments.length > 0 ? (
           <div className="relative z-10 mt-3 flex flex-col gap-2">
