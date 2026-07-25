@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import uuid
 import logging
@@ -7,13 +8,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
-try:
-    import redis.asyncio as aioredis
-except ModuleNotFoundError as exc:
-    aioredis = None  # type: ignore[assignment]
-    _redis_import_error: ModuleNotFoundError | None = exc
-else:
-    _redis_import_error = None
+from ..bootstrap import redis as redis_bootstrap
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +20,8 @@ _QUEUE_KEY = os.environ.get("OMNIX_JOB_QUEUE", _DEFAULT_QUEUE_KEY)
 _QUEUE_PAYLOAD_KEY = "_queue"
 _DEFAULT_QUEUE_RECOVERY_MIN_AGE_SECONDS = 60.0
 _DEFAULT_QUEUE_RECOVERY_LIMIT = 100
+_DEFAULT_REDIS_OPERATION_TIMEOUT_SECONDS = 5.0
+_DEFAULT_DATABASE_FALLBACK_LIMIT = 16
 
 _LPUSH_IF_ABSENT_SCRIPT = """
 local existing = redis.call('LRANGE', KEYS[1], 0, -1)
@@ -37,6 +34,9 @@ redis.call('LPUSH', KEYS[1], ARGV[1])
 return 1
 """
 
+# Compatibility alias for callers that previously patched this module. The
+# object itself is always created by bootstrap.redis, so every entry point uses
+# the same connection policy.
 _redis_client: Any | None = None
 
 
@@ -47,32 +47,10 @@ class JobEnqueueError(RuntimeError):
         self.persisted = persisted
 
 
-def _configured_redis_url() -> str:
-    try:
-        from ..settings import get_settings
-
-        return get_settings().REDIS_URL
-    except Exception:
-        logger.warning("Unable to load configured REDIS_URL; falling back to %s", REDIS_URL)
-        return REDIS_URL
-
-
-def _missing_redis_dependency_error() -> RuntimeError:
-    return RuntimeError(
-        "The Python package 'redis' is required for Omnix background jobs. "
-        "Install backend dependencies with `pip install -r backend/requirements.txt` "
-        "or `pip install redis>=5.0.0` in the active backend environment."
-    )
-
-
 def get_redis() -> Any:
     global _redis_client
-    if aioredis is None:
-        raise _missing_redis_dependency_error() from _redis_import_error
-
     if _redis_client is None:
-        redis_url = _configured_redis_url()
-        _redis_client = aioredis.from_url(redis_url, decode_responses=True)
+        _redis_client = redis_bootstrap.get_redis()
     return _redis_client
 
 
@@ -161,6 +139,19 @@ def _env_int(name: str, default: int, *, minimum: int = 1) -> int:
     return max(minimum, value)
 
 
+def _redis_operation_timeout_seconds() -> float:
+    return _env_float(
+        "OMNIX_REDIS_OPERATION_TIMEOUT_SECONDS",
+        _DEFAULT_REDIS_OPERATION_TIMEOUT_SECONDS,
+        minimum=0.1,
+    )
+
+
+async def _await_redis_operation(operation: Any) -> Any:
+    """Bound an individual Redis command even when a client is lazily connected."""
+    return await asyncio.wait_for(operation, timeout=_redis_operation_timeout_seconds())
+
+
 def _decode_redis_value(value: Any) -> str:
     if isinstance(value, bytes):
         return value.decode("utf-8")
@@ -173,13 +164,61 @@ async def _lpush_if_absent(redis: Any, queue_name: str, job_id: str, queued_ids:
 
     eval_script = getattr(redis, "eval", None)
     if callable(eval_script):
-        pushed = await eval_script(_LPUSH_IF_ABSENT_SCRIPT, 1, queue_name, job_id)
+        pushed = await _await_redis_operation(eval_script(_LPUSH_IF_ABSENT_SCRIPT, 1, queue_name, job_id))
         queued_ids.add(job_id)
         return bool(int(pushed))
 
-    await redis.lpush(queue_name, job_id)
+    await _await_redis_operation(redis.lpush(queue_name, job_id))
     queued_ids.add(job_id)
     return True
+
+
+async def push_job_id(job_id: str, *, queue: str | None = None) -> None:
+    """Push a persisted job id to Redis with a bounded command deadline."""
+    redis = get_redis()
+    await _await_redis_operation(redis.lpush(_queue_name(queue), job_id))
+
+
+async def queued_job_ids_for_queue(
+    *,
+    queue: str | None = None,
+    limit: int | None = None,
+) -> list[str]:
+    """Return the oldest durable queued job ids for one worker queue.
+
+    Redis is a wake-up path, not the source of truth. The queue marker is queried
+    in Postgres so an OCR backlog cannot consume the ordinary ingestion worker's
+    fallback capacity. Jobs created before queue markers existed are considered
+    only by the normal ingestion queue.
+    """
+    from ..services.supabase_service import select_all_trusted
+
+    queue_name = _queue_name(queue)
+    row_limit = max(
+        1,
+        int(limit) if limit is not None else _env_int("OMNIX_DATABASE_QUEUE_FALLBACK_LIMIT", _DEFAULT_DATABASE_FALLBACK_LIMIT),
+    )
+    rows = await select_all_trusted(
+        "jobs",
+        "id",
+        filters={"status": "queued", f"payload->>{_QUEUE_PAYLOAD_KEY}": queue_name},
+        order_by="created_at",
+        limit=row_limit,
+    )
+    job_ids = [str(row["id"]) for row in rows if row.get("id")]
+
+    if queue_name != primary_job_queue() or len(job_ids) >= row_limit:
+        return job_ids
+
+    legacy_rows = await select_all_trusted(
+        "jobs",
+        "id",
+        filters={"status": "queued", f"payload->>{_QUEUE_PAYLOAD_KEY}": {"is": "null"}},
+        order_by="created_at",
+        limit=row_limit - len(job_ids),
+    )
+    job_ids.extend(str(row["id"]) for row in legacy_rows if row.get("id"))
+    return job_ids
 
 
 async def recover_missing_queued_jobs(
@@ -217,7 +256,10 @@ async def recover_missing_queued_jobs(
     )
 
     redis = get_redis()
-    queued_ids = {_decode_redis_value(item) for item in await redis.lrange(queue_name, 0, -1)}
+    queued_ids = {
+        _decode_redis_value(item)
+        for item in await _await_redis_operation(redis.lrange(queue_name, 0, -1))
+    }
 
     already_queued = 0
     other_queue_jobs = 0
@@ -272,7 +314,7 @@ async def recover_missing_queued_jobs(
 
 async def enqueue_job(payload: Dict[str, Any], queue: str | None = None) -> str:
     """
-    Create a jobs table row (trusted) and push job id to Redis queue.
+    Create a jobs table row (trusted) and push its id to the Redis wake-up queue.
 
     Safety contract:
     - DB row is always written first. If Redis push fails, the job row remains
@@ -280,7 +322,7 @@ async def enqueue_job(payload: Dict[str, Any], queue: str | None = None) -> str:
     - If the DB write fails, we log and continue without Redis push, so we do
       not push an orphan job_id that has no corresponding DB row.
     - Redis unavailability does NOT silently swallow the job — the DB row
-      persists and is detectable via stuck-job detection.
+      remains authoritative and a worker can pick it up through database fallback.
     """
     queue_name = queue or queue_name_for_payload(payload)
     job_id = str(uuid.uuid4())
@@ -311,13 +353,12 @@ async def enqueue_job(payload: Dict[str, Any], queue: str | None = None) -> str:
 
     # Step 2: Push to Redis. If Redis is down, the DB row is the recovery source.
     try:
-        redis = get_redis()
-        await redis.lpush(queue_name, job_id)
+        await push_job_id(job_id, queue=queue_name)
         logger.info("Enqueued job %s to %s", job_id, queue_name)
     except Exception:
         logger.exception(
             "Failed to push job %s to Redis queue %s. "
-            "Job row exists in DB with status='queued' and will be detectable as stuck.",
+            "Job row exists in DB with status='queued' and remains eligible for worker fallback.",
             job_id,
             queue_name,
         )

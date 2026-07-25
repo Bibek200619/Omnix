@@ -1,6 +1,8 @@
 from __future__ import annotations
+import asyncio
 import logging
 from typing import Any
+
 from ..settings import get_settings
 
 try:
@@ -14,6 +16,8 @@ else:
 logger = logging.getLogger(__name__)
 
 _redis_client: Any | None = None
+_REDIS_SOCKET_TIMEOUT_SECONDS = 5.0
+_REDIS_INITIALIZATION_TIMEOUT_SECONDS = 6.0
 
 def _missing_redis_dependency_error() -> RuntimeError:
     return RuntimeError(
@@ -21,37 +25,33 @@ def _missing_redis_dependency_error() -> RuntimeError:
         "Install backend dependencies with `pip install redis>=5.0.0`."
     )
 
-async def initialize_redis():
-    global _redis_client
+def _build_redis_client() -> Any:
     if aioredis is None:
         raise _missing_redis_dependency_error() from _redis_import_error
 
     settings = get_settings()
-    logger.info(f"Initializing Redis at {settings.REDIS_URL}...")
-    
-    if _redis_client is None:
-        _redis_client = aioredis.from_url(
-            settings.REDIS_URL, 
-            decode_responses=True,
-            socket_timeout=5.0,
-            socket_connect_timeout=5.0,
-            retry_on_timeout=True
-        )
-        # Verify connection
-        await _redis_client.ping()
-        logger.info("Redis connection established.")
+    return aioredis.from_url(
+        settings.REDIS_URL,
+        decode_responses=True,
+        socket_timeout=_REDIS_SOCKET_TIMEOUT_SECONDS,
+        socket_connect_timeout=_REDIS_SOCKET_TIMEOUT_SECONDS,
+        retry_on_timeout=True,
+    )
+
+
+async def initialize_redis() -> bool:
+    logger.info("Initializing Redis distributed state.")
+    client = get_redis()
+    await asyncio.wait_for(client.ping(), timeout=_REDIS_INITIALIZATION_TIMEOUT_SECONDS)
+    logger.info("Redis connection established.")
     return True
 
+
 def get_redis() -> Any:
+    global _redis_client
     if _redis_client is None:
-        # Fallback for lazy initialization if startup event didn't run (e.g. scripts)
-        if aioredis is None:
-            raise _missing_redis_dependency_error() from _redis_import_error
-        
-        from ..settings import get_settings
-        settings = get_settings()
-        # Note: This is synchronous but aioredis.from_url is fast.
-        # The actual connection happens on first command.
-        return aioredis.from_url(settings.REDIS_URL, decode_responses=True)
-    
+        # The connection is established lazily on the first command. Cache the
+        # client here as well as during app startup so workers and scripts use
+        # the same bounded connection settings.
+        _redis_client = _build_redis_client()
     return _redis_client
