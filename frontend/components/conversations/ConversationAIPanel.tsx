@@ -88,19 +88,8 @@ export function ConversationAIPanel({
     }
   }
 
-  async function openCandidateDecision(candidate: DecisionCandidate) {
+  function openCandidateDecision(candidate: DecisionCandidate) {
     onOpenDecision({ kind: "candidate", candidate });
-    if (!activeWorkspaceId) return;
-    try {
-      await apiClient.post(`/workspaces/${activeWorkspaceId}/decisions/candidates/metrics`, {
-        action: "accept",
-        candidate_id: candidate.id,
-        source_type: candidate.source_type,
-        source_id: candidate.source_id,
-      });
-    } catch (err) {
-      logClientError("Failed to log decision candidate acceptance", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/metrics` });
-    }
   }
 
   async function dismissDecisionCandidate(candidate: DecisionCandidate) {

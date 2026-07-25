@@ -479,6 +479,24 @@ export type WorkspaceTaskAssistance = {
 export type WorkspaceDecisionStatus = "proposed" | "accepted" | "rejected" | "superseded";
 export type WorkspaceDecisionSourceType = "conversation" | "conversation_message" | "document";
 
+export type DecisionEvidenceKind = "conversation_message" | "document_chunk";
+
+export type DecisionEvidence = {
+  kind: DecisionEvidenceKind;
+  channel_id?: string | null;
+  message_id?: string | null;
+  file_id?: string | null;
+  chunk_id?: string | null;
+  chunk_index?: number | null;
+  page?: number | null;
+  char_start: number;
+  char_end: number;
+  quote: string;
+  quote_sha256?: string | null;
+  source_content_hash: string;
+  source_updated_at?: string | null;
+};
+
 export type WorkspaceDecision = {
   id: string;
   workspace_id: string;
@@ -490,6 +508,7 @@ export type WorkspaceDecision = {
   source_id?: string | null;
   source_message_id?: string | null;
   source_channel_id?: string | null;
+  source_evidence?: DecisionEvidence[];
   initiative_id?: string | null;
   created_by: string;
   created_at?: string | null;
@@ -524,7 +543,7 @@ export type DecisionCandidate = {
   confidence: DecisionCandidateConfidence;
   source_type: DecisionCandidateSourceType;
   source_id: string;
-  supporting_evidence: string[];
+  supporting_evidence: DecisionEvidence[];
 };
 
 export type DecisionCandidateList = {

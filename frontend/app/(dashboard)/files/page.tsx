@@ -99,7 +99,7 @@ function FilesPageContent() {
   const [decisionCandidates, setDecisionCandidates] = useState<DecisionCandidate[]>([]);
   const [decisionCandidatesLoading, setDecisionCandidatesLoading] = useState(false);
   const [decisionCandidatesError, setDecisionCandidatesError] = useState<string | null>(null);
-  const [decisionCandidateDraft, setDecisionCandidateDraft] = useState<{ title: string; reason: string; description: string; status: WorkspaceDecisionStatus; source_type: DecisionCandidate["source_type"]; source_id: string } | null>(null);
+  const [decisionCandidateDraft, setDecisionCandidateDraft] = useState<{ title: string; reason: string; description: string; status: WorkspaceDecisionStatus; source_type: DecisionCandidate["source_type"]; source_id: string; candidate_id: string; source_evidence: DecisionCandidate["supporting_evidence"] } | null>(null);
   const fileResultsRef = useRef<HTMLDivElement | null>(null);
   const [gridColumnCount, setGridColumnCount] = useState(1);
   const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
@@ -270,24 +270,18 @@ function FilesPageContent() {
     }
   }
 
-  async function openCandidateDecision(candidate: DecisionCandidate) {
+  function openCandidateDecision(candidate: DecisionCandidate) {
     if (!activeWorkspaceId) return;
     setDecisionCandidateDraft({
       title: candidate.title,
       reason: candidate.reason,
-      description: `Supporting evidence:\n${candidate.supporting_evidence.join("\n")}`,
-      status: "proposed", source_type: candidate.source_type, source_id: candidate.source_id,
+      description: `Supporting evidence:\n${candidate.supporting_evidence.map((evidence) => evidence.quote).join("\n")}`,
+      status: "proposed",
+      source_type: candidate.source_type,
+      source_id: candidate.source_id,
+      candidate_id: candidate.id,
+      source_evidence: candidate.supporting_evidence,
     });
-    try {
-      await apiClient.post(`/workspaces/${activeWorkspaceId}/decisions/candidates/metrics`, {
-        action: "accept",
-        candidate_id: candidate.id,
-        source_type: candidate.source_type,
-        source_id: candidate.source_id,
-      });
-    } catch (err) {
-      logClientError("Failed to log document decision candidate acceptance", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/metrics` });
-    }
   }
 
   async function dismissDecisionCandidate(candidate: DecisionCandidate) {

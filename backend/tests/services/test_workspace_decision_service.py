@@ -161,7 +161,6 @@ async def test_create_decision_allows_document_source_reference_without_rational
         workspace_id="workspace-1",
         user_id="user-1",
         payload={"title": "Use the document decision", "status": "accepted", "source_type": "document", "source_id": "file-1"},
-        origin="decision_candidate",
     )
 
     assert captured["decision_reason"] is None
@@ -207,7 +206,6 @@ async def test_create_decision_maps_conversation_source_to_channel(monkeypatch: 
         workspace_id="workspace-1",
         user_id="user-1",
         payload={"title": "Use the candidate decision", "status": "accepted", "source_type": "conversation", "source_id": "channel-1"},
-        origin="decision_candidate",
     )
 
     assert captured["source_type"] == "conversation"
@@ -243,7 +241,6 @@ async def test_create_decision_rejects_document_source_outside_workspace(monkeyp
                 "source_type": "document",
                 "source_id": "file-other",
             },
-            origin="decision_candidate",
         )
 
     assert getattr(exc_info.value, "status_code", None) == 400
@@ -302,3 +299,233 @@ async def test_create_decision_persists_structured_mentions(monkeypatch: pytest.
     assert captured_sync["source_type"] == "decision"
     assert captured_sync["source_id"] == "decision-1"
     assert result["mentions"] == mention_metadata
+
+
+@pytest.mark.asyncio
+async def test_create_decision_from_candidate_persists_server_verified_message_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
+    source_content = "We will use Supabase Realtime for presence updates."
+    captured: dict[str, object] = {}
+    metric: dict[str, object] = {}
+
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_channel_access(**kwargs):
+        assert kwargs == {"workspace_id": "workspace-1", "channel_id": "channel-1", "user_id": "user-1"}
+        return {"id": "channel-1"}, object()
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
+        assert table == "workspace_channel_messages"
+        assert filters == {"id": "message-1", "workspace_id": "workspace-1", "channel_id": "channel-1"}
+        return {
+            "id": "message-1",
+            "workspace_id": "workspace-1",
+            "channel_id": "channel-1",
+            "content": source_content,
+            "updated_at": "2026-07-25T12:00:00+00:00",
+        }
+
+    async def fake_prepare_mentions(**kwargs):
+        return []
+
+    async def fake_insert(table: str, payload: dict[str, object]):
+        assert table == "workspace_decisions"
+        captured.update(payload)
+        return {"id": "decision-1", "workspace_id": "workspace-1", "created_by": "user-1", **payload}
+
+    async def fake_activity(**kwargs):
+        return None
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    async def fake_metric(**kwargs):
+        metric.update(kwargs)
+
+    monkeypatch.setattr(decisions, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(decisions, "_require_channel_access", fake_channel_access)
+    monkeypatch.setattr(decisions, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(decisions, "prepare_mentions_for_workspace", fake_prepare_mentions)
+    monkeypatch.setattr(decisions, "insert_one_trusted", fake_insert)
+    monkeypatch.setattr(decisions, "log_workspace_activity", fake_activity)
+    monkeypatch.setattr(decisions, "get_profiles", fake_profiles)
+    monkeypatch.setattr(decisions, "log_candidate_metrics", fake_metric)
+
+    result = await decisions.create_decision_from_candidate(
+        workspace_id="workspace-1",
+        user_id="user-1",
+        payload={
+            "candidate_id": "conversation-candidate-1",
+            "title": "Use Supabase Realtime",
+            "decision_reason": "The team explicitly selected the realtime provider.",
+            "status": "proposed",
+            "source_type": "conversation",
+            "source_id": "channel-1",
+            "source_evidence": [
+                {
+                    "kind": "conversation_message",
+                    "channel_id": "channel-1",
+                    "message_id": "message-1",
+                    "char_start": 0,
+                    "char_end": len(source_content),
+                    "quote": source_content,
+                    "source_content_hash": decisions._content_hash(source_content),
+                    "source_updated_at": "forged-client-version",
+                }
+            ],
+        },
+    )
+
+    evidence = captured["source_evidence"]
+    assert isinstance(evidence, list)
+    assert evidence[0]["message_id"] == "message-1"
+    assert evidence[0]["channel_id"] == "channel-1"
+    assert evidence[0]["quote"] == source_content
+    assert evidence[0]["quote_sha256"] == decisions._content_hash(source_content)
+    assert evidence[0]["source_updated_at"] == "2026-07-25T12:00:00+00:00"
+    assert result["source_evidence"] == evidence
+    assert metric["action"] == "accept"
+    assert metric["candidate_id"] == "conversation-candidate-1"
+
+
+@pytest.mark.asyncio
+async def test_candidate_evidence_rejects_message_from_another_channel_before_insert(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_channel_access(**kwargs):
+        return {"id": "channel-1"}, object()
+
+    async def fail_insert(*args, **kwargs):
+        raise AssertionError("cross-channel evidence must not be inserted")
+
+    monkeypatch.setattr(decisions, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(decisions, "_require_channel_access", fake_channel_access)
+    monkeypatch.setattr(decisions, "insert_one_trusted", fail_insert)
+
+    with pytest.raises(Exception) as exc_info:
+        await decisions.create_decision_from_candidate(
+            workspace_id="workspace-1",
+            user_id="user-1",
+            payload={
+                "candidate_id": "candidate-1",
+                "title": "Use the external channel",
+                "source_type": "conversation",
+                "source_id": "channel-1",
+                "source_evidence": [
+                    {
+                        "kind": "conversation_message",
+                        "channel_id": "channel-other",
+                        "message_id": "message-other",
+                        "char_start": 0,
+                        "char_end": 12,
+                        "quote": "Shared quote",
+                        "source_content_hash": decisions._content_hash("Shared quote"),
+                    }
+                ],
+            },
+        )
+
+    assert getattr(exc_info.value, "status_code", None) == 400
+    assert getattr(exc_info.value, "detail", None) == "Candidate evidence is not in the selected conversation."
+
+
+@pytest.mark.asyncio
+async def test_candidate_evidence_rejects_document_chunk_outside_workspace_before_insert(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
+        if table == "files":
+            assert filters == {"id": "file-1", "workspace_id": "workspace-1"}
+            return {"id": "file-1"}
+        assert table == "documents"
+        assert filters == {"id": "chunk-other", "file_id": "file-1", "workspace_id": "workspace-1"}
+        return None
+
+    async def fail_insert(*args, **kwargs):
+        raise AssertionError("cross-workspace document evidence must not be inserted")
+
+    monkeypatch.setattr(decisions, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(decisions, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(decisions, "insert_one_trusted", fail_insert)
+
+    with pytest.raises(Exception) as exc_info:
+        await decisions.create_decision_from_candidate(
+            workspace_id="workspace-1",
+            user_id="user-1",
+            payload={
+                "candidate_id": "candidate-1",
+                "title": "Use the external document",
+                "source_type": "document",
+                "source_id": "file-1",
+                "source_evidence": [
+                    {
+                        "kind": "document_chunk",
+                        "file_id": "file-1",
+                        "chunk_id": "chunk-other",
+                        "chunk_index": 2,
+                        "char_start": 0,
+                        "char_end": 12,
+                        "quote": "Shared quote",
+                        "source_content_hash": decisions._content_hash("Shared quote"),
+                    }
+                ],
+            },
+        )
+
+    assert getattr(exc_info.value, "status_code", None) == 400
+    assert getattr(exc_info.value, "detail", None) == "Candidate evidence document chunk is not in this workspace."
+
+
+@pytest.mark.asyncio
+async def test_candidate_evidence_rejects_stale_message_revision_before_insert(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_channel_access(**kwargs):
+        return {"id": "channel-1"}, object()
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
+        assert table == "workspace_channel_messages"
+        return {
+            "id": "message-1",
+            "workspace_id": "workspace-1",
+            "channel_id": "channel-1",
+            "content": "The source was edited after the candidate scan.",
+            "updated_at": "2026-07-25T12:05:00+00:00",
+        }
+
+    async def fail_insert(*args, **kwargs):
+        raise AssertionError("stale evidence must not be inserted")
+
+    monkeypatch.setattr(decisions, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(decisions, "_require_channel_access", fake_channel_access)
+    monkeypatch.setattr(decisions, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(decisions, "insert_one_trusted", fail_insert)
+
+    with pytest.raises(Exception) as exc_info:
+        await decisions.create_decision_from_candidate(
+            workspace_id="workspace-1",
+            user_id="user-1",
+            payload={
+                "candidate_id": "candidate-1",
+                "title": "Use stale evidence",
+                "source_type": "conversation",
+                "source_id": "channel-1",
+                "source_evidence": [
+                    {
+                        "kind": "conversation_message",
+                        "channel_id": "channel-1",
+                        "message_id": "message-1",
+                        "char_start": 0,
+                        "char_end": 12,
+                        "quote": "Original text",
+                        "source_content_hash": decisions._content_hash("Original text"),
+                    }
+                ],
+            },
+        )
+
+    assert getattr(exc_info.value, "status_code", None) == 409
+    assert "stale" in str(getattr(exc_info.value, "detail", "")).lower()

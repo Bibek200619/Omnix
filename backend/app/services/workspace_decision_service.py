@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import hashlib
 import logging
+import re
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -15,6 +17,7 @@ from .supabase_service import (
     update_one_trusted,
 )
 from .workspace_collaboration_service import log_workspace_activity
+from .decision_candidate_service import log_candidate_metrics
 from .workspace_conversation_service import MESSAGE_COLUMNS, _require_channel_access
 from .workspace_mention_service import (
     mention_metadata_for_sources,
@@ -25,12 +28,16 @@ from .workspace_service import get_profiles, require_workspace_access, utc_now_i
 
 DECISION_COLUMNS = (
     "id,workspace_id,title,description,decision_reason,status,source_type,source_id,source_message_id,"
-    "source_channel_id,initiative_id,created_by,created_at,updated_at"
+    "source_channel_id,source_evidence,initiative_id,created_by,created_at,updated_at"
 )
 TASK_PREVIEW_COLUMNS = "id,title,status,owner_user_id"
 INITIATIVE_PREVIEW_COLUMNS = "id,title,status,momentum_state"
 DECISION_STATUSES = ("proposed", "accepted", "rejected", "superseded")
 DECISION_SOURCE_TYPES = {"conversation", "conversation_message", "document"}
+EVIDENCE_KINDS = {"conversation_message", "document_chunk"}
+MAX_EVIDENCE_ITEMS = 5
+MAX_EVIDENCE_QUOTE_CHARS = 420
+_SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
 logger = logging.getLogger(__name__)
 
 
@@ -144,6 +151,185 @@ def _normalize_source_type(value: Any) -> str | None:
     return source_type
 
 
+def _evidence_identifier(value: Any, *, field: str) -> str:
+    identifier = _clean_text(value)
+    if not identifier or len(identifier) > 160:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Candidate evidence {field} is invalid.")
+    return identifier
+
+
+def _evidence_integer(value: Any, *, field: str) -> int:
+    if isinstance(value, bool):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Candidate evidence {field} is invalid.")
+    try:
+        integer = int(value)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Candidate evidence {field} is invalid.") from exc
+    if integer < 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Candidate evidence {field} is invalid.")
+    return integer
+
+
+def _evidence_page(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        page = int(value)
+    except (TypeError, ValueError):
+        return None
+    return page if page > 0 else None
+
+
+def _content_hash(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _stale_evidence() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Candidate evidence is stale. Scan the source again before recording this decision.",
+    )
+
+
+async def _validated_candidate_evidence(
+    *,
+    workspace_id: str,
+    resolved_source_type: str | None,
+    resolved_source_id: str | None,
+    evidence_values: Any,
+) -> list[dict[str, Any]]:
+    """Reload and canonicalize every candidate anchor before persisting it.
+
+    The browser only supplies a claim. The workspace-scoped source row is the
+    authority for the source IDs, quote span, source revision hash, page, and
+    chunk index that are written to a decision.
+    """
+
+    if resolved_source_type not in {"conversation", "document"} or not resolved_source_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Candidate evidence requires a conversation or document source.",
+        )
+    if not isinstance(evidence_values, list) or not evidence_values or len(evidence_values) > MAX_EVIDENCE_ITEMS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Candidate evidence must include between one and five source references.",
+        )
+
+    canonical: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, int, int]] = set()
+    for raw_evidence in evidence_values:
+        if not isinstance(raw_evidence, Mapping):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence is invalid.")
+        kind = _clean_text(raw_evidence.get("kind"))
+        if kind not in EVIDENCE_KINDS:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence kind is invalid.")
+        quote = raw_evidence.get("quote")
+        if not isinstance(quote, str) or not quote.strip() or len(quote) > MAX_EVIDENCE_QUOTE_CHARS:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence quote is invalid.")
+        supplied_hash = str(raw_evidence.get("source_content_hash") or "")
+        if not _SHA256_RE.fullmatch(supplied_hash):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence revision is invalid.")
+        char_start = _evidence_integer(raw_evidence.get("char_start"), field="start offset")
+        char_end = _evidence_integer(raw_evidence.get("char_end"), field="end offset")
+        if char_end <= char_start:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence range is invalid.")
+
+        if resolved_source_type == "conversation":
+            if kind != "conversation_message":
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence does not match its conversation source.")
+            channel_id = _evidence_identifier(raw_evidence.get("channel_id"), field="channel identifier")
+            message_id = _evidence_identifier(raw_evidence.get("message_id"), field="message identifier")
+            if channel_id != resolved_source_id:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence is not in the selected conversation.")
+            try:
+                source_row = await select_one_trusted(
+                    "workspace_channel_messages",
+                    "id,workspace_id,channel_id,content,updated_at",
+                    {"id": message_id, "workspace_id": workspace_id, "channel_id": channel_id},
+                )
+            except SupabaseServiceError as exc:
+                raise _database_error() from exc
+            if source_row is None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence message is not in this workspace.")
+            content = str(source_row.get("content") or "")
+            current_hash = _content_hash(content)
+            if current_hash != supplied_hash:
+                raise _stale_evidence()
+            if char_end > len(content) or content[char_start:char_end] != quote:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence quote does not match its source.")
+            key = (kind, message_id, char_start, char_end)
+            if key in seen:
+                continue
+            seen.add(key)
+            canonical.append(
+                {
+                    "kind": kind,
+                    "channel_id": channel_id,
+                    "message_id": message_id,
+                    "char_start": char_start,
+                    "char_end": char_end,
+                    "quote": quote,
+                    "quote_sha256": _content_hash(quote),
+                    "source_content_hash": current_hash,
+                    "source_updated_at": source_row.get("updated_at"),
+                }
+            )
+            continue
+
+        if kind != "document_chunk":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence does not match its document source.")
+        file_id = _evidence_identifier(raw_evidence.get("file_id"), field="file identifier")
+        chunk_id = _evidence_identifier(raw_evidence.get("chunk_id"), field="chunk identifier")
+        chunk_index = _evidence_integer(raw_evidence.get("chunk_index"), field="chunk index")
+        if file_id != resolved_source_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence is not in the selected document.")
+        try:
+            source_row = await select_one_trusted(
+                "documents",
+                "id,file_id,workspace_id,content,chunk_index,metadata,updated_at",
+                {"id": chunk_id, "file_id": file_id, "workspace_id": workspace_id},
+            )
+        except SupabaseServiceError as exc:
+            raise _database_error() from exc
+        if source_row is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence document chunk is not in this workspace.")
+        actual_chunk_index = _evidence_integer(source_row.get("chunk_index"), field="chunk index")
+        if actual_chunk_index != chunk_index:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence chunk does not match its source.")
+        content = str(source_row.get("content") or "")
+        current_hash = _content_hash(content)
+        if current_hash != supplied_hash:
+            raise _stale_evidence()
+        if char_end > len(content) or content[char_start:char_end] != quote:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence quote does not match its source.")
+        key = (kind, chunk_id, char_start, char_end)
+        if key in seen:
+            continue
+        seen.add(key)
+        metadata = source_row.get("metadata") if isinstance(source_row.get("metadata"), Mapping) else {}
+        evidence = {
+            "kind": kind,
+            "file_id": file_id,
+            "chunk_id": chunk_id,
+            "chunk_index": actual_chunk_index,
+            "char_start": char_start,
+            "char_end": char_end,
+            "quote": quote,
+            "quote_sha256": _content_hash(quote),
+            "source_content_hash": current_hash,
+            "source_updated_at": source_row.get("updated_at"),
+        }
+        page = _evidence_page(metadata.get("page"))
+        if page is not None:
+            evidence["page"] = page
+        canonical.append(evidence)
+
+    if not canonical:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Candidate evidence is invalid.")
+    return canonical
+
+
 async def _resolve_source_reference(
     *,
     workspace_id: str,
@@ -205,6 +391,25 @@ async def _resolve_source_reference(
     if file_row is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Decision source document is not in this workspace.")
     return resolved_type, resolved_id, resolved_channel_id, resolved_message_id
+
+
+async def validate_candidate_metric_source(
+    *,
+    workspace_id: str,
+    user_id: str,
+    source_type: str,
+    source_id: str,
+) -> None:
+    """Do not record candidate activity for a source outside the active workspace."""
+
+    await _resolve_source_reference(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        source_type=source_type,
+        source_id=source_id,
+        source_channel_id=None,
+        source_message_id=None,
+    )
 
 
 async def list_decisions(*, workspace_id: str, user_id: str) -> list[dict[str, Any]]:
@@ -365,8 +570,14 @@ async def create_decision(
     source_id: str | None = None,
     source_channel_id: str | None = None,
     source_message_id: str | None = None,
+    require_verified_evidence: bool = False,
 ) -> dict[str, Any]:
     access = await require_workspace_access(workspace_id, user_id)
+    if origin == "decision_candidate" and not require_verified_evidence:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Decision candidates must include verified source evidence.",
+        )
     title = _clean_text(payload.get("title"))
     if not title:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Decision title cannot be empty.")
@@ -384,6 +595,14 @@ async def create_decision(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Decision rationale or source evidence is required.",
         )
+    source_evidence: list[dict[str, Any]] = []
+    if require_verified_evidence:
+        source_evidence = await _validated_candidate_evidence(
+            workspace_id=workspace_id,
+            resolved_source_type=resolved_source_type,
+            resolved_source_id=resolved_source_id,
+            evidence_values=payload.get("source_evidence"),
+        )
     mentions = await prepare_mentions_for_workspace(
         workspace=access.workspace,
         mentions=payload.get("mentions"),
@@ -400,6 +619,7 @@ async def create_decision(
         "source_id": resolved_source_id,
         "source_message_id": resolved_source_message_id,
         "source_channel_id": resolved_source_channel_id,
+        "source_evidence": source_evidence,
         "created_by": user_id,
         "updated_at": timestamp,
     }
@@ -430,6 +650,37 @@ async def create_decision(
         },
     )
     return (await _hydrate_decisions([created]))[0]
+
+
+async def create_decision_from_candidate(
+    *,
+    workspace_id: str,
+    user_id: str,
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Create a decision only after source evidence has been revalidated."""
+
+    decision = await create_decision(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        payload=payload,
+        origin="decision_candidate",
+        source_type=_clean_text(payload.get("source_type")),
+        source_id=_clean_text(payload.get("source_id")),
+        require_verified_evidence=True,
+    )
+    try:
+        await log_candidate_metrics(
+            workspace_id=workspace_id,
+            user_id=user_id,
+            source_type=str(payload.get("source_type")),
+            source_id=str(payload.get("source_id")),
+            action="accept",
+            candidate_id=_clean_text(payload.get("candidate_id")),
+        )
+    except Exception:
+        logger.warning("Decision candidate acceptance metric could not be recorded.", exc_info=True)
+    return decision
 
 
 async def create_decision_from_message(

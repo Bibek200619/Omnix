@@ -140,6 +140,18 @@ def test_ai_eval_document_context_handles_uploaded_evidence() -> None:
 
 
 def test_ai_eval_decision_candidate_extraction_rejects_unsupported_claims() -> None:
+    source_catalog = candidates._source_catalog(
+        [
+            {
+                "source_ref": "d1",
+                "kind": "document_chunk",
+                "file_id": "file-a",
+                "chunk_id": "chunk-a",
+                "chunk_index": 0,
+                "content": "Decision: ship async ingestion before public launch.",
+            }
+        ]
+    )
     unsupported = candidates._normalize_candidates(
         {
             "candidates": [
@@ -147,12 +159,13 @@ def test_ai_eval_decision_candidate_extraction_rejects_unsupported_claims() -> N
                     "title": "Ship launch",
                     "reason": "Looks plausible",
                     "confidence": "high",
-                    "supporting_evidence": [],
+                    "evidence": [],
                 }
             ]
         },
         source_type="document",
         source_id="file-a",
+        source_catalog=source_catalog,
     )
     supported = candidates._normalize_candidates(
         {
@@ -161,12 +174,13 @@ def test_ai_eval_decision_candidate_extraction_rejects_unsupported_claims() -> N
                     "title": "Ship async ingestion",
                     "reason": "The source explicitly says this is required before public launch.",
                     "confidence": "high",
-                    "supporting_evidence": ["Decision: ship async ingestion before public launch."],
+                    "evidence": [{"source_ref": "d1", "quote": "Decision: ship async ingestion before public launch."}],
                 }
             ]
         },
         source_type="document",
         source_id="file-a",
+        source_catalog=source_catalog,
     )
 
     assert unsupported == []

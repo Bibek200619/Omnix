@@ -13,6 +13,25 @@ DecisionSourceType = Literal["conversation", "conversation_message", "document"]
 DecisionCandidateSourceType = Literal["conversation", "document"]
 DecisionCandidateConfidence = Literal["low", "medium", "high"]
 DecisionCandidateMetricAction = Literal["accept", "dismiss"]
+DecisionEvidenceKind = Literal["conversation_message", "document_chunk"]
+
+
+class DecisionEvidence(BaseModel):
+    """A verbatim, server-verified locator for candidate decision evidence."""
+
+    kind: DecisionEvidenceKind
+    channel_id: str | None = Field(default=None, max_length=160)
+    message_id: str | None = Field(default=None, max_length=160)
+    file_id: str | None = Field(default=None, max_length=160)
+    chunk_id: str | None = Field(default=None, max_length=160)
+    chunk_index: int | None = Field(default=None, ge=0)
+    page: int | None = Field(default=None, ge=1)
+    char_start: int = Field(..., ge=0)
+    char_end: int = Field(..., ge=1)
+    quote: str = Field(..., min_length=1, max_length=420)
+    quote_sha256: str | None = Field(default=None, min_length=64, max_length=64, pattern=r"^[a-f0-9]{64}$")
+    source_content_hash: str = Field(..., min_length=64, max_length=64, pattern=r"^[a-f0-9]{64}$")
+    source_updated_at: datetime | None = None
 
 
 class WorkspaceDecisionCreate(BaseModel):
@@ -22,6 +41,24 @@ class WorkspaceDecisionCreate(BaseModel):
     status: DecisionStatus = "accepted"
     source_type: DecisionSourceType | None = None
     source_id: str | None = Field(default=None, max_length=160)
+    mentions: list[WorkspaceMentionInput] = Field(default_factory=list, max_length=50)
+
+
+class WorkspaceDecisionCandidateCreate(BaseModel):
+    """Candidate acceptance is separate from manual decision creation.
+
+    The service reloads and verifies every submitted source anchor before it writes
+    the resulting immutable evidence snapshot.
+    """
+
+    candidate_id: str = Field(..., min_length=1, max_length=160)
+    title: str = Field(..., min_length=1, max_length=180)
+    description: str | None = Field(default=None, max_length=4000)
+    decision_reason: str | None = Field(default=None, max_length=6000)
+    status: DecisionStatus = "accepted"
+    source_type: DecisionCandidateSourceType
+    source_id: str = Field(..., min_length=1, max_length=160)
+    source_evidence: list[DecisionEvidence] = Field(..., min_length=1, max_length=5)
     mentions: list[WorkspaceMentionInput] = Field(default_factory=list, max_length=50)
 
 
@@ -40,7 +77,7 @@ class DecisionCandidate(BaseModel):
     confidence: DecisionCandidateConfidence
     source_type: DecisionCandidateSourceType
     source_id: str
-    supporting_evidence: list[str] = Field(..., min_length=1, max_length=5)
+    supporting_evidence: list[DecisionEvidence] = Field(..., min_length=1, max_length=5)
 
 
 class DecisionCandidateListRead(BaseModel):
@@ -71,6 +108,7 @@ class WorkspaceDecisionRead(BaseModel):
     source_id: str | None = None
     source_message_id: str | None = None
     source_channel_id: str | None = None
+    source_evidence: list[DecisionEvidence] = Field(default_factory=list)
     initiative_id: str | None = None
     created_by: str
     created_at: datetime | None = None
