@@ -6,7 +6,14 @@ import os
 from collections.abc import Iterable
 from typing import Any
 
-from .queue import get_redis, queue_name_for_payload, recover_missing_queued_jobs, worker_queue_name
+from .queue import (
+    get_redis,
+    push_job_id,
+    queue_name_for_payload,
+    queued_job_ids_for_queue,
+    recover_missing_queued_jobs,
+    worker_queue_name,
+)
 from .ingestion_jobs import handle_ingest_file
 from .automation_jobs import handle_run_automation
 from ..services.supabase_service import update_one_trusted, select_one_trusted
@@ -24,6 +31,7 @@ _DEFAULT_REDIS_OPERATION_TIMEOUT_SECONDS = 7.0
 _DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 30.0
 _DEFAULT_MAX_JOB_ATTEMPTS = 3
 _DEFAULT_QUEUE_RECOVERY_INTERVAL_SECONDS = 60.0
+_DEFAULT_DATABASE_QUEUE_FALLBACK_INTERVAL_SECONDS = 5.0
 _DEFAULT_OCR_WORKER_CONCURRENCY = 1
 _DEFAULT_OCR_JOB_TIMEOUT_SECONDS = 30 * 60
 
@@ -83,8 +91,7 @@ def _job_timeout_seconds() -> float:
 
 
 async def _push_retry_job(job_id: str, *, queue_name: str | None = None) -> None:
-    redis = get_redis()
-    await redis.lpush(queue_name or worker_queue_name(), job_id)
+    await push_job_id(job_id, queue=queue_name or worker_queue_name())
 
 
 async def _recover_missing_queued_jobs_once(queue_name: str) -> dict[str, Any] | None:
@@ -107,6 +114,22 @@ async def _recover_missing_queued_jobs_once(queue_name: str) -> dict[str, Any] |
             queue_name,
         )
     return result
+
+
+async def _database_fallback_job_ids_once(queue_name: str, *, limit: int) -> list[str]:
+    try:
+        job_ids = await queued_job_ids_for_queue(queue=queue_name, limit=limit)
+    except Exception as exc:
+        logger.warning("Durable queue fallback scan failed for %s: %s", queue_name, exc)
+        return []
+
+    if job_ids:
+        logger.warning(
+            "Scheduling %d durable queued job(s) for %s without a Redis wake-up.",
+            len(job_ids),
+            queue_name,
+        )
+    return job_ids
 
 
 async def _retry_or_dead_letter_job(
@@ -163,23 +186,35 @@ async def _retry_or_dead_letter_job(
 
 
 async def _process_job(job_id: str):
-    """Fetch job row, mark processing, run handler, update result."""
+    """Claim a queued job, run its handler once, and persist its result."""
     runtime = RuntimeManager.get()
-    runtime.record_job_started(_worker_id())
     success = False
+    runtime_recorded = False
     try:
         job_row = await select_one_trusted("jobs", "*", {"id": job_id})
         if not job_row:
             logger.warning("Job %s missing in DB; skipping", job_id)
+            # A stale Redis entry is still an operational failure, unlike a
+            # duplicate delivery that loses the conditional claim below.
+            runtime.record_job_started(_worker_id())
+            runtime_recorded = True
             return
 
-        # Update status to processing and increment attempt counter
+        # Atomically claim the row. Redis retries, recovery, and database
+        # fallback can all deliver the same id; only the first worker may run it.
         attempt_number = int(job_row.get("attempts") or 0) + 1
-        await update_one_trusted(
+        claimed_row = await update_one_trusted(
             "jobs",
-            {"id": job_id},
+            {"id": job_id, "status": "queued"},
             {"status": "processing", "attempts": attempt_number},
         )
+        if claimed_row is None:
+            logger.info("Job %s was already claimed by another worker; skipping duplicate delivery.", job_id)
+            return
+
+        job_row = {**job_row, **claimed_row}
+        runtime.record_job_started(_worker_id())
+        runtime_recorded = True
 
         job_type = job_row.get("type")
         if job_type == "ingest_file":
@@ -228,7 +263,8 @@ async def _process_job(job_id: str):
         except Exception:
             logger.exception("Failed to update job row for job %s after exception", job_id)
     finally:
-        runtime.record_job_completed(_worker_id(), success=success)
+        if runtime_recorded:
+            runtime.record_job_completed(_worker_id(), success=success)
 
 
 async def _process_job_with_timeout(job_id: str, *, timeout_seconds: float) -> None:
@@ -306,7 +342,8 @@ async def _worker_loop(shutdown_event: asyncio.Event):
         logger.exception("Worker startup failed to initialize embeddings provider: %s", exc)
         return
 
-    # Connect to Redis
+    # Construct the bounded Redis client. A connection outage is handled by the
+    # durable queue fallback in the polling loop below.
     try:
         redis = get_redis()
         queue_name = worker_queue_name()
@@ -321,18 +358,23 @@ async def _worker_loop(shutdown_event: asyncio.Event):
             "OMNIX_QUEUE_RECOVERY_INTERVAL_SECONDS",
             _DEFAULT_QUEUE_RECOVERY_INTERVAL_SECONDS,
         )
+        database_fallback_interval_seconds = _env_float(
+            "OMNIX_DATABASE_QUEUE_FALLBACK_INTERVAL_SECONDS",
+            _DEFAULT_DATABASE_QUEUE_FALLBACK_INTERVAL_SECONDS,
+        )
         shutdown_timeout_seconds = _env_float(
             "OMNIX_WORKER_SHUTDOWN_TIMEOUT_SECONDS",
             _DEFAULT_SHUTDOWN_TIMEOUT_SECONDS,
         )
         logger.info(
-            "Worker ready; listening on queue %s with concurrency=%d job_timeout=%.2fs",
+            "Worker ready; listening on queue %s with concurrency=%d job_timeout=%.2fs durable_fallback=%.2fs",
             queue_name,
             concurrency,
             job_timeout_seconds,
+            database_fallback_interval_seconds,
         )
     except Exception as exc:
-        logger.exception("Failed to connect to Redis during worker startup: %s", exc)
+        logger.exception("Failed to configure Redis client during worker startup: %s", exc)
         return
 
     # Register with RuntimeManager
@@ -345,6 +387,16 @@ async def _worker_loop(shutdown_event: asyncio.Event):
     semaphore = asyncio.Semaphore(concurrency)
     in_flight: set[asyncio.Task[None]] = set()
     last_recovery_scan = 0.0
+    last_database_fallback_scan = asyncio.get_running_loop().time()
+    redis_unavailable = False
+    force_database_fallback = False
+
+    def _schedule_job(job_id: str) -> None:
+        task = asyncio.create_task(
+            _run_limited_job(job_id, semaphore, timeout_seconds=job_timeout_seconds),
+            name=f"omnix-job-{job_id}",
+        )
+        in_flight.add(task)
 
     try:
         # Poll loop
@@ -356,11 +408,23 @@ async def _worker_loop(shutdown_event: asyncio.Event):
                 _consume_finished_tasks(in_flight, done)
                 continue
 
+            now = asyncio.get_running_loop().time()
+            if force_database_fallback or now - last_database_fallback_scan >= database_fallback_interval_seconds:
+                last_database_fallback_scan = now
+                force_database_fallback = False
+                available_slots = concurrency - len(in_flight)
+                fallback_job_ids = await _database_fallback_job_ids_once(queue_name, limit=available_slots)
+                if fallback_job_ids:
+                    for fallback_job_id in fallback_job_ids[:available_slots]:
+                        _schedule_job(fallback_job_id)
+                    continue
+
             try:
                 item = await asyncio.wait_for(
                     redis.brpop(queue_name, timeout=int(poll_timeout_seconds)),
                     timeout=redis_operation_timeout_seconds,
                 )
+                redis_unavailable = False
                 if not item:
                     now = asyncio.get_running_loop().time()
                     if now - last_recovery_scan >= recovery_interval_seconds:
@@ -371,20 +435,23 @@ async def _worker_loop(shutdown_event: asyncio.Event):
                 _, raw_job_id = item
                 job_id = _decode_job_id(raw_job_id)
                 logger.info("Dequeued job %s", job_id)
-                task = asyncio.create_task(
-                    _run_limited_job(job_id, semaphore, timeout_seconds=job_timeout_seconds),
-                    name=f"omnix-job-{job_id}",
-                )
-                in_flight.add(task)
+                _schedule_job(job_id)
             except asyncio.TimeoutError:
                 logger.warning(
                     "Redis poll for queue %s exceeded %.2fs operation timeout.",
                     queue_name,
                     redis_operation_timeout_seconds,
                 )
+                if not redis_unavailable:
+                    force_database_fallback = True
+                redis_unavailable = True
+                await asyncio.sleep(0.1)
             except Exception as exc:
                 logger.exception("Worker loop error: %s", exc)
-                await asyncio.sleep(1)
+                if not redis_unavailable:
+                    force_database_fallback = True
+                redis_unavailable = True
+                await asyncio.sleep(0.1)
     finally:
         await _drain_in_flight_jobs(in_flight, timeout_seconds=shutdown_timeout_seconds)
 
