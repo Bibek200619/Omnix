@@ -1,4 +1,11 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import {
+  isCurrentWorkspaceChannelChange,
+  isCurrentWorkspaceChannelLoad,
+  mergeWorkspaceChannelMessage,
+  reconcileWorkspaceChannelChange,
+} from "../components/conversations/conversationUtils";
+import type { WorkspaceChannel, WorkspaceChannelMessage } from "../lib/workspace-types";
 
 const axePath = `${process.cwd()}/node_modules/axe-core/axe.min.js`;
 
@@ -58,6 +65,26 @@ const members = [
 
 let tasks: Array<Record<string, unknown>>;
 let files: Array<Record<string, unknown>>;
+
+function workspaceChannel(overrides: Partial<WorkspaceChannel> = {}): WorkspaceChannel {
+  return {
+    id: "channel-general",
+    workspace_id: "workspace-1",
+    name: "General",
+    slug: "general",
+    purpose: "Coordinate work",
+    channel_type: "operational",
+    visibility: "workspace",
+    posting_policy: "members",
+    is_archived: false,
+    message_count: 1,
+    last_message_preview: "Earlier update",
+    last_message_at: "2026-06-20T00:00:00.000Z",
+    created_at: "2026-06-20T00:00:00.000Z",
+    updated_at: "2026-06-20T00:00:00.000Z",
+    ...overrides,
+  };
+}
 
 function resetMockState() {
   tasks = [
@@ -326,6 +353,120 @@ async function runAxe(page: Page) {
   const severe = results.violations.filter((violation: AxeViolation) => ["critical", "serious"].includes(violation.impact || ""));
   expect(severe, severe.map((violation) => `${violation.id}: ${violation.help}`).join("\n")).toEqual([]);
 }
+
+test("reconciles realtime channel rows without a reload", () => {
+  const general = workspaceChannel();
+  const announcements = workspaceChannel({
+    id: "channel-announcements",
+    name: "Announcements",
+    slug: "announcements",
+    channel_type: "announcement",
+  });
+  const planning = workspaceChannel({
+    id: "channel-planning",
+    name: "alpha planning",
+    slug: "alpha-planning",
+  });
+
+  const inserted = reconcileWorkspaceChannelChange([general, announcements], {
+    eventType: "INSERT",
+    new: planning,
+  });
+  expect(inserted.map((channel) => channel.id)).toEqual([
+    "channel-announcements",
+    "channel-planning",
+    "channel-general",
+  ]);
+
+  const updated = reconcileWorkspaceChannelChange(inserted, {
+    eventType: "UPDATE",
+    new: {
+      ...general,
+      message_count: 4,
+      last_message_preview: "Authoritative update",
+      last_message_at: "2026-06-20T00:01:00.000Z",
+    },
+  });
+  expect(updated.find((channel) => channel.id === general.id)).toMatchObject({
+    message_count: 4,
+    last_message_preview: "Authoritative update",
+    last_message_at: "2026-06-20T00:01:00.000Z",
+  });
+
+  expect(isCurrentWorkspaceChannelChange(
+    { eventType: "UPDATE", new: general },
+    "workspace-1",
+    "workspace-1",
+  )).toBe(true);
+  expect(isCurrentWorkspaceChannelChange(
+    { eventType: "UPDATE", new: general },
+    "workspace-1",
+    "workspace-2",
+  )).toBe(false);
+  expect(isCurrentWorkspaceChannelChange(
+    { eventType: "UPDATE", new: { ...general, workspace_id: "workspace-2" } },
+    "workspace-1",
+    "workspace-1",
+  )).toBe(false);
+  expect(isCurrentWorkspaceChannelChange(
+    { eventType: "DELETE", old: { id: general.id } },
+    "workspace-1",
+    "workspace-1",
+  )).toBe(true);
+  expect(isCurrentWorkspaceChannelChange(
+    { eventType: "DELETE", old: { id: general.id, workspace_id: "workspace-2" } },
+    "workspace-1",
+    "workspace-1",
+  )).toBe(false);
+
+  const loadState = {
+    requestId: 3,
+    latestRequestId: 3,
+    requestWorkspaceId: "workspace-1",
+    activeWorkspaceId: "workspace-1",
+    stateRevision: 8,
+    currentStateRevision: 8,
+  };
+  expect(isCurrentWorkspaceChannelLoad(loadState)).toBe(true);
+  expect(isCurrentWorkspaceChannelLoad({ ...loadState, currentStateRevision: 9 })).toBe(false);
+  expect(isCurrentWorkspaceChannelLoad({ ...loadState, activeWorkspaceId: "workspace-2" })).toBe(false);
+
+  const createdMessage = {
+    id: "message-1",
+    workspace_id: "workspace-1",
+    channel_id: general.id,
+    author_user_id: userId,
+    parent_message_id: null,
+    content: "A local message\nwith concise context",
+    context_links: [],
+    metadata: {},
+    created_at: "2026-06-20T00:02:00.000Z",
+    updated_at: "2026-06-20T00:02:00.000Z",
+    author_avatar_label: "R",
+    thread_reply_count: 0,
+  } satisfies WorkspaceChannelMessage;
+  const projected = mergeWorkspaceChannelMessage(updated, createdMessage);
+  expect(projected.find((channel) => channel.id === general.id)).toMatchObject({
+    message_count: 4,
+    last_message_preview: "A local message with concise context",
+    last_message_at: "2026-06-20T00:02:00.000Z",
+  });
+  expect(mergeWorkspaceChannelMessage(projected, createdMessage)).toEqual(projected);
+  expect(mergeWorkspaceChannelMessage(projected, {
+    ...createdMessage,
+    id: "message-older",
+    content: "An older local message",
+    created_at: "2026-06-20T00:01:30.000Z",
+    updated_at: "2026-06-20T00:01:30.000Z",
+  })).toEqual(projected);
+
+  expect(
+    reconcileWorkspaceChannelChange(updated, { eventType: "DELETE", old: { id: planning.id } }),
+  ).not.toContainEqual(expect.objectContaining({ id: planning.id }));
+  expect(
+    reconcileWorkspaceChannelChange(updated, { eventType: "UPDATE", new: { ...general, is_archived: true } }),
+  ).not.toContainEqual(expect.objectContaining({ id: general.id }));
+});
 
 test.describe("public auth pages", () => {
   test("render login and register pages", async ({ page }) => {

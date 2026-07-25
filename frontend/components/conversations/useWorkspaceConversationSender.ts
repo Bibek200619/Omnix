@@ -28,9 +28,9 @@ type SenderIdentity = {
 type UseWorkspaceConversationSenderParams = {
   activeWorkspaceId: string | null;
   identity: SenderIdentity;
-  loadChannels: () => void;
   loadMessages: (channelId: string) => void;
   mayPost: boolean;
+  onChannelMessageCreated: (message: WorkspaceChannelMessage) => void;
   selectedChannelId: string | null;
   sendTypingSignal: (conversationId?: string | null, isTyping?: boolean) => Promise<void>;
   setError: (message: string) => void;
@@ -41,9 +41,9 @@ type UseWorkspaceConversationSenderParams = {
 export function useWorkspaceConversationSender({
   activeWorkspaceId,
   identity,
-  loadChannels,
   loadMessages,
   mayPost,
+  onChannelMessageCreated,
   selectedChannelId,
   sendTypingSignal,
   setError,
@@ -107,8 +107,8 @@ export function useWorkspaceConversationSender({
         setDraft("");
         setDraftMentions([]);
       }
+      onChannelMessageCreated(created);
       await sendTypingSignal(selectedChannelId, false);
-      loadChannels();
     } catch (err) {
       const markFailed = (current: DisplayMessage[]) =>
         current.map((message) => message.client_nonce === nonce ? { ...message, delivery: "failed" as const } : message);
