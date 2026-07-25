@@ -1,4 +1,4 @@
-import type { Message, MessageAttachment } from "@/components/chat/types";
+import type { Message, MessageAttachment, RetrievalState } from "@/components/chat/types";
 import { formatChatTime, type SenderLookup } from "@/components/chat/chatMessageUtils";
 import { initialsFromText } from "@/lib/workspace-roles";
 
@@ -46,6 +46,7 @@ export function mergeStreamInitMessages(
   persistedUserMessageId: string | null,
   assistantId: string,
   sources: Message["sources"],
+  retrieval?: RetrievalState,
 ): Message[] {
   const next = current.map((message) =>
     message.id === messageId ? { ...message, id: persistedUserMessageId ?? message.id, status: "sent" as const } : message,
@@ -53,7 +54,9 @@ export function mergeStreamInitMessages(
 
   if (next.some((message) => message.id === assistantId)) {
     return next.map((message) =>
-      message.id === assistantId ? { ...message, status: "streaming" as const, isStreaming: true, sources: sources ?? message.sources ?? [] } : message,
+      message.id === assistantId
+        ? { ...message, status: "streaming" as const, isStreaming: true, sources: sources ?? message.sources ?? [], retrieval: retrieval ?? message.retrieval }
+        : message,
     );
   }
 
@@ -72,6 +75,7 @@ export function mergeStreamInitMessages(
       status: "streaming" as const,
       isStreaming: true,
       sources: sources ?? [],
+      retrieval,
     },
   ];
 }

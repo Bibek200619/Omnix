@@ -29,9 +29,15 @@ class PromptBuilder:
         query: str, 
         citations: List[Citation], 
         system_instructions: str = "",
-        specialization: str | None = None
+        specialization: str | None = None,
+        retrieval_outcome: str = "not_requested",
     ) -> AssembledContext:
         """Assemble final prompt from query, citations, and workspace cognitive posture."""
+        retrieval_outcome = (
+            retrieval_outcome
+            if retrieval_outcome in {"not_requested", "sources_found", "no_relevant_sources", "partial", "failed"}
+            else "failed"
+        )
         
         # 1. Workspace Cognitive Posture Directive
         workspace_focus = normalize_workspace_focus(specialization)
@@ -67,6 +73,25 @@ class PromptBuilder:
             "",
             UNTRUSTED_CONTENT_SYSTEM_POLICY,
         ]
+        if retrieval_outcome == "partial":
+            system_block.extend(
+                [
+                    "",
+                    "RETRIEVAL COVERAGE:",
+                    "- Some source-retrieval channels were unavailable.",
+                    "- Use only the provided sources and do not imply complete workspace coverage.",
+                ]
+            )
+        elif retrieval_outcome == "failed":
+            system_block.extend(
+                [
+                    "",
+                    "RETRIEVAL STATUS:",
+                    "- Workspace source retrieval is temporarily unavailable.",
+                    "- Do not claim source-backed certainty, cite workspace sources, or imply that documents were searched.",
+                    "- Explain the limitation and ask the user to retry instead of producing a workspace report.",
+                ]
+            )
         
         if system_instructions:
             system_block.append(f"\nADDITIONAL MANDATES:\n{system_instructions}")
@@ -110,6 +135,7 @@ class PromptBuilder:
             diagnostics={
                 "citations_count": len(citations),
                 "workspace_focus": workspace_focus,
+                "retrieval_outcome": retrieval_outcome,
             },
             token_usage={}
         )

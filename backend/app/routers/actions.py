@@ -7,7 +7,7 @@ from typing import Any
 
 from ..rag.startup import get_vector_store
 
-from ..context.engine import ContextEngine
+from ..context.engine import ContextEngine, ContextRetrievalUnavailableError
 
 from ..actions import summarize as summarize_action
 from ..actions import tasks as tasks_action
@@ -62,6 +62,11 @@ async def run_action(request: Request, body: ActionRequest) -> Any:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown action: {action}")
     except HTTPException:
         raise
+    except ContextRetrievalUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Workspace source retrieval is temporarily unavailable. Please retry shortly.",
+        ) from exc
     except Exception as exc:
         logger.exception("Failed to run action %s", action)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to perform action.") from exc

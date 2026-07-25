@@ -100,6 +100,7 @@ class ChatResponse(BaseModel):
     assistant_message_id: str
     response: str
     sources: list[dict[str, Any]] = Field(default_factory=list)
+    retrieval: dict[str, Any] | None = None
     conversation: ConversationHistoryRead | None = None
     user_message: MessageRead | None = None
     assistant_message: MessageRead | None = None

@@ -10,3 +10,4 @@ class RetrievalSettings(BaseAppSettings):
     HYBRID_DYNAMIC_WEIGHTING: bool = True
     HYBRID_CONTEXT_TOKEN_BUDGET: int = 2200
     HYBRID_MAX_CHUNK_TOKENS: int = 520
+    HYBRID_CHANNEL_TIMEOUT_SECONDS: float = 12.0

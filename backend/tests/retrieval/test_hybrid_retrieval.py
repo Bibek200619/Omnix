@@ -117,6 +117,123 @@ def test_hybrid_engine_runs_semantic_keyword_fusion_and_reranking() -> None:
     assert response.diagnostics["keyword_matches"] == 1
 
 
+def test_hybrid_engine_marks_vector_channel_failure_as_partial_without_error_text() -> None:
+    class FailingSemanticSearch:
+        async def search(self, *args, **kwargs):
+            raise RuntimeError("vector endpoint secret: should not reach diagnostics")
+
+    class WorkingKeywordSearch:
+        async def search(self, *args, **kwargs):
+            return [_result("chunk-keyword", "Keyword fallback found this evidence.", keyword_score=1.0, source="keyword")]
+
+    engine = HybridSearchEngine(
+        semantic_search=FailingSemanticSearch(),
+        keyword_search=WorkingKeywordSearch(),
+        config=HybridSearchConfig(dev_diagnostics=False, channel_timeout_seconds=0.1),
+    )
+
+    response = asyncio.run(engine.search("evidence", user_id="user-a", workspace_id="workspace-a"))
+
+    retrieval = response.diagnostics["retrieval"]
+    assert [result.chunk_id for result in response.results] == ["chunk-keyword"]
+    assert retrieval["outcome"] == "partial"
+    assert retrieval["failed_channels"] == ["semantic"]
+    assert retrieval["channels"]["semantic"]["status"] == "failed"
+    assert retrieval["channels"]["semantic"]["error_code"] == "unexpected_error"
+    assert "secret" not in str(retrieval)
+
+
+def test_hybrid_engine_marks_keyword_channel_failure_as_partial() -> None:
+    class WorkingSemanticSearch:
+        async def search(self, *args, **kwargs):
+            return [_result("chunk-semantic", "Semantic evidence remains available.", semantic_score=0.8)]
+
+    class FailingKeywordSearch:
+        async def search(self, *args, **kwargs):
+            raise RuntimeError("keyword database unavailable")
+
+    engine = HybridSearchEngine(
+        semantic_search=WorkingSemanticSearch(),
+        keyword_search=FailingKeywordSearch(),
+        config=HybridSearchConfig(dev_diagnostics=False, channel_timeout_seconds=0.1),
+    )
+
+    response = asyncio.run(engine.search("evidence", user_id="user-a", workspace_id="workspace-a"))
+
+    retrieval = response.diagnostics["retrieval"]
+    assert [result.chunk_id for result in response.results] == ["chunk-semantic"]
+    assert retrieval["outcome"] == "partial"
+    assert retrieval["failed_channels"] == ["keyword"]
+    assert retrieval["channels"]["keyword"]["status"] == "failed"
+
+
+def test_hybrid_engine_marks_all_channel_failures_as_failed() -> None:
+    class FailingSearch:
+        async def search(self, *args, **kwargs):
+            raise RuntimeError("provider unavailable")
+
+    engine = HybridSearchEngine(
+        semantic_search=FailingSearch(),
+        keyword_search=FailingSearch(),
+        config=HybridSearchConfig(dev_diagnostics=False, channel_timeout_seconds=0.1),
+    )
+
+    response = asyncio.run(engine.search("evidence", user_id="user-a", workspace_id="workspace-a"))
+
+    retrieval = response.diagnostics["retrieval"]
+    assert response.results == []
+    assert retrieval["outcome"] == "failed"
+    assert retrieval["failed_channels"] == ["semantic", "keyword"]
+    assert all(channel["status"] == "failed" for channel in retrieval["channels"].values())
+
+
+def test_hybrid_engine_marks_timed_out_channel_as_partial() -> None:
+    class SlowSemanticSearch:
+        async def search(self, *args, **kwargs):
+            await asyncio.sleep(1)
+            return []
+
+    class WorkingKeywordSearch:
+        async def search(self, *args, **kwargs):
+            return [_result("chunk-keyword", "Keyword result after semantic timeout.", keyword_score=1.0, source="keyword")]
+
+    engine = HybridSearchEngine(
+        semantic_search=SlowSemanticSearch(),
+        keyword_search=WorkingKeywordSearch(),
+        config=HybridSearchConfig(dev_diagnostics=False, channel_timeout_seconds=0.01),
+    )
+
+    response = asyncio.run(engine.search("evidence", user_id="user-a", workspace_id="workspace-a"))
+
+    retrieval = response.diagnostics["retrieval"]
+    assert retrieval["outcome"] == "partial"
+    assert retrieval["reason"] == "channel_timeout"
+    assert retrieval["channels"]["semantic"]["status"] == "timed_out"
+    assert retrieval["channels"]["semantic"]["error_code"] == "timeout"
+
+
+def test_hybrid_engine_distinguishes_empty_context_from_failure() -> None:
+    class EmptySearch:
+        async def search(self, *args, **kwargs):
+            return []
+
+    engine = HybridSearchEngine(
+        semantic_search=EmptySearch(),
+        keyword_search=EmptySearch(),
+        config=HybridSearchConfig(dev_diagnostics=False, channel_timeout_seconds=0.1),
+    )
+
+    response = asyncio.run(engine.search("evidence", user_id="user-a", workspace_id="workspace-a"))
+
+    retrieval = response.diagnostics["retrieval"]
+    assert response.results == []
+    assert retrieval["outcome"] == "no_relevant_sources"
+    assert retrieval["reason"] == "no_matches"
+    assert retrieval["failed_channels"] == []
+    assert retrieval["channels"]["semantic"]["status"] == "empty"
+    assert retrieval["channels"]["keyword"]["status"] == "empty"
+
+
 if __name__ == "__main__":
     test_query_analysis_favors_keywords_for_ids_and_filenames()
     test_query_analysis_favors_semantic_for_conceptual_questions()

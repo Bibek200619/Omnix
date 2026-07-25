@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from .query_classifier import SearchMode
+from .retrieval_state import public_retrieval_payload
 from .supabase_service import SupabaseServiceError, update_one, update_one_trusted
 
 logger = logging.getLogger(__name__)
@@ -124,17 +125,25 @@ def assistant_message_payload(
         for source in compact_sources
         if isinstance(source.get("label"), str) and source.get("label")
     ]
-    return {
+    payload: dict[str, Any] = {
         "mode": mode,
         "web_search_used": web_search_used,
         "sources": compact_sources,
         "citations": citations,
     }
+    retrieval = public_retrieval_payload(retrieval_debug, compact_sources)
+    if retrieval:
+        payload["retrieval"] = retrieval
+    return payload
 
 
 def has_persistable_payload(payload: dict[str, Any]) -> bool:
     sources = payload.get("sources")
-    return bool(payload.get("web_search_used") or (isinstance(sources, list) and sources))
+    return bool(
+        payload.get("web_search_used")
+        or (isinstance(sources, list) and sources)
+        or isinstance(payload.get("retrieval"), dict)
+    )
 
 
 async def persist_assistant_payload(
@@ -156,12 +165,13 @@ async def persist_assistant_payload(
         return None
 
     logger.info(
-        "Persisting assistant payload: stage=%s assistant_message_id=%s mode=%s web_search_used=%s source_count=%d",
+        "Persisting assistant payload: stage=%s assistant_message_id=%s mode=%s web_search_used=%s source_count=%d retrieval_outcome=%s",
         stage,
         assistant_message_id,
         message_payload.get("mode"),
         message_payload.get("web_search_used"),
         len(message_payload.get("sources") or []),
+        (message_payload.get("retrieval") or {}).get("outcome") if isinstance(message_payload.get("retrieval"), dict) else None,
     )
 
     try:
@@ -226,7 +236,14 @@ async def update_assistant_message(
                 {
                     "content": content,
                     "status": status_value,
-                    "metadata": {"sources": payload["payload"]["sources"]},
+                    "metadata": {
+                        "sources": payload["payload"]["sources"],
+                        **(
+                            {"retrieval": payload["payload"]["retrieval"]}
+                            if isinstance(payload["payload"].get("retrieval"), dict)
+                            else {}
+                        ),
+                    },
                 },
             )
         except SupabaseServiceError:

@@ -85,7 +85,13 @@ class ContextBuilder:
         *,
         workspace_id: str | None = None,
         supplemental_contexts: list[ContextSupplement | dict[str, Any]] | None = None,
+        retrieval_outcome: str = "sources_found",
     ) -> BuiltContext:
+        retrieval_outcome = (
+            retrieval_outcome
+            if retrieval_outcome in {"sources_found", "no_relevant_sources", "partial", "failed"}
+            else "sources_found"
+        )
         candidates = self._candidates_from_results(results, workspace_id=workspace_id)
         candidates.extend(self._candidates_from_supplements(supplemental_contexts or [], workspace_id=workspace_id))
 
@@ -138,7 +144,11 @@ class ContextBuilder:
         document_context_text = "\n\n".join(str(block.get("content") or "") for block in document_context_blocks)
         context_text = "\n\n".join(
             block for block in (web_context_text, document_context_text) if block
-        ) or "No relevant context found."
+        ) or (
+            "Workspace retrieval is temporarily unavailable."
+            if retrieval_outcome == "failed"
+            else "No relevant context found."
+        )
         clean_query = (query or "").strip()
         prompt_parts = [
             "You are Omnix AI.",
@@ -156,7 +166,14 @@ class ContextBuilder:
         if document_context_text:
             prompt_parts.append(untrusted_data_block("DOCUMENT CONTEXT:", document_context_blocks))
         if not web_context_text and not document_context_text:
-            prompt_parts.append("DOCUMENT CONTEXT:\nNo relevant document or workspace context found.")
+            if retrieval_outcome == "failed":
+                prompt_parts.append(
+                    "SOURCE RETRIEVAL STATUS:\n"
+                    "Workspace retrieval is temporarily unavailable. Do not claim that any document or workspace "
+                    "source was searched, reviewed, or supports this answer."
+                )
+            else:
+                prompt_parts.append("DOCUMENT CONTEXT:\nNo relevant document or workspace context found.")
 
         prompt_parts.extend(
             [
@@ -180,6 +197,18 @@ class ContextBuilder:
                 ),
             ]
         )
+        if retrieval_outcome == "partial":
+            prompt_parts.append(
+                "SOURCE RETRIEVAL STATUS:\n"
+                "Some retrieval channels were unavailable. Use only the supplied sources, and do not imply "
+                "complete workspace coverage or source-backed certainty beyond them."
+            )
+        elif retrieval_outcome == "failed":
+            prompt_parts.append(
+                "SOURCE RETRIEVAL STATUS:\n"
+                "Retrieval failed. Do not provide a source-backed answer, cite sources, or imply that workspace "
+                "documents were available. Transparently ask the user to retry."
+            )
         prompt = "\n\n".join(prompt_parts)
 
         return BuiltContext(
@@ -194,6 +223,7 @@ class ContextBuilder:
                 "document_context_count": len(document_context_blocks),
                 "estimated_context_tokens": used_tokens,
                 "token_budget": self.token_budget,
+                "retrieval_outcome": retrieval_outcome,
             },
         )
 

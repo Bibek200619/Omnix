@@ -11,6 +11,7 @@ from ..embeddings.dimensions import get_expected_embedding_dimension, validate_e
 from ..rag.embedding import get_embedding
 from ..rag.vector_store_base import VectorStore
 from ..services.supabase_service import select_all, select_all_trusted
+from .outcomes import RetrievalChannelError
 from .scoring import RetrievalResult, distance_to_similarity
 
 logger = logging.getLogger(__name__)
@@ -64,9 +65,9 @@ class SemanticSearch:
                 expected_dim=get_expected_embedding_dimension(),
                 label="semantic query embedding",
             )
-        except Exception:
+        except Exception as exc:
             logger.exception("Semantic query embedding failed.")
-            return []
+            raise RetrievalChannelError("semantic", "embedding_unavailable") from exc
 
         try:
             raw_matches = await run_in_threadpool(
@@ -76,9 +77,9 @@ class SemanticSearch:
                 workspace_id,
                 top_k,
             )
-        except Exception:
+        except Exception as exc:
             logger.exception("Vector store semantic search failed.")
-            return []
+            raise RetrievalChannelError("semantic", "vector_store_unavailable") from exc
 
         filtered_matches: list[tuple[str, float]] = []
         rejected = 0

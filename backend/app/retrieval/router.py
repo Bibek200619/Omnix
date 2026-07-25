@@ -5,6 +5,7 @@ from typing import List, Dict, Any
 
 from ..services import workspace_intelligence_service, workspace_service
 from ..context.schemas import ContextPayload
+from .outcomes import RetrievalChannelError
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +25,9 @@ class IntelligenceRouter:
             try:
                 workspaces = await workspace_service.list_user_workspaces(payload.user_id)
                 return [str(w["id"]) for w in workspaces if w.get("id")]
-            except Exception:
+            except Exception as exc:
                 logger.exception("Failed to determine global retrieval scope")
-                return []
+                raise RetrievalChannelError("routing", "scope_unavailable") from exc
 
         try:
             # Fetch the workspace to check its intelligence preferences
@@ -37,9 +38,9 @@ class IntelligenceRouter:
             return await workspace_intelligence_service.workspace_retrieval_scope_ids(
                 workspace, payload.user_id
             )
-        except Exception:
-            logger.exception(f"Failed to route intelligence for workspace: {payload.workspace_id}")
-            return [payload.workspace_id]
+        except Exception as exc:
+            logger.exception("Failed to route intelligence for workspace retrieval.")
+            raise RetrievalChannelError("routing", "scope_unavailable") from exc
 
     async def route_query(self, payload: ContextPayload) -> Dict[str, Any]:
         """

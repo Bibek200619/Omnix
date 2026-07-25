@@ -160,3 +160,45 @@ async def test_persist_assistant_payload_updates_payload_immediately(monkeypatch
             }
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_zero_source_retrieval_failure_persists_safe_outcome(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured_payload: dict[str, object] = {}
+
+    async def fake_update_one(table: str, filters: dict[str, object], payload: dict[str, object]):
+        assert table == "messages"
+        assert filters == {"id": "assistant-1", "user_id": "user-1"}
+        captured_payload.update(payload)
+        return {"id": "assistant-1", **payload}
+
+    monkeypatch.setattr(messages, "update_one", fake_update_one)
+
+    updated = await messages._update_assistant_message(
+        assistant_message_id="assistant-1",
+        user_id="user-1",
+        content="Source retrieval is temporarily unavailable.",
+        status_value="completed",
+        sources=[],
+        search_mode="workspace",
+        retrieval_debug={
+            "outcome": "failed",
+            "reason": "channel_timeout",
+            "failed_channels": ["semantic", "keyword", "not-public"],
+            "diagnostics": {"provider_error": "internal endpoint https://secret.invalid"},
+        },
+    )
+
+    assert updated is not None
+    assert captured_payload["payload"] == {
+        "mode": "workspace",
+        "web_search_used": False,
+        "sources": [],
+        "citations": [],
+        "retrieval": {
+            "outcome": "failed",
+            "source_count": 0,
+            "reason": "channel_timeout",
+            "failed_channels": ["semantic", "keyword"],
+        },
+    }
