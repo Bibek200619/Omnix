@@ -23,6 +23,7 @@ const [
   filesPage,
   filesModel,
   sidebarNav,
+  mobileDock,
   globalsCss,
   landingPage,
 ] = await Promise.all([
@@ -31,6 +32,7 @@ const [
   read("app/(dashboard)/files/page.tsx"),
   read("components/files/filesPageModel.ts"),
   read("components/layout/sidebar/SidebarNav.tsx"),
+  read("components/layout/MobileDock.tsx"),
   read("styles/globals.css"),
   read("app/page.tsx"),
 ]);
@@ -60,6 +62,18 @@ for (const label of ["Core", "Execution", "Workspace", "System"]) {
   assertIncludes(sidebarNav, `label: "${label}"`, "Sidebar grouped navigation");
 }
 assertIncludes(sidebarNav, "navGroups", "Sidebar grouped navigation");
+
+for (const href of ["/dashboard", "/chat", "/tasks", "/files", "/decisions", "/initiatives", "/settings"]) {
+  assertIncludes(mobileDock, `href: "${href}"`, "Mobile navigation coverage");
+}
+assertIncludes(mobileDock, "grid-cols-7 gap-px", "Mobile navigation target width");
+assertIncludes(mobileDock, "min-h-[48px]", "Mobile navigation target height");
+assertIncludes(mobileDock, "safe-area-inset-bottom", "Mobile navigation safe area");
+assertIncludes(mobileDock, "touch-manipulation", "Mobile navigation touch behavior");
+assertIncludes(mobileDock, "focus-visible:ring-2", "Mobile navigation focus behavior");
+assertIncludes(mobileDock, "max-w-full truncate", "Mobile navigation long labels");
+assertExcludes(mobileDock, "MoreHorizontal", "Mobile navigation indirect domain access");
+assertExcludes(mobileDock, "Open more navigation", "Mobile navigation indirect domain access");
 
 const landingFiles = await readdir(join(root, "components/landing"));
 assert.deepEqual(

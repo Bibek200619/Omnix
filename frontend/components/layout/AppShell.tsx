@@ -124,7 +124,7 @@ export function AppShell({ children }: AppShellProps) {
           >
             <PageTransition className="flex min-h-0 flex-1 flex-col">{children}</PageTransition>
           </main>
-          <MobileDock onMoreClick={() => setIsSidebarOpen(true)} />
+          <MobileDock />
           <KeyboardShortcutsModal
             isOpen={isShortcutsOpen}
             onClose={() => setIsShortcutsOpen(false)}

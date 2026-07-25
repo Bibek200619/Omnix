@@ -459,19 +459,37 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page.getByText("Queued").first()).toBeVisible();
   });
 
-  test("mobile navigation renders core routes and command palette", async ({ page, isMobile }) => {
+  test("mobile navigation exposes core domains directly at phone and tablet widths", async ({ page, isMobile }) => {
     test.skip(!isMobile, "mobile project only");
-    await page.goto("/dashboard");
-    await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Open command palette" })).toBeVisible();
-    await page.goto("/files");
-    await expect(page.getByText("Workspace files")).toBeVisible();
-    await page.goto("/tasks");
-    await expect(page.getByRole("button", { name: "Record Task" })).toBeVisible();
-    await page.goto("/decisions");
-    await expect(page.getByRole("heading", { name: "Workspace Decisions" })).toBeVisible();
-    await page.goto("/notifications");
-    await expect(page.getByText("Notifications").first()).toBeVisible();
+
+    const directRoutes = [
+      ["Decisions", "/decisions"],
+      ["Initiatives", "/initiatives"],
+      ["Settings", "/settings"],
+    ] as const;
+
+    for (const width of [375, 390, 768]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto("/dashboard");
+      const dock = page.getByRole("navigation", { name: "Primary mobile navigation" });
+      await expect(dock).toBeVisible();
+
+      for (const [label, route] of directRoutes) {
+        const link = dock.getByRole("link", { name: label });
+        await expect(link).toBeVisible();
+        await expect(link).toHaveCSS("min-height", "48px");
+        await link.click();
+        await expect(page).toHaveURL(new RegExp(`${route}$`));
+      }
+
+      await page.goto("/dashboard");
+      await page.getByRole("button", { name: "Open navigation" }).click();
+      await page.getByRole("link", { name: "Team" }).click();
+      await expect(page).toHaveURL(/\/team$/);
+      await page.getByRole("button", { name: "Open navigation" }).click();
+      await page.getByRole("link", { name: "Analytics" }).click();
+      await expect(page).toHaveURL(/\/analytics$/);
+    }
   });
 
   test("mobile shell lets dense task forms scroll", async ({ page, isMobile }) => {
