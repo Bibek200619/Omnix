@@ -5,7 +5,6 @@ import { ConversationHistoryProvider } from "@/lib/conversation-history-context"
 import { ProfileProvider } from "@/lib/profile-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
 import { WorkspaceCollaborationProvider } from "@/lib/workspace-collaboration-context";
-import { WorkspaceContinuityProvider } from "@/lib/workspace-continuity-context";
 import { WorkspaceNotificationsProvider } from "@/lib/workspace-notifications-context";
 
 const WorkspaceOnboardingGate = dynamic(
@@ -18,13 +17,11 @@ export function DashboardProviders({ children }: { children: React.ReactNode }) 
     <WorkspaceProvider>
       <WorkspaceCollaborationProvider>
         <WorkspaceNotificationsProvider>
-          <WorkspaceContinuityProvider>
-            <ProfileProvider>
-              <ConversationHistoryProvider>
-                <WorkspaceOnboardingGate>{children}</WorkspaceOnboardingGate>
-              </ConversationHistoryProvider>
-            </ProfileProvider>
-          </WorkspaceContinuityProvider>
+          <ProfileProvider>
+            <ConversationHistoryProvider>
+              <WorkspaceOnboardingGate>{children}</WorkspaceOnboardingGate>
+            </ConversationHistoryProvider>
+          </ProfileProvider>
         </WorkspaceNotificationsProvider>
       </WorkspaceCollaborationProvider>
     </WorkspaceProvider>
