@@ -16,11 +16,14 @@ import {
   type DisplayMessage,
   type TaskSource,
   canCreateOperationalChannel,
+  incrementThreadReplyCount,
   isCurrentWorkspaceChannelChange,
   isCurrentWorkspaceChannelLoad,
+  mergeMessagePage,
   mergeWorkspaceChannelMessage,
   mergeMessage,
   reconcileWorkspaceChannelChange,
+  splitMessagePage,
   sortWorkspaceChannels,
   type WorkspaceChannelRealtimeChange,
 } from "@/components/conversations/conversationUtils";
@@ -38,6 +41,8 @@ import type {
   WorkspaceChannel,
   WorkspaceChannelMessage,
 } from "@/lib/workspace-types";
+
+const MESSAGE_PAGE_SIZE = 80;
 
 export const WorkspaceConversationSurface = memo(function WorkspaceConversationSurface() {
   return (
@@ -60,7 +65,11 @@ function WorkspaceConversationSurfaceContent() {
   const [threadMessages, setThreadMessages] = useState<DisplayMessage[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [loadingNewerThreadReplies, setLoadingNewerThreadReplies] = useState(false);
+  const [hasNewerThreadReplies, setHasNewerThreadReplies] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [channelName, setChannelName] = useState("");
@@ -77,8 +86,11 @@ function WorkspaceConversationSurfaceContent() {
   const channelStateRevisionRef = useRef(0);
   const loadChannelsRef = useRef<(() => Promise<void>) | null>(null);
   const messageRequestRef = useRef(0);
+  const nextMessageOffsetRef = useRef<number | null>(null);
   const threadRequestRef = useRef(0);
+  const nextThreadOffsetRef = useRef<number | null>(null);
   const threadRootRef = useRef(threadRoot);
+  const countedThreadReplyIdsRef = useRef(new Set<string>());
   const lastIdentityActivityRef = useRef<string | null>(null);
 
   workspaceRef.current = activeWorkspaceId;
@@ -145,14 +157,31 @@ function WorkspaceConversationSurfaceContent() {
 
   loadChannelsRef.current = loadChannels;
 
-  const loadMessages = useCallback(async (channelId: string) => {
+  const loadMessages = useCallback(async (
+    channelId: string,
+    { append = false, offset = 0 }: { append?: boolean; offset?: number } = {},
+  ) => {
     if (!activeWorkspaceId) return;
     const requestId = ++messageRequestRef.current;
-    setMessagesLoading(true);
+    if (append) {
+      setLoadingOlderMessages(true);
+    } else {
+      setMessagesLoading(true);
+      setLoadingOlderMessages(false);
+    }
     try {
-      const incoming = await apiClient.get<WorkspaceChannelMessage[]>(`/workspaces/${activeWorkspaceId}/channels/${channelId}/messages?limit=80`);
+      const incoming = await apiClient.get<WorkspaceChannelMessage[]>(
+        `/workspaces/${activeWorkspaceId}/channels/${channelId}/messages?limit=${MESSAGE_PAGE_SIZE + 1}&offset=${offset}`,
+      );
       if (requestId === messageRequestRef.current && workspaceRef.current === activeWorkspaceId && selectedChannelRef.current === channelId) {
-        setMessages(incoming);
+        const page = splitMessagePage(incoming, MESSAGE_PAGE_SIZE, "start");
+        if (append) {
+          setMessages((current) => mergeMessagePage(current, page.records));
+        } else {
+          setMessages(page.records);
+        }
+        nextMessageOffsetRef.current = page.hasMore ? offset + MESSAGE_PAGE_SIZE : null;
+        setHasOlderMessages(page.hasMore);
         setError(null);
       }
     } catch (err) {
@@ -161,18 +190,45 @@ function WorkspaceConversationSurfaceContent() {
         setError("Unable to load discussion. Check your connection and try again.");
       }
     } finally {
-      if (requestId === messageRequestRef.current) setMessagesLoading(false);
+      if (requestId === messageRequestRef.current) {
+        if (append) setLoadingOlderMessages(false);
+        else setMessagesLoading(false);
+      }
     }
   }, [activeWorkspaceId]);
 
-  const loadThread = useCallback(async (channelId: string, root: WorkspaceChannelMessage) => {
+  const loadThread = useCallback(async (
+    channelId: string,
+    root: WorkspaceChannelMessage,
+    { append = false, offset = 0 }: { append?: boolean; offset?: number } = {},
+  ) => {
     if (!activeWorkspaceId) return;
     const requestId = ++threadRequestRef.current;
-    setThreadLoading(true);
+    if (append) {
+      setLoadingNewerThreadReplies(true);
+    } else {
+      setThreadLoading(true);
+      setLoadingNewerThreadReplies(false);
+    }
     try {
-      const incoming = await apiClient.get<WorkspaceChannelMessage[]>(`/workspaces/${activeWorkspaceId}/channels/${channelId}/messages?thread_root_id=${root.id}&limit=80`);
-      if (requestId === threadRequestRef.current && workspaceRef.current === activeWorkspaceId && selectedChannelRef.current === channelId) {
-        setThreadMessages(incoming);
+      const incoming = await apiClient.get<WorkspaceChannelMessage[]>(
+        `/workspaces/${activeWorkspaceId}/channels/${channelId}/messages?thread_root_id=${root.id}&limit=${MESSAGE_PAGE_SIZE + 1}&offset=${offset}`,
+      );
+      if (
+        requestId === threadRequestRef.current
+        && workspaceRef.current === activeWorkspaceId
+        && selectedChannelRef.current === channelId
+        && threadRootRef.current?.id === root.id
+      ) {
+        const returnedRoot = incoming.find((message) => message.id === root.id) ?? root;
+        const page = splitMessagePage(incoming.filter((message) => message.id !== root.id), MESSAGE_PAGE_SIZE, "end");
+        if (append) {
+          setThreadMessages((current) => mergeMessagePage(current, page.records));
+        } else {
+          setThreadMessages(mergeMessagePage([], [returnedRoot, ...page.records]));
+        }
+        nextThreadOffsetRef.current = page.hasMore ? offset + MESSAGE_PAGE_SIZE : null;
+        setHasNewerThreadReplies(page.hasMore);
       }
     } catch (err) {
       if (requestId === threadRequestRef.current) {
@@ -180,9 +236,24 @@ function WorkspaceConversationSurfaceContent() {
         setError("Unable to open thread. Check your connection and try again.");
       }
     } finally {
-      if (requestId === threadRequestRef.current) setThreadLoading(false);
+      if (requestId === threadRequestRef.current) {
+        if (append) setLoadingNewerThreadReplies(false);
+        else setThreadLoading(false);
+      }
     }
   }, [activeWorkspaceId]);
+
+  const loadOlderMessages = useCallback(() => {
+    const offset = nextMessageOffsetRef.current;
+    if (!selectedChannelId || !hasOlderMessages || loadingOlderMessages || offset === null) return;
+    void loadMessages(selectedChannelId, { append: true, offset });
+  }, [hasOlderMessages, loadMessages, loadingOlderMessages, selectedChannelId]);
+
+  const loadNewerThreadReplies = useCallback(() => {
+    const offset = nextThreadOffsetRef.current;
+    if (!selectedChannelId || !threadRoot || !hasNewerThreadReplies || loadingNewerThreadReplies || offset === null) return;
+    void loadThread(selectedChannelId, threadRoot, { append: true, offset });
+  }, [hasNewerThreadReplies, loadThread, loadingNewerThreadReplies, selectedChannelId, threadRoot]);
 
   const refreshVisibleMessageIdentities = useCallback(() => {
     const channelId = selectedChannelRef.current;
@@ -195,6 +266,17 @@ function WorkspaceConversationSurfaceContent() {
     if (!message.workspace_id || message.workspace_id !== workspaceRef.current) return;
     channelStateRevisionRef.current += 1;
     setChannels((current) => mergeWorkspaceChannelMessage(current, message));
+  }, []);
+
+  const applyThreadReplyCount = useCallback((message: WorkspaceChannelMessage) => {
+    if (
+      !message.parent_message_id
+      || message.workspace_id !== workspaceRef.current
+      || message.channel_id !== selectedChannelRef.current
+      || countedThreadReplyIdsRef.current.has(message.id)
+    ) return;
+    countedThreadReplyIdsRef.current.add(message.id);
+    setMessages((current) => incrementThreadReplyCount(current, message));
   }, []);
 
   const applyChannelRealtimeChange = useCallback((payload: WorkspaceChannelRealtimeChange) => {
@@ -217,9 +299,9 @@ function WorkspaceConversationSurfaceContent() {
       role: currentMember?.role,
       workspaceRole: activeWorkspace?.current_user_role,
     },
-    loadMessages,
     mayPost,
     onChannelMessageCreated: applyChannelMessageSummary,
+    onThreadReplyCreated: applyThreadReplyCount,
     selectedChannelId,
     sendTypingSignal,
     setError,
@@ -230,8 +312,16 @@ function WorkspaceConversationSurfaceContent() {
   useEffect(() => {
     setSelectedChannelId(null);
     setMessages([]);
+    setHasOlderMessages(false);
+    setLoadingOlderMessages(false);
+    nextMessageOffsetRef.current = null;
+    countedThreadReplyIdsRef.current.clear();
+    threadRootRef.current = null;
     setThreadRoot(null);
     setThreadMessages([]);
+    setHasNewerThreadReplies(false);
+    setLoadingNewerThreadReplies(false);
+    nextThreadOffsetRef.current = null;
     setTaskSource(null);
     setTaskConfirmation(null);
     setDecisionSource(null);
@@ -249,8 +339,16 @@ function WorkspaceConversationSurfaceContent() {
   }, [activeWorkspaceId, applyChannelRealtimeChange, session?.user.id]);
 
   useEffect(() => {
+    threadRootRef.current = null;
     setThreadRoot(null);
     setThreadMessages([]);
+    setHasNewerThreadReplies(false);
+    setLoadingNewerThreadReplies(false);
+    nextThreadOffsetRef.current = null;
+    setHasOlderMessages(false);
+    setLoadingOlderMessages(false);
+    nextMessageOffsetRef.current = null;
+    countedThreadReplyIdsRef.current.clear();
     if (!selectedChannelId) {
       setMessages([]);
       return;
@@ -264,15 +362,17 @@ function WorkspaceConversationSurfaceContent() {
       channel.on("postgres_changes", { event: "INSERT", schema: "public", table: "workspace_channel_messages", filter: `channel_id=eq.${selectedChannelId}` }, (payload: { new: WorkspaceChannelMessage }) => {
         const incoming = payload.new;
         if (incoming.parent_message_id) {
-          if (threadRoot?.id === incoming.parent_message_id) void loadThread(selectedChannelId, threadRoot);
-          setMessages((current) => current.map((message) => message.id === incoming.parent_message_id ? { ...message, thread_reply_count: message.thread_reply_count + 1 } : message));
+          if (threadRootRef.current?.id === incoming.parent_message_id) {
+            setThreadMessages((current) => mergeMessage(current, incoming));
+          }
+          applyThreadReplyCount(incoming);
           return;
         }
         setMessages((current) => mergeMessage(current, incoming));
       }),
     );
     return () => realtimeRegistry.unsubscribe({ type: "channel_messages", workspaceId: activeWorkspaceId, conversationId: selectedChannelId });
-  }, [activeWorkspaceId, loadMessages, loadThread, selectedChannelId, session?.user.id, threadRoot]);
+  }, [activeWorkspaceId, applyThreadReplyCount, selectedChannelId, session?.user.id]);
 
   useEffect(() => {
     const identityEvent = activity.find((event) => event.event_type === "workspace.member_role_updated");
@@ -330,14 +430,27 @@ function WorkspaceConversationSurfaceContent() {
   }
 
   function handleBackToChannels() {
+    closeThread();
+    setMobileConversationView("channels");
+  }
+
+  function closeThread() {
+    threadRootRef.current = null;
     setThreadRoot(null);
     setThreadMessages([]);
-    setMobileConversationView("channels");
+    setHasNewerThreadReplies(false);
+    setLoadingNewerThreadReplies(false);
+    nextThreadOffsetRef.current = null;
   }
 
   function openThread(message: WorkspaceChannelMessage) {
     if (!selectedChannelId) return;
+    threadRootRef.current = message;
     setThreadRoot(message);
+    setThreadMessages([]);
+    setHasNewerThreadReplies(false);
+    setLoadingNewerThreadReplies(false);
+    nextThreadOffsetRef.current = null;
     setMobileConversationView("messages");
     sender.setThreadDraft("");
     sender.setThreadDraftMentions([]);
@@ -370,10 +483,10 @@ function WorkspaceConversationSurfaceContent() {
               Channels
             </Button>
           </div>
-          <MessageThread activeMembers={activeMembers} aiPanel={<ConversationAIPanel activeWorkspaceId={activeWorkspaceId} messagesCount={messages.length} onError={setError} onOpenDecision={setDecisionSource} onOpenTask={setTaskSource} selectedChannelId={selectedChannelId} threadRoot={threadRoot} />} channelTyping={channelTyping} draft={sender.draft} draftMentions={sender.draftMentions} mayPost={mayPost} messages={messages} messagesLoading={messagesLoading} onDraftChange={sender.setDraft} onDraftMentionsChange={sender.setDraftMentions} onOpenDecision={(message) => setDecisionSource({ kind: "message", message })} onOpenTask={(message) => setTaskSource({ kind: "message", message })} onOpenThread={openThread} onSend={(content, parent, mentions) => void sender.sendMessage(content, parent, mentions)} onTypingChange={(isTyping) => void sendTypingSignal(selectedChannelId, isTyping)} selectedChannel={selectedChannel} sending={sender.sending} />
+          <MessageThread activeMembers={activeMembers} aiPanel={<ConversationAIPanel activeWorkspaceId={activeWorkspaceId} messagesCount={messages.length} onError={setError} onOpenDecision={setDecisionSource} onOpenTask={setTaskSource} selectedChannelId={selectedChannelId} threadRoot={threadRoot} />} channelTyping={channelTyping} draft={sender.draft} draftMentions={sender.draftMentions} hasOlderMessages={hasOlderMessages} loadingOlderMessages={loadingOlderMessages} mayPost={mayPost} messages={messages} messagesLoading={messagesLoading} onDraftChange={sender.setDraft} onDraftMentionsChange={sender.setDraftMentions} onLoadOlderMessages={loadOlderMessages} onOpenDecision={(message) => setDecisionSource({ kind: "message", message })} onOpenTask={(message) => setTaskSource({ kind: "message", message })} onOpenThread={openThread} onSend={(content, parent, mentions) => void sender.sendMessage(content, parent, mentions)} onTypingChange={(isTyping) => void sendTypingSignal(selectedChannelId, isTyping)} selectedChannel={selectedChannel} sending={sender.sending} />
         </div>
         <div className="omnix-conversation-thread min-h-0 min-w-0">
-          <ThreadPanel activeMembers={activeMembers} mayPost={mayPost} onClose={() => setThreadRoot(null)} onOpenDecision={(message) => setDecisionSource({ kind: "message", message })} onOpenTask={(message) => setTaskSource({ kind: "message", message })} onSend={(content, parent, mentions) => void sender.sendMessage(content, parent, mentions)} onThreadDraftChange={sender.setThreadDraft} onThreadDraftMentionsChange={sender.setThreadDraftMentions} onTypingChange={(isTyping) => void sendTypingSignal(selectedChannelId, isTyping)} threadDraft={sender.threadDraft} threadDraftMentions={sender.threadDraftMentions} threadLoading={threadLoading} threadMessages={threadMessages} threadRoot={threadRoot} threadSending={sender.threadSending} />
+          <ThreadPanel activeMembers={activeMembers} hasNewerThreadReplies={hasNewerThreadReplies} loadingNewerThreadReplies={loadingNewerThreadReplies} mayPost={mayPost} onClose={closeThread} onLoadNewerReplies={loadNewerThreadReplies} onOpenDecision={(message) => setDecisionSource({ kind: "message", message })} onOpenTask={(message) => setTaskSource({ kind: "message", message })} onSend={(content, parent, mentions) => void sender.sendMessage(content, parent, mentions)} onThreadDraftChange={sender.setThreadDraft} onThreadDraftMentionsChange={sender.setThreadDraftMentions} onTypingChange={(isTyping) => void sendTypingSignal(selectedChannelId, isTyping)} threadDraft={sender.threadDraft} threadDraftMentions={sender.threadDraftMentions} threadLoading={threadLoading} threadMessages={threadMessages} threadRoot={threadRoot} threadSending={sender.threadSending} />
         </div>
       </div>
       <TaskFromMessageModal activeMembers={activeMembers} activeWorkspaceId={activeWorkspaceId} onClose={() => setTaskSource(null)} onCreated={setTaskConfirmation} onError={setError} selectedChannelId={selectedChannelId} source={taskSource} threadRoot={threadRoot} />

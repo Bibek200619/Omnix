@@ -123,11 +123,14 @@ type MessageThreadProps = {
   channelTyping: TypingSignal[];
   draft: string;
   draftMentions: WorkspaceMentionMetadata[];
+  hasOlderMessages: boolean;
+  loadingOlderMessages: boolean;
   mayPost: boolean;
   messages: DisplayMessage[];
   messagesLoading: boolean;
   onDraftChange: (value: string) => void;
   onDraftMentionsChange: (mentions: WorkspaceMentionMetadata[]) => void;
+  onLoadOlderMessages: () => void;
   onOpenDecision: (message: WorkspaceChannelMessage) => void;
   onOpenTask: (message: WorkspaceChannelMessage) => void;
   onOpenThread: (message: WorkspaceChannelMessage) => void;
@@ -143,11 +146,14 @@ export function MessageThread({
   channelTyping,
   draft,
   draftMentions,
+  hasOlderMessages,
+  loadingOlderMessages,
   mayPost,
   messages,
   messagesLoading,
   onDraftChange,
   onDraftMentionsChange,
+  onLoadOlderMessages,
   onOpenDecision,
   onOpenTask,
   onOpenThread,
@@ -182,6 +188,16 @@ export function MessageThread({
       {aiPanel}
       <div className="omnix-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto px-2 py-3 sm:px-3">
         {messagesLoading ? <Loader2 className="mx-auto mt-10 h-5 w-5 animate-spin text-cyan-100/50" /> : null}
+        {hasOlderMessages ? (
+          <div className="flex flex-wrap items-center justify-center gap-2 px-2 pb-2">
+            <Button type="button" size="sm" variant="ghost" onClick={onLoadOlderMessages} isLoading={loadingOlderMessages}>
+              Load Earlier Messages
+            </Button>
+            <p role="status" aria-live="polite" className="text-[11px] text-[var(--omnix-text-3)]">
+              {loadingOlderMessages ? "Loading earlier messages…" : "Earlier discussion is available."}
+            </p>
+          </div>
+        ) : null}
         {!messagesLoading && messages.length === 0 ? (
           <div className="mx-auto mt-14 max-w-sm text-center">
             <MessagesSquare className="mx-auto h-7 w-7 text-cyan-100/35" />

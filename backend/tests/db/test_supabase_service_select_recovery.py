@@ -13,12 +13,14 @@ class FakeQuery:
         self.table = table
         self.columns = columns
         self.filters: dict[str, Any] = {}
+        self.orders: list[tuple[str, bool]] = []
 
     def eq(self, column: str, value: Any) -> FakeQuery:
         self.filters[column] = value
         return self
 
-    def order(self, *_args: Any, **_kwargs: Any) -> FakeQuery:
+    def order(self, column: str, *, desc: bool = False, **_kwargs: Any) -> FakeQuery:
+        self.orders.append((column, desc))
         return self
 
     def limit(self, *_args: Any, **_kwargs: Any) -> FakeQuery:
@@ -71,3 +73,30 @@ async def test_select_all_recovers_from_multiple_schema_cache_misses(monkeypatch
         "id,user_id,name,ai_specialization",
         "id,user_id,name",
     ]
+
+
+@pytest.mark.asyncio
+async def test_select_all_trusted_chains_a_secondary_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    queries: list[FakeQuery] = []
+
+    async def fake_async_client() -> FakeClient:
+        return FakeClient()
+
+    async def fake_execute(query: FakeQuery, *, operation: str = "execute", **_kwargs: Any) -> Any:
+        queries.append(query)
+        return SimpleNamespace(data=[{"id": "message-1"}])
+
+    monkeypatch.setattr(supabase_service, "_async_client", fake_async_client)
+    monkeypatch.setattr(supabase_service, "_execute_with_retry_async", fake_execute)
+
+    rows = await supabase_service.select_all_trusted(
+        "workspace_channel_messages",
+        "id,created_at",
+        filters={"channel_id": "channel-1"},
+        order_by="created_at",
+        secondary_order_by="id",
+        desc=True,
+    )
+
+    assert rows == [{"id": "message-1"}]
+    assert queries[0].orders == [("created_at", True), ("id", True)]

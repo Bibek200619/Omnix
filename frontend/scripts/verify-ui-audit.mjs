@@ -105,6 +105,15 @@ assertIncludes(conversationUtils, "reconcileWorkspaceChannelChange", "Conversati
 assertIncludes(conversationUtils, "mergeWorkspaceChannelMessage", "Conversation message summary helper");
 assertIncludes(conversationUtils, "isCurrentWorkspaceChannelChange", "Conversation realtime workspace helper");
 assertIncludes(conversationUtils, "isCurrentWorkspaceChannelLoad", "Conversation realtime snapshot helper");
+assertIncludes(conversationUtils, "splitMessagePage", "Conversation message pagination helper");
+assertIncludes(conversationUtils, "incrementThreadReplyCount", "Conversation thread reply reconciliation");
+assertIncludes(conversationSurface, "loadOlderMessages", "Conversation history continuation");
+assertIncludes(conversationSurface, "loadNewerThreadReplies", "Thread reply continuation");
+assertIncludes(conversationSurface, "limit=${MESSAGE_PAGE_SIZE + 1}&offset=${offset}", "Conversation pagination probe");
+assertIncludes(conversationSurface, "applyThreadReplyCount(incoming)", "Conversation realtime page preservation");
+assertIncludes(conversationSurface, "setThreadMessages((current) => mergeMessage(current, incoming))", "Conversation realtime page preservation");
+assertIncludes(conversationSender, "onThreadReplyCreated(created)", "Thread reply preserves paged history");
+assertExcludes(conversationSender, "loadMessages", "Thread reply preserves paged history");
 
 for (const [source, label] of [
   [ambientParticles, "Ambient particles"],
