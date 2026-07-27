@@ -597,6 +597,46 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page.locator("#main-content").getByText("Verify release checklist").first()).toBeVisible();
   });
 
+  test("keeps initiative creation explicit and replays palette create requests", async ({ page }) => {
+    async function selectCreateAction(label: "Create Task" | "Create Decision" | "Create Initiative") {
+      await page.getByRole("button", { name: "Open command palette" }).first().click();
+      await page.getByRole("button", { name: new RegExp(`^${label}\\.`) }).click();
+    }
+
+    await page.goto("/initiatives");
+    const initiativeTitle = page.getByPlaceholder("Investor demo");
+    const directInitiativeCreate = page.getByRole("button", { name: "Create Initiative" }).first();
+    await expect(directInitiativeCreate).toBeVisible();
+    await directInitiativeCreate.click();
+    await expect(initiativeTitle).toBeVisible();
+
+    await page.goto("/dashboard");
+    await selectCreateAction("Create Task");
+    await expect(page).toHaveURL(/\/tasks\?create=task&palette=/);
+    const taskTitle = page.getByPlaceholder("Operational next step");
+    await expect(taskTitle).toBeVisible();
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(taskTitle).toBeHidden();
+
+    await selectCreateAction("Create Task");
+    await expect(taskTitle).toBeVisible();
+
+    await page.goto("/dashboard");
+    await selectCreateAction("Create Decision");
+    await expect(page).toHaveURL(/\/decisions\?create=decision&palette=/);
+    await expect(page.getByRole("dialog", { name: "Record New Decision" })).toBeVisible();
+
+    await page.goto("/dashboard");
+    await selectCreateAction("Create Initiative");
+    await expect(page).toHaveURL(/\/initiatives\?create=initiative&palette=/);
+    await expect(initiativeTitle).toBeVisible();
+    await page.getByRole("button", { name: "Create Initiative" }).first().click();
+    await expect(initiativeTitle).toBeHidden();
+
+    await selectCreateAction("Create Initiative");
+    await expect(initiativeTitle).toBeVisible();
+  });
+
   test("shows file upload shell and queued upload state", async ({ page }) => {
     await page.goto("/files");
     await expect(page.getByText("Workspace files")).toBeVisible();
