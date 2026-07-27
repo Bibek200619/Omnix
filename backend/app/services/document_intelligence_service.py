@@ -14,6 +14,18 @@ MIN_EXTRACTED_CHARACTERS = int(os.environ.get("OMNIX_MIN_EXTRACTED_CHARACTERS", 
 OCR_ENABLED = os.environ.get("OMNIX_OCR_ENABLED", "true").lower() not in {"0", "false", "no"}
 MAX_OCR_PAGES = int(os.environ.get("OMNIX_MAX_OCR_PAGES", "25"))
 
+EXTRACTION_COLUMN_NAMES = (
+    "page_count",
+    "extractor_used",
+    "extracted_character_count",
+    "image_page_count",
+    "text_page_count",
+    "extraction_status",
+    "extraction_failure_reason",
+    "ocr_used",
+    "ocr_character_count",
+)
+
 
 @dataclass(slots=True)
 class ExtractionDiagnostics:
@@ -26,6 +38,9 @@ class ExtractionDiagnostics:
     extraction_failure_reason: str | None = None
     ocr_used: bool = False
     ocr_character_count: int = 0
+    ocr_pages_processed: int | None = None
+    ocr_pages_omitted: int | None = None
+    ocr_coverage_complete: bool | None = None
 
     def to_metadata(self) -> dict[str, Any]:
         return asdict(self)
@@ -42,7 +57,8 @@ def normalize_extracted_text(text: str) -> str:
 
 
 def extraction_columns_payload(diagnostics: ExtractionDiagnostics) -> dict[str, Any]:
-    return diagnostics.to_metadata()
+    metadata = diagnostics.to_metadata()
+    return {column: metadata[column] for column in EXTRACTION_COLUMN_NAMES}
 
 
 def diagnostics_from_file(file_row: dict[str, Any]) -> ExtractionDiagnostics:
@@ -70,6 +86,9 @@ def diagnostics_from_file(file_row: dict[str, Any]) -> ExtractionDiagnostics:
         extraction_failure_reason=_optional_str(values.get("extraction_failure_reason")),
         ocr_used=bool(values.get("ocr_used") or False),
         ocr_character_count=int(values.get("ocr_character_count") or 0),
+        ocr_pages_processed=_optional_int(values.get("ocr_pages_processed")),
+        ocr_pages_omitted=_optional_int(values.get("ocr_pages_omitted")),
+        ocr_coverage_complete=_optional_bool(values.get("ocr_coverage_complete")),
     )
 
 
@@ -203,9 +222,13 @@ def _extract_pdf(filename: str, file_type: str | None, data: bytes) -> Extractio
             diagnostics.extraction_failure_reason = "This PDF contains no readable text layer. OCR is required."
             return ExtractionResult(text="", diagnostics=diagnostics)
 
-        ocr_text, ocr_error = _ocr_pdf(data, diagnostics.page_count or 0)
+        ocr_text, ocr_error, ocr_pages_processed = _ocr_pdf(data, diagnostics.page_count or 0)
         diagnostics.ocr_used = ocr_text is not None
         diagnostics.ocr_character_count = len(normalize_extracted_text(ocr_text or ""))
+        if ocr_text is not None:
+            diagnostics.ocr_pages_processed = ocr_pages_processed
+            diagnostics.ocr_pages_omitted = max((diagnostics.page_count or 0) - ocr_pages_processed, 0)
+            diagnostics.ocr_coverage_complete = diagnostics.ocr_pages_omitted == 0
         if ocr_text and diagnostics.ocr_character_count >= MIN_EXTRACTED_CHARACTERS:
             diagnostics.extraction_status = "searchable"
             diagnostics.extraction_failure_reason = None
@@ -225,12 +248,12 @@ def _extract_pdf(filename: str, file_type: str | None, data: bytes) -> Extractio
     return ExtractionResult(text="", diagnostics=diagnostics)
 
 
-def _ocr_pdf(data: bytes, page_count: int) -> tuple[str | None, str | None]:
+def _ocr_pdf(data: bytes, page_count: int) -> tuple[str | None, str | None, int]:
     try:
         import pypdfium2 as pdfium
         import pytesseract
     except ImportError as exc:
-        return None, f"OCR dependencies are unavailable: {exc.name or str(exc)}."
+        return None, f"OCR dependencies are unavailable: {exc.name or str(exc)}.", 0
 
     try:
         pdf = pdfium.PdfDocument(data)
@@ -243,10 +266,10 @@ def _ocr_pdf(data: bytes, page_count: int) -> tuple[str | None, str | None]:
             normalized = normalize_extracted_text(page_text)
             if normalized:
                 texts.append(normalized)
-        return normalize_extracted_text("\n\n".join(texts)), None
+        return normalize_extracted_text("\n\n".join(texts)), None, page_limit
     except Exception as exc:
         logger.exception("OCR failed.")
-        return None, _friendly_failure_reason(exc)
+        return None, _friendly_failure_reason(exc), 0
 
 
 def _page_has_image_xobject(page: Any) -> bool:
@@ -282,6 +305,12 @@ def _optional_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _optional_bool(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    return None
 
 
 def _optional_str(value: Any) -> str | None:

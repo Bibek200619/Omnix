@@ -185,6 +185,8 @@ assertIncludes(filesPage, "activeSection", "Sources tabs");
 assertIncludes(filesPage, "connectorSourceTypes", "Sources tabs");
 assertIncludes(filesPage, 'activeSection === "files"', "Sources tabs");
 assertIncludes(filesPage, 'activeSection === "connectors"', "Sources tabs");
+assertIncludes(filesModel, "ocr_pages_processed", "OCR coverage disclosure");
+assertIncludes(filesModel, "not processed because of the OCR limit", "OCR coverage disclosure");
 
 for (const label of ["Core", "Execution", "Workspace", "System"]) {
   assertIncludes(sidebarNav, `label: "${label}"`, "Sidebar grouped navigation");

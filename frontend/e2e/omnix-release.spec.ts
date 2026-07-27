@@ -809,6 +809,41 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page.getByText("Queued").first()).toBeVisible();
   });
 
+  test("discloses bounded OCR coverage for searchable files", async ({ page }) => {
+    files = [
+      {
+        id: "file-ocr-bounded",
+        user_id: userId,
+        workspace_id: "workspace-1",
+        file_name: "scanned-contract.pdf",
+        file_type: "application/pdf",
+        size_bytes: 2048,
+        processing_status: "searchable",
+        extraction_status: "searchable",
+        metadata: {
+          processing_status: "searchable",
+          ocr_used: true,
+          ocr_character_count: 1234,
+          page_count: 30,
+          ocr_pages_processed: 25,
+          ocr_pages_omitted: 5,
+          ocr_coverage_complete: false,
+        },
+        created_at: "2026-06-20T00:00:00Z",
+      },
+      ...files,
+    ];
+
+    await page.goto("/files");
+
+    await expect(
+      page.getByText(
+        "OCR indexed the first 25 of 30 pages and extracted 1,234 characters. 5 pages were not processed because of the OCR limit.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+  });
+
   test("discloses decision source coverage and scans a document continuation", async ({ page }) => {
     await page.goto("/files");
     await page.getByRole("button", { name: "Decisions" }).first().click();
