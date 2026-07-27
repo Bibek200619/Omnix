@@ -65,6 +65,8 @@ const members = [
 
 let tasks: Array<Record<string, unknown>>;
 let files: Array<Record<string, unknown>>;
+let conversations: Array<Record<string, unknown>>;
+let messagesByConversation: Record<string, Array<Record<string, unknown>>>;
 
 function workspaceChannel(overrides: Partial<WorkspaceChannel> = {}): WorkspaceChannel {
   return {
@@ -87,6 +89,8 @@ function workspaceChannel(overrides: Partial<WorkspaceChannel> = {}): WorkspaceC
 }
 
 function resetMockState() {
+  conversations = [];
+  messagesByConversation = {};
   tasks = [
     {
       id: "task-1",
@@ -337,7 +341,11 @@ async function mockApi(page: Page) {
       files = [uploaded, ...files];
       return fulfillJson(route, uploaded, 201);
     }
-    if (path === "/conversations") return fulfillJson(route, []);
+    const conversationMessagesMatch = path.match(/^\/conversations\/([^/]+)\/messages$/);
+    if (conversationMessagesMatch && method === "GET") {
+      return fulfillJson(route, messagesByConversation[conversationMessagesMatch[1]] ?? []);
+    }
+    if (path === "/conversations") return fulfillJson(route, conversations);
 
     return fulfillJson(route, method === "GET" ? [] : {});
   });
@@ -599,6 +607,37 @@ test.describe("authenticated Omnix shell", () => {
       buffer: Buffer.from("# E2E upload\n\nQueued processing."),
     });
     await expect(page.getByText("Queued").first()).toBeVisible();
+  });
+
+  test("loads syntax highlighting only for fenced chat code blocks", async ({ page }) => {
+    conversations = [
+      {
+        id: "code-sample",
+        workspace_id: "workspace-1",
+        title: "Code sample",
+        preview: "A fenced TypeScript example",
+        latest_message_role: "assistant",
+        latest_message_at: "2026-06-20T00:00:00Z",
+      },
+    ];
+    messagesByConversation = {
+      "code-sample": [
+        {
+          id: "message-code-sample",
+          conversation_id: "code-sample",
+          role: "assistant",
+          content: ["```ts", 'const greeting = "hello";', "```"].join("\n"),
+          status: "completed",
+          created_at: "2026-06-20T00:00:00Z",
+        },
+      ],
+    };
+
+    await page.goto("/chat?conversation=code-sample");
+
+    const codeBlock = page.getByTestId("chat-code-block");
+    await expect(codeBlock).toContainText('const greeting = "hello";');
+    await expect(codeBlock.getByRole("button", { name: "Copy code" })).toBeVisible();
   });
 
   test("mobile file upload surface queues a selected file", async ({ page, isMobile }) => {

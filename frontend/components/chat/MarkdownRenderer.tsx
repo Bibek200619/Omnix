@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { safeLinkHref } from "@/lib/url-safety";
@@ -18,8 +16,57 @@ type StreamingTextRendererProps = MarkdownRendererProps & {
   showCursor?: boolean;
 };
 
+type SyntaxHighlighterComponent = typeof import("react-syntax-highlighter/dist/esm/prism").default;
+type SyntaxHighlighterTheme = typeof import("react-syntax-highlighter/dist/esm/styles/prism").vscDarkPlus;
+
+type SyntaxHighlighterRuntime = {
+  Component: SyntaxHighlighterComponent;
+  theme: SyntaxHighlighterTheme;
+};
+
+let syntaxHighlighterRuntimePromise: Promise<SyntaxHighlighterRuntime> | null = null;
+
+function loadSyntaxHighlighter() {
+  syntaxHighlighterRuntimePromise ??= Promise.all([
+    import("react-syntax-highlighter/dist/esm/prism"),
+    import("react-syntax-highlighter/dist/esm/styles/prism"),
+  ]).then(([runtime, styles]) => ({
+    Component: runtime.default,
+    theme: styles.vscDarkPlus,
+  }));
+
+  return syntaxHighlighterRuntimePromise;
+}
+
+function PlainCode({ code }: { code: string }) {
+  return (
+    <pre className="whitespace-pre-wrap break-words p-4 text-[13px] leading-[1.65] text-slate-100">
+      <code className="font-mono">{code}</code>
+    </pre>
+  );
+}
+
 function CodeBlock({ code, language }: { code: string; language?: string }) {
   const [copied, setCopied] = useState(false);
+  const [highlighter, setHighlighter] = useState<SyntaxHighlighterRuntime | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void loadSyntaxHighlighter()
+      .then((runtime) => {
+        if (!cancelled) {
+          setHighlighter(runtime);
+        }
+      })
+      .catch(() => {
+        // Keep the immediately available plain-code fallback if optional highlighting cannot load.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleCopy() {
     if (!navigator.clipboard) return;
@@ -29,8 +76,10 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
     window.setTimeout(() => setCopied(false), 1400);
   }
 
+  const SyntaxHighlighter = highlighter?.Component;
+
   return (
-    <div className="my-3 overflow-hidden rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-color-05070b)] shadow-[0_16px_50px_var(--omnix-rgba-0-0-0-0-28)]">
+    <div data-testid="chat-code-block" className="my-3 overflow-hidden rounded-lg border border-[var(--omnix-border)] bg-[var(--omnix-color-05070b)] shadow-[0_16px_50px_var(--omnix-rgba-0-0-0-0-28)]">
       <div className="flex h-10 items-center justify-between border-b border-[var(--omnix-border)] bg-[var(--omnix-surface)] px-3">
         <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
           {language || "code"}
@@ -45,26 +94,30 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
       </div>
-      <SyntaxHighlighter
-        language={language || "text"}
-        style={vscDarkPlus}
-        customStyle={{
-          margin: 0,
-          background: "transparent",
-          padding: "1rem",
-          fontSize: "13px",
-          lineHeight: "1.65",
-        }}
-        codeTagProps={{
-          style: {
-            fontFamily:
-              "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-          },
-        }}
-        wrapLongLines
-      >
-        {code}
-      </SyntaxHighlighter>
+      {SyntaxHighlighter ? (
+        <SyntaxHighlighter
+          language={language || "text"}
+          style={highlighter.theme}
+          customStyle={{
+            margin: 0,
+            background: "transparent",
+            padding: "1rem",
+            fontSize: "13px",
+            lineHeight: "1.65",
+          }}
+          codeTagProps={{
+            style: {
+              fontFamily:
+                "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+            },
+          }}
+          wrapLongLines
+        >
+          {code}
+        </SyntaxHighlighter>
+      ) : (
+        <PlainCode code={code} />
+      )}
     </div>
   );
 }
