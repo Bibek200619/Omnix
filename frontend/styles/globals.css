@@ -412,6 +412,9 @@ textarea {
   background-size: 36px 36px;
   content: "";
   opacity: 0.5;
+}
+
+.omnix-app-bg.omnix-dashboard-ambient::before {
   animation: omnix-grid-drift 38s linear infinite;
 }
 
