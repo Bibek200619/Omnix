@@ -659,6 +659,23 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page.locator(".omnix-shell-popover-enter")).toHaveCSS("animation-name", "none");
   });
 
+  test("runs ambient shell effects only on the dashboard", async ({ page }) => {
+    const appShell = page.locator(".omnix-app-bg.omnix-auth-shell");
+    const gridAnimationName = () => appShell.evaluate((element) => getComputedStyle(element, "::before").animationName);
+
+    await page.goto("/dashboard");
+    await expect(appShell).toHaveClass(/omnix-dashboard-ambient/);
+    await expect(page.locator(".omnix-ambient-layer")).toHaveCount(1);
+    await expect(page.locator(".omnix-shell-particle")).toHaveCount(30);
+    await expect.poll(gridAnimationName).toBe("omnix-grid-drift");
+
+    await page.goto("/chat");
+    await expect(appShell).not.toHaveClass(/omnix-dashboard-ambient/);
+    await expect(page.locator(".omnix-ambient-layer")).toHaveCount(0);
+    await expect(page.locator(".omnix-shell-particle")).toHaveCount(0);
+    await expect.poll(gridAnimationName).toBe("none");
+  });
+
   test("opens command palette, searches, and activates a result", async ({ page }) => {
     await page.goto("/dashboard");
     await page.getByRole("button", { name: "Open command palette" }).first().click();

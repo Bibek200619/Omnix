@@ -25,6 +25,7 @@ const [
   filesPage,
   filesModel,
   pageSkeleton,
+  appShell,
   sidebarNav,
   mobileDock,
   globalsCss,
@@ -56,6 +57,7 @@ const [
   read("app/(dashboard)/files/page.tsx"),
   read("components/files/filesPageModel.ts"),
   read("components/ui/PageSkeleton.tsx"),
+  read("components/layout/AppShell.tsx"),
   read("components/layout/sidebar/SidebarNav.tsx"),
   read("components/layout/MobileDock.tsx"),
   read("styles/globals.css"),
@@ -128,6 +130,10 @@ for (const [source, label] of [
   assertExcludes(source, "framer-motion", `${label} global shell dependency`);
 }
 assertIncludes(ambientParticles, "omnix-shell-particle", "Ambient particles CSS motion");
+assertIncludes(appShell, 'const showDashboardAmbient = pathname === "/dashboard"', "Ambient route isolation");
+assertIncludes(appShell, "omnix-dashboard-ambient", "Ambient route isolation");
+assertIncludes(appShell, "{showDashboardAmbient ? (", "Ambient route isolation");
+assertIncludes(globalsCss, ".omnix-app-bg.omnix-dashboard-ambient::before", "Ambient route isolation");
 assertIncludes(pageTransition, "omnix-shell-page-enter", "Page transition CSS motion");
 assertIncludes(workspaceSelector, "omnix-shell-popover-enter", "Workspace selector CSS motion");
 assertIncludes(workspaceTreeNode, "omnix-shell-list-enter", "Workspace tree CSS motion");
