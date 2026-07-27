@@ -4,7 +4,12 @@ import Link from "next/link";
 import { BadgeCheck, ChevronDown, ChevronRight, Loader2, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-import type { DecisionCandidate, DecisionEvidence } from "@/lib/workspace-types";
+import type {
+  DecisionCandidate,
+  DecisionCandidateSourceCoverage,
+  DecisionCandidateSourceType,
+  DecisionEvidence,
+} from "@/lib/workspace-types";
 
 type DecisionCandidatePanelProps = {
   title?: string;
@@ -13,8 +18,11 @@ type DecisionCandidatePanelProps = {
   loading?: boolean;
   error?: string | null;
   emptyText?: string;
+  sourceCoverage?: DecisionCandidateSourceCoverage | null;
+  sourceType?: DecisionCandidateSourceType;
   onToggle: () => void;
   onRefresh: () => void;
+  onScanMore?: () => void;
   onCreate: (candidate: DecisionCandidate) => void;
   onDismiss: (candidate: DecisionCandidate) => void;
 };
@@ -45,6 +53,30 @@ function evidenceHref(evidence: DecisionEvidence) {
   return undefined;
 }
 
+function coverageCopy(coverage: DecisionCandidateSourceCoverage, sourceType: DecisionCandidateSourceType) {
+  const recordLabel = sourceType === "conversation" ? "message" : "document chunk";
+  const plural = coverage.selected_record_count === 1 ? recordLabel : `${recordLabel}s`;
+  const messages = [`Reviewed ${coverage.selected_record_count} ${plural} in this scan.`];
+
+  if (coverage.context_limited) {
+    messages.push(
+      `${coverage.prompt_record_count} of those ${plural} fit the analysis context.`,
+    );
+  }
+  if (coverage.has_additional_records) {
+    messages.push(
+      sourceType === "conversation"
+        ? "Earlier messages are available; suggestions cover this source window only."
+        : "Later document chunks are available; suggestions cover this source window only.",
+    );
+  }
+  return messages.join(" ");
+}
+
+function scanMoreLabel(sourceType: DecisionCandidateSourceType) {
+  return sourceType === "conversation" ? "Scan Earlier Messages" : "Scan Next Document Section";
+}
+
 export function DecisionCandidatePanel({
   title = "Potential Decisions",
   candidates,
@@ -52,8 +84,11 @@ export function DecisionCandidatePanel({
   loading = false,
   error = null,
   emptyText = "No evidence-backed decision candidates found.",
+  sourceCoverage = null,
+  sourceType,
   onToggle,
   onRefresh,
+  onScanMore,
   onCreate,
   onDismiss,
 }: DecisionCandidatePanelProps) {
@@ -91,6 +126,28 @@ export function DecisionCandidatePanel({
               Scan
             </Button>
           </div>
+          {sourceCoverage && sourceType ? (
+            <div
+              data-testid="decision-source-coverage"
+              role="status"
+              aria-live="polite"
+              className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.05] px-3 py-2 text-[11px] leading-5 text-cyan-50/80"
+            >
+              <p className="min-w-0 flex-1">{coverageCopy(sourceCoverage, sourceType)}</p>
+              {sourceCoverage.has_additional_records && onScanMore ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="min-h-11"
+                  onClick={onScanMore}
+                  isLoading={loading}
+                >
+                  {scanMoreLabel(sourceType)}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           {loading ? (
             <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/10 px-3 py-3 text-xs text-cyan-100/70">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />

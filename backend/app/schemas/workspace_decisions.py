@@ -80,12 +80,25 @@ class DecisionCandidate(BaseModel):
     supporting_evidence: list[DecisionEvidence] = Field(..., min_length=1, max_length=5)
 
 
+class DecisionCandidateSourceCoverage(BaseModel):
+    """Public bounds for a single candidate-analysis source window."""
+
+    source_offset: int = Field(..., ge=0)
+    loaded_record_count: int = Field(..., ge=0)
+    selected_record_count: int = Field(..., ge=0)
+    prompt_record_count: int = Field(..., ge=0)
+    context_limited: bool
+    has_additional_records: bool
+    next_source_offset: int | None = Field(default=None, ge=0)
+
+
 class DecisionCandidateListRead(BaseModel):
     candidates: list[DecisionCandidate] = Field(default_factory=list)
     candidate_count: int
     source_type: DecisionCandidateSourceType
     source_id: str
     generated_at: str
+    source_coverage: DecisionCandidateSourceCoverage
 
 
 class DecisionCandidateMetricCreate(BaseModel):

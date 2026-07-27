@@ -68,6 +68,7 @@ let files: Array<Record<string, unknown>>;
 let conversations: Array<Record<string, unknown>>;
 let messagesByConversation: Record<string, Array<Record<string, unknown>>>;
 let chatStreamFixture: string | null;
+let decisionCandidateOffsets: number[];
 
 function workspaceChannel(overrides: Partial<WorkspaceChannel> = {}): WorkspaceChannel {
   return {
@@ -93,6 +94,7 @@ function resetMockState() {
   conversations = [];
   messagesByConversation = {};
   chatStreamFixture = null;
+  decisionCandidateOffsets = [];
   tasks = [
     {
       id: "task-1",
@@ -288,6 +290,64 @@ async function mockApi(page: Page) {
     }
     const channelsMatch = path.match(/^\/workspaces\/([^/]+)\/channels$/);
     if (channelsMatch) return fulfillJson(route, []);
+    const documentCandidatesMatch = path.match(/^\/workspaces\/([^/]+)\/decisions\/candidates\/document\/([^/]+)$/);
+    if (documentCandidatesMatch && method === "POST") {
+      const sourceOffset = Number(url.searchParams.get("source_offset") ?? "0");
+      decisionCandidateOffsets.push(sourceOffset);
+      const isContinuation = sourceOffset === 40;
+      return fulfillJson(route, {
+        candidates: [
+          {
+            id: isContinuation ? "candidate-later" : "candidate-first",
+            title: isContinuation ? "Later source decision" : "Initial source decision",
+            reason: "The source window contains a reviewed decision.",
+            confidence: "medium",
+            source_type: "document",
+            source_id: documentCandidatesMatch[2],
+            supporting_evidence: [
+              {
+                kind: "document_chunk",
+                channel_id: null,
+                message_id: null,
+                file_id: documentCandidatesMatch[2],
+                chunk_id: isContinuation ? "chunk-41" : "chunk-1",
+                chunk_index: isContinuation ? 40 : 0,
+                page: 1,
+                char_start: 0,
+                char_end: 8,
+                quote: "Decision",
+                quote_sha256: "a".repeat(64),
+                source_content_hash: "b".repeat(64),
+                source_updated_at: "2026-06-20T00:00:00Z",
+              },
+            ],
+          },
+        ],
+        candidate_count: 1,
+        source_type: "document",
+        source_id: documentCandidatesMatch[2],
+        generated_at: "2026-06-20T00:00:00Z",
+        source_coverage: isContinuation
+          ? {
+              source_offset: 40,
+              loaded_record_count: 1,
+              selected_record_count: 1,
+              prompt_record_count: 1,
+              context_limited: false,
+              has_additional_records: false,
+              next_source_offset: null,
+            }
+          : {
+              source_offset: 0,
+              loaded_record_count: 41,
+              selected_record_count: 40,
+              prompt_record_count: 37,
+              context_limited: true,
+              has_additional_records: true,
+              next_source_offset: 40,
+            },
+      });
+    }
     const decisionsMatch = path.match(/^\/workspaces\/([^/]+)\/decisions$/);
     if (decisionsMatch) return fulfillJson(route, []);
     const mentionsMatch = path.match(/^\/workspaces\/([^/]+)\/mentions(?:\/unread-count)?$/);
@@ -665,6 +725,19 @@ test.describe("authenticated Omnix shell", () => {
       buffer: Buffer.from("# E2E upload\n\nQueued processing."),
     });
     await expect(page.getByText("Queued").first()).toBeVisible();
+  });
+
+  test("discloses decision source coverage and scans a document continuation", async ({ page }) => {
+    await page.goto("/files");
+    await page.getByRole("button", { name: "Decisions" }).first().click();
+
+    const coverage = page.getByTestId("decision-source-coverage");
+    await expect(coverage).toContainText("Reviewed 40 document chunks in this scan.");
+    await expect(coverage).toContainText("37 of those document chunks fit the analysis context.");
+    await page.getByRole("button", { name: "Scan Next Document Section" }).click();
+
+    await expect(coverage).toContainText("Reviewed 1 document chunk in this scan.");
+    expect(decisionCandidateOffsets).toEqual([0, 40]);
   });
 
   test("loads syntax highlighting only for fenced chat code blocks", async ({ page }) => {

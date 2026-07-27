@@ -28,6 +28,8 @@ FILE_COLUMNS = "id,user_id,workspace_id,file_name,file_type,extraction_status,cr
 CONFIDENCE_VALUES = {"low", "medium", "high"}
 MAX_SOURCE_CHARS = 9000
 MAX_SOURCE_RECORDS = 60
+CONVERSATION_SOURCE_PAGE_SIZE = MAX_SOURCE_RECORDS
+DOCUMENT_SOURCE_PAGE_SIZE = 40
 MAX_EVIDENCE_ITEMS = 5
 MAX_QUOTE_CHARS = 420
 MIN_QUOTE_CHARS = 8
@@ -105,17 +107,43 @@ def _json_payload(content: str) -> Any:
             return {}
 
 
+def _stratified_record_indexes(record_count: int) -> list[int]:
+    """Prioritize both ends and the middle before filling a bounded source context."""
+
+    if record_count <= 0:
+        return []
+    if record_count == 1:
+        return [0]
+
+    indexes = [0, record_count - 1]
+    seen = set(indexes)
+    intervals = [(0, record_count - 1)]
+    while intervals:
+        next_intervals: list[tuple[int, int]] = []
+        for start, end in intervals:
+            if end - start <= 1:
+                continue
+            midpoint = (start + end) // 2
+            if midpoint not in seen:
+                indexes.append(midpoint)
+                seen.add(midpoint)
+            next_intervals.extend(((start, midpoint), (midpoint, end)))
+        intervals = next_intervals
+    return indexes
+
+
 def _source_catalog(source_records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return whole, authoritative source records within the prompt budget.
+    """Return whole, authoritative source records across the source window's prompt budget.
 
     Never slice an individual message or chunk: an evidence reference must always
-    point to a complete source record that the service can revalidate later.
+    point to a complete source record that the service can revalidate later. When
+    a source window exceeds the character budget, preserve early, middle, and late
+    context before filling the remaining prompt capacity.
     """
 
-    catalog: list[dict[str, Any]] = []
+    normalized_records: list[tuple[int, dict[str, Any]]] = []
     seen_refs: set[str] = set()
-    total_chars = 0
-    for record in source_records[:MAX_SOURCE_RECORDS]:
+    for index, record in enumerate(source_records[:MAX_SOURCE_RECORDS]):
         source_ref = _identifier(record.get("source_ref"))
         kind = str(record.get("kind") or "")
         content = record.get("content")
@@ -150,15 +178,42 @@ def _source_catalog(source_records: list[dict[str, Any]]) -> list[dict[str, Any]
         if record.get("source_updated_at"):
             normalized["source_updated_at"] = str(record["source_updated_at"])
 
-        serialized_length = len(json.dumps(normalized, ensure_ascii=False, separators=(",", ":")))
-        if serialized_length > MAX_SOURCE_CHARS:
-            continue
-        if total_chars + serialized_length > MAX_SOURCE_CHARS:
-            continue
-        catalog.append(normalized)
+        normalized_records.append((index, normalized))
         seen_refs.add(source_ref)
+
+    selected_records: list[tuple[int, dict[str, Any]]] = []
+    total_chars = 0
+    for record_index in _stratified_record_indexes(len(normalized_records)):
+        index, normalized = normalized_records[record_index]
+        serialized_length = len(json.dumps(normalized, ensure_ascii=False, separators=(",", ":")))
+        if serialized_length > MAX_SOURCE_CHARS or total_chars + serialized_length > MAX_SOURCE_CHARS:
+            continue
+        selected_records.append((index, normalized))
         total_chars += serialized_length
-    return catalog
+
+    return [normalized for _, normalized in sorted(selected_records, key=lambda item: item[0])]
+
+
+def _source_coverage(
+    *,
+    source_offset: int,
+    loaded_record_count: int,
+    selected_records: list[dict[str, Any]],
+    source_catalog: list[dict[str, Any]],
+    has_additional_records: bool,
+) -> dict[str, int | bool | None]:
+    """Describe the bounded source window without exposing source contents or IDs."""
+
+    selected_record_count = len(selected_records)
+    return {
+        "source_offset": source_offset,
+        "loaded_record_count": loaded_record_count,
+        "selected_record_count": selected_record_count,
+        "prompt_record_count": len(source_catalog),
+        "context_limited": len(source_catalog) < selected_record_count,
+        "has_additional_records": has_additional_records,
+        "next_source_offset": source_offset + selected_record_count if has_additional_records else None,
+    }
 
 
 def _validated_evidence(
@@ -257,8 +312,10 @@ async def _extract_candidates(
     source_type: SourceType,
     source_id: str,
     source_records: list[dict[str, Any]],
+    source_catalog: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    source_catalog = _source_catalog(source_records)
+    if source_catalog is None:
+        source_catalog = _source_catalog(source_records)
     if not source_catalog:
         return []
 
@@ -323,16 +380,23 @@ async def conversation_decision_candidates(
     channel_id: str,
     user_id: str,
     thread_root_id: str | None = None,
+    source_offset: int = 0,
 ) -> dict[str, Any]:
-    messages = await channel_transcript_for_assistance(
+    loaded_messages = await channel_transcript_for_assistance(
         workspace_id=workspace_id,
         channel_id=channel_id,
         user_id=user_id,
         thread_root_id=thread_root_id,
+        limit=CONVERSATION_SOURCE_PAGE_SIZE + 1,
+        offset=source_offset,
     )
+    has_additional_records = len(loaded_messages) > CONVERSATION_SOURCE_PAGE_SIZE
+    # The transcript is chronological after its newest-first database query. Drop
+    # the oldest probe so this window holds the newest records at the current offset.
+    messages = loaded_messages[1:] if has_additional_records else loaded_messages
     source_records = [
         {
-            "source_ref": f"m{index + 1}",
+            "source_ref": f"m{source_offset + index + 1}",
             "kind": "conversation_message",
             "channel_id": channel_id,
             "message_id": message.get("id"),
@@ -340,12 +404,14 @@ async def conversation_decision_candidates(
             "content": message.get("content"),
             "source_updated_at": message.get("updated_at") or message.get("edited_at") or message.get("created_at"),
         }
-        for index, message in enumerate(messages[-MAX_SOURCE_RECORDS:])
+        for index, message in enumerate(messages)
     ]
+    source_catalog = _source_catalog(source_records)
     candidates = await _extract_candidates(
         source_type="conversation",
         source_id=channel_id,
         source_records=source_records,
+        source_catalog=source_catalog,
     )
     await log_candidate_metrics(
         workspace_id=workspace_id,
@@ -360,6 +426,13 @@ async def conversation_decision_candidates(
         "source_type": "conversation",
         "source_id": channel_id,
         "generated_at": utc_now_iso(),
+        "source_coverage": _source_coverage(
+            source_offset=source_offset,
+            loaded_record_count=len(loaded_messages),
+            selected_records=source_records,
+            source_catalog=source_catalog,
+            has_additional_records=has_additional_records,
+        ),
     }
 
 
@@ -368,6 +441,7 @@ async def document_decision_candidates(
     workspace_id: str,
     file_id: str,
     user_id: str,
+    source_offset: int = 0,
 ) -> dict[str, Any]:
     await require_workspace_access(workspace_id, user_id)
     try:
@@ -377,13 +451,22 @@ async def document_decision_candidates(
     if file_row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found in this workspace.")
 
-    chunks = await _load_document_chunks([file_id], user_id=user_id, workspace_id=workspace_id)
+    loaded_chunks = await _load_document_chunks(
+        [file_id],
+        user_id=user_id,
+        workspace_id=workspace_id,
+        limit=DOCUMENT_SOURCE_PAGE_SIZE + 1,
+        offset=source_offset,
+        order_by="chunk_index",
+    )
+    has_additional_records = len(loaded_chunks) > DOCUMENT_SOURCE_PAGE_SIZE
+    chunks = loaded_chunks[:DOCUMENT_SOURCE_PAGE_SIZE]
     source_records: list[dict[str, Any]] = []
-    for index, chunk in enumerate(chunks[:40]):
+    for index, chunk in enumerate(chunks):
         metadata = chunk.get("metadata") if isinstance(chunk.get("metadata"), dict) else {}
         source_records.append(
             {
-                "source_ref": f"d{index + 1}",
+                "source_ref": f"d{source_offset + index + 1}",
                 "kind": "document_chunk",
                 "file_id": file_id,
                 "chunk_id": chunk.get("id"),
@@ -393,10 +476,12 @@ async def document_decision_candidates(
                 "source_updated_at": chunk.get("updated_at") or chunk.get("created_at"),
             }
         )
+    source_catalog = _source_catalog(source_records)
     candidates = await _extract_candidates(
         source_type="document",
         source_id=file_id,
         source_records=source_records,
+        source_catalog=source_catalog,
     )
     await log_candidate_metrics(
         workspace_id=workspace_id,
@@ -411,6 +496,13 @@ async def document_decision_candidates(
         "source_type": "document",
         "source_id": file_id,
         "generated_at": utc_now_iso(),
+        "source_coverage": _source_coverage(
+            source_offset=source_offset,
+            loaded_record_count=len(loaded_chunks),
+            selected_records=source_records,
+            source_catalog=source_catalog,
+            has_additional_records=has_additional_records,
+        ),
     }
 
 
