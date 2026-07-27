@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { AlertTriangle, Check, Edit3, Plus, Settings, Trash2, UserPlus, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -220,7 +219,7 @@ export function WorkspaceManagementActions({
   return (
     <div className="border-t border-white/5 bg-black/10 p-2">
       {showManageActions ? (
-        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ height: "auto", opacity: 1 }} className="space-y-2 pb-2">
+        <div className="omnix-shell-expand-enter space-y-2 pb-2">
           {createError ? (
             <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[10px] text-rose-200">{createError}</div>
           ) : null}
@@ -273,7 +272,7 @@ export function WorkspaceManagementActions({
           <button type="button" onClick={() => onShowManageActionsChange(false)} className="min-h-11 w-full rounded-md px-3 text-[8px] font-bold uppercase tracking-[0.2em] text-white/10 transition-colors hover:bg-white/5 hover:text-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
             Close Settings
           </button>
-        </motion.div>
+        </div>
       ) : (
         <button type="button" onClick={() => onShowManageActionsChange(true)} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-3 text-[9px] font-bold uppercase tracking-[0.2em] text-white/20 transition hover:bg-white/5 hover:text-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
           <Settings className="h-3 w-3" /> Workspace Management

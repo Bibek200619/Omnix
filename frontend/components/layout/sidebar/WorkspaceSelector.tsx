@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
@@ -260,39 +259,37 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
         </div>
       </button>
 
-      <AnimatePresence>
-        {open ? (
-          <FloatingMenuLayer anchorRef={selectorRef} contentRef={selectorMenuRef} placement="bottom-start" width="anchor" minWidth={248} offset={6} zIndex={145}>
-            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: "easeOut" }} className="omnix-floating-card w-full overflow-hidden">
-              <div className="omnix-scrollbar overflow-y-auto py-1" style={{ maxHeight: "min(22rem, var(--omnix-floating-max-h))" }}>
-                <WorkspaceListState
-                  loading={loading}
-                  error={workspaceError}
-                  workspaces={workspaces}
-                  expandedWorkspaceIds={expandedWorkspaceIds}
-                  onRetry={() => void refreshWorkspaces({ force: true })}
-                  onToggleExpanded={toggleExpanded}
-                  onSelectWorkspace={selectWorkspace}
-                />
-              </div>
-              <WorkspaceManagementActions
-                canManageActive={canManageActive} canCreateSubspace={canCreateSubspace}
-                showManageActions={showManageActions} showCreateForm={showCreateForm}
-                createError={createError} creatingWorkspace={creatingWorkspace} newWorkspaceName={newWorkspaceName}
-                onNewWorkspaceNameChange={(value) => { setNewWorkspaceName(value); setCreateError(null); }}
-                onCreateWorkspace={handleCreateWorkspace}
-                onCancelCreate={() => { setShowCreateForm(false); setNewWorkspaceName(""); setCreateError(null); }}
-                onOpenCreate={() => setShowCreateForm(true)}
-                onOpenSubspace={() => { setCreateSubspaceError(null); setShowCreateSubspaceModal(true); }}
-                onOpenRename={() => { if (!active) return; setRenameDraft(active.name); setRenameError(null); setRenameOpen(true); }}
-                onOpenDelete={() => { setDeleteConfirmText(""); setDeleteError(null); setDeleteOpen(true); }}
-                onOpenInvite={() => { setInviteError(null); setInviteOpen(true); }}
-                onShowManageActionsChange={setShowManageActions}
+      {open ? (
+        <FloatingMenuLayer anchorRef={selectorRef} contentRef={selectorMenuRef} placement="bottom-start" width="anchor" minWidth={248} offset={6} zIndex={145}>
+          <div className="omnix-floating-card omnix-shell-popover-enter w-full overflow-hidden">
+            <div className="omnix-scrollbar overflow-y-auto py-1" style={{ maxHeight: "min(22rem, var(--omnix-floating-max-h))" }}>
+              <WorkspaceListState
+                loading={loading}
+                error={workspaceError}
+                workspaces={workspaces}
+                expandedWorkspaceIds={expandedWorkspaceIds}
+                onRetry={() => void refreshWorkspaces({ force: true })}
+                onToggleExpanded={toggleExpanded}
+                onSelectWorkspace={selectWorkspace}
               />
-            </motion.div>
-          </FloatingMenuLayer>
-        ) : null}
-      </AnimatePresence>
+            </div>
+            <WorkspaceManagementActions
+              canManageActive={canManageActive} canCreateSubspace={canCreateSubspace}
+              showManageActions={showManageActions} showCreateForm={showCreateForm}
+              createError={createError} creatingWorkspace={creatingWorkspace} newWorkspaceName={newWorkspaceName}
+              onNewWorkspaceNameChange={(value) => { setNewWorkspaceName(value); setCreateError(null); }}
+              onCreateWorkspace={handleCreateWorkspace}
+              onCancelCreate={() => { setShowCreateForm(false); setNewWorkspaceName(""); setCreateError(null); }}
+              onOpenCreate={() => setShowCreateForm(true)}
+              onOpenSubspace={() => { setCreateSubspaceError(null); setShowCreateSubspaceModal(true); }}
+              onOpenRename={() => { if (!active) return; setRenameDraft(active.name); setRenameError(null); setRenameOpen(true); }}
+              onOpenDelete={() => { setDeleteConfirmText(""); setDeleteError(null); setDeleteOpen(true); }}
+              onOpenInvite={() => { setInviteError(null); setInviteOpen(true); }}
+              onShowManageActionsChange={setShowManageActions}
+            />
+          </div>
+        </FloatingMenuLayer>
+      ) : null}
 
       {active ? (
         <>

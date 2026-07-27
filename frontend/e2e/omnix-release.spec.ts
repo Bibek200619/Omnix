@@ -490,6 +490,20 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page.getByRole("button", { name: "Open command palette" }).first()).toBeVisible();
   });
 
+  test("keeps shell motion CSS-only and honors reduced motion", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/dashboard");
+
+    const pageTransition = page.locator(".omnix-shell-page-enter");
+    const particles = page.locator(".omnix-shell-particle");
+    await expect(pageTransition).toHaveCSS("animation-name", "none");
+    await expect(particles).toHaveCount(30);
+    await expect(particles.first()).toHaveCSS("animation-name", "none");
+
+    await page.getByRole("button", { name: /Switch workspace\. Current workspace: Acme Operations/ }).click();
+    await expect(page.locator(".omnix-shell-popover-enter")).toHaveCSS("animation-name", "none");
+  });
+
   test("opens command palette, searches, and activates a result", async ({ page }) => {
     await page.goto("/dashboard");
     await page.getByRole("button", { name: "Open command palette" }).first().click();
