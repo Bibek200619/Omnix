@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +18,8 @@ _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]+")
 DEFAULT_UPLOAD_DIR = "./uploads"
 DEFAULT_STORAGE_BUCKET = "omnix-files"
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+
+logger = logging.getLogger(__name__)
 
 
 class StorageError(RuntimeError):
@@ -232,3 +235,22 @@ async def delete_storage_object(storage_path: str | os.PathLike[str] | None) -> 
         return False
     except OSError as exc:
         raise StorageError("Failed to delete file from local storage") from exc
+
+
+async def discard_uncommitted_storage_object(storage_path: str | os.PathLike[str] | None) -> None:
+    """Best-effort rollback for an object whose file metadata was not persisted.
+
+    A registration failure must not leave an otherwise unreachable upload behind.
+    Cleanup is intentionally non-fatal so callers can return the original
+    metadata-registration error to the user.
+    """
+    if not storage_path:
+        return
+
+    try:
+        await delete_storage_object(storage_path)
+    except Exception as exc:
+        logger.warning(
+            "Unable to discard an unregistered storage object (%s).",
+            type(exc).__name__,
+        )

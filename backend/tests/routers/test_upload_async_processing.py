@@ -137,3 +137,42 @@ async def test_upload_marks_processing_failed_when_enqueue_cannot_persist_job(
     assert result["metadata"]["processing_status"] == "failed"
     assert "could not be queued" in result["metadata"]["processing_error"]
     assert updates[-1]["processing_status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_upload_discards_storage_object_when_file_registration_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    discarded_paths: list[str] = []
+
+    async def fake_require_workspace_access(workspace_id: str, user_id: str) -> dict[str, Any]:
+        return {"workspace": {"id": workspace_id}, "role": "founder"}
+
+    async def fake_save_bytes(*args: Any, **kwargs: Any) -> str:
+        return "supabase://omnix-test/uploads/user-1/release-note.md"
+
+    async def fake_insert_file_row(payload: dict[str, Any], user_id: str) -> dict[str, Any]:
+        raise upload.SupabaseServiceError("files insert failed")
+
+    async def fake_discard(storage_path: str) -> None:
+        discarded_paths.append(storage_path)
+
+    async def enqueue_must_not_run(payload: dict[str, Any]) -> str:
+        raise AssertionError("ingestion must not be queued without a file record")
+
+    monkeypatch.setattr(upload, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(upload, "save_bytes_to_user_upload", fake_save_bytes)
+    monkeypatch.setattr(upload, "_insert_file_row", fake_insert_file_row)
+    monkeypatch.setattr(upload, "discard_uncommitted_storage_object", fake_discard)
+    monkeypatch.setattr(upload.job_queue, "enqueue_job", enqueue_must_not_run)
+
+    with pytest.raises(upload.HTTPException) as error:
+        await upload.upload_file(
+            _workspace_request("workspace-1"),
+            file=_upload_file(),
+            conversation_id=None,
+            current_user={"sub": "user-1"},
+        )
+
+    assert error.value.status_code == 500
+    assert discarded_paths == ["supabase://omnix-test/uploads/user-1/release-note.md"]

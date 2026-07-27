@@ -104,3 +104,18 @@ async def test_unknown_storage_backend_fails_closed(monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(file_storage.StorageError, match="Unsupported file storage backend"):
         await file_storage.save_bytes_to_user_upload("user-1", "notes.md", b"content")
+
+
+@pytest.mark.asyncio
+async def test_discard_uncommitted_storage_object_suppresses_cleanup_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    attempted_paths: list[str] = []
+
+    async def fake_delete(storage_path: str) -> bool:
+        attempted_paths.append(storage_path)
+        raise file_storage.StorageError("storage unavailable")
+
+    monkeypatch.setattr(file_storage, "delete_storage_object", fake_delete)
+
+    await file_storage.discard_uncommitted_storage_object("supabase://omnix-test/uploads/user-1/notes.md")
+
+    assert attempted_paths == ["supabase://omnix-test/uploads/user-1/notes.md"]
