@@ -28,9 +28,9 @@ type SenderIdentity = {
 type UseWorkspaceConversationSenderParams = {
   activeWorkspaceId: string | null;
   identity: SenderIdentity;
-  loadMessages: (channelId: string) => void;
   mayPost: boolean;
   onChannelMessageCreated: (message: WorkspaceChannelMessage) => void;
+  onThreadReplyCreated: (message: WorkspaceChannelMessage) => void;
   selectedChannelId: string | null;
   sendTypingSignal: (conversationId?: string | null, isTyping?: boolean) => Promise<void>;
   setError: (message: string) => void;
@@ -41,9 +41,9 @@ type UseWorkspaceConversationSenderParams = {
 export function useWorkspaceConversationSender({
   activeWorkspaceId,
   identity,
-  loadMessages,
   mayPost,
   onChannelMessageCreated,
+  onThreadReplyCreated,
   selectedChannelId,
   sendTypingSignal,
   setError,
@@ -101,7 +101,7 @@ export function useWorkspaceConversationSender({
         setThreadMessages((current) => mergeMessage(current, created));
         setThreadDraft("");
         setThreadDraftMentions([]);
-        loadMessages(selectedChannelId);
+        onThreadReplyCreated(created);
       } else {
         setMessages((current) => mergeMessage(current, created));
         setDraft("");

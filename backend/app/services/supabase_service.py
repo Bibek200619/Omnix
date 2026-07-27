@@ -700,6 +700,7 @@ async def select_all_trusted(
     desc: bool = False,
     limit: int | None = None,
     offset: int | None = None,
+    secondary_order_by: str | None = None,
 ) -> list[dict[str, Any]]:
     try:
         client = await _async_client()
@@ -710,6 +711,8 @@ async def select_all_trusted(
 
             if order_by:
                 query = query.order(order_by, desc=desc)
+            if secondary_order_by:
+                query = query.order(secondary_order_by, desc=desc)
             if limit is not None:
                 query = query.limit(limit)
             if offset is not None:
@@ -734,6 +737,8 @@ async def select_all_trusted(
             query = _apply_filters(query, filters)
             if order_by:
                 query = query.order(order_by, desc=desc)
+            if secondary_order_by:
+                query = query.order(secondary_order_by, desc=desc)
             if limit is not None:
                 query = query.limit(limit)
             if offset is not None:

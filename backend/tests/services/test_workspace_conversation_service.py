@@ -33,6 +33,8 @@ async def test_list_messages_loads_latest_roots_and_reply_counts(monkeypatch: py
         assert table == "workspace_channel_messages"
         if filters.get("parent_message_id") == {"is": None}:
             assert kwargs["desc"] is True
+            assert kwargs["order_by"] == "created_at"
+            assert kwargs["secondary_order_by"] == "id"
             return [
                 {
                     "id": "root-new",
@@ -90,6 +92,89 @@ async def test_list_messages_loads_latest_roots_and_reply_counts(monkeypatch: py
     assert result[0]["thread_reply_count"] == 1
     assert result[0]["author_name"] == "Rhea"
     assert result[0]["author_identity"]["display_label"] == "Team Lead \u2022 Backend"
+
+
+@pytest.mark.asyncio
+async def test_list_messages_uses_stable_order_for_thread_reply_pages(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_require_channel_access(**kwargs):
+        return {"id": kwargs["channel_id"], "visibility": "workspace"}, SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_select_one(*_args, **_kwargs):
+        return {
+            "id": "root-1",
+            "workspace_id": "workspace-1",
+            "channel_id": "channel-1",
+            "author_user_id": "user-1",
+            "parent_message_id": None,
+            "content": "Root",
+            "context_links": [],
+            "metadata": {},
+            "created_at": "2026-06-20T00:00:00Z",
+        }
+
+    async def fake_select_all(_table: str, _columns: str, filters: dict[str, object], **kwargs):
+        assert filters == {
+            "channel_id": "channel-1",
+            "workspace_id": "workspace-1",
+            "parent_message_id": "root-1",
+        }
+        captured.update(kwargs)
+        return [
+            {
+                "id": "reply-a",
+                "workspace_id": "workspace-1",
+                "channel_id": "channel-1",
+                "author_user_id": "user-1",
+                "parent_message_id": "root-1",
+                "content": "First tied reply",
+                "context_links": [],
+                "metadata": {},
+                "created_at": "2026-06-20T00:01:00Z",
+            },
+            {
+                "id": "reply-b",
+                "workspace_id": "workspace-1",
+                "channel_id": "channel-1",
+                "author_user_id": "user-1",
+                "parent_message_id": "root-1",
+                "content": "Second tied reply",
+                "context_links": [],
+                "metadata": {},
+                "created_at": "2026-06-20T00:01:00Z",
+            },
+        ]
+
+    async def fake_members(_workspace: dict[str, object]):
+        return [{"user_id": "user-1", "role": "member", "full_name": "Rhea", "avatar_label": "R"}]
+
+    async def fake_profiles(_user_ids: list[str]):
+        return {}
+
+    monkeypatch.setattr(conversations, "_require_channel_access", fake_require_channel_access)
+    monkeypatch.setattr(conversations, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(conversations, "select_all_trusted", fake_select_all)
+    monkeypatch.setattr(conversations, "list_workspace_members", fake_members)
+    monkeypatch.setattr(conversations, "get_profiles", fake_profiles)
+
+    result = await conversations.list_messages(
+        workspace_id="workspace-1",
+        channel_id="channel-1",
+        user_id="user-1",
+        limit=81,
+        offset=80,
+        thread_root_id="root-1",
+    )
+
+    assert [row["id"] for row in result] == ["root-1", "reply-a", "reply-b"]
+    assert captured == {
+        "order_by": "created_at",
+        "secondary_order_by": "id",
+        "desc": False,
+        "limit": 81,
+        "offset": 80,
+    }
 
 
 @pytest.mark.asyncio

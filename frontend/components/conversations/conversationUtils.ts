@@ -55,6 +55,32 @@ export function mergeMessage(current: DisplayMessage[], incoming: WorkspaceChann
   return chronological([...filtered, incoming]);
 }
 
+export function mergeMessagePage(current: DisplayMessage[], incoming: WorkspaceChannelMessage[]) {
+  return incoming.reduce<DisplayMessage[]>((merged, message) => mergeMessage(merged, message), current);
+}
+
+export function incrementThreadReplyCount(current: DisplayMessage[], reply: WorkspaceChannelMessage) {
+  if (!reply.parent_message_id) return current;
+  return current.map((message) => (
+    message.id === reply.parent_message_id
+      ? { ...message, thread_reply_count: message.thread_reply_count + 1 }
+      : message
+  ));
+}
+
+export function splitMessagePage<T>(
+  records: T[],
+  pageSize: number,
+  probePosition: "start" | "end",
+) {
+  const hasMore = records.length > pageSize;
+  if (!hasMore) return { records, hasMore: false };
+  return {
+    records: probePosition === "start" ? records.slice(1) : records.slice(0, pageSize),
+    hasMore: true,
+  };
+}
+
 export function sortWorkspaceChannels(channels: WorkspaceChannel[]) {
   return [...channels].sort((left, right) => {
     const channelTypeOrder = Number(left.channel_type !== "announcement") - Number(right.channel_type !== "announcement");

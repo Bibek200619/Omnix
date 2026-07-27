@@ -2,8 +2,11 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import {
   isCurrentWorkspaceChannelChange,
   isCurrentWorkspaceChannelLoad,
+  incrementThreadReplyCount,
+  mergeMessagePage,
   mergeWorkspaceChannelMessage,
   reconcileWorkspaceChannelChange,
+  splitMessagePage,
 } from "../components/conversations/conversationUtils";
 import type { WorkspaceChannel, WorkspaceChannelMessage } from "../lib/workspace-types";
 
@@ -69,6 +72,9 @@ let conversations: Array<Record<string, unknown>>;
 let messagesByConversation: Record<string, Array<Record<string, unknown>>>;
 let chatStreamFixture: string | null;
 let decisionCandidateOffsets: number[];
+let workspaceChannels: WorkspaceChannel[];
+let workspaceChannelMessages: WorkspaceChannelMessage[];
+let workspaceMessagePageRequests: Array<{ threadRootId: string | null; offset: number; limit: number }>;
 
 function workspaceChannel(overrides: Partial<WorkspaceChannel> = {}): WorkspaceChannel {
   return {
@@ -90,11 +96,37 @@ function workspaceChannel(overrides: Partial<WorkspaceChannel> = {}): WorkspaceC
   };
 }
 
+function workspaceChannelMessage(
+  index: number,
+  overrides: Partial<WorkspaceChannelMessage> = {},
+): WorkspaceChannelMessage {
+  const createdAt = new Date(Date.UTC(2026, 5, 20, 0, 0, index)).toISOString();
+  return {
+    id: `channel-message-${index}`,
+    workspace_id: "workspace-1",
+    channel_id: "channel-general",
+    author_user_id: "user-2",
+    parent_message_id: null,
+    content: `Operational update ${index}`,
+    context_links: [],
+    metadata: {},
+    created_at: createdAt,
+    updated_at: createdAt,
+    author_name: "Taylor Ops",
+    author_avatar_label: "T",
+    thread_reply_count: 0,
+    ...overrides,
+  };
+}
+
 function resetMockState() {
   conversations = [];
   messagesByConversation = {};
   chatStreamFixture = null;
   decisionCandidateOffsets = [];
+  workspaceChannels = [];
+  workspaceChannelMessages = [];
+  workspaceMessagePageRequests = [];
   tasks = [
     {
       id: "task-1",
@@ -289,7 +321,32 @@ async function mockApi(page: Page) {
       return fulfillJson(route, created, 201);
     }
     const channelsMatch = path.match(/^\/workspaces\/([^/]+)\/channels$/);
-    if (channelsMatch) return fulfillJson(route, []);
+    if (channelsMatch && method === "GET") {
+      return fulfillJson(route, workspaceChannels.filter((channel) => channel.workspace_id === channelsMatch[1]));
+    }
+    const channelMessagesMatch = path.match(/^\/workspaces\/([^/]+)\/channels\/([^/]+)\/messages$/);
+    if (channelMessagesMatch && method === "GET") {
+      const limit = Number(url.searchParams.get("limit") ?? "60");
+      const offset = Number(url.searchParams.get("offset") ?? "0");
+      const threadRootId = url.searchParams.get("thread_root_id");
+      workspaceMessagePageRequests.push({ threadRootId, offset, limit });
+      const channelMessages = workspaceChannelMessages.filter(
+        (message) => message.workspace_id === channelMessagesMatch[1] && message.channel_id === channelMessagesMatch[2],
+      );
+      if (threadRootId) {
+        const root = channelMessages.find((message) => message.id === threadRootId && !message.parent_message_id);
+        const replies = channelMessages
+          .filter((message) => message.parent_message_id === threadRootId)
+          .sort((left, right) => Date.parse(left.created_at ?? "") - Date.parse(right.created_at ?? ""));
+        return fulfillJson(route, root ? [root, ...replies.slice(offset, offset + limit)] : []);
+      }
+      const roots = channelMessages
+        .filter((message) => !message.parent_message_id)
+        .sort((left, right) => Date.parse(right.created_at ?? "") - Date.parse(left.created_at ?? ""))
+        .slice(offset, offset + limit)
+        .reverse();
+      return fulfillJson(route, roots);
+    }
     const documentCandidatesMatch = path.match(/^\/workspaces\/([^/]+)\/decisions\/candidates\/document\/([^/]+)$/);
     if (documentCandidatesMatch && method === "POST") {
       const sourceOffset = Number(url.searchParams.get("source_offset") ?? "0");
@@ -541,6 +598,31 @@ test("reconciles realtime channel rows without a reload", () => {
   ).not.toContainEqual(expect.objectContaining({ id: general.id }));
 });
 
+test("merges message pages while excluding each pagination probe", () => {
+  const root = workspaceChannelMessage(0, { id: "root" });
+  const mainPage = splitMessagePage([root, workspaceChannelMessage(1), workspaceChannelMessage(2)], 2, "start");
+  expect(mainPage).toMatchObject({
+    hasMore: true,
+    records: [expect.objectContaining({ id: "channel-message-1" }), expect.objectContaining({ id: "channel-message-2" })],
+  });
+
+  const replyPage = splitMessagePage([workspaceChannelMessage(3), workspaceChannelMessage(4), workspaceChannelMessage(5)], 2, "end");
+  expect(replyPage).toMatchObject({
+    hasMore: true,
+    records: [expect.objectContaining({ id: "channel-message-3" }), expect.objectContaining({ id: "channel-message-4" })],
+  });
+
+  const merged = mergeMessagePage(mainPage.records, [workspaceChannelMessage(1, { content: "Hydrated update" })]);
+  expect(merged).toHaveLength(2);
+  expect(merged.find((message) => message.id === "channel-message-1")).toMatchObject({ content: "Hydrated update" });
+
+  const counted = incrementThreadReplyCount(
+    [root],
+    workspaceChannelMessage(6, { parent_message_id: "root" }),
+  );
+  expect(counted).toMatchObject([{ id: "root", thread_reply_count: 1 }]);
+});
+
 test.describe("public auth pages", () => {
   test("render login and register pages", async ({ page }) => {
     await page.goto("/login");
@@ -738,6 +820,56 @@ test.describe("authenticated Omnix shell", () => {
 
     await expect(coverage).toContainText("Reviewed 1 document chunk in this scan.");
     expect(decisionCandidateOffsets).toEqual([0, 40]);
+  });
+
+  test("paginates channel history and thread replies without hiding messages", async ({ page }) => {
+    const rootMessages = Array.from({ length: 161 }, (_, index) => workspaceChannelMessage(index, {
+      id: `root-message-${index}`,
+      content: `Root update ${index}`,
+      thread_reply_count: index === 160 ? 161 : 0,
+    }));
+    const threadReplies = Array.from({ length: 161 }, (_, index) => workspaceChannelMessage(index + 161, {
+      id: `thread-reply-${index}`,
+      parent_message_id: "root-message-160",
+      content: `Thread reply ${index}`,
+      thread_reply_count: 0,
+    }));
+    workspaceChannels = [workspaceChannel({ message_count: rootMessages.length })];
+    workspaceChannelMessages = [...rootMessages, ...threadReplies];
+
+    await page.goto("/conversations");
+
+    await expect(page.getByText("Root update 81", { exact: true })).toBeVisible();
+    await expect(page.getByText("Root update 80", { exact: true })).toHaveCount(0);
+    const olderMessages = page.getByRole("button", { name: "Load Earlier Messages" });
+    await expect(olderMessages).toBeVisible();
+    await olderMessages.click();
+    await expect(page.getByText("Root update 1", { exact: true })).toBeVisible();
+    await expect(page.getByText("Root update 0", { exact: true })).toHaveCount(0);
+    await olderMessages.click();
+    await expect(page.getByText("Root update 0", { exact: true })).toBeVisible();
+    await expect(olderMessages).toHaveCount(0);
+
+    await page.getByRole("button", { name: "161 thread replies" }).click();
+    await expect(page.getByText("Thread reply 0", { exact: true })).toBeVisible();
+    await expect(page.getByText("Thread reply 80", { exact: true })).toHaveCount(0);
+    const newerReplies = page.getByRole("button", { name: "Load Newer Replies" });
+    await expect(newerReplies).toBeVisible();
+    await newerReplies.click();
+    await expect(page.getByText("Thread reply 80", { exact: true })).toBeVisible();
+    await expect(page.getByText("Thread reply 160", { exact: true })).toHaveCount(0);
+    await newerReplies.click();
+    await expect(page.getByText("Thread reply 160", { exact: true })).toBeVisible();
+    await expect(newerReplies).toHaveCount(0);
+
+    expect(workspaceMessagePageRequests).toEqual(expect.arrayContaining([
+      { threadRootId: null, offset: 0, limit: 81 },
+      { threadRootId: null, offset: 80, limit: 81 },
+      { threadRootId: null, offset: 160, limit: 81 },
+      { threadRootId: "root-message-160", offset: 0, limit: 81 },
+      { threadRootId: "root-message-160", offset: 80, limit: 81 },
+      { threadRootId: "root-message-160", offset: 160, limit: 81 },
+    ]));
   });
 
   test("loads syntax highlighting only for fenced chat code blocks", async ({ page }) => {

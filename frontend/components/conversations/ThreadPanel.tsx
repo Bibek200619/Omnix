@@ -14,8 +14,11 @@ import type {
 
 type ThreadPanelProps = {
   activeMembers: WorkspaceMember[];
+  hasNewerThreadReplies: boolean;
+  loadingNewerThreadReplies: boolean;
   mayPost: boolean;
   onClose: () => void;
+  onLoadNewerReplies: () => void;
   onOpenDecision: (message: WorkspaceChannelMessage) => void;
   onOpenTask: (message: WorkspaceChannelMessage) => void;
   onSend: (content: string, parentMessageId?: string, mentions?: WorkspaceMentionMetadata[]) => void;
@@ -32,8 +35,11 @@ type ThreadPanelProps = {
 
 export function ThreadPanel({
   activeMembers,
+  hasNewerThreadReplies,
+  loadingNewerThreadReplies,
   mayPost,
   onClose,
+  onLoadNewerReplies,
   onOpenDecision,
   onOpenTask,
   onSend,
@@ -88,6 +94,16 @@ export function ThreadPanel({
             onOpenTask={onOpenTask}
           />
         ))}
+        {hasNewerThreadReplies ? (
+          <div className="flex flex-col items-center gap-2 px-2 py-3">
+            <Button type="button" size="sm" variant="ghost" onClick={onLoadNewerReplies} isLoading={loadingNewerThreadReplies}>
+              Load Newer Replies
+            </Button>
+            <p role="status" aria-live="polite" className="text-center text-[11px] text-[var(--omnix-text-3)]">
+              {loadingNewerThreadReplies ? "Loading newer replies…" : "More replies are available."}
+            </p>
+          </div>
+        ) : null}
       </div>
       <form className="border-t border-[var(--omnix-border)] p-3" onSubmit={submit}>
         <MentionTextarea
