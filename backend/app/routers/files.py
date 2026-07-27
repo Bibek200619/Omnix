@@ -233,20 +233,6 @@ async def delete_file(
             detail="Only the uploader or workspace owner can delete this file.",
         )
 
-    try:
-        await delete_many_trusted("files", {"id": file_id})
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-
-    if file_row.get("workspace_id"):
-        await log_workspace_activity(
-            workspace_id=str(file_row["workspace_id"]),
-            actor_user_id=user_id,
-            event_type="workspace.source_removed",
-            summary=f"{file_row.get('file_name') or 'A source'} was removed from the workspace.",
-            metadata={"file_id": file_id},
-        )
-
     storage_missing = False
     storage_path = file_row.get("storage_path")
     if storage_path:
@@ -260,6 +246,29 @@ async def delete_file(
                 file_id, storage_path,
             )
             storage_missing = True
+
+    document_filters: dict[str, Any] = {"file_id": file_id}
+    workspace_id = file_row.get("workspace_id")
+    if workspace_id:
+        document_filters["workspace_id"] = str(workspace_id)
+    else:
+        document_filters["user_id"] = str(file_row.get("user_id") or "")
+        document_filters["workspace_id"] = {"is": None}
+
+    try:
+        await delete_many_trusted("documents", document_filters)
+        await delete_many_trusted("files", {"id": file_id})
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    if workspace_id:
+        await log_workspace_activity(
+            workspace_id=str(workspace_id),
+            actor_user_id=user_id,
+            event_type="workspace.source_removed",
+            summary=f"{file_row.get('file_name') or 'A source'} was removed from the workspace.",
+            metadata={"file_id": file_id},
+        )
 
     if storage_missing:
         return JSONResponse(
