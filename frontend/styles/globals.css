@@ -626,6 +626,40 @@ textarea {
   animation: omnix-scan 9s ease-in-out infinite;
 }
 
+.omnix-shell-page-enter {
+  animation: omnix-shell-page-enter 220ms ease-out both;
+}
+
+.omnix-shell-particle {
+  animation: omnix-shell-particle-drift 24s ease-in-out infinite;
+}
+
+.omnix-shell-popover-enter {
+  animation: omnix-shell-popover-enter 180ms ease-out both;
+}
+
+.omnix-shell-list-enter {
+  animation: omnix-shell-list-enter 120ms ease-out both;
+}
+
+.omnix-shell-expand-enter {
+  animation: omnix-shell-expand-enter 140ms ease-out both;
+}
+
+.omnix-shell-invite-enter {
+  animation: omnix-shell-invite-enter 180ms ease-out both;
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  .omnix-shell-particle {
+    animation: none;
+  }
+
+  .omnix-shell-particle:nth-child(n + 9) {
+    display: none;
+  }
+}
+
 .omnix-panel {
   border: 1px solid var(--omnix-border);
   background: var(--omnix-surface);
@@ -1929,7 +1963,13 @@ textarea {
   .omnix-dashboard-hero::before,
   .omnix-dashboard-metric,
   .omnix-dashboard-meter::after,
-  .omnix-dashboard-hero-action {
+  .omnix-dashboard-hero-action,
+  .omnix-shell-page-enter,
+  .omnix-shell-particle,
+  .omnix-shell-popover-enter,
+  .omnix-shell-list-enter,
+  .omnix-shell-expand-enter,
+  .omnix-shell-invite-enter {
     animation: none;
     transition: none;
     transform: none;
@@ -1937,6 +1977,73 @@ textarea {
 }
 
 /* ── Missing keyframes ──────────────────────────────────────── */
+
+@keyframes omnix-shell-page-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes omnix-shell-particle-drift {
+  0%,
+  100% {
+    opacity: var(--omnix-shell-particle-opacity);
+    transform: translate3d(-12px, -25px, 0);
+  }
+  50% {
+    opacity: var(--omnix-shell-particle-peak-opacity);
+    transform: translate3d(12px, 25px, 0);
+  }
+}
+
+@keyframes omnix-shell-popover-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes omnix-shell-list-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes omnix-shell-expand-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes omnix-shell-invite-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
 
 @keyframes omnix-dot-pulse {
   0%, 100% {

@@ -28,6 +28,12 @@ const [
   mobileDock,
   globalsCss,
   landingPage,
+  ambientParticles,
+  pageTransition,
+  workspaceSelector,
+  workspaceTreeNode,
+  sidebarModals,
+  inviteNotifications,
 ] = await Promise.all([
   read("app/(dashboard)/analytics/page.tsx"),
   read("components/conversations/WorkspaceConversationSurface.tsx"),
@@ -39,6 +45,12 @@ const [
   read("components/layout/MobileDock.tsx"),
   read("styles/globals.css"),
   read("app/page.tsx"),
+  read("components/layout/AmbientParticles.tsx"),
+  read("components/layout/PageTransition.tsx"),
+  read("components/layout/sidebar/WorkspaceSelector.tsx"),
+  read("components/layout/sidebar/WorkspaceTreeNode.tsx"),
+  read("components/layout/sidebar/SidebarModals.tsx"),
+  read("components/workspace/InviteNotifications.tsx"),
 ]);
 
 assertIncludes(analyticsPage, "Runtime telemetry is unavailable.", "Analytics truthfulness");
@@ -67,6 +79,33 @@ assertIncludes(conversationUtils, "reconcileWorkspaceChannelChange", "Conversati
 assertIncludes(conversationUtils, "mergeWorkspaceChannelMessage", "Conversation message summary helper");
 assertIncludes(conversationUtils, "isCurrentWorkspaceChannelChange", "Conversation realtime workspace helper");
 assertIncludes(conversationUtils, "isCurrentWorkspaceChannelLoad", "Conversation realtime snapshot helper");
+
+for (const [source, label] of [
+  [ambientParticles, "Ambient particles"],
+  [pageTransition, "Page transition"],
+  [workspaceSelector, "Workspace selector"],
+  [workspaceTreeNode, "Workspace tree"],
+  [sidebarModals, "Sidebar modals"],
+  [inviteNotifications, "Invite notifications"],
+]) {
+  assertExcludes(source, "framer-motion", `${label} global shell dependency`);
+}
+assertIncludes(ambientParticles, "omnix-shell-particle", "Ambient particles CSS motion");
+assertIncludes(pageTransition, "omnix-shell-page-enter", "Page transition CSS motion");
+assertIncludes(workspaceSelector, "omnix-shell-popover-enter", "Workspace selector CSS motion");
+assertIncludes(workspaceTreeNode, "omnix-shell-list-enter", "Workspace tree CSS motion");
+assertIncludes(sidebarModals, "omnix-shell-expand-enter", "Sidebar modal CSS motion");
+assertIncludes(inviteNotifications, "omnix-shell-invite-enter", "Invite notification CSS motion");
+for (const className of [
+  ".omnix-shell-page-enter",
+  ".omnix-shell-particle",
+  ".omnix-shell-popover-enter",
+  ".omnix-shell-list-enter",
+  ".omnix-shell-expand-enter",
+  ".omnix-shell-invite-enter",
+]) {
+  assertIncludes(globalsCss, className, "Global shell CSS motion");
+}
 
 assertIncludes(filesModel, 'type SourceSection = "files" | "connectors"', "Sources tabs");
 assertIncludes(filesPage, "activeSection", "Sources tabs");

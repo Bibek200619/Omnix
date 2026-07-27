@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown, Loader2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
@@ -121,51 +120,43 @@ export function InviteNotificationBar() {
     });
   }, [pendingInvites]);
 
-  return (
-    <AnimatePresence initial={false}>
-      {invite ? (
-        <motion.div
-          key={getWorkspaceInviteId(invite)}
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -12 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-          className="border-b border-[var(--omnix-border)] bg-[var(--omnix-rgba-5-12-23-0-96)] shadow-[0_16px_40px_var(--omnix-rgba-0-0-0-0-26),var(--omnix-glow-xs)] backdrop-blur-xl"
-        >
-          <div className="flex w-full flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]">
-                {pendingInvitesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium leading-6 text-white">
-                  You were invited to <span className="text-cyan-100">{inviteWorkspaceName(invite)}</span>
-                </p>
-                <p className="text-xs leading-5 text-slate-400">
-                  by {inviteSender(invite)}
-                  {visibleInvites.length > 1 ? ` · ${visibleInvites.length - 1} more pending` : ""}
-                </p>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
-              <InviteActionButtons invite={invite} compact />
-              <button
-                type="button"
-                aria-label="Dismiss invite notification"
-                title="Dismiss"
-                onClick={() => {
-                  setDismissedInviteIds((current) => new Set(current).add(getWorkspaceInviteId(invite)));
-                }}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-500 transition hover:bg-cyan-300/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+  return invite ? (
+    <div
+      key={getWorkspaceInviteId(invite)}
+      className="omnix-shell-invite-enter border-b border-[var(--omnix-border)] bg-[var(--omnix-rgba-5-12-23-0-96)] shadow-[0_16px_40px_var(--omnix-rgba-0-0-0-0-26),var(--omnix-glow-xs)] backdrop-blur-xl"
+    >
+      <div className="flex w-full flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]">
+            {pendingInvitesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
           </div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
-  );
+          <div className="min-w-0">
+            <p className="text-sm font-medium leading-6 text-white">
+              You were invited to <span className="text-cyan-100">{inviteWorkspaceName(invite)}</span>
+            </p>
+            <p className="text-xs leading-5 text-slate-400">
+              by {inviteSender(invite)}
+              {visibleInvites.length > 1 ? ` · ${visibleInvites.length - 1} more pending` : ""}
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
+          <InviteActionButtons invite={invite} compact />
+          <button
+            type="button"
+            aria-label="Dismiss invite notification"
+            title="Dismiss"
+            onClick={() => {
+              setDismissedInviteIds((current) => new Set(current).add(getWorkspaceInviteId(invite)));
+            }}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-500 transition hover:bg-cyan-300/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 }
 
 export function InviteNotificationBell() {
@@ -224,16 +215,9 @@ export function InviteNotificationBell() {
         ) : null}
       </Button>
 
-      <AnimatePresence>
-        {open ? (
-          <FloatingMenuLayer anchorRef={panelRef} contentRef={panelContentRef} placement="bottom-end" width={352} zIndex={150}>
-          <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.98 }}
-            transition={{ duration: 0.16, ease: "easeOut" }}
-            className="omnix-floating-card w-full overflow-hidden ring-1 ring-black/40"
-          >
+      {open ? (
+        <FloatingMenuLayer anchorRef={panelRef} contentRef={panelContentRef} placement="bottom-end" width={352} zIndex={150}>
+          <div className="omnix-floating-card omnix-shell-popover-enter w-full overflow-hidden ring-1 ring-black/40">
             <div className="flex items-center justify-between gap-3 border-b border-[var(--omnix-border)] px-4 py-3">
               <div>
                 <p className="text-sm font-semibold text-white">Invitations</p>
@@ -283,10 +267,9 @@ export function InviteNotificationBell() {
                 </div>
               )}
             </div>
-          </motion.div>
-          </FloatingMenuLayer>
-        ) : null}
-      </AnimatePresence>
+          </div>
+        </FloatingMenuLayer>
+      ) : null}
     </div>
   );
 }
