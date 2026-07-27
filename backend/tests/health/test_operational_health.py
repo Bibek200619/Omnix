@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 from typing import Any
 
@@ -216,6 +217,7 @@ async def test_readiness_includes_and_rejects_failed_file_storage(monkeypatch: p
     response = await router.readiness_check()
 
     assert response.status_code == 503
+    assert json.loads(response.body) == {"status": "not_ready"}
 
 
 @pytest.mark.asyncio
@@ -303,7 +305,4 @@ async def test_readiness_allows_explicit_warning_state(monkeypatch: pytest.Monke
 
     monkeypatch.setattr(router, "run_all_checks", warning_checks)
 
-    assert await router.readiness_check() == {
-        "status": "ready",
-        "checks": {"chat_provider": {"status": "warning"}},
-    }
+    assert await router.readiness_check() == {"status": "ready"}
