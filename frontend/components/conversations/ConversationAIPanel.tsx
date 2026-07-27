@@ -9,6 +9,7 @@ import { logClientError } from "@/lib/errors";
 import type {
   DecisionCandidate,
   DecisionCandidateList,
+  DecisionCandidateSourceCoverage,
   WorkspaceChannelMessage,
   WorkspaceConversationAssistance,
   WorkspaceConversationAssistanceMode,
@@ -20,6 +21,11 @@ const assistanceLabels: Record<WorkspaceConversationAssistanceMode, string> = {
   actions: "Actions",
   blockers: "Blockers",
 };
+
+function mergeDecisionCandidates(current: DecisionCandidate[], incoming: DecisionCandidate[]) {
+  const knownIds = new Set(current.map((candidate) => candidate.id));
+  return [...current, ...incoming.filter((candidate) => !knownIds.has(candidate.id))];
+}
 
 type ConversationAIPanelProps = {
   activeWorkspaceId: string | null;
@@ -44,11 +50,16 @@ export function ConversationAIPanel({
   const [assistanceLoading, setAssistanceLoading] = useState<WorkspaceConversationAssistanceMode | null>(null);
   const [decisionCandidatesCollapsed, setDecisionCandidatesCollapsed] = useState(true);
   const [decisionCandidates, setDecisionCandidates] = useState<DecisionCandidate[]>([]);
+  const [decisionCandidateCoverage, setDecisionCandidateCoverage] = useState<DecisionCandidateSourceCoverage | null>(null);
   const [decisionCandidatesLoading, setDecisionCandidatesLoading] = useState(false);
   const [decisionCandidatesError, setDecisionCandidatesError] = useState<string | null>(null);
+  const nextDecisionSourceOffset = decisionCandidateCoverage?.next_source_offset;
 
   useEffect(() => {
     setAssistance(null);
+    setDecisionCandidates([]);
+    setDecisionCandidateCoverage(null);
+    setDecisionCandidatesError(null);
   }, [selectedChannelId]);
 
   async function requestAssistance(mode: WorkspaceConversationAssistanceMode) {
@@ -69,17 +80,18 @@ export function ConversationAIPanel({
     }
   }
 
-  async function scanDecisionCandidates() {
+  async function scanDecisionCandidates(sourceOffset = 0, append = false) {
     if (!activeWorkspaceId || !selectedChannelId) return;
     setDecisionCandidatesCollapsed(false);
     setDecisionCandidatesLoading(true);
     setDecisionCandidatesError(null);
     try {
       const result = await apiClient.post<DecisionCandidateList>(
-        `/workspaces/${activeWorkspaceId}/decisions/candidates/conversation/${selectedChannelId}`,
+        `/workspaces/${activeWorkspaceId}/decisions/candidates/conversation/${selectedChannelId}?source_offset=${sourceOffset}`,
         {},
       );
-      setDecisionCandidates(result.candidates);
+      setDecisionCandidates((current) => (append ? mergeDecisionCandidates(current, result.candidates) : result.candidates));
+      setDecisionCandidateCoverage(result.source_coverage);
     } catch (err) {
       logClientError("Failed to extract decision candidates", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/conversation/${selectedChannelId}` });
       setDecisionCandidatesError("Unable to scan this conversation for decision candidates. Please try again in a moment.");
@@ -132,13 +144,20 @@ export function ConversationAIPanel({
           collapsed={decisionCandidatesCollapsed}
           loading={decisionCandidatesLoading}
           error={decisionCandidatesError}
+          sourceCoverage={decisionCandidateCoverage}
+          sourceType="conversation"
           onToggle={() => {
             setDecisionCandidatesCollapsed((collapsed) => !collapsed);
-            if (decisionCandidatesCollapsed && decisionCandidates.length === 0 && !decisionCandidatesLoading) {
+            if (decisionCandidatesCollapsed && decisionCandidateCoverage === null && !decisionCandidatesLoading) {
               void scanDecisionCandidates();
             }
           }}
           onRefresh={() => void scanDecisionCandidates()}
+          onScanMore={
+            typeof nextDecisionSourceOffset !== "number"
+              ? undefined
+              : () => void scanDecisionCandidates(nextDecisionSourceOffset, true)
+          }
           onCreate={(candidate) => void openCandidateDecision(candidate)}
           onDismiss={(candidate) => void dismissDecisionCandidate(candidate)}
         />

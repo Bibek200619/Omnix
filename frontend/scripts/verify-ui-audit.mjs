@@ -45,6 +45,8 @@ const [
   messageBubble,
   chatMessageUtils,
   chatStream,
+  conversationAiPanel,
+  decisionCandidatePanel,
 ] = await Promise.all([
   read("app/(dashboard)/analytics/page.tsx"),
   read("components/conversations/WorkspaceConversationSurface.tsx"),
@@ -73,6 +75,8 @@ const [
   read("components/chat/MessageBubble.tsx"),
   read("components/chat/chatMessageUtils.ts"),
   read("components/chat/useChatStream.ts"),
+  read("components/conversations/ConversationAIPanel.tsx"),
+  read("components/decisions/DecisionCandidatePanel.tsx"),
 ]);
 
 assertIncludes(analyticsPage, "Runtime telemetry is unavailable.", "Analytics truthfulness");
@@ -158,6 +162,14 @@ assertIncludes(messageBubble, 'data-testid="citation-validation-notice"', "Citat
 assertIncludes(chatMessageUtils, "normalizeCitationValidation", "Citation validation payload parsing");
 assertIncludes(chatStream, "citationValidation: citationValidation ?? message.citationValidation", "Citation validation stream reconciliation");
 assertIncludes(chatStream, "content: typeof obj.content === \"string\" ? obj.content : message.content", "Citation validation stream reconciliation");
+
+assertIncludes(conversationAiPanel, "source_offset=${sourceOffset}", "Conversation decision source windows");
+assertIncludes(conversationAiPanel, "sourceCoverage={decisionCandidateCoverage}", "Conversation decision source coverage");
+assertIncludes(filesPage, "source_offset=${sourceOffset}", "Document decision source windows");
+assertIncludes(filesPage, "sourceCoverage={decisionCandidateCoverage}", "Document decision source coverage");
+assertIncludes(decisionCandidatePanel, 'data-testid="decision-source-coverage"', "Decision source coverage disclosure");
+assertIncludes(decisionCandidatePanel, "Scan Earlier Messages", "Conversation decision source continuation");
+assertIncludes(decisionCandidatePanel, "Scan Next Document Section", "Document decision source continuation");
 
 assertIncludes(filesModel, 'type SourceSection = "files" | "connectors"', "Sources tabs");
 assertIncludes(filesPage, "activeSection", "Sources tabs");

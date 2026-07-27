@@ -363,11 +363,16 @@ async def _load_document_chunks(
     user_id: str,
     workspace_id: str | None,
     scope_workspace_ids: list[str] | None = None,
+    limit: int = 500,
+    offset: int = 0,
+    order_by: str = "created_at",
 ) -> list[dict[str, Any]]:
     if not file_ids:
         return []
 
     try:
+        query_limit = min(max(limit, 1), 500)
+        query_offset = max(offset, 0)
         workspace_ids = [
             str(item)
             for item in (scope_workspace_ids or ([workspace_id] if workspace_id else []))
@@ -378,8 +383,9 @@ async def _load_document_chunks(
                 "documents",
                 DOCUMENT_COLUMNS,
                 filters={"file_id": file_ids, "workspace_id": workspace_ids},
-                order_by="created_at",
-                limit=500,
+                order_by=order_by,
+                limit=query_limit,
+                offset=query_offset,
             )
             scope_set = set(workspace_ids)
             return [row for row in rows if str(row.get("workspace_id") or "") in scope_set]
@@ -388,8 +394,9 @@ async def _load_document_chunks(
             "documents",
             DOCUMENT_COLUMNS,
             filters={"file_id": file_ids, "user_id": user_id},
-            order_by="created_at",
-            limit=500,
+            order_by=order_by,
+            limit=query_limit,
+            offset=query_offset,
         )
         return [row for row in rows if str(row.get("user_id") or "") == user_id and not row.get("workspace_id")]
     except SupabaseServiceError:

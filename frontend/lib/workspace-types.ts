@@ -546,12 +546,23 @@ export type DecisionCandidate = {
   supporting_evidence: DecisionEvidence[];
 };
 
+export type DecisionCandidateSourceCoverage = {
+  source_offset: number;
+  loaded_record_count: number;
+  selected_record_count: number;
+  prompt_record_count: number;
+  context_limited: boolean;
+  has_additional_records: boolean;
+  next_source_offset: number | null;
+};
+
 export type DecisionCandidateList = {
   candidates: DecisionCandidate[];
   candidate_count: number;
   source_type: DecisionCandidateSourceType;
   source_id: string;
   generated_at: string;
+  source_coverage: DecisionCandidateSourceCoverage;
 };
 
 export type WorkspaceSearchResultType =

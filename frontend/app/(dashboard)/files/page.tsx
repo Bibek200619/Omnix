@@ -39,7 +39,12 @@ import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStac
 import { workspaceRoleLabel } from "@/lib/workspace-roles";
 import { cn } from "@/lib/utils";
 import type { MessageAttachment } from "@/components/chat/types";
-import type { DecisionCandidate, DecisionCandidateList, WorkspaceDecisionStatus } from "@/lib/workspace-types";
+import type {
+  DecisionCandidate,
+  DecisionCandidateList,
+  DecisionCandidateSourceCoverage,
+  WorkspaceDecisionStatus,
+} from "@/lib/workspace-types";
 import {
   connectorAccent,
   connectorIcon,
@@ -66,6 +71,11 @@ import {
 } from "@/components/files/filesPageModel";
 
 const UploadDropzone = dynamic(() => import("@/components/upload/UploadDropzone").then((m) => m.UploadDropzone), { ssr: false });
+
+function mergeDecisionCandidates(current: DecisionCandidate[], incoming: DecisionCandidate[]) {
+  const knownIds = new Set(current.map((candidate) => candidate.id));
+  return [...current, ...incoming.filter((candidate) => !knownIds.has(candidate.id))];
+}
 
 export default function FilesPage() {
   return (
@@ -97,8 +107,10 @@ function FilesPageContent() {
   const [authConnectorId, setAuthConnectorId] = useState<string | null>(null);
   const [candidateFile, setCandidateFile] = useState<FileData | null>(null);
   const [decisionCandidates, setDecisionCandidates] = useState<DecisionCandidate[]>([]);
+  const [decisionCandidateCoverage, setDecisionCandidateCoverage] = useState<DecisionCandidateSourceCoverage | null>(null);
   const [decisionCandidatesLoading, setDecisionCandidatesLoading] = useState(false);
   const [decisionCandidatesError, setDecisionCandidatesError] = useState<string | null>(null);
+  const nextDecisionSourceOffset = decisionCandidateCoverage?.next_source_offset;
   const [decisionCandidateDraft, setDecisionCandidateDraft] = useState<{ title: string; reason: string; description: string; status: WorkspaceDecisionStatus; source_type: DecisionCandidate["source_type"]; source_id: string; candidate_id: string; source_evidence: DecisionCandidate["supporting_evidence"] } | null>(null);
   const fileResultsRef = useRef<HTMLDivElement | null>(null);
   const [gridColumnCount, setGridColumnCount] = useState(1);
@@ -247,21 +259,25 @@ function FilesPageContent() {
     }
   }
 
-  async function scanDocumentDecisionCandidates(file: FileData) {
+  async function scanDocumentDecisionCandidates(file: FileData, sourceOffset = 0, append = false) {
     if (!activeWorkspaceId) {
       setError("Select a workspace before scanning document decisions.");
       return;
     }
     setCandidateFile(file);
-    setDecisionCandidates([]);
+    if (!append) {
+      setDecisionCandidates([]);
+      setDecisionCandidateCoverage(null);
+    }
     setDecisionCandidatesLoading(true);
     setDecisionCandidatesError(null);
     try {
       const result = await apiClient.post<DecisionCandidateList>(
-        `/workspaces/${activeWorkspaceId}/decisions/candidates/document/${file.id}`,
+        `/workspaces/${activeWorkspaceId}/decisions/candidates/document/${file.id}?source_offset=${sourceOffset}`,
         {},
       );
-      setDecisionCandidates(result.candidates);
+      setDecisionCandidates((current) => (append ? mergeDecisionCandidates(current, result.candidates) : result.candidates));
+      setDecisionCandidateCoverage(result.source_coverage);
     } catch (err) {
       logClientError("Failed to extract document decision candidates", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/document/${file.id}` });
       setDecisionCandidatesError("Unable to scan this document for decision candidates. Please try again in a moment.");
@@ -838,6 +854,7 @@ function FilesPageContent() {
                   onClick={() => {
                     setCandidateFile(null);
                     setDecisionCandidates([]);
+                    setDecisionCandidateCoverage(null);
                     setDecisionCandidatesError(null);
                   }}
                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
@@ -853,8 +870,15 @@ function FilesPageContent() {
                 loading={decisionCandidatesLoading}
                 error={decisionCandidatesError}
                 emptyText="No evidence-backed document decisions found."
+                sourceCoverage={decisionCandidateCoverage}
+                sourceType="document"
                 onToggle={() => undefined}
                 onRefresh={() => void scanDocumentDecisionCandidates(candidateFile)}
+                onScanMore={
+                  typeof nextDecisionSourceOffset !== "number"
+                    ? undefined
+                    : () => void scanDocumentDecisionCandidates(candidateFile, nextDecisionSourceOffset, true)
+                }
                 onCreate={(candidate) => void openCandidateDecision(candidate)}
                 onDismiss={(candidate) => void dismissDecisionCandidate(candidate)}
               />
@@ -872,6 +896,7 @@ function FilesPageContent() {
             setDecisionCandidateDraft(null);
             setCandidateFile(null);
             setDecisionCandidates([]);
+            setDecisionCandidateCoverage(null);
           }}
         />
       ) : null}

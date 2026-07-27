@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from ..core.security import get_current_user
 from .ai_rate_limits import enforce_expensive_ai_rate_limit
@@ -109,6 +109,7 @@ async def post_workspace_decision_from_message(
 async def post_conversation_decision_candidates(
     workspace_id: str,
     channel_id: str,
+    source_offset: int = Query(0, ge=0),
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     user_id = _user_id(current_user)
@@ -122,6 +123,7 @@ async def post_conversation_decision_candidates(
         workspace_id=workspace_id,
         channel_id=channel_id,
         user_id=user_id,
+        source_offset=source_offset,
     )
 
 
@@ -129,6 +131,7 @@ async def post_conversation_decision_candidates(
 async def post_document_decision_candidates(
     workspace_id: str,
     file_id: str,
+    source_offset: int = Query(0, ge=0),
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     user_id = _user_id(current_user)
@@ -142,6 +145,7 @@ async def post_document_decision_candidates(
         workspace_id=workspace_id,
         file_id=file_id,
         user_id=user_id,
+        source_offset=source_offset,
     )
 
 

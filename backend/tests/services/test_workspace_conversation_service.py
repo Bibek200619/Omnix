@@ -218,6 +218,8 @@ async def test_channel_assistance_transcript_includes_thread_replies(monkeypatch
 
     async def fake_select_all(table: str, columns: str, filters: dict[str, object], **kwargs):
         assert kwargs["desc"] is True
+        assert kwargs["limit"] == 61
+        assert kwargs["offset"] == 60
         return [
             {
                 "id": "reply-1",
@@ -258,6 +260,8 @@ async def test_channel_assistance_transcript_includes_thread_replies(monkeypatch
         channel_id="channel-1",
         user_id="user-1",
         thread_root_id=None,
+        limit=61,
+        offset=60,
     )
 
     assert [message["id"] for message in result] == ["root-1", "reply-1"]

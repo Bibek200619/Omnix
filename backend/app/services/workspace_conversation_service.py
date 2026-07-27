@@ -470,14 +470,18 @@ async def channel_transcript_for_assistance(
     channel_id: str,
     user_id: str,
     thread_root_id: str | None,
+    limit: int = 60,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
+    query_limit = min(max(limit, 1), MESSAGE_LIST_LIMIT)
+    query_offset = max(offset, 0)
     if thread_root_id:
         return await list_messages(
             workspace_id=workspace_id,
             channel_id=channel_id,
             user_id=user_id,
-            limit=60,
-            offset=0,
+            limit=query_limit,
+            offset=query_offset,
             thread_root_id=thread_root_id,
         )
     _, access = await _require_channel_access(workspace_id=workspace_id, channel_id=channel_id, user_id=user_id)
@@ -488,7 +492,8 @@ async def channel_transcript_for_assistance(
             filters={"workspace_id": workspace_id, "channel_id": channel_id},
             order_by="created_at",
             desc=True,
-            limit=60,
+            limit=query_limit,
+            offset=query_offset,
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
