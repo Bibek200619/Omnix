@@ -34,6 +34,7 @@ const [
   workspaceTreeNode,
   sidebarModals,
   inviteNotifications,
+  markdownRenderer,
 ] = await Promise.all([
   read("app/(dashboard)/analytics/page.tsx"),
   read("components/conversations/WorkspaceConversationSurface.tsx"),
@@ -51,6 +52,7 @@ const [
   read("components/layout/sidebar/WorkspaceTreeNode.tsx"),
   read("components/layout/sidebar/SidebarModals.tsx"),
   read("components/workspace/InviteNotifications.tsx"),
+  read("components/chat/MarkdownRenderer.tsx"),
 ]);
 
 assertIncludes(analyticsPage, "Runtime telemetry is unavailable.", "Analytics truthfulness");
@@ -106,6 +108,12 @@ for (const className of [
 ]) {
   assertIncludes(globalsCss, className, "Global shell CSS motion");
 }
+
+assertExcludes(markdownRenderer, 'from "react-syntax-highlighter"', "Chat syntax highlighter eager import");
+assertIncludes(markdownRenderer, 'import("react-syntax-highlighter/dist/esm/prism")', "Chat syntax highlighter deferred runtime");
+assertIncludes(markdownRenderer, 'import("react-syntax-highlighter/dist/esm/styles/prism")', "Chat syntax highlighter deferred theme");
+assertIncludes(markdownRenderer, "loadSyntaxHighlighter", "Chat syntax highlighter code-block boundary");
+assertIncludes(markdownRenderer, "PlainCode", "Chat syntax highlighter fallback");
 
 assertIncludes(filesModel, 'type SourceSection = "files" | "connectors"', "Sources tabs");
 assertIncludes(filesPage, "activeSection", "Sources tabs");
