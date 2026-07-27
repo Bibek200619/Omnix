@@ -80,6 +80,62 @@ async def test_insights_sanitize_generation_errors(monkeypatch: pytest.MonkeyPat
 
 
 @pytest.mark.asyncio
+async def test_insights_persist_validated_citation_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def allow_access(*args, **kwargs):
+        return object()
+
+    async def validated_result(*args, **kwargs):
+        return {
+            "markdown": "Verified workspace finding [S1].",
+            "structured_text": "Verified workspace finding [S1].",
+            "citations": [{"label": "S1", "source_id": "release-plan"}],
+            "citation_validation": {
+                "status": "supported",
+                "source_count": 1,
+                "cited_source_count": 1,
+                "invalid_citation_count": 0,
+            },
+        }
+
+    async def fake_insert_one(table: str, payload: dict[str, object]) -> dict[str, str]:
+        assert table == "artifacts"
+        captured.update(payload)
+        return {"id": "artifact-1"}
+
+    monkeypatch.setattr(insights, "require_workspace_access", allow_access)
+    monkeypatch.setattr(insights, "ContextEngine", lambda: object())
+    monkeypatch.setattr(insights.workspace_summary, "run", validated_result)
+    monkeypatch.setattr(insights.topic_detection, "run", validated_result)
+    monkeypatch.setattr(insights.action_item_detector, "run", validated_result)
+    monkeypatch.setattr(insights.conflict_detector, "run", validated_result)
+    monkeypatch.setattr(insights, "insert_one", fake_insert_one)
+
+    response = await insights.generate_insights(DummyRequest(), "workspace-1", {"sub": "user-1"})
+
+    assert response["artifact_id"] == "artifact-1"
+    assert captured["metadata"] == {
+        "summary_structured": "Verified workspace finding [S1].",
+        "topics_structured": "Verified workspace finding [S1].",
+        "actions_structured": "Verified workspace finding [S1].",
+        "conflicts_structured": "Verified workspace finding [S1].",
+        "citations": {
+            "summary": [{"label": "S1", "source_id": "release-plan"}],
+            "topics": [{"label": "S1", "source_id": "release-plan"}],
+            "actions": [{"label": "S1", "source_id": "release-plan"}],
+            "conflicts": [{"label": "S1", "source_id": "release-plan"}],
+        },
+        "citation_validation": {
+            "summary": {"status": "supported", "source_count": 1, "cited_source_count": 1, "invalid_citation_count": 0},
+            "topics": {"status": "supported", "source_count": 1, "cited_source_count": 1, "invalid_citation_count": 0},
+            "actions": {"status": "supported", "source_count": 1, "cited_source_count": 1, "invalid_citation_count": 0},
+            "conflicts": {"status": "supported", "source_count": 1, "cited_source_count": 1, "invalid_citation_count": 0},
+        },
+    }
+
+
+@pytest.mark.asyncio
 async def test_continuity_sanitizes_timeline_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     async def broken_timeline(*args, **kwargs):
         raise RuntimeError("raw timeline query failure")

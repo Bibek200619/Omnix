@@ -42,6 +42,9 @@ const [
   modal,
   focusTrap,
   commandPalette,
+  messageBubble,
+  chatMessageUtils,
+  chatStream,
 ] = await Promise.all([
   read("app/(dashboard)/analytics/page.tsx"),
   read("components/conversations/WorkspaceConversationSurface.tsx"),
@@ -67,6 +70,9 @@ const [
   read("components/ui/Modal.tsx"),
   read("lib/use-focus-trap.ts"),
   read("components/layout/CommandPalette.tsx"),
+  read("components/chat/MessageBubble.tsx"),
+  read("components/chat/chatMessageUtils.ts"),
+  read("components/chat/useChatStream.ts"),
 ]);
 
 assertIncludes(analyticsPage, "Runtime telemetry is unavailable.", "Analytics truthfulness");
@@ -146,6 +152,12 @@ assertIncludes(focusTrap, "isolateBackground", "Focus trap background isolation"
 assertIncludes(focusTrap, "aria-hidden", "Focus trap background isolation");
 assertIncludes(focusTrap, ".inert = true", "Focus trap background isolation");
 assertIncludes(commandPalette, "isolateBackground: true", "Command palette background isolation");
+
+assertIncludes(messageBubble, "citationNoticeFor", "Citation validation notice");
+assertIncludes(messageBubble, 'data-testid="citation-validation-notice"', "Citation validation notice");
+assertIncludes(chatMessageUtils, "normalizeCitationValidation", "Citation validation payload parsing");
+assertIncludes(chatStream, "citationValidation: citationValidation ?? message.citationValidation", "Citation validation stream reconciliation");
+assertIncludes(chatStream, "content: typeof obj.content === \"string\" ? obj.content : message.content", "Citation validation stream reconciliation");
 
 assertIncludes(filesModel, 'type SourceSection = "files" | "connectors"', "Sources tabs");
 assertIncludes(filesPage, "activeSection", "Sources tabs");

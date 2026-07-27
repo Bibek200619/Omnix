@@ -1,4 +1,4 @@
-import type { Message, RetrievalState } from "@/components/chat/types";
+import type { CitationValidation, Message, RetrievalState } from "@/components/chat/types";
 
 export type StreamEvent = {
   type: "init" | "status" | "sources" | "token" | "error" | "done";
@@ -6,9 +6,12 @@ export type StreamEvent = {
   user_message_id?: string;
   assistant_message_id?: string;
   sources?: Message["sources"];
+  citations?: string[];
+  citation_validation?: CitationValidation;
   retrieval?: RetrievalState;
   status?: string;
   text?: string;
+  content?: string;
   detail?: string;
 };
 

@@ -67,6 +67,7 @@ let tasks: Array<Record<string, unknown>>;
 let files: Array<Record<string, unknown>>;
 let conversations: Array<Record<string, unknown>>;
 let messagesByConversation: Record<string, Array<Record<string, unknown>>>;
+let chatStreamFixture: string | null;
 
 function workspaceChannel(overrides: Partial<WorkspaceChannel> = {}): WorkspaceChannel {
   return {
@@ -91,6 +92,7 @@ function workspaceChannel(overrides: Partial<WorkspaceChannel> = {}): WorkspaceC
 function resetMockState() {
   conversations = [];
   messagesByConversation = {};
+  chatStreamFixture = null;
   tasks = [
     {
       id: "task-1",
@@ -344,6 +346,9 @@ async function mockApi(page: Page) {
     const conversationMessagesMatch = path.match(/^\/conversations\/([^/]+)\/messages$/);
     if (conversationMessagesMatch && method === "GET") {
       return fulfillJson(route, messagesByConversation[conversationMessagesMatch[1]] ?? []);
+    }
+    if (path === "/chat/stream" && method === "POST" && chatStreamFixture) {
+      return route.fulfill({ status: 200, contentType: "text/event-stream", body: chatStreamFixture });
     }
     if (path === "/conversations") return fulfillJson(route, conversations);
 
@@ -691,6 +696,56 @@ test.describe("authenticated Omnix shell", () => {
     const codeBlock = page.getByTestId("chat-code-block");
     await expect(codeBlock).toContainText('const greeting = "hello";');
     await expect(codeBlock.getByRole("button", { name: "Copy code" })).toBeVisible();
+  });
+
+  test("replaces streamed text with the validated citation result", async ({ page }) => {
+    conversations = [
+      {
+        id: "citation-stream",
+        workspace_id: "workspace-1",
+        title: "Citation validation",
+        preview: "Validate generated references",
+        latest_message_role: "assistant",
+        latest_message_at: "2026-06-20T00:00:00Z",
+      },
+    ];
+    messagesByConversation = { "citation-stream": [] };
+    chatStreamFixture = [
+      {
+        type: "init",
+        conversation_id: "citation-stream",
+        user_message_id: "user-citation-stream",
+        assistant_message_id: "assistant-citation-stream",
+        sources: [],
+      },
+      {
+        type: "sources",
+        sources: [{ label: "S1", type: "retrieval", title: "Release plan", excerpt: "Release is ready." }],
+        retrieval: { outcome: "sources_found", source_count: 1 },
+      },
+      { type: "token", text: "Release is ready [S1] and [S99]." },
+      {
+        type: "done",
+        conversation_id: "citation-stream",
+        content: "Release is ready [S1] and.",
+        citations: ["S1"],
+        citation_validation: {
+          status: "incomplete",
+          source_count: 1,
+          cited_source_count: 1,
+          invalid_citation_count: 1,
+        },
+      },
+    ].map((event) => `data: ${JSON.stringify(event)}\n\n`).join("");
+
+    await page.goto("/chat?conversation=citation-stream");
+    const input = page.getByPlaceholder("Type a message or '/' for commands...");
+    await input.fill("Is the release ready?");
+    await page.getByRole("button", { name: "Send message" }).click();
+
+    await expect(page.getByText("Release is ready [S1] and.")).toBeVisible();
+    await expect(page.getByTestId("citation-validation-notice")).toContainText("Citation coverage is incomplete");
+    await expect(page.getByText("[S99]", { exact: false })).toHaveCount(0);
   });
 
   test("mobile file upload surface queues a selected file", async ({ page, isMobile }) => {
