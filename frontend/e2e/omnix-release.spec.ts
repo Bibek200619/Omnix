@@ -552,6 +552,17 @@ test.describe("authenticated Omnix shell", () => {
   });
 
   test("keyboard shortcuts modal restores focus on close", async ({ page }) => {
+    async function mainContentHasIsolatedAncestor() {
+      return page.locator("#main-content").evaluate((mainContent) => {
+        for (let ancestor = mainContent.parentElement; ancestor; ancestor = ancestor.parentElement) {
+          if (ancestor.getAttribute("aria-hidden") === "true" && ancestor.inert) {
+            return true;
+          }
+        }
+        return false;
+      });
+    }
+
     await page.goto("/dashboard");
     const trigger = page.getByRole("button", { name: "Open command palette" }).first();
     await trigger.focus();
@@ -560,10 +571,12 @@ test.describe("authenticated Omnix shell", () => {
     const dialog = page.getByRole("dialog", { name: "Keyboard shortcuts" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Close keyboard shortcuts" })).toBeFocused();
+    await expect.poll(mainContentHasIsolatedAncestor).toBe(true);
 
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
     await expect(trigger).toBeFocused();
+    await expect.poll(mainContentHasIsolatedAncestor).toBe(false);
   });
 
   test("announces command palette no-result state", async ({ page }) => {

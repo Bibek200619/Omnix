@@ -59,7 +59,7 @@ export function CommandPalette() {
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const dialogRef = useFocusTrap<HTMLDivElement>(open, inputRef);
+  const dialogRef = useFocusTrap<HTMLDivElement>(open, inputRef, { isolateBackground: true });
   const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const openerRef = useRef<HTMLElement | null>(null);
   const requestRef = useRef(0);

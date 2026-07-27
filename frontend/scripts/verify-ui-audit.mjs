@@ -40,6 +40,8 @@ const [
   workspaceInitiativesSurface,
   commandPaletteModel,
   modal,
+  focusTrap,
+  commandPalette,
 ] = await Promise.all([
   read("app/(dashboard)/analytics/page.tsx"),
   read("components/conversations/WorkspaceConversationSurface.tsx"),
@@ -63,6 +65,8 @@ const [
   read("components/initiatives/WorkspaceInitiativesSurface.tsx"),
   read("components/layout/command-palette/commandPaletteModel.ts"),
   read("components/ui/Modal.tsx"),
+  read("lib/use-focus-trap.ts"),
+  read("components/layout/CommandPalette.tsx"),
 ]);
 
 assertIncludes(analyticsPage, "Runtime telemetry is unavailable.", "Analytics truthfulness");
@@ -137,6 +141,11 @@ assertIncludes(modal, "useId", "Modal accessible naming");
 assertIncludes(modal, "aria-labelledby={titleId}", "Modal accessible naming");
 assertIncludes(modal, '<span id={titleId} className="sr-only">{title}</span>', "Modal accessible naming");
 assertExcludes(modal, "aria-label={label}", "Modal accessible naming");
+assertIncludes(modal, "isolateBackground: true", "Modal background isolation");
+assertIncludes(focusTrap, "isolateBackground", "Focus trap background isolation");
+assertIncludes(focusTrap, "aria-hidden", "Focus trap background isolation");
+assertIncludes(focusTrap, ".inert = true", "Focus trap background isolation");
+assertIncludes(commandPalette, "isolateBackground: true", "Command palette background isolation");
 
 assertIncludes(filesModel, 'type SourceSection = "files" | "connectors"', "Sources tabs");
 assertIncludes(filesPage, "activeSection", "Sources tabs");

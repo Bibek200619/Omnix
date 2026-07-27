@@ -27,7 +27,7 @@ function ModalRoot({
   backdropClassName,
   footerClassName,
 }: ModalProps) {
-  const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
+  const modalRef = useFocusTrap<HTMLDivElement>(isOpen, undefined, { isolateBackground: true });
   const titleId = useId();
 
   useEffect(() => {
