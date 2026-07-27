@@ -37,6 +37,7 @@ class CitationManager:
 
         records = []
         for idx, citation in enumerate(citations, 1):
+            label = citation.label or f"S{idx}"
             if citation.file_name and citation.file_name != "Unknown File":
                 title = citation.file_name
             else:
@@ -46,7 +47,7 @@ class CitationManager:
                 make_untrusted_data_record(
                     kind=f"{citation.source_type.value}_source",
                     content=citation.content.strip(),
-                    label=f"[S{idx}]",
+                    label=f"[{label}]",
                     source_id=citation.source_id,
                     source_type=citation.source_type.value,
                     title=title,

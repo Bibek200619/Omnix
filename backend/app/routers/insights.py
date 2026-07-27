@@ -69,6 +69,18 @@ async def generate_insights(request: Request, workspace_id: str, current_user: d
             "topics_structured": topics.get("structured_text"),
             "actions_structured": actions.get("structured_text"),
             "conflicts_structured": conflicts.get("structured_text"),
+            "citations": {
+                "summary": summary.get("citations", []),
+                "topics": topics.get("citations", []),
+                "actions": actions.get("citations", []),
+                "conflicts": conflicts.get("citations", []),
+            },
+            "citation_validation": {
+                "summary": summary.get("citation_validation"),
+                "topics": topics.get("citation_validation"),
+                "actions": actions.get("citation_validation"),
+                "conflicts": conflicts.get("citation_validation"),
+            },
         },
     }
 

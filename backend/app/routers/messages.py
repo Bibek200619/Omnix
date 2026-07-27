@@ -272,15 +272,10 @@ _web_only_context = message_retrieval_service.web_only_context
 _compact_intelligence_debug = message_retrieval_service.compact_intelligence_debug
 _should_bypass_model_for_retrieval = message_retrieval_service.should_bypass_model_for_retrieval
 
-_compact_text = message_payload_service.compact_text
 _compact_sources_for_payload = message_payload_service.compact_sources_for_payload
-_sources_from_container = message_payload_service.sources_from_container
-_message_sources = message_payload_service.message_sources
 _with_sources_payload = message_payload_service.with_sources_payload
-_mode_from_retrieval_debug = message_payload_service.mode_from_retrieval_debug
-_assistant_message_payload = message_payload_service.assistant_message_payload
-_has_persistable_payload = message_payload_service.has_persistable_payload
 _public_retrieval_payload = message_payload_service.public_retrieval_payload
+_validate_generated_citations = message_payload_service.validate_generated_citations
 
 
 async def _persist_assistant_payload(
@@ -703,6 +698,8 @@ async def chat(
             logger.exception("Failed to generate chat response")
             raise HTTPException(status_code=exc.status_code, detail="AI response is unavailable.") from exc
 
+    citation_validation = _validate_generated_citations(assistant_response, sources)
+    assistant_response = citation_validation.content
     timestamp = utc_now_iso()
 
     try:
@@ -951,6 +948,8 @@ async def chat_stream(
             return
 
         final_content = "".join(assistant_parts)
+        citation_validation = _validate_generated_citations(final_content, sources)
+        final_content = citation_validation.content
         finished_at = utc_now_iso()
 
         try:
@@ -994,7 +993,7 @@ async def chat_stream(
                 },
             )
 
-        done_payload = {"type": "done", "conversation_id": conversation_id}
+        done_payload = {"type": "done", "conversation_id": conversation_id, **citation_validation.stream_payload()}
         yield f"data: {json.dumps(done_payload)}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

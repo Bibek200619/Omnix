@@ -7,6 +7,13 @@ export type RetrievalState = {
   reason?: string;
 };
 
+export type CitationValidation = {
+  status: "pending" | "supported" | "incomplete" | "unsupported" | "not_applicable";
+  source_count: number;
+  cited_source_count: number;
+  invalid_citation_count: number;
+};
+
 export type Message = {
   id: string;
   role: "user" | "assistant";
@@ -30,6 +37,7 @@ export type Message = {
   sourceMode?: SearchMode;
   webSearchUsed?: boolean;
   citations?: string[];
+  citationValidation?: CitationValidation;
   retrieval?: RetrievalState;
   // optional sources attached to assistant responses
   sources?: Array<{

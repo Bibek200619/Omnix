@@ -44,6 +44,8 @@ class PromptBuilder:
         posture_directive = build_workspace_focus_prompt(workspace_focus)
         
         # 2. Workspace Profile Directive (if present in citations)
+        for index, citation in enumerate(citations, start=1):
+            citation.label = f"S{index}"
         workspace_citations = [c for c in citations if c.source_type == ContextSourceType.WORKSPACE]
         other_citations = [c for c in citations if c.source_type != ContextSourceType.WORKSPACE]
         

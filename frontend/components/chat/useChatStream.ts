@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import { createOptimisticUserMessage, mergeStreamInitMessages } from "@/components/chat/chatStreamMessages";
 import { readChatStream, type StreamEvent } from "@/components/chat/chatStreamProtocol";
 import type { Message, MessageAttachment, SearchMode } from "@/components/chat/types";
-import { normalizeRetrievalState } from "@/components/chat/chatMessageUtils";
+import { normalizeCitationValidation, normalizeRetrievalState } from "@/components/chat/chatMessageUtils";
 import { type ChatRef, type RefreshConversations, type SenderLookup } from "@/components/chat/useChatMessages";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
@@ -173,6 +173,7 @@ export function useChatStream({
 
       const handleStreamEvent = (obj: StreamEvent) => {
         const retrieval = normalizeRetrievalState(obj.retrieval);
+        const citationValidation = normalizeCitationValidation(obj.citation_validation);
         if (obj.type === "init") {
           if (obj.conversation_id) {
             streamConversationId = obj.conversation_id;
@@ -223,8 +224,22 @@ export function useChatStream({
         if (obj.type === "done") {
           flushPendingTokens();
           streamConversationId = obj.conversation_id ?? streamConversationId;
+          const citations = Array.isArray(obj.citations)
+            ? obj.citations.filter((citation): citation is string => typeof citation === "string" && /^[SW]\d{1,4}$/.test(citation))
+            : undefined;
           if (assistantId) {
-            setMessages((current) => current.map((message) => (message.id === assistantId ? { ...message, status: "sent", isStreaming: false } : message)));
+            setMessages((current) => current.map((message) => (
+              message.id === assistantId
+                ? {
+                    ...message,
+                    content: typeof obj.content === "string" ? obj.content : message.content,
+                    citations: citations ?? message.citations,
+                    citationValidation: citationValidation ?? message.citationValidation,
+                    status: "sent",
+                    isStreaming: false,
+                  }
+                : message
+            )));
           }
           if (!conversationId && obj.conversation_id) router.replace(`/chat?conversation=${obj.conversation_id}`, { scroll: false });
           scheduleStreamAnnouncerClear();
