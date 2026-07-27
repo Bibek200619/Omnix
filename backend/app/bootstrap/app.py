@@ -28,6 +28,8 @@ _PRODUCTION_CORS_ORIGINS = (
     "https://omni-x.co.in",
     "https://www.omni-x.co.in",
 )
+_BROWSER_CORS_METHODS = ("GET", "POST", "PATCH", "DELETE")
+_BROWSER_CORS_HEADERS = ("Authorization", "Content-Type", "X-Omnix-Workspace")
 
 
 def _is_dev_environment(settings: Any) -> bool:
@@ -116,9 +118,9 @@ def _cors_options() -> dict[str, Any]:
     return {
         "allow_origins": _cors_allowed_origins(settings),
         "allow_origin_regex": getattr(settings, "CORS_ALLOWED_ORIGIN_REGEX", None) or None,
-        "allow_credentials": True,
-        "allow_methods": ["*"],
-        "allow_headers": ["*"],
+        "allow_credentials": False,
+        "allow_methods": list(_BROWSER_CORS_METHODS),
+        "allow_headers": list(_BROWSER_CORS_HEADERS),
     }
 
 
