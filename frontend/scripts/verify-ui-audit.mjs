@@ -35,6 +35,10 @@ const [
   sidebarModals,
   inviteNotifications,
   markdownRenderer,
+  workspaceTasksSurface,
+  workspaceDecisionsSurface,
+  workspaceInitiativesSurface,
+  commandPaletteModel,
 ] = await Promise.all([
   read("app/(dashboard)/analytics/page.tsx"),
   read("components/conversations/WorkspaceConversationSurface.tsx"),
@@ -53,6 +57,10 @@ const [
   read("components/layout/sidebar/SidebarModals.tsx"),
   read("components/workspace/InviteNotifications.tsx"),
   read("components/chat/MarkdownRenderer.tsx"),
+  read("components/tasks/WorkspaceTasksSurface.tsx"),
+  read("components/decisions/WorkspaceDecisionsSurface.tsx"),
+  read("components/initiatives/WorkspaceInitiativesSurface.tsx"),
+  read("components/layout/command-palette/commandPaletteModel.ts"),
 ]);
 
 assertIncludes(analyticsPage, "Runtime telemetry is unavailable.", "Analytics truthfulness");
@@ -114,6 +122,14 @@ assertIncludes(markdownRenderer, 'import("react-syntax-highlighter/dist/esm/pris
 assertIncludes(markdownRenderer, 'import("react-syntax-highlighter/dist/esm/styles/prism")', "Chat syntax highlighter deferred theme");
 assertIncludes(markdownRenderer, "loadSyntaxHighlighter", "Chat syntax highlighter code-block boundary");
 assertIncludes(markdownRenderer, "PlainCode", "Chat syntax highlighter fallback");
+
+assertIncludes(commandPaletteModel, 'href: "/tasks?create=task"', "Task creation quick action");
+assertIncludes(commandPaletteModel, 'href: "/decisions?create=decision"', "Decision creation quick action");
+assertIncludes(commandPaletteModel, 'href: "/initiatives?create=initiative"', "Initiative creation quick action");
+assertIncludes(workspaceTasksSurface, "[routeCreateTask, routeCreateTaskToken]", "Task creation replay token");
+assertIncludes(workspaceDecisionsSurface, "routeCreateDecision", "Decision creation route");
+assertIncludes(workspaceInitiativesSurface, "[routeCreateInitiative, routeCreateInitiativeToken]", "Initiative creation replay token");
+assertIncludes(workspaceInitiativesSurface, ">Create Initiative</Button>", "Initiative creation CTA");
 
 assertIncludes(filesModel, 'type SourceSection = "files" | "connectors"', "Sources tabs");
 assertIncludes(filesPage, "activeSection", "Sources tabs");

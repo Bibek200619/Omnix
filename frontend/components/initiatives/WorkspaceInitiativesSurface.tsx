@@ -86,6 +86,7 @@ function WorkspaceInitiativesSurfaceContent() {
   const searchParams = useSearchParams();
   const routeInitiativeId = searchParams?.get("id") ?? null;
   const routeCreateInitiative = searchParams?.get("create") === "initiative";
+  const routeCreateInitiativeToken = searchParams?.get("palette") ?? null;
   const [initiatives, setInitiatives] = useState<WorkspaceInitiative[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<WorkspaceTask[]>([]);
@@ -217,7 +218,7 @@ function WorkspaceInitiativesSurfaceContent() {
     if (routeCreateInitiative) {
       setCreateOpen(true);
     }
-  }, [routeCreateInitiative]);
+  }, [routeCreateInitiative, routeCreateInitiativeToken]);
 
   useEffect(() => {
     if (!activeWorkspaceId || !session?.user.id) return;
@@ -502,7 +503,7 @@ function WorkspaceInitiativesSurfaceContent() {
         )}>
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Direction</p>
-            <Button size="sm" variant="ghost" onClick={() => setCreateOpen((open) => !open)} leftIcon={<Plus className="h-3.5 w-3.5" />}>Open</Button>
+            <Button size="sm" variant="ghost" onClick={() => setCreateOpen((open) => !open)} leftIcon={<Plus className="h-3.5 w-3.5" />}>Create Initiative</Button>
           </div>
           {createOpen ? (
             <InitiativeCreateForm

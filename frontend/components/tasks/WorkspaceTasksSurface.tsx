@@ -69,6 +69,7 @@ function WorkspaceTasksSurfaceContent() {
   const searchParams = useSearchParams();
   const routeTaskId = searchParams?.get("id") ?? null;
   const routeCreateTask = searchParams?.get("create") === "task";
+  const routeCreateTaskToken = searchParams?.get("palette") ?? null;
   const [tasks, setTasks] = useState<WorkspaceTask[]>([]);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [initiatives, setInitiatives] = useState<WorkspaceInitiative[]>([]);
@@ -187,7 +188,7 @@ function WorkspaceTasksSurfaceContent() {
     if (routeCreateTask) {
       setCreateOpen(true);
     }
-  }, [routeCreateTask]);
+  }, [routeCreateTask, routeCreateTaskToken]);
 
   useEffect(() => {
     if (!activeWorkspaceId || !session?.user.id) return;
