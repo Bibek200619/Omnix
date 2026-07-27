@@ -12,6 +12,26 @@ logger = logging.getLogger(__name__)
 
 _LOG_EXECUTOR = ThreadPoolExecutor(max_workers=5, thread_name_prefix="api_logger")
 _MAX_BACKGROUND_LOG_TASKS = 100
+_API_CONTENT_SECURITY_POLICY = (
+    "default-src 'none'; base-uri 'none'; form-action 'none'; "
+    "frame-ancestors 'none'; object-src 'none'"
+)
+_DOCS_CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "img-src 'self' data: https://fastapi.tiangolo.com; "
+    "font-src 'self' data: https://cdn.jsdelivr.net; connect-src 'self'"
+)
+_DOCS_PATHS = {"/docs", "/docs/oauth2-redirect", "/redoc"}
+_SECURITY_HEADERS = {
+    "Permissions-Policy": "accelerometer=(), autoplay=(), camera=(), geolocation=(), gyroscope=(), microphone=(), payment=(), usb=()",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "0",
+}
+_HSTS_VALUE = "max-age=31536000"
 _background_tasks: set[asyncio.Task[None]] = set()
 _api_log_metrics: dict[str, int | str | None] = {
     "enqueued_total": 0,
@@ -24,6 +44,24 @@ _api_log_metrics: dict[str, int | str | None] = {
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _content_security_policy(path: str) -> str:
+    normalized_path = path.rstrip("/") or "/"
+    return _DOCS_CONTENT_SECURITY_POLICY if normalized_path in _DOCS_PATHS else _API_CONTENT_SECURITY_POLICY
+
+
+async def security_headers_middleware(request: Request, call_next) -> Response:
+    response = await call_next(request)
+    for header, value in _SECURITY_HEADERS.items():
+        if header not in response.headers:
+            response.headers[header] = value
+    if "Content-Security-Policy" not in response.headers:
+        response.headers["Content-Security-Policy"] = _content_security_policy(request.url.path)
+    if request.url.scheme == "https" and "Strict-Transport-Security" not in response.headers:
+        response.headers["Strict-Transport-Security"] = _HSTS_VALUE
+    return response
+
 
 def _insert_api_log_sync(log_payload: dict[str, Any]) -> bool:
     try:

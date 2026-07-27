@@ -130,6 +130,7 @@ def create_app() -> FastAPI:
     # Register Middlewares
     app.middleware("http")(auth_context_middleware)
     app.middleware("http")(middleware.api_logging_middleware)
+    app.middleware("http")(middleware.security_headers_middleware)
     app.add_middleware(
         CORSMiddleware,
         **_cors_options(),
