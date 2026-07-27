@@ -43,9 +43,9 @@ def _api_logging_health() -> dict[str, Any]:
         "enqueued_total": 4,
         "written_total": 4,
         "failed_total": 0,
-        "dropped_total": 0,
+        "backpressured_total": 0,
         "last_failure_at": None,
-        "last_drop_at": None,
+        "last_backpressure_at": None,
     }
 
 
@@ -80,6 +80,7 @@ def test_operational_health_contains_required_components() -> None:
         "queue_recovery",
         "dead_letters",
     }.issubset(result["components"])
+    assert result["components"]["api_logging"]["backpressured_total"] == 0
 
 
 def test_operational_health_distinguishes_warning_and_degraded_states() -> None:

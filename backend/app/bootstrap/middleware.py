@@ -17,9 +17,9 @@ _api_log_metrics: dict[str, int | str | None] = {
     "enqueued_total": 0,
     "written_total": 0,
     "failed_total": 0,
-    "dropped_total": 0,
+    "backpressured_total": 0,
     "last_failure_at": None,
-    "last_drop_at": None,
+    "last_backpressure_at": None,
 }
 
 def _utc_now_iso() -> str:
@@ -46,13 +46,19 @@ def _increment_api_log_metric(name: str) -> int:
     return value
 
 
+def _discard_completed_api_log_tasks() -> None:
+    completed = {task for task in tuple(_background_tasks) if task.done()}
+    _background_tasks.difference_update(completed)
+
+
 def get_api_logging_health() -> dict[str, Any]:
+    _discard_completed_api_log_tasks()
     pending_tasks = len(_background_tasks)
     failed_total = int(_api_log_metrics["failed_total"] or 0)
-    dropped_total = int(_api_log_metrics["dropped_total"] or 0)
-    if failed_total or dropped_total:
+    backpressured_total = int(_api_log_metrics["backpressured_total"] or 0)
+    if failed_total:
         status = "degraded"
-    elif pending_tasks >= int(_MAX_BACKGROUND_LOG_TASKS * 0.8):
+    elif backpressured_total or pending_tasks >= int(_MAX_BACKGROUND_LOG_TASKS * 0.8):
         status = "warning"
     else:
         status = "healthy"
@@ -78,22 +84,33 @@ async def _write_api_log(log_payload: dict[str, Any]) -> None:
         _api_log_metrics["last_failure_at"] = _utc_now_iso()
         logger.exception("API log background write failed.")
 
-def _fire_and_forget_log(log_payload: dict[str, Any]) -> None:
-    if len(_background_tasks) >= _MAX_BACKGROUND_LOG_TASKS:
-        dropped_total = _increment_api_log_metric("dropped_total")
-        _api_log_metrics["last_drop_at"] = _utc_now_iso()
-        if dropped_total == 1 or dropped_total % 100 == 0:
-            logger.warning(
-                "API log backlog saturated; events are being dropped | pending=%d | limit=%d | dropped_total=%d",
-                len(_background_tasks),
-                _MAX_BACKGROUND_LOG_TASKS,
-                dropped_total,
-            )
-        return
+async def _enqueue_api_log(log_payload: dict[str, Any]) -> None:
+    backpressured = False
+    _discard_completed_api_log_tasks()
+    while len(_background_tasks) >= _MAX_BACKGROUND_LOG_TASKS:
+        if not backpressured:
+            backpressured_total = _increment_api_log_metric("backpressured_total")
+            _api_log_metrics["last_backpressure_at"] = _utc_now_iso()
+            backpressured = True
+            if backpressured_total == 1 or backpressured_total % 100 == 0:
+                logger.warning(
+                    "API log backlog saturated; applying request backpressure | pending=%d | limit=%d | backpressured_total=%d",
+                    len(_background_tasks),
+                    _MAX_BACKGROUND_LOG_TASKS,
+                    backpressured_total,
+                )
+
+        pending_tasks = tuple(_background_tasks)
+        if not pending_tasks:
+            continue
+        await asyncio.wait(pending_tasks, return_when=asyncio.FIRST_COMPLETED)
+        _discard_completed_api_log_tasks()
+
     task = asyncio.create_task(_write_api_log(log_payload))
     _increment_api_log_metric("enqueued_total")
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
+
 
 async def api_logging_middleware(request: Request, call_next) -> Response:
     started_at = time.perf_counter()
@@ -107,7 +124,7 @@ async def api_logging_middleware(request: Request, call_next) -> Response:
             duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
             user_claims = getattr(request.state, "user", None)
             user_id = user_claims.get("sub") if isinstance(user_claims, dict) else None
-            _fire_and_forget_log({
+            await _enqueue_api_log({
                 "endpoint": request.url.path,
                 "status": status_code,
                 "response_time_ms": duration_ms,

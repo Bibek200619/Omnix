@@ -493,9 +493,9 @@ def build_operational_health(
                 "enqueued_total",
                 "written_total",
                 "failed_total",
-                "dropped_total",
+                "backpressured_total",
                 "last_failure_at",
-                "last_drop_at",
+                "last_backpressure_at",
             ),
         ),
         "startup": _operational_component(
