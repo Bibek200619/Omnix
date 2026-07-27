@@ -24,6 +24,7 @@ const [
   conversationUtils,
   filesPage,
   filesModel,
+  pageSkeleton,
   sidebarNav,
   mobileDock,
   globalsCss,
@@ -54,6 +55,7 @@ const [
   read("components/conversations/conversationUtils.ts"),
   read("app/(dashboard)/files/page.tsx"),
   read("components/files/filesPageModel.ts"),
+  read("components/ui/PageSkeleton.tsx"),
   read("components/layout/sidebar/SidebarNav.tsx"),
   read("components/layout/MobileDock.tsx"),
   read("styles/globals.css"),
@@ -187,6 +189,11 @@ assertIncludes(filesPage, 'activeSection === "files"', "Sources tabs");
 assertIncludes(filesPage, 'activeSection === "connectors"', "Sources tabs");
 assertIncludes(filesModel, "ocr_pages_processed", "OCR coverage disclosure");
 assertIncludes(filesModel, "not processed because of the OCR limit", "OCR coverage disclosure");
+assertIncludes(pageSkeleton, 'role="status"', "Page loading announcement");
+assertIncludes(pageSkeleton, 'aria-live="polite"', "Page loading announcement");
+assertIncludes(pageSkeleton, 'aria-atomic="true"', "Page loading announcement");
+assertIncludes(pageSkeleton, "Loading page…", "Page loading announcement");
+assertIncludes(pageSkeleton, 'aria-hidden="true"', "Page loading skeleton decoration");
 
 for (const label of ["Core", "Execution", "Workspace", "System"]) {
   assertIncludes(sidebarNav, `label: "${label}"`, "Sidebar grouped navigation");
