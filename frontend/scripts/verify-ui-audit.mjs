@@ -39,6 +39,7 @@ const [
   workspaceDecisionsSurface,
   workspaceInitiativesSurface,
   commandPaletteModel,
+  modal,
 ] = await Promise.all([
   read("app/(dashboard)/analytics/page.tsx"),
   read("components/conversations/WorkspaceConversationSurface.tsx"),
@@ -61,6 +62,7 @@ const [
   read("components/decisions/WorkspaceDecisionsSurface.tsx"),
   read("components/initiatives/WorkspaceInitiativesSurface.tsx"),
   read("components/layout/command-palette/commandPaletteModel.ts"),
+  read("components/ui/Modal.tsx"),
 ]);
 
 assertIncludes(analyticsPage, "Runtime telemetry is unavailable.", "Analytics truthfulness");
@@ -130,6 +132,11 @@ assertIncludes(workspaceTasksSurface, "[routeCreateTask, routeCreateTaskToken]",
 assertIncludes(workspaceDecisionsSurface, "routeCreateDecision", "Decision creation route");
 assertIncludes(workspaceInitiativesSurface, "[routeCreateInitiative, routeCreateInitiativeToken]", "Initiative creation replay token");
 assertIncludes(workspaceInitiativesSurface, ">Create Initiative</Button>", "Initiative creation CTA");
+
+assertIncludes(modal, "useId", "Modal accessible naming");
+assertIncludes(modal, "aria-labelledby={titleId}", "Modal accessible naming");
+assertIncludes(modal, '<span id={titleId} className="sr-only">{title}</span>', "Modal accessible naming");
+assertExcludes(modal, "aria-label={label}", "Modal accessible naming");
 
 assertIncludes(filesModel, 'type SourceSection = "files" | "connectors"', "Sources tabs");
 assertIncludes(filesPage, "activeSection", "Sources tabs");

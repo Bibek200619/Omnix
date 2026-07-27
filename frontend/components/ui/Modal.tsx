@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import type { HTMLAttributes, MouseEvent, ReactNode } from "react";
 import { Portal } from "@/components/ui/Portal";
 import { useFocusTrap } from "@/lib/use-focus-trap";
@@ -28,7 +28,7 @@ function ModalRoot({
   footerClassName,
 }: ModalProps) {
   const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
-  const label = typeof title === "string" ? title : undefined;
+  const titleId = useId();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -81,9 +81,10 @@ function ModalRoot({
           ref={modalRef}
           role="dialog"
           aria-modal="true"
-          aria-label={label}
+          aria-labelledby={titleId}
           className={cn("omnix-modal-card relative flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden", className)}
         >
+          <span id={titleId} className="sr-only">{title}</span>
           {children}
           {footer ? <ModalFooter className={footerClassName}>{footer}</ModalFooter> : null}
         </div>
