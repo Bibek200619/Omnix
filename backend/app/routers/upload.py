@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from ..jobs import queue as job_queue
 from ..core.security import get_current_user
 from ..services.document_intelligence_service import (
+    EXTRACTION_COLUMN_NAMES,
     ExtractionDiagnostics,
     extraction_columns_payload,
 )
@@ -101,7 +102,7 @@ async def _insert_file_row(payload: dict[str, Any], user_id: str) -> dict[str, A
         return await insert_one("files", {"user_id": user_id, **payload})
     except SupabaseServiceError as exc:
         message = str(exc.__cause__ or exc).lower()
-        optional_columns = set(ExtractionDiagnostics().__dataclass_fields__) | PROCESSING_COLUMNS
+        optional_columns = set(EXTRACTION_COLUMN_NAMES) | PROCESSING_COLUMNS
         if not any(column in message for column in optional_columns):
             raise
         logger.warning("File status columns are unavailable; inserting file metadata without physical status columns.")

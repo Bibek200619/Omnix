@@ -40,6 +40,9 @@ export interface FileData {
   processing_job_id?: string | null;
   ocr_used?: boolean | null;
   ocr_character_count?: number | null;
+  ocr_pages_processed?: number | null;
+  ocr_pages_omitted?: number | null;
+  ocr_coverage_complete?: boolean | null;
 }
 
 export type ConnectorType = "knowledge_link" | "file_repository" | "company_drive" | "external_database";
@@ -322,6 +325,11 @@ export function fileStatusDetail(file: FileData) {
   const extractedChars = numberDiagnostic(file, "extracted_character_count") ?? 0;
   const ocrChars = numberDiagnostic(file, "ocr_character_count") ?? 0;
   const pages = numberDiagnostic(file, "page_count");
+  const ocrPagesProcessed = numberDiagnostic(file, "ocr_pages_processed");
+  const ocrPagesOmitted = numberDiagnostic(file, "ocr_pages_omitted");
+  const omittedOcrPages = ocrPagesOmitted ?? 0;
+  const ocrCoverageComplete = booleanDiagnostic(file, "ocr_coverage_complete");
+  const ocrUsed = booleanDiagnostic(file, "ocr_used");
   if (status === "uploaded") return "The file is stored and waiting to be queued for processing.";
   if (status === "queued") return "Processing is queued. Omnix will extract, chunk, and embed this source in the background.";
   if (status === "processing" || status === "extracting") return "Text extraction is still running.";
@@ -333,6 +341,19 @@ export function fileStatusDetail(file: FileData) {
   if (status === "ocr_required") return "This PDF contains no readable text layer. OCR is required before it becomes searchable.";
   if (status === "ocr_running") return "OCR is running before this source can be indexed.";
   if (status === "extraction_failed") return "Text extraction failed for this document.";
+  if ((status === "searchable" || status === "ocr_complete") && ocrUsed && ocrChars > 0) {
+    if (ocrPagesProcessed === undefined) {
+      return `OCR extracted ${ocrChars.toLocaleString()} characters. Page coverage was not recorded for this older import.`;
+    }
+    if (omittedOcrPages > 0) {
+      const pageCoverage = pages ? `the first ${ocrPagesProcessed.toLocaleString()} of ${pages.toLocaleString()}` : ocrPagesProcessed.toLocaleString();
+      return `OCR indexed ${pageCoverage} pages and extracted ${ocrChars.toLocaleString()} characters. ${omittedOcrPages.toLocaleString()} pages were not processed because of the OCR limit.`;
+    }
+    if (ocrCoverageComplete) {
+      return `OCR extracted ${ocrChars.toLocaleString()} characters from all ${pages?.toLocaleString() ?? ocrPagesProcessed.toLocaleString()} pages.`;
+    }
+    return `OCR extracted ${ocrChars.toLocaleString()} characters from ${ocrPagesProcessed.toLocaleString()} OCR-processed pages.`;
+  }
   if (status === "ocr_complete") return `OCR extracted ${ocrChars.toLocaleString()} characters${pages ? ` across ${pages} pages` : ""}.`;
   return `Extracted ${extractedChars.toLocaleString()} characters${pages ? ` across ${pages} pages` : ""}.`;
 }
