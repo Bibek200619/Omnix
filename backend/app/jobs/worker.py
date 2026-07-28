@@ -16,6 +16,12 @@ from .queue import (
 )
 from .ingestion_jobs import handle_ingest_file
 from .automation_jobs import handle_run_automation
+from .file_lifecycle_jobs import (
+    handle_cleanup_file_storage,
+    handle_expire_file,
+    lifecycle_maintenance_interval_seconds,
+    run_file_lifecycle_maintenance_once,
+)
 from ..services.supabase_service import update_one_trusted, select_one_trusted
 from ..rag.startup import initialize_vector_store, shutdown_vector_store
 from ..embeddings.provider import warm_up_default_provider
@@ -34,6 +40,7 @@ _DEFAULT_QUEUE_RECOVERY_INTERVAL_SECONDS = 60.0
 _DEFAULT_DATABASE_QUEUE_FALLBACK_INTERVAL_SECONDS = 5.0
 _DEFAULT_OCR_WORKER_CONCURRENCY = 1
 _DEFAULT_OCR_JOB_TIMEOUT_SECONDS = 30 * 60
+_FILE_LIFECYCLE_JOB_TYPES = ("cleanup_file_storage", "expire_file")
 
 
 def _env_int(name: str, default: int, *, minimum: int = 1) -> int:
@@ -132,6 +139,23 @@ async def _database_fallback_job_ids_once(queue_name: str, *, limit: int) -> lis
     return job_ids
 
 
+async def _run_file_lifecycle_maintenance_once() -> dict[str, int] | None:
+    try:
+        result = await run_file_lifecycle_maintenance_once()
+    except Exception as exc:
+        logger.warning("File lifecycle maintenance scan failed: %s", exc)
+        return None
+
+    if result["expired_jobs"] or result["orphan_jobs"]:
+        logger.info(
+            "File lifecycle maintenance queued expired=%d orphan=%d after scanning=%d.",
+            result["expired_jobs"],
+            result["orphan_jobs"],
+            result["objects_scanned"],
+        )
+    return result
+
+
 async def _retry_or_dead_letter_job(
     job_id: str,
     job_row: dict[str, Any],
@@ -225,12 +249,21 @@ async def _process_job(job_id: str):
             from .reembed_jobs import handle_reembed_batch
 
             result = await handle_reembed_batch(job_row)
+        elif job_type == "cleanup_file_storage":
+            result = await handle_cleanup_file_storage(job_row)
+        elif job_type == "expire_file":
+            result = await handle_expire_file(job_row)
         else:
             logger.error("Unknown job type %s for job %s", job_type, job_id)
             result = {"status": "failed", "error": "unknown job type"}
 
         status = result.get("status", "failed")
-        if status == "failed" and job_type in {"ingest_file", "run_automation", "reembed_batch"}:
+        if status == "failed" and job_type in {
+            "ingest_file",
+            "run_automation",
+            "reembed_batch",
+            *_FILE_LIFECYCLE_JOB_TYPES,
+        }:
             status = await _retry_or_dead_letter_job(
                 job_id,
                 job_row,
@@ -378,7 +411,12 @@ async def _worker_loop(shutdown_event: asyncio.Event):
         return
 
     # Register with RuntimeManager
-    capabilities = ["ingest_file", "run_automation", "reembed_batch"]
+    capabilities = [
+        "ingest_file",
+        "run_automation",
+        "reembed_batch",
+        *_FILE_LIFECYCLE_JOB_TYPES,
+    ]
     if _is_ocr_worker():
         capabilities.append("ocr")
     runtime.register_worker(_worker_id(), capabilities=capabilities, worker_type="ingestion")
@@ -388,6 +426,10 @@ async def _worker_loop(shutdown_event: asyncio.Event):
     in_flight: set[asyncio.Task[None]] = set()
     last_recovery_scan = 0.0
     last_database_fallback_scan = asyncio.get_running_loop().time()
+    lifecycle_maintenance_interval = lifecycle_maintenance_interval_seconds()
+    last_lifecycle_maintenance = (
+        asyncio.get_running_loop().time() - lifecycle_maintenance_interval
+    )
     redis_unavailable = False
     force_database_fallback = False
 
@@ -409,6 +451,13 @@ async def _worker_loop(shutdown_event: asyncio.Event):
                 continue
 
             now = asyncio.get_running_loop().time()
+            if (
+                not _is_ocr_worker()
+                and now - last_lifecycle_maintenance >= lifecycle_maintenance_interval
+            ):
+                last_lifecycle_maintenance = now
+                await _run_file_lifecycle_maintenance_once()
+
             if force_database_fallback or now - last_database_fallback_scan >= database_fallback_interval_seconds:
                 last_database_fallback_scan = now
                 force_database_fallback = False

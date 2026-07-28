@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import quote
 
@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, Response
 
 from ..core.security import get_current_user
-from ..schemas.chat import FileCreate, FileRead
+from ..schemas.chat import FileCreate, FileRead, FileRetentionUpdate, FileVersionRead
 from ..services.supabase_service import (
     SupabaseServiceError,
     delete_many_trusted,
@@ -17,6 +17,7 @@ from ..services.supabase_service import (
     select_all,
     select_all_trusted,
     select_one_trusted,
+    update_one_trusted,
 )
 from ..services.file_storage import (
     StorageError,
@@ -40,11 +41,18 @@ FILE_COLUMNS = (
     "id,user_id,workspace_id,conversation_id,file_name,file_type,size_bytes,storage_path,metadata,"
     "page_count,extractor_used,extracted_character_count,image_page_count,text_page_count,"
     "extraction_status,extraction_failure_reason,processing_status,processing_error,processing_job_id,"
-    "ocr_used,ocr_character_count,created_at"
+    "ocr_used,ocr_character_count,retention_expires_at,lifecycle_status,created_at"
+)
+FILE_VERSION_COLUMNS = (
+    "id,file_id,version_number,file_name,file_type,size_bytes,content_hash,storage_backend,"
+    "lifecycle_status,cleanup_reason,created_at,cleanup_requested_at,cleaned_at"
 )
 FILE_LOCATOR_COLUMNS = "id,user_id,workspace_id"
 DEFAULT_FILE_LIMIT = 50
 MAX_FILE_LIMIT = 100
+DEFAULT_FILE_VERSION_LIMIT = 50
+MAX_FILE_VERSION_LIMIT = 100
+MIN_FILE_RETENTION_DELAY = timedelta(minutes=5)
 
 
 def _user_id_from_claims(current_user: dict[str, Any]) -> str:
@@ -63,6 +71,28 @@ def _file_not_found() -> HTTPException:
         status_code=status.HTTP_404_NOT_FOUND,
         detail="File not found.",
     )
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _retention_expiry_value(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="retention_expires_at must include a timezone offset.",
+        )
+    normalized = value.astimezone(timezone.utc)
+    if normalized < _utcnow() + MIN_FILE_RETENTION_DELAY:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="retention_expires_at must be at least 5 minutes in the future.",
+        )
+    return normalized.isoformat()
 
 
 def _file_scope_filters(
@@ -234,6 +264,95 @@ async def get_files(
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
+
+
+@router.get("/{file_id}/versions", response_model=list[FileVersionRead])
+async def get_file_versions(
+    file_id: str,
+    limit: int = Query(default=DEFAULT_FILE_VERSION_LIMIT, ge=1, le=MAX_FILE_VERSION_LIMIT),
+    offset: int = Query(default=0, ge=0),
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    user_id = _user_id_from_claims(current_user)
+    await _require_file_access(file_id, user_id)
+
+    try:
+        rows = await select_all_trusted(
+            "file_versions",
+            FILE_VERSION_COLUMNS,
+            filters={"file_id": file_id},
+            order_by="version_number",
+            desc=True,
+            limit=limit,
+            offset=offset,
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+    return [FileVersionRead.model_validate(row).model_dump() for row in rows]
+
+
+@router.patch("/{file_id}/retention", response_model=FileRead)
+async def update_file_retention(
+    file_id: str,
+    retention: FileRetentionUpdate,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id_from_claims(current_user)
+    file_row, workspace_access = await _require_file_access(file_id, user_id)
+
+    uploader_user_id = str(file_row.get("user_id") or "")
+    if (
+        workspace_access is not None
+        and uploader_user_id != user_id
+        and not can_manage_workspace_resource(uploader_user_id, workspace_access, user_id)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the uploader or workspace owner can manage file retention.",
+        )
+
+    if file_row.get("lifecycle_status") == "retention_pending":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="File retention expiry is already in progress.",
+        )
+
+    retention_expires_at = _retention_expiry_value(retention.retention_expires_at)
+    filters = _file_scope_filters(file_id, user_id, workspace_access)
+    filters["lifecycle_status"] = "active"
+
+    try:
+        updated = await update_one_trusted(
+            "files",
+            filters,
+            {"retention_expires_at": retention_expires_at},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+
+    if updated is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="File lifecycle changed while retention was being updated.",
+        )
+
+    if workspace_access is not None:
+        await log_workspace_activity(
+            workspace_id=workspace_access.workspace_id,
+            actor_user_id=user_id,
+            event_type="workspace.source_retention_updated",
+            summary=(
+                f"Retention was scheduled for {file_row.get('file_name') or 'a source'}."
+                if retention_expires_at is not None
+                else f"Retention was cleared for {file_row.get('file_name') or 'a source'}."
+            ),
+            metadata={
+                "file_id": file_id,
+                "retention_expires_at": retention_expires_at,
+            },
+        )
+
+    return {**file_row, **updated}
 
 
 @router.get("/{file_id}/download")
