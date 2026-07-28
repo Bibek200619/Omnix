@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { ConversationHistoryProvider } from "@/lib/conversation-history-context";
 import { ProfileProvider } from "@/lib/profile-context";
-import { WorkspaceProvider } from "@/lib/workspace-context";
+import { WorkspaceProvider } from "@/lib/workspace-provider";
 import { WorkspaceCollaborationProvider } from "@/lib/workspace-collaboration-context";
 import { WorkspaceNotificationsProvider } from "@/lib/workspace-notifications-context";
 

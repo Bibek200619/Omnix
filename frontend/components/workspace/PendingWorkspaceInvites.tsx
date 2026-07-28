@@ -6,7 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
 import { logClientError } from "@/lib/errors";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceMembership } from "@/lib/workspace-membership-context";
 import { getWorkspaceInviteId } from "@/lib/workspace-types";
 import { workspaceRoleLabel } from "@/lib/workspace-roles";
 import { cn } from "@/lib/utils";
@@ -33,7 +33,7 @@ export function PendingWorkspaceInvites({
     pendingInvitesLoading,
     acceptInvite,
     declineInvite,
-  } = useWorkspace();
+  } = useWorkspaceMembership();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);

@@ -22,7 +22,8 @@ import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
 import { Portal } from "@/components/ui/Portal";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { logClientError } from "@/lib/errors";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceMembership } from "@/lib/workspace-membership-context";
+import { useWorkspaceTree } from "@/lib/workspace-tree-context";
 import {
   getWorkspaceInviteId,
   type WorkspaceMember,
@@ -202,8 +203,8 @@ function MemberActionsMenu({
 }
 
 export function WorkspaceAccessPanel() {
+  const { activeWorkspace } = useWorkspaceTree();
   const {
-    activeWorkspace,
     activeMembers,
     activeInvites,
     membersLoading,
@@ -213,7 +214,7 @@ export function WorkspaceAccessPanel() {
     revokeInvite,
     updateWorkspaceMemberRole,
     assignWorkspaceMember,
-  } = useWorkspace();
+  } = useWorkspaceMembership();
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);

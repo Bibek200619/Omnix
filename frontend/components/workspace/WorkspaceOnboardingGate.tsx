@@ -22,7 +22,8 @@ import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
 import { markOnboardingCompleted, readOnboardingCompleted } from "@/lib/onboarding";
 import { useFocusTrap } from "@/lib/use-focus-trap";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceMembership } from "@/lib/workspace-membership-context";
+import { useWorkspaceTree } from "@/lib/workspace-tree-context";
 import type { Workspace, WorkspaceFocus, WorkspaceInvite } from "@/lib/workspace-types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -103,14 +104,12 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
     error,
     activeWorkspace,
     activeWorkspaceId,
-    pendingInvites,
-    acceptInvite,
-    declineInvite,
     createWorkspace,
     refreshWorkspaces,
-    refreshActiveWorkspaceData,
     setActiveWorkspace,
-  } = useWorkspace();
+  } = useWorkspaceTree();
+  const { pendingInvites, acceptInvite, declineInvite, refreshActiveWorkspaceData } =
+    useWorkspaceMembership();
   const { user, signOut } = useAuth();
 
   const [onboardingComplete, setOnboardingComplete] = useState(false);

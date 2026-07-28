@@ -14,8 +14,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { apiClient } from "./api";
 import { useAuth } from "./auth-context";
 import { logger } from "./logger";
-import { useWorkspace } from "./workspace-context";
 import { realtimeRegistry } from "./realtime-registry";
+import { useWorkspaceIntelligence } from "./workspace-intelligence-context";
+import { useWorkspaceMembership } from "./workspace-membership-context";
+import { useWorkspaceTree } from "./workspace-tree-context";
 import type {
   TypingSignal,
   WorkspaceActivityEvent,
@@ -76,14 +78,10 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
   const pathname = usePathname();
   const router = useRouter();
   const { session } = useAuth();
-  const {
-    activeWorkspace,
-    activeWorkspaceId,
-    refreshActiveWorkspaceData,
-    refreshWorkspaceIntelligence,
-    refreshWorkspaces,
-    setActiveWorkspace,
-  } = useWorkspace();
+  const { activeWorkspace, activeWorkspaceId, refreshWorkspaces, setActiveWorkspace } =
+    useWorkspaceTree();
+  const { refreshActiveWorkspaceData } = useWorkspaceMembership();
+  const { refreshWorkspaceIntelligence } = useWorkspaceIntelligence();
   const [presence, setPresence] = useState<WorkspacePresenceSnapshot | null>(null);
   const [activity, setActivity] = useState<WorkspaceActivityEvent[]>([]);
   const [liveStatuses, setLiveStatuses] = useState<Record<string, WorkspaceLiveStatus>>({});

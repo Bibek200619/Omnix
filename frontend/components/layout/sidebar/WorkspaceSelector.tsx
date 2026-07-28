@@ -8,7 +8,8 @@ import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModa
 import { logClientError } from "@/lib/errors";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceMembership } from "@/lib/workspace-membership-context";
+import { useWorkspaceTree } from "@/lib/workspace-tree-context";
 import { cn } from "@/lib/utils";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { Workspace, WorkspaceRole } from "@/lib/workspace-types";
@@ -27,15 +28,14 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
     error: workspaceError,
     activeWorkspace,
     activeRootWorkspace,
-    pendingInvites,
     setActiveWorkspace,
     refreshWorkspaces,
     createWorkspace,
     createSubspace,
     renameWorkspace,
     deleteWorkspace,
-    inviteToActiveWorkspace,
-  } = useWorkspace();
+  } = useWorkspaceTree();
+  const { pendingInvites, inviteToActiveWorkspace } = useWorkspaceMembership();
   const { presence, statusForWorkspace, realtimeStatus } = useWorkspaceCollaboration();
   const [open, setOpen] = useState(false);
   const selectorRef = useRef<HTMLDivElement | null>(null);

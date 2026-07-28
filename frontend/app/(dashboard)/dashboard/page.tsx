@@ -29,7 +29,8 @@ import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceIntelligence } from "@/lib/workspace-intelligence-context";
+import { useWorkspaceTree } from "@/lib/workspace-tree-context";
 import { workspaceRoleLabel } from "@/lib/workspace-roles";
 import { cn } from "@/lib/utils";
 import { WorkspaceIntelligencePanel } from "@/components/workspace/WorkspaceIntelligencePanel";
@@ -107,13 +108,9 @@ export default function DashboardPage() {
 function DashboardPageContent() {
   const router = useRouter();
   const { conversations } = useConversationHistory();
-  const {
-    activeWorkspace,
-    workspaces,
-    activeWorkspaceIntelligence,
-    intelligenceError,
-    intelligenceLoading,
-  } = useWorkspace();
+  const { activeWorkspace, workspaces } = useWorkspaceTree();
+  const { activeWorkspaceIntelligence, intelligenceError, intelligenceLoading } =
+    useWorkspaceIntelligence();
   const { activity, loadingActivity, presence } = useWorkspaceCollaboration();
   const [files, setFiles] = useState<FileData[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);

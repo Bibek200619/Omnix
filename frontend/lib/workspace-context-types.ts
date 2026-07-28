@@ -60,8 +60,3 @@ export type WorkspaceIntelligenceContextValue = {
   refreshWorkspaceIntelligence: (options?: RefreshOptions) => Promise<WorkspaceIntelligenceProfile | null>;
   updateWorkspaceIntelligence: (payload: WorkspaceIntelligenceUpdatePayload) => Promise<WorkspaceIntelligenceProfile>;
 };
-
-export type WorkspaceContextType =
-  WorkspaceTreeContextValue &
-  WorkspaceMembershipContextValue &
-  WorkspaceIntelligenceContextValue;

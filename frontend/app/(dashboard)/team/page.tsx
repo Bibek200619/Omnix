@@ -32,7 +32,8 @@ import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModal";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceMembership } from "@/lib/workspace-membership-context";
+import { useWorkspaceTree } from "@/lib/workspace-tree-context";
 import { cn } from "@/lib/utils";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { WorkspaceMember, WorkspaceRole } from "@/lib/workspace-types";
@@ -223,18 +224,17 @@ export default function TeamPage() {
 }
 
 function TeamPageContent() {
+  const { activeWorkspace, refreshWorkspaces } = useWorkspaceTree();
   const {
-    activeWorkspace,
     activeMembers,
     activeInvites,
     membersError,
     membersLoading,
     refreshActiveWorkspaceData,
-    refreshWorkspaces,
     inviteToActiveWorkspace,
     removeWorkspaceMember,
     updateWorkspaceMemberRole,
-  } = useWorkspace();
+  } = useWorkspaceMembership();
   const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");

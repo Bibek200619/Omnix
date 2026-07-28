@@ -9,7 +9,9 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Toggle } from "@/components/ui/Toggle";
 import { logClientError } from "@/lib/errors";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceIntelligence } from "@/lib/workspace-intelligence-context";
+import { useWorkspaceMembership } from "@/lib/workspace-membership-context";
+import { useWorkspaceTree } from "@/lib/workspace-tree-context";
 import { flattenWorkspaces } from "@/lib/workspace-utils";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { Workspace } from "@/lib/workspace-types";
@@ -42,16 +44,15 @@ export function WorkspaceSettingsPanel() {
   const {
     activeWorkspace,
     activeRootWorkspace,
-    activeMembers,
-    activeInvites,
-    activeWorkspaceIntelligence,
     createSubspace,
     deleteWorkspace,
     renameWorkspace,
     setActiveWorkspace,
-    updateWorkspaceIntelligence,
     workspaces,
-  } = useWorkspace();
+  } = useWorkspaceTree();
+  const { activeMembers, activeInvites } = useWorkspaceMembership();
+  const { activeWorkspaceIntelligence, updateWorkspaceIntelligence } =
+    useWorkspaceIntelligence();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
