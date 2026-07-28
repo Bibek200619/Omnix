@@ -27,10 +27,12 @@ from ..services.workspace_service import (
     require_workspace_access,
     utc_now_iso,
 )
+from ..services.workspace_common import WorkspaceAccess
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 logger = logging.getLogger(__name__)
 CONVERSATION_COLUMNS = "id,user_id,workspace_id,title,is_archived,created_at,updated_at,last_message_at"
+CONVERSATION_LOCATOR_COLUMNS = "id,user_id,workspace_id"
 MESSAGE_PREVIEW_COLUMNS = "id,conversation_id,user_id,role,content,status,created_at"
 DEFAULT_CONVERSATION_LIMIT = 50
 MAX_CONVERSATION_LIMIT = 100
@@ -54,6 +56,23 @@ def _conversation_not_found() -> HTTPException:
         status_code=status.HTTP_404_NOT_FOUND,
         detail="Conversation not found.",
     )
+
+
+def _conversation_scope_filters(
+    conversation_id: str,
+    user_id: str,
+    workspace_access: WorkspaceAccess | None,
+) -> dict[str, Any]:
+    if workspace_access is not None:
+        return {
+            "id": conversation_id,
+            "workspace_id": workspace_access.workspace_id,
+        }
+    return {
+        "id": conversation_id,
+        "user_id": user_id,
+        "workspace_id": {"is": None},
+    }
 
 
 def build_conversation_title(message: str) -> str:
@@ -149,28 +168,43 @@ async def hydrate_conversation_history(
 async def require_conversation_access(
     conversation_id: str,
     user_id: str,
-) -> tuple[dict[str, Any], Any | None]:
+) -> tuple[dict[str, Any], WorkspaceAccess | None]:
     try:
-        conversation = await select_one_trusted(
+        locator = await select_one_trusted(
             "conversations",
-            CONVERSATION_COLUMNS,
+            CONVERSATION_LOCATOR_COLUMNS,
             {"id": conversation_id},
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
+    if locator is None:
+        raise _conversation_not_found()
+
+    workspace_access: WorkspaceAccess | None = None
+    workspace_id = locator.get("workspace_id")
+    if workspace_id:
+        try:
+            workspace_access = await require_workspace_access(str(workspace_id), user_id)
+        except HTTPException as exc:
+            if exc.status_code in {status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND}:
+                raise _conversation_not_found() from exc
+            raise
+    elif str(locator.get("user_id") or "") != user_id:
+        raise _conversation_not_found()
+
+    try:
+        conversation = await select_one_trusted(
+            "conversations",
+            CONVERSATION_COLUMNS,
+            _conversation_scope_filters(conversation_id, user_id, workspace_access),
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
     if conversation is None:
         raise _conversation_not_found()
 
-    workspace_id = conversation.get("workspace_id")
-    if workspace_id:
-        access = await require_workspace_access(str(workspace_id), user_id)
-        return conversation, access
-
-    if str(conversation.get("user_id") or "") != user_id:
-        raise _conversation_not_found()
-
-    return conversation, None
+    return conversation, workspace_access
 
 
 @router.post("", response_model=ConversationRead, status_code=status.HTTP_201_CREATED)
@@ -221,7 +255,7 @@ async def get_conversations(
             conversations = await select_all(
                 "conversations",
                 CONVERSATION_COLUMNS,
-                filters={"user_id": user_id},
+                filters={"user_id": user_id, "workspace_id": {"is": None}},
                 order_by="last_message_at",
                 desc=True,
                 limit=limit,
@@ -288,13 +322,13 @@ async def update_conversation(
         if workspace_access is not None:
             updated_conversation = await update_one_trusted(
                 "conversations",
-                {"id": conversation_id},
+                _conversation_scope_filters(conversation_id, user_id, workspace_access),
                 payload,
             )
         else:
             updated_conversation = await update_one(
                 "conversations",
-                {"id": conversation_id, "user_id": user_id},
+                _conversation_scope_filters(conversation_id, user_id, None),
                 payload,
             )
     except SupabaseServiceError as exc:
