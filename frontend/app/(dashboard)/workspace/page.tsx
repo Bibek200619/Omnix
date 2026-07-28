@@ -37,7 +37,9 @@ import { WorkspaceOperationalTimeline } from "@/components/workspace/WorkspaceOp
 import { logClientError } from "@/lib/errors";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { WorkspaceContinuityProvider, useWorkspaceContinuity } from "@/lib/workspace-continuity-context";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceIntelligence } from "@/lib/workspace-intelligence-context";
+import { useWorkspaceMembership } from "@/lib/workspace-membership-context";
+import { useWorkspaceTree } from "@/lib/workspace-tree-context";
 import { cn } from "@/lib/utils";
 import {
   isWorkspaceFounderRole,
@@ -117,16 +119,14 @@ function WorkspacePageContent() {
   const {
     activeWorkspace,
     activeWorkspaceId,
-    activeMembers,
-    activeInvites,
-    activeWorkspaceIntelligence,
-    intelligenceError,
     createWorkspace,
     createSubspace,
     loading,
     setActiveWorkspace,
     workspaces,
-  } = useWorkspace();
+  } = useWorkspaceTree();
+  const { activeMembers, activeInvites } = useWorkspaceMembership();
+  const { activeWorkspaceIntelligence, intelligenceError } = useWorkspaceIntelligence();
   const { initiatives, timeline, loading: loadingContinuity } = useWorkspaceContinuity();
   const { activity, loadingActivity, presence, statusForWorkspace } = useWorkspaceCollaboration();
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {

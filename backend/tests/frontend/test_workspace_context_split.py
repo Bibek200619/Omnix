@@ -15,6 +15,8 @@ def read_frontend(relative_path: str) -> str:
 def test_workspace_provider_exposes_split_contexts() -> None:
     source = WORKSPACE_CONTEXT.read_text(encoding="utf-8")
     context_values = read_frontend("lib/workspace-context-values.ts")
+    context_exports = read_frontend("lib/workspace-context.tsx")
+    context_types = read_frontend("lib/workspace-context-types.ts")
 
     assert "useWorkspaceContextValues" in source
     assert "useMemo<WorkspaceTreeContextValue>" in context_values
@@ -23,10 +25,12 @@ def test_workspace_provider_exposes_split_contexts() -> None:
     assert "<WorkspaceTreeContext.Provider value={treeValue}>" in source
     assert "<WorkspaceMembershipContext.Provider value={membershipValue}>" in source
     assert "<WorkspaceIntelligenceContext.Provider value={intelligenceValue}>" in source
-    assert "...treeValue" in context_values
-    assert "...membershipValue" in context_values
-    assert "...intelligenceValue" in context_values
-    assert "export function useWorkspace()" in source
+    assert "const WorkspaceContext =" not in source
+    assert "<WorkspaceContext.Provider" not in source
+    assert "export function useWorkspace()" not in source
+    assert "WorkspaceProvider, useWorkspace" not in context_exports
+    assert "export { useWorkspace }" not in context_exports
+    assert "WorkspaceContextType" not in context_types
 
 
 def test_workspace_context_modules_have_guarded_hooks() -> None:
@@ -219,3 +223,42 @@ def test_low_scope_consumers_use_targeted_workspace_hooks() -> None:
 
         assert hook_name in source
         assert "useWorkspace()" not in source
+
+
+def test_broad_workspace_consumers_use_explicit_domain_hooks() -> None:
+    consumers = {
+        "app/(dashboard)/dashboard/page.tsx": ("useWorkspaceTree", "useWorkspaceIntelligence"),
+        "app/(dashboard)/team/page.tsx": ("useWorkspaceTree", "useWorkspaceMembership"),
+        "app/(dashboard)/workspace/page.tsx": (
+            "useWorkspaceTree",
+            "useWorkspaceMembership",
+            "useWorkspaceIntelligence",
+        ),
+        "components/chat/ChatInterface.tsx": (
+            "useWorkspaceTree",
+            "useWorkspaceMembership",
+            "useWorkspaceIntelligence",
+        ),
+        "components/layout/sidebar/WorkspaceSelector.tsx": ("useWorkspaceTree", "useWorkspaceMembership"),
+        "components/settings/WorkspaceSettingsPanel.tsx": (
+            "useWorkspaceTree",
+            "useWorkspaceMembership",
+            "useWorkspaceIntelligence",
+        ),
+        "components/workspace/PendingWorkspaceInvites.tsx": ("useWorkspaceMembership",),
+        "components/workspace/WorkspaceAccessPanel.tsx": ("useWorkspaceTree", "useWorkspaceMembership"),
+        "components/workspace/WorkspaceOnboardingGate.tsx": ("useWorkspaceTree", "useWorkspaceMembership"),
+        "lib/workspace-collaboration-context.tsx": (
+            "useWorkspaceTree",
+            "useWorkspaceMembership",
+            "useWorkspaceIntelligence",
+        ),
+    }
+
+    for relative_path, hook_names in consumers.items():
+        source = read_frontend(relative_path)
+
+        assert "useWorkspace()" not in source
+        assert "workspace-context\"" not in source
+        for hook_name in hook_names:
+            assert hook_name in source

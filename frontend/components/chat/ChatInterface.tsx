@@ -20,7 +20,9 @@ import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useProfile } from "@/lib/profile-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceIntelligence } from "@/lib/workspace-intelligence-context";
+import { useWorkspaceMembership } from "@/lib/workspace-membership-context";
+import { useWorkspaceTree } from "@/lib/workspace-tree-context";
 import { initialsFromText } from "@/lib/workspace-roles";
 import type { WorkspaceMember } from "@/lib/workspace-types";
 
@@ -29,13 +31,9 @@ export function ChatInterface() {
   const router = useRouter();
   const { user } = useAuth();
   const { profile } = useProfile();
-  const {
-    activeWorkspace,
-    activeMembers,
-    activeWorkspaceId,
-    activeWorkspaceIntelligence,
-    refreshActiveWorkspaceData,
-  } = useWorkspace();
+  const { activeWorkspace, activeWorkspaceId } = useWorkspaceTree();
+  const { activeMembers, refreshActiveWorkspaceData } = useWorkspaceMembership();
+  const { activeWorkspaceIntelligence } = useWorkspaceIntelligence();
   const {
     activeConversationId,
     conversations,

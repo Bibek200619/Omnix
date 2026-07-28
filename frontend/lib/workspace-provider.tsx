@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "./auth-context";
 import { logClientError } from "./errors";
 import { logger } from "./logger";
@@ -43,23 +43,17 @@ import {
 import { WorkspaceIntelligenceContext } from "./workspace-intelligence-context";
 import { WorkspaceMembershipContext } from "./workspace-membership-context";
 import { WorkspaceTreeContext } from "./workspace-tree-context";
-import type {
-  RefreshOptions,
-  WorkspaceContextType,
-} from "./workspace-context-types";
+import type { RefreshOptions } from "./workspace-context-types";
 
 export { useWorkspaceIntelligence } from "./workspace-intelligence-context";
 export { useWorkspaceMembership } from "./workspace-membership-context";
 export { useWorkspaceTree } from "./workspace-tree-context";
 export type {
   RefreshOptions,
-  WorkspaceContextType,
   WorkspaceIntelligenceContextValue,
   WorkspaceMembershipContextValue,
   WorkspaceTreeContextValue,
 } from "./workspace-context-types";
-
-const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
 
 const WORKSPACE_SILENT_REFRESH_MIN_MS = 15_000;
 const PENDING_INVITES_POLL_INTERVAL_MS = 60_000;
@@ -479,7 +473,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     void refreshWorkspaceIntelligence({ force: true });
   }, [clearWorkspaceIntelligenceRequest, refreshWorkspaceIntelligence]);
 
-  const { treeValue, membershipValue, intelligenceValue, value } = useWorkspaceContextValues({
+  const { treeValue, membershipValue, intelligenceValue } = useWorkspaceContextValues({
     workspaces,
     loading,
     error,
@@ -523,24 +517,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     <WorkspaceTreeContext.Provider value={treeValue}>
       <WorkspaceMembershipContext.Provider value={membershipValue}>
         <WorkspaceIntelligenceContext.Provider value={intelligenceValue}>
-          <WorkspaceContext.Provider value={value}>
-            {children}
-            <WorkspaceDestructiveConfirmationModal
-              confirmation={destructiveConfirmation}
-              onCancel={cancelDestructiveConfirmation}
-              onConfirm={approveDestructiveConfirmation}
-            />
-          </WorkspaceContext.Provider>
+          {children}
+          <WorkspaceDestructiveConfirmationModal
+            confirmation={destructiveConfirmation}
+            onCancel={cancelDestructiveConfirmation}
+            onConfirm={approveDestructiveConfirmation}
+          />
         </WorkspaceIntelligenceContext.Provider>
       </WorkspaceMembershipContext.Provider>
     </WorkspaceTreeContext.Provider>
   );
-}
-
-export function useWorkspace() {
-  const ctx = useContext(WorkspaceContext);
-  if (!ctx) {
-    throw new Error("useWorkspace must be used within WorkspaceProvider");
-  }
-  return ctx;
 }
