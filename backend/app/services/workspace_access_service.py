@@ -23,6 +23,9 @@ from .workspace_common import (
 from .workspace_permissions import OrganizationalAccessAuthority
 
 logger = logging.getLogger(__name__)
+WORKSPACE_ACCESS_LOCATOR_COLUMNS = "id,user_id,parent_workspace_id,workspace_type,is_global"
+LEGACY_WORKSPACE_ACCESS_LOCATOR_COLUMNS = "id,user_id"
+_WORKSPACE_AUTHORITY_FIELDS = ("id", "user_id", "parent_workspace_id", "workspace_type", "is_global")
 
 
 def active_workspace_id_from_request(request: Request) -> str | None:
@@ -34,19 +37,17 @@ def active_workspace_id_from_request(request: Request) -> str | None:
     return workspace_id or None
 
 
-async def select_workspace_record(filters: Mapping[str, Any]) -> dict[str, Any] | None:
-    column_sets = (
-        ("current", WORKSPACE_COLUMNS),
-        ("hierarchy", HIERARCHY_WORKSPACE_COLUMNS),
-        ("legacy", LEGACY_WORKSPACE_COLUMNS),
-    )
+async def _select_workspace_columns(
+    filters: Mapping[str, Any],
+    column_sets: tuple[tuple[str, str], ...],
+) -> dict[str, Any] | None:
     last_error: SupabaseServiceError | None = None
-    for label, columns in column_sets:
+    for index, (label, columns) in enumerate(column_sets):
         try:
             return await select_one_trusted("workspaces", columns, filters)
         except SupabaseServiceError as exc:
             last_error = exc
-            if label != "legacy":
+            if index < len(column_sets) - 1:
                 logger.warning(
                     "Workspace read using %s schema failed; retrying narrower columns.",
                     label,
@@ -56,16 +57,60 @@ async def select_workspace_record(filters: Mapping[str, Any]) -> dict[str, Any] 
     raise database_error() from last_error
 
 
+async def select_workspace_record(filters: Mapping[str, Any]) -> dict[str, Any] | None:
+    return await _select_workspace_columns(
+        filters,
+        (
+            ("current", WORKSPACE_COLUMNS),
+            ("hierarchy", HIERARCHY_WORKSPACE_COLUMNS),
+            ("legacy", LEGACY_WORKSPACE_COLUMNS),
+        ),
+    )
+
+
+async def _select_workspace_access_locator(
+    filters: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    return await _select_workspace_columns(
+        filters,
+        (
+            ("hierarchy locator", WORKSPACE_ACCESS_LOCATOR_COLUMNS),
+            ("legacy locator", LEGACY_WORKSPACE_ACCESS_LOCATOR_COLUMNS),
+        ),
+    )
+
+
+def _membership_role(
+    membership: dict[str, Any] | None,
+    user_id: str,
+    workspace: dict[str, Any],
+) -> WorkspaceRole | None:
+    if not membership:
+        return None
+    return normalize_workspace_role(
+        membership.get("role"),
+        member_user_id=user_id,
+        owner_user_id=str(workspace.get("user_id") or ""),
+    )
+
+
+def _workspace_authority_matches(locator: dict[str, Any], hydrated: dict[str, Any]) -> bool:
+    return all(
+        locator.get(field) == hydrated.get(field)
+        for field in _WORKSPACE_AUTHORITY_FIELDS
+    )
+
+
 async def resolve_workspace_access(
     workspace_id: str,
     user_id: str,
 ) -> WorkspaceAccess | None:
-    workspace = await select_workspace_record({"id": workspace_id})
-    if workspace is None:
+    workspace_locator = await _select_workspace_access_locator({"id": workspace_id})
+    if workspace_locator is None:
         return None
 
-    workspace = normalize_workspace_record(workspace)
-    parent_workspace_id = str(workspace.get("parent_workspace_id") or "").strip()
+    workspace_locator = normalize_workspace_record(workspace_locator)
+    parent_workspace_id = str(workspace_locator.get("parent_workspace_id") or "").strip()
 
     try:
         direct_membership = await select_one_trusted(
@@ -76,70 +121,69 @@ async def resolve_workspace_access(
     except SupabaseServiceError as exc:
         raise database_error() from exc
 
-    direct_role: WorkspaceRole | None = None
-    if direct_membership:
-        direct_role = normalize_workspace_role(
-            direct_membership.get("role"),
-            member_user_id=user_id,
-            owner_user_id=str(workspace.get("user_id") or ""),
-        )
+    direct_role = _membership_role(direct_membership, user_id, workspace_locator)
 
+    resolved_role: WorkspaceRole | None = None
+    membership_uses_parent = False
+    parent_locator: dict[str, Any] | None = None
     if not parent_workspace_id:
-        if direct_role:
-            return WorkspaceAccess(
-                workspace=workspace,
-                role=direct_role,
-                membership_workspace=workspace,
+        resolved_role = direct_role
+    else:
+        parent_locator = await _select_workspace_access_locator({"id": parent_workspace_id})
+        if parent_locator is None:
+            return None
+
+        parent_locator = normalize_workspace_record(parent_locator)
+        if not is_super_workspace(parent_locator):
+            return None
+
+        try:
+            parent_membership = await select_one_trusted(
+                "workspace_members",
+                WORKSPACE_MEMBER_COLUMNS,
+                {"workspace_id": parent_workspace_id, "user_id": user_id},
             )
+        except SupabaseServiceError as exc:
+            raise database_error() from exc
+
+        parent_role = _membership_role(parent_membership, user_id, parent_locator)
+
+        if parent_role == "founder":
+            resolved_role = "founder"
+            membership_uses_parent = True
+        elif workspace_locator.get("is_global") and parent_role:
+            resolved_role = parent_role
+            membership_uses_parent = True
+        else:
+            resolved_role = direct_role
+
+    if resolved_role is None:
         return None
 
-    parent_workspace = await select_workspace_record({"id": parent_workspace_id})
-    if parent_workspace is None:
+    workspace = await select_workspace_record({"id": workspace_id})
+    if workspace is None:
+        return None
+    workspace = normalize_workspace_record(workspace)
+    if not _workspace_authority_matches(workspace_locator, workspace):
         return None
 
-    parent_workspace = normalize_workspace_record(parent_workspace)
-    if not is_super_workspace(parent_workspace):
-        return None
+    membership_workspace = workspace
+    if membership_uses_parent:
+        if parent_locator is None:
+            return None
+        parent_workspace = await select_workspace_record({"id": parent_workspace_id})
+        if parent_workspace is None:
+            return None
+        parent_workspace = normalize_workspace_record(parent_workspace)
+        if not _workspace_authority_matches(parent_locator, parent_workspace):
+            return None
+        membership_workspace = parent_workspace
 
-    try:
-        parent_membership = await select_one_trusted(
-            "workspace_members",
-            WORKSPACE_MEMBER_COLUMNS,
-            {"workspace_id": parent_workspace_id, "user_id": user_id},
-        )
-    except SupabaseServiceError as exc:
-        raise database_error() from exc
-
-    parent_role: WorkspaceRole | None = None
-    if parent_membership:
-        parent_role = normalize_workspace_role(
-            parent_membership.get("role"),
-            member_user_id=user_id,
-            owner_user_id=str(parent_workspace.get("user_id") or ""),
-        )
-
-    if parent_role == "founder":
-        return WorkspaceAccess(
-            workspace=workspace,
-            role="founder",
-            membership_workspace=parent_workspace,
-        )
-
-    if workspace.get("is_global") and parent_role:
-        return WorkspaceAccess(
-            workspace=workspace,
-            role=parent_role,
-            membership_workspace=parent_workspace,
-        )
-
-    if direct_role:
-        return WorkspaceAccess(
-            workspace=workspace,
-            role=direct_role,
-            membership_workspace=workspace,
-        )
-
-    return None
+    return WorkspaceAccess(
+        workspace=workspace,
+        role=resolved_role,
+        membership_workspace=membership_workspace,
+    )
 
 
 async def require_workspace_access(
