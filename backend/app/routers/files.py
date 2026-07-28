@@ -30,6 +30,7 @@ from ..services.workspace_service import (
     can_manage_workspace_resource,
     require_workspace_access,
 )
+from ..services.workspace_common import WorkspaceAccess
 from ..services.workspace_collaboration_service import log_workspace_activity
 from .conversations import require_conversation_access
 
@@ -41,6 +42,7 @@ FILE_COLUMNS = (
     "extraction_status,extraction_failure_reason,processing_status,processing_error,processing_job_id,"
     "ocr_used,ocr_character_count,created_at"
 )
+FILE_LOCATOR_COLUMNS = "id,user_id,workspace_id"
 DEFAULT_FILE_LIMIT = 50
 MAX_FILE_LIMIT = 100
 
@@ -56,27 +58,70 @@ def _database_error() -> HTTPException:
     )
 
 
+def _file_not_found() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="File not found.",
+    )
+
+
+def _file_scope_filters(
+    file_id: str,
+    user_id: str,
+    workspace_access: WorkspaceAccess | None,
+) -> dict[str, Any]:
+    if workspace_access is not None:
+        return {
+            "id": file_id,
+            "workspace_id": workspace_access.workspace_id,
+        }
+    return {
+        "id": file_id,
+        "user_id": user_id,
+        "workspace_id": {"is": None},
+    }
+
+
 async def _require_file_access(
     file_id: str,
     user_id: str,
-) -> tuple[dict[str, Any], Any | None]:
+) -> tuple[dict[str, Any], WorkspaceAccess | None]:
     try:
-        file_row = await select_one_trusted("files", FILE_COLUMNS, {"id": file_id})
+        locator = await select_one_trusted(
+            "files",
+            FILE_LOCATOR_COLUMNS,
+            {"id": file_id},
+        )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
-    if file_row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
+    if locator is None:
+        raise _file_not_found()
 
-    workspace_id = file_row.get("workspace_id")
+    workspace_access: WorkspaceAccess | None = None
+    workspace_id = locator.get("workspace_id")
     if workspace_id:
-        access = await require_workspace_access(str(workspace_id), user_id)
-        return file_row, access
+        try:
+            workspace_access = await require_workspace_access(str(workspace_id), user_id)
+        except HTTPException as exc:
+            if exc.status_code in {status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND}:
+                raise _file_not_found() from exc
+            raise
+    elif str(locator.get("user_id") or "") != user_id:
+        raise _file_not_found()
 
-    if str(file_row.get("user_id") or "") != user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
+    try:
+        file_row = await select_one_trusted(
+            "files",
+            FILE_COLUMNS,
+            _file_scope_filters(file_id, user_id, workspace_access),
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+    if file_row is None:
+        raise _file_not_found()
 
-    return file_row, None
+    return file_row, workspace_access
 
 
 async def _resolve_effective_workspace_id(
@@ -98,7 +143,8 @@ async def _resolve_effective_workspace_id(
         effective_workspace_id = conversation_workspace_id
 
     if effective_workspace_id:
-        await require_workspace_access(effective_workspace_id, user_id)
+        access = await require_workspace_access(effective_workspace_id, user_id)
+        effective_workspace_id = access.workspace_id
 
     return effective_workspace_id
 
@@ -174,7 +220,7 @@ async def get_files(
                 offset=offset,
             )
 
-        filters = {"user_id": user_id}
+        filters = {"user_id": user_id, "workspace_id": {"is": None}}
         if conversation_id is not None:
             filters["conversation_id"] = conversation_id
         return await select_all(
@@ -248,16 +294,20 @@ async def delete_file(
             storage_missing = True
 
     document_filters: dict[str, Any] = {"file_id": file_id}
-    workspace_id = file_row.get("workspace_id")
-    if workspace_id:
-        document_filters["workspace_id"] = str(workspace_id)
+    if workspace_access is not None:
+        workspace_id = workspace_access.workspace_id
+        document_filters["workspace_id"] = workspace_id
     else:
-        document_filters["user_id"] = str(file_row.get("user_id") or "")
+        workspace_id = None
+        document_filters["user_id"] = user_id
         document_filters["workspace_id"] = {"is": None}
 
     try:
         await delete_many_trusted("documents", document_filters)
-        await delete_many_trusted("files", {"id": file_id})
+        await delete_many_trusted(
+            "files",
+            _file_scope_filters(file_id, user_id, workspace_access),
+        )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
