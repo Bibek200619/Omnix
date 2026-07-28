@@ -99,6 +99,7 @@ async def enqueue_reembed_all(batch_size: int = 50) -> dict[str, Any]:
             order_by="created_at",
             limit=batch_size,
             offset=offset,
+            unscoped_reason="reembedding_batch_scan",
         )
         if not rows:
             break
