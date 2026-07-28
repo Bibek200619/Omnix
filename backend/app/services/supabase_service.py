@@ -152,6 +152,19 @@ class SupabaseServiceError(RuntimeError):
     pass
 
 
+def _require_trusted_filters(
+    table: str,
+    filters: Mapping[str, Any] | None,
+    operation: str,
+    *,
+    unscoped_reason: str | None = None,
+) -> None:
+    if filters or (isinstance(unscoped_reason, str) and unscoped_reason.strip()):
+        return
+    logger.error("Rejected unscoped trusted %s on table '%s'.", operation, table)
+    raise SupabaseServiceError(INTERNAL_DB_ERROR)
+
+
 def _is_supabase_auth_error(exc: Exception) -> bool:
     message = str(exc).lower()
     return "invalid api key" in message or (
@@ -359,6 +372,7 @@ def _select_all_trusted_sync(
     limit: int | None = None,
     offset: int | None = None,
 ) -> list[dict[str, Any]]:
+    _require_trusted_filters(table, filters, "read")
     query = get_supabase().table(table).select(columns)
     query = _apply_filters(query, filters)
 
@@ -468,6 +482,7 @@ def _select_one_trusted_sync(
     columns: str,
     filters: Mapping[str, Any],
 ) -> dict[str, Any] | None:
+    _require_trusted_filters(table, filters, "single-row read")
     query = get_supabase().table(table).select(columns)
     query = _apply_filters(query, filters)
     try:
@@ -528,6 +543,7 @@ def _update_one_trusted_sync(
     filters: Mapping[str, Any],
     payload: Mapping[str, Any],
 ) -> dict[str, Any] | None:
+    _require_trusted_filters(table, filters, "update")
     if not payload:
         logger.error("Trusted update for '%s' requires at least one field.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
@@ -545,6 +561,7 @@ def _delete_many_trusted_sync(
     table: str,
     filters: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
+    _require_trusted_filters(table, filters, "delete")
     query = get_supabase().table(table).delete()
     query = _apply_filters(query, filters)
     response = _execute_with_retry(query, operation=f"trusted delete {table}")
@@ -701,7 +718,14 @@ async def select_all_trusted(
     limit: int | None = None,
     offset: int | None = None,
     secondary_order_by: str | None = None,
+    unscoped_reason: str | None = None,
 ) -> list[dict[str, Any]]:
+    _require_trusted_filters(
+        table,
+        filters,
+        "read",
+        unscoped_reason=unscoped_reason,
+    )
     try:
         client = await _async_client()
         selected_columns = columns
@@ -804,6 +828,7 @@ async def select_one_trusted(
     columns: str,
     filters: Mapping[str, Any],
 ) -> dict[str, Any] | None:
+    _require_trusted_filters(table, filters, "single-row read")
     try:
         client = await _async_client()
         selected_columns = columns
@@ -878,6 +903,7 @@ async def update_one_trusted(
     filters: Mapping[str, Any],
     payload: Mapping[str, Any],
 ) -> dict[str, Any] | None:
+    _require_trusted_filters(table, filters, "update")
     if not payload:
         logger.error("Trusted update for '%s' requires at least one field.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
@@ -900,6 +926,7 @@ async def update_many_trusted(
     filters: Mapping[str, Any],
     payload: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
+    _require_trusted_filters(table, filters, "batch update")
     if not payload:
         logger.error("Trusted batch update for '%s' requires at least one field.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
@@ -944,6 +971,7 @@ async def delete_one_trusted(
     table: str,
     filters: Mapping[str, Any],
 ) -> dict[str, Any] | None:
+    _require_trusted_filters(table, filters, "single-row delete")
     try:
         client = await _async_client()
         query = client.table(table).delete()
@@ -959,6 +987,7 @@ async def delete_many_trusted(
     table: str,
     filters: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
+    _require_trusted_filters(table, filters, "delete")
     try:
         client = await _async_client()
         query = client.table(table).delete()
