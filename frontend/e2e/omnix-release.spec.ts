@@ -874,7 +874,7 @@ test.describe("authenticated Omnix shell", () => {
     expect(decisionCandidateOffsets).toEqual([0, 40]);
   });
 
-  test("paginates channel history and thread replies without hiding messages", async ({ page }) => {
+  test("paginates channel history and thread replies without hiding messages", async ({ page, isMobile }) => {
     const rootMessages = Array.from({ length: 161 }, (_, index) => workspaceChannelMessage(index, {
       id: `root-message-${index}`,
       content: `Root update ${index}`,
@@ -890,6 +890,7 @@ test.describe("authenticated Omnix shell", () => {
     workspaceChannelMessages = [...rootMessages, ...threadReplies];
 
     await page.goto("/conversations");
+    if (isMobile) await page.getByRole("button", { name: /^General\b/ }).click();
 
     await expect(page.getByText("Root update 81", { exact: true })).toBeVisible();
     await expect(page.getByText("Root update 80", { exact: true })).toHaveCount(0);
@@ -922,6 +923,48 @@ test.describe("authenticated Omnix shell", () => {
       { threadRootId: "root-message-160", offset: 80, limit: 81 },
       { threadRootId: "root-message-160", offset: 160, limit: 81 },
     ]));
+  });
+
+  test("mobile conversation threads replace messages and return to the channel", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "mobile project only");
+    const root = workspaceChannelMessage(0, {
+      id: "mobile-thread-root",
+      content: "Mobile root update",
+      thread_reply_count: 1,
+    });
+    workspaceChannels = [workspaceChannel({ message_count: 2 })];
+    workspaceChannelMessages = [
+      root,
+      workspaceChannelMessage(1, {
+        id: "mobile-thread-reply",
+        parent_message_id: root.id,
+        content: "Mobile follow-through",
+      }),
+    ];
+
+    for (const width of [375, 390, 768]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto("/conversations");
+      await page.getByRole("button", { name: /^General\b/ }).click();
+
+      const workbench = page.locator(".omnix-conversation-workbench");
+      const messagesPane = page.locator(".omnix-conversation-messages");
+      const threadPane = page.locator(".omnix-conversation-thread");
+      await expect(messagesPane).toBeVisible();
+      await expect(threadPane).toBeHidden();
+
+      await messagesPane.getByRole("button", { name: "1 thread replies" }).click();
+      await expect(workbench).toHaveAttribute("data-thread", "open");
+      await expect(messagesPane).toBeHidden();
+      await expect(threadPane).toBeVisible();
+      await expect(threadPane.getByText("Mobile follow-through", { exact: true })).toBeVisible();
+
+      await threadPane.getByRole("button", { name: "Close thread" }).click();
+      await expect(workbench).toHaveAttribute("data-thread", "closed");
+      await expect(threadPane).toBeHidden();
+      await expect(messagesPane).toBeVisible();
+      await expect(messagesPane.getByText("Mobile root update", { exact: true })).toBeVisible();
+    }
   });
 
   test("loads syntax highlighting only for fenced chat code blocks", async ({ page }) => {

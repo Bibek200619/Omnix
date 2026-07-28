@@ -956,6 +956,16 @@ textarea {
   display: none;
 }
 
+@container (max-width: 47.999rem) {
+  .omnix-conversation-workbench[data-thread="open"] .omnix-conversation-messages {
+    display: none;
+  }
+
+  .omnix-conversation-workbench[data-thread="open"] .omnix-conversation-thread {
+    display: flex;
+  }
+}
+
 .omnix-conversation-channels > *,
 .omnix-conversation-thread > * {
   height: 100%;
