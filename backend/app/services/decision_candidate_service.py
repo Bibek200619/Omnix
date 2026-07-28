@@ -15,9 +15,10 @@ from .prompt_trust import (
 from .chat_service import ModelServiceError, generate_ai_response
 from .document_context_service import _load_document_chunks
 from .supabase_service import SupabaseServiceError, select_one_trusted
+from .workspace_access_service import require_workspace_access
 from .workspace_collaboration_service import log_workspace_activity
+from .workspace_common import utc_now_iso
 from .workspace_conversation_service import channel_transcript_for_assistance
-from .workspace_service import require_workspace_access, utc_now_iso
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 from .supabase_service import insert_one_trusted, select_all_trusted
-from .workspace_service import require_workspace_access
+from .workspace_access_service import require_workspace_access
 
 
 async def get_continuity_timeline(

@@ -9,6 +9,10 @@ from starlette.concurrency import run_in_threadpool
 from ..db.supabase_client import get_supabase
 from .profile_service import get_user_profile_map
 from .supabase_service import SupabaseServiceError, insert_one, select_all_trusted, select_one_trusted
+from .workspace_access_service import (
+    require_workspace_management_access,
+    select_workspace_record,
+)
 from .workspace_common import (
     WORKSPACE_MEMBER_COLUMNS,
     database_error,
@@ -157,8 +161,6 @@ def hydrate_member_records(
 
 
 async def membership_source_workspace(workspace: dict[str, Any]) -> dict[str, Any]:
-    from .workspace_service import _select_workspace_record
-
     normalized = normalize_workspace_record(workspace)
     parent_workspace_id = normalized.get("parent_workspace_id")
     if not parent_workspace_id:
@@ -167,7 +169,7 @@ async def membership_source_workspace(workspace: dict[str, Any]) -> dict[str, An
     if not normalized.get("is_global"):
         return normalized
 
-    parent_workspace = await _select_workspace_record({"id": str(parent_workspace_id)})
+    parent_workspace = await select_workspace_record({"id": str(parent_workspace_id)})
 
     if parent_workspace is None:
         return normalized
@@ -209,8 +211,6 @@ async def list_potential_subspace_members(
     workspace_id: str,
     user_id: str,
 ) -> list[dict[str, Any]]:
-    from .workspace_service import _select_workspace_record, require_workspace_management_access
-
     access = await require_workspace_management_access(workspace_id, user_id)
     workspace = normalize_workspace_record(access.workspace)
 
@@ -240,7 +240,7 @@ async def list_potential_subspace_members(
         if str(member["user_id"]) not in current_user_ids
     ]
 
-    parent_workspace = await _select_workspace_record({"id": parent_workspace_id})
+    parent_workspace = await select_workspace_record({"id": parent_workspace_id})
     if parent_workspace:
         parent_owner_id = str(parent_workspace.get("user_id") or "")
         if parent_owner_id and parent_owner_id not in current_user_ids:
@@ -276,8 +276,6 @@ async def assign_member_to_subspace(
     role: str,
     actor_user_id: str,
 ) -> dict[str, Any]:
-    from .workspace_service import require_workspace_management_access
-
     access = await require_workspace_management_access(workspace_id, actor_user_id)
     workspace = normalize_workspace_record(access.workspace)
     workspace_type = workspace.get("workspace_type") or "subworkspace"

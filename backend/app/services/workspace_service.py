@@ -4,7 +4,7 @@ from collections.abc import Mapping
 import logging
 from typing import Any
 
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException
 
 from .supabase_service import (
     SupabaseServiceError,
@@ -17,8 +17,8 @@ from .supabase_service import (
 from .workspace_cognition import normalize_workspace_focus
 from .workspace_common import (
     GLOBAL_SPACE_NAME,
-    HIERARCHY_WORKSPACE_COLUMNS,
-    LEGACY_WORKSPACE_COLUMNS,
+    HIERARCHY_WORKSPACE_COLUMNS as HIERARCHY_WORKSPACE_COLUMNS,
+    LEGACY_WORKSPACE_COLUMNS as LEGACY_WORKSPACE_COLUMNS,
     MEMBERS_PREVIEW_LIMIT,
     WORKSPACE_COLUMNS,
     WORKSPACE_INVITE_COLUMNS,
@@ -40,7 +40,6 @@ from .workspace_common import (
     normalize_workspace_role,
     normalize_workspace_type,
     utc_now_iso,
-    workspace_not_found as _workspace_not_found,
     workspace_validation_error as _workspace_validation_error,
 )
 from .workspace_membership_service import (
@@ -51,8 +50,38 @@ from .workspace_membership_service import (
     list_workspace_members,
     membership_source_workspace,
 )
+from .workspace_access_service import (
+    _select_workspace_record as _select_workspace_record,
+    active_workspace_id_from_request as active_workspace_id_from_request,
+    can_manage_workspace_resource as can_manage_workspace_resource,
+    require_active_workspace_access as require_active_workspace_access,
+    require_workspace_access,
+    require_workspace_management_access,
+    resolve_workspace_access as resolve_workspace_access,
+)
+from .workspace_permissions import OrganizationalAccessAuthority
 
 logger = logging.getLogger(__name__)
+
+__all__ = (
+    "WorkspaceAIMode",
+    "WorkspaceAccess",
+    "WorkspaceInviteStatus",
+    "_select_workspace_record",
+    "active_workspace_id_from_request",
+    "assign_member_to_subspace",
+    "can_manage_workspace_resource",
+    "list_potential_subspace_members",
+    "list_workspace_members",
+    "membership_source_workspace",
+    "normalize_intelligence_preferences",
+    "normalize_operational_label",
+    "normalize_workspace_focus",
+    "require_active_workspace_access",
+    "require_workspace_access",
+    "require_workspace_management_access",
+    "resolve_workspace_access",
+)
 
 
 def user_email_from_claims(current_user: Any) -> str | None:
@@ -64,182 +93,6 @@ def user_email_from_claims(current_user: Any) -> str | None:
     if isinstance(email, str) and email.strip():
         return normalize_email(email)
     return None
-
-
-def active_workspace_id_from_request(request: Request) -> str | None:
-    raw_value = request.headers.get("X-Omnix-Workspace")
-    if raw_value is None:
-        return None
-
-    workspace_id = raw_value.strip()
-    return workspace_id or None
-
-
-async def _select_workspace_record(filters: Mapping[str, Any]) -> dict[str, Any] | None:
-    column_sets = (
-        ("current", WORKSPACE_COLUMNS),
-        ("hierarchy", HIERARCHY_WORKSPACE_COLUMNS),
-        ("legacy", LEGACY_WORKSPACE_COLUMNS),
-    )
-    last_error: SupabaseServiceError | None = None
-    for label, columns in column_sets:
-        try:
-            return await select_one_trusted(
-                "workspaces",
-                columns,
-                filters,
-            )
-        except SupabaseServiceError as exc:
-            last_error = exc
-            if label != "legacy":
-                logger.warning(
-                    "Workspace read using %s schema failed; retrying narrower columns.",
-                    label,
-                    exc_info=True,
-                )
-
-    raise _database_error() from last_error
-
-
-from app.services.workspace_permissions import OrganizationalAccessAuthority
-
-async def resolve_workspace_access(
-    workspace_id: str,
-    user_id: str,
-) -> WorkspaceAccess | None:
-    workspace = await _select_workspace_record({"id": workspace_id})
-
-    if workspace is None:
-        return None
-    workspace = normalize_workspace_record(workspace)
-
-    parent_workspace_id = str(workspace.get("parent_workspace_id") or "").strip()
-    
-    # 1. First, check for explicit direct membership on the workspace itself
-    try:
-        direct_membership = await select_one_trusted(
-            "workspace_members",
-            WORKSPACE_MEMBER_COLUMNS,
-            {"workspace_id": workspace_id, "user_id": user_id},
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-        
-    direct_role = None
-    if direct_membership:
-        owner_user_id = str(workspace.get("user_id") or "")
-        direct_role = normalize_workspace_role(
-            direct_membership.get("role"),
-            member_user_id=user_id,
-            owner_user_id=owner_user_id,
-        )
-
-    # If it's a top-level super workspace and we have direct membership, we're done
-    if not parent_workspace_id:
-        if direct_role:
-            return WorkspaceAccess(workspace=workspace, role=direct_role, membership_workspace=workspace)
-        return None
-
-    # 2. It is a subworkspace. Let's get the parent workspace to check super founder or global visibility
-    parent_workspace = await _select_workspace_record({"id": parent_workspace_id})
-
-    if parent_workspace is None:
-        return None
-
-    parent_workspace = normalize_workspace_record(parent_workspace)
-    if not is_super_workspace(parent_workspace):
-        return None
-
-    # 3. Check membership on the parent workspace
-    try:
-        parent_membership = await select_one_trusted(
-            "workspace_members",
-            WORKSPACE_MEMBER_COLUMNS,
-            {"workspace_id": parent_workspace_id, "user_id": user_id},
-        )
-    except SupabaseServiceError as exc:
-        raise _database_error() from exc
-
-    parent_role = None
-    if parent_membership:
-        parent_owner_user_id = str(parent_workspace.get("user_id") or "")
-        parent_role = normalize_workspace_role(
-            parent_membership.get("role"),
-            member_user_id=user_id,
-            owner_user_id=parent_owner_user_id,
-        )
-
-    # 4. Resolve access rules
-    is_global = workspace.get("is_global")
-    
-    # Rule A: Super Founder has access to all subworkspaces
-    if parent_role == "founder":
-        return WorkspaceAccess(
-            workspace=workspace,
-            role="founder",
-            membership_workspace=parent_workspace,
-        )
-
-    # Rule B: Global workspace is visible to all members of the super workspace
-    if is_global and parent_role:
-        return WorkspaceAccess(
-            workspace=workspace,
-            role=parent_role, # Inherit role level from parent for global
-            membership_workspace=parent_workspace,
-        )
-        
-    # Rule C: Explicit direct membership required for non-global subspaces
-    if direct_role:
-        return WorkspaceAccess(
-            workspace=workspace,
-            role=direct_role,
-            membership_workspace=workspace,
-        )
-        
-    # Access Denied
-    return None
-
-
-async def require_workspace_access(
-    workspace_id: str,
-    user_id: str,
-) -> WorkspaceAccess:
-    access = await resolve_workspace_access(workspace_id, user_id)
-    if access is None:
-        raise _workspace_not_found()
-    return access
-
-
-async def require_workspace_management_access(
-    workspace_id: str,
-    user_id: str,
-) -> WorkspaceAccess:
-    access = await require_workspace_access(workspace_id, user_id)
-    workspace_type = access.workspace.get("workspace_type") or "workspace"
-    if not OrganizationalAccessAuthority.can_manage_workspace(access.role, workspace_type):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to manage this workspace.",
-        )
-    return access
-
-
-async def require_active_workspace_access(
-    request: Request,
-    user_id: str,
-) -> WorkspaceAccess | None:
-    workspace_id = active_workspace_id_from_request(request)
-    if workspace_id is None:
-        return None
-    return await require_workspace_access(workspace_id, user_id)
-
-
-def can_manage_workspace_resource(
-    record_user_id: str | None,
-    access: WorkspaceAccess,
-    current_user_id: str,
-) -> bool:
-    return access.is_owner or (record_user_id is not None and record_user_id == current_user_id)
 
 
 async def list_user_workspaces(user_id: str) -> list[dict[str, Any]]:
