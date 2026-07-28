@@ -17,7 +17,9 @@ from .supabase_service import (
     update_many_trusted,
     update_one_trusted,
 )
-from .workspace_service import WORKSPACE_COLUMNS, get_profiles, list_workspace_members, require_workspace_access
+from .workspace_access_service import require_workspace_access
+from .workspace_common import WORKSPACE_COLUMNS
+from .workspace_membership_service import get_profiles, list_workspace_members
 
 MENTION_COLUMNS = (
     "id,workspace_id,mentioned_user_id,mentioned_by_user_id,source_type,source_id,created_at,read_at"

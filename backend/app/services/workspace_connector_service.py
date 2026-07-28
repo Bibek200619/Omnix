@@ -33,12 +33,12 @@ from ..services.supabase_service import (
     update_one_trusted,
 )
 from ..services.workspace_collaboration_service import log_workspace_activity
-from ..services.workspace_permissions import OrganizationalAccessAuthority
-from ..services.workspace_service import (
-    WorkspaceAccess,
+from ..services.workspace_access_service import (
     can_manage_workspace_resource,
     require_workspace_access,
 )
+from ..services.workspace_common import WorkspaceAccess
+from ..services.workspace_permissions import OrganizationalAccessAuthority
 
 logger = logging.getLogger(__name__)
 

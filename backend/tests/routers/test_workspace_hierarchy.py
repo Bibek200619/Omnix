@@ -4,7 +4,7 @@ from fastapi import HTTPException
 import pytest
 
 from app.schemas.chat import WorkspaceRead, WorkspaceTreeRead
-from app.services import workspace_service
+from app.services import workspace_access_service, workspace_service
 
 
 def test_workspace_response_models_accept_team_lead_roles() -> None:
@@ -63,7 +63,7 @@ async def test_workspace_access_falls_back_to_hierarchy_workspace_columns(monkey
             return {"workspace_id": "workspace-1", "user_id": "member-1", "role": "member"}
         raise AssertionError(table)
 
-    monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_access_service, "select_one_trusted", fake_select_one_trusted)
 
     access = await workspace_service.resolve_workspace_access("workspace-1", "member-1")
 
@@ -97,7 +97,7 @@ async def test_workspace_access_falls_back_to_baseline_workspace_columns(monkeyp
             return {"workspace_id": "workspace-1", "user_id": "member-1", "role": "member"}
         raise AssertionError(table)
 
-    monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_access_service, "select_one_trusted", fake_select_one_trusted)
 
     access = await workspace_service.resolve_workspace_access("workspace-1", "member-1")
 
@@ -218,7 +218,7 @@ async def test_subspace_access_requires_explicit_membership(monkeypatch: pytest.
             return {"workspace_id": "super-1", "user_id": "member-1", "role": "member"}
         raise AssertionError((table, filters))
 
-    monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_access_service, "select_one_trusted", fake_select_one_trusted)
 
     access = await workspace_service.resolve_workspace_access("sub-1", "member-1")
 
@@ -252,7 +252,7 @@ async def test_global_subspace_access_inherits_parent_membership(monkeypatch: py
             return {"workspace_id": "super-1", "user_id": "member-1", "role": "member"}
         raise AssertionError((table, filters))
 
-    monkeypatch.setattr(workspace_service, "select_one_trusted", fake_select_one_trusted)
+    monkeypatch.setattr(workspace_access_service, "select_one_trusted", fake_select_one_trusted)
 
     access = await workspace_service.resolve_workspace_access("sub-1", "member-1")
 

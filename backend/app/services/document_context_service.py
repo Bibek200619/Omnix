@@ -19,7 +19,7 @@ from ..services.supabase_service import (
     select_all,
     select_all_trusted,
 )
-from ..services.workspace_service import utc_now_iso
+from ..services.workspace_common import utc_now_iso
 
 logger = logging.getLogger(__name__)
 

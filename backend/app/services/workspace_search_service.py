@@ -9,8 +9,9 @@ from fastapi import HTTPException, status
 
 from ..db.supabase_client import get_async_supabase
 from .supabase_service import SupabaseServiceError, select_all_trusted
+from .workspace_access_service import require_workspace_access
+from .workspace_membership_service import list_workspace_members
 from .workspace_mention_service import list_mentions_for_user
-from .workspace_service import list_workspace_members, require_workspace_access
 
 logger = logging.getLogger(__name__)
 

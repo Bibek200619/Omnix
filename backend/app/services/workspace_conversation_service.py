@@ -13,17 +13,13 @@ from .supabase_service import (
     select_all_trusted,
     select_one_trusted,
 )
+from .workspace_access_service import require_workspace_access
+from .workspace_common import normalize_operational_label, utc_now_iso
+from .workspace_membership_service import get_profiles, list_workspace_members
 from .workspace_mention_service import (
     mention_metadata_for_sources,
     prepare_mentions_for_workspace,
     sync_mentions_for_source,
-)
-from .workspace_service import (
-    get_profiles,
-    list_workspace_members,
-    normalize_operational_label,
-    require_workspace_access,
-    utc_now_iso,
 )
 
 logger = logging.getLogger(__name__)

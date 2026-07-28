@@ -4,6 +4,7 @@ import logging
 from typing import List, Dict, Any
 
 from ..services import workspace_intelligence_service, workspace_service
+from ..services.workspace_access_service import require_workspace_access
 from ..context.schemas import ContextPayload
 from .outcomes import RetrievalChannelError
 
@@ -31,7 +32,7 @@ class IntelligenceRouter:
 
         try:
             # Fetch the workspace to check its intelligence preferences
-            access = await workspace_service.require_workspace_access(payload.workspace_id, payload.user_id)
+            access = await require_workspace_access(payload.workspace_id, payload.user_id)
             workspace = access.workspace
             
             # Use the established service logic for hierarchy-aware scoping

@@ -13,15 +13,15 @@ from ..services.supabase_service import (
     select_all_trusted,
     upsert_one,
 )
-from .workspace_service import (
-    get_profiles,
-    list_user_workspaces,
+from .workspace_access_service import require_workspace_access
+from .workspace_cognition import normalize_workspace_focus
+from .workspace_common import (
     normalize_ai_specialization,
-    normalize_workspace_focus,
     normalize_workspace_record,
-    require_workspace_access,
     utc_now_iso,
 )
+from .workspace_membership_service import get_profiles
+from .workspace_service import list_user_workspaces
 from ..bootstrap.redis import get_redis
 import json
 
