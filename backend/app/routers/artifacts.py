@@ -26,6 +26,11 @@ from ..rag.startup import get_vector_store
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
+ARTIFACT_LOCATOR_COLUMNS = "id,workspace_id,user_id"
+ARTIFACT_READ_COLUMNS = (
+    "id,workspace_id,user_id,title,type,content,created_at,updated_at,pinned,metadata"
+)
+ARTIFACT_EXPORT_COLUMNS = "id,workspace_id,user_id,title,type,content"
 
 
 class ArtifactCreate(BaseModel):
@@ -46,6 +51,13 @@ class ArtifactUpdate(BaseModel):
     pinned: bool | None = None
 
 
+def _artifact_not_found() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Artifact not found",
+    )
+
+
 def _artifact_scope_filters(artifact_id: str, art: dict[str, Any], current_user_id: str) -> dict[str, Any]:
     workspace_id = art.get("workspace_id")
     if workspace_id:
@@ -58,15 +70,73 @@ async def _require_artifact_mutation_access(art: dict[str, Any], current_user_id
     workspace_id = art.get("workspace_id")
     if not workspace_id:
         if owner_user_id != current_user_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+            raise _artifact_not_found()
         return
 
-    access = await require_workspace_access(str(workspace_id), current_user_id)
+    try:
+        access = await require_workspace_access(str(workspace_id), current_user_id)
+    except HTTPException as exc:
+        if exc.status_code in {status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND}:
+            raise _artifact_not_found() from exc
+        raise
+
     workspace_type = str(access.workspace.get("workspace_type") or "workspace")
     can_manage = OrganizationalAccessAuthority.can_manage_workspace(access.role, workspace_type)
     if owner_user_id == current_user_id or access.is_owner or can_manage:
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+
+async def _authorized_artifact_scope(
+    artifact_id: str,
+    current_user_id: str,
+) -> dict[str, Any]:
+    try:
+        locator = await select_one_trusted(
+            "artifacts",
+            ARTIFACT_LOCATOR_COLUMNS,
+            {"id": artifact_id},
+        )
+    except SupabaseServiceError as exc:
+        logger.exception("Failed to locate artifact")
+        raise _database_error() from exc
+
+    if locator is None:
+        raise _artifact_not_found()
+
+    workspace_id = locator.get("workspace_id")
+    if workspace_id:
+        try:
+            access = await require_workspace_access(str(workspace_id), current_user_id)
+        except HTTPException as exc:
+            if exc.status_code in {status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND}:
+                raise _artifact_not_found() from exc
+            raise
+        return {"id": artifact_id, "workspace_id": access.workspace_id}
+
+    if str(locator.get("user_id") or "") != current_user_id:
+        raise _artifact_not_found()
+    return {
+        "id": artifact_id,
+        "user_id": current_user_id,
+        "workspace_id": {"is": None},
+    }
+
+
+async def _load_authorized_artifact(
+    artifact_id: str,
+    current_user_id: str,
+    columns: str,
+) -> dict[str, Any]:
+    filters = await _authorized_artifact_scope(artifact_id, current_user_id)
+    try:
+        artifact = await select_one_trusted("artifacts", columns, filters)
+    except SupabaseServiceError as exc:
+        logger.exception("Failed to hydrate artifact")
+        raise _database_error() from exc
+    if artifact is None:
+        raise _artifact_not_found()
+    return artifact
 
 
 async def _delete_artifact_chunks(artifact_id: str, art: dict[str, Any], current_user_id: str) -> None:
@@ -86,7 +156,13 @@ async def list_artifacts(request: Request, current_user: dict[str, Any] = Depend
     if access is None:
         # return user's personal artifacts
         try:
-            rows = await select_all_trusted("artifacts", "id,workspace_id,user_id,title,type,created_at,updated_at,pinned,metadata", filters={"user_id": user_id}, order_by="created_at", desc=True)
+            rows = await select_all_trusted(
+                "artifacts",
+                "id,workspace_id,user_id,title,type,created_at,updated_at,pinned,metadata",
+                filters={"user_id": user_id, "workspace_id": {"is": None}},
+                order_by="created_at",
+                desc=True,
+            )
             return rows
         except SupabaseServiceError as exc:
             logger.exception("Failed to list personal artifacts")
@@ -143,37 +219,23 @@ async def create_artifact(request: Request, payload: ArtifactCreate, current_use
 
 @router.get("/{artifact_id}")
 async def get_artifact(artifact_id: str, current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
-    try:
-        art = await select_one_trusted("artifacts", "id,workspace_id,user_id,title,type,content,created_at,updated_at,pinned,metadata", {"id": artifact_id})
-    except SupabaseServiceError as exc:
-        logger.exception("Failed to fetch artifact")
-        raise _database_error() from exc
-
-    if art is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
-
-    # enforce workspace access when applicable
-    if art.get("workspace_id"):
-        workspace_id = str(art["workspace_id"])
-        # ensure caller has workspace access
-        await require_workspace_access(workspace_id, str(current_user["sub"]))
-    else:
-        if str(art.get("user_id")) != str(current_user["sub"]):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-
-    return art
+    return await _load_authorized_artifact(
+        artifact_id,
+        str(current_user["sub"]),
+        ARTIFACT_READ_COLUMNS,
+    )
 
 
 @router.patch("/{artifact_id}")
 async def update_artifact(artifact_id: str, payload: ArtifactUpdate, current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
     try:
-        art = await select_one_trusted("artifacts", "id,workspace_id,user_id", {"id": artifact_id})
+        art = await select_one_trusted("artifacts", ARTIFACT_LOCATOR_COLUMNS, {"id": artifact_id})
     except SupabaseServiceError as exc:
         logger.exception("Failed to fetch artifact for update")
         raise _database_error() from exc
 
     if art is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
+        raise _artifact_not_found()
 
     current_user_id = str(current_user["sub"])
     await _require_artifact_mutation_access(art, current_user_id)
@@ -194,7 +256,7 @@ async def update_artifact(artifact_id: str, payload: ArtifactUpdate, current_use
     try:
         updated = await update_one_trusted("artifacts", _artifact_scope_filters(artifact_id, art, current_user_id), update_payload)
         if updated is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
+            raise _artifact_not_found()
     except SupabaseServiceError as exc:
         logger.exception("Failed to update artifact")
         raise _database_error() from exc
@@ -217,13 +279,13 @@ async def update_artifact(artifact_id: str, payload: ArtifactUpdate, current_use
 @router.delete("/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_artifact(artifact_id: str, current_user: dict[str, Any] = Depends(get_current_user)) -> Response:
     try:
-        art = await select_one_trusted("artifacts", "id,workspace_id,user_id", {"id": artifact_id})
+        art = await select_one_trusted("artifacts", ARTIFACT_LOCATOR_COLUMNS, {"id": artifact_id})
     except SupabaseServiceError as exc:
         logger.exception("Failed to fetch artifact for delete")
         raise _database_error() from exc
 
     if art is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
+        raise _artifact_not_found()
 
     current_user_id = str(current_user["sub"])
     await _require_artifact_mutation_access(art, current_user_id)
@@ -240,22 +302,11 @@ async def delete_artifact(artifact_id: str, current_user: dict[str, Any] = Depen
 
 @router.get("/{artifact_id}/export")
 async def export_artifact(artifact_id: str, current_user: dict[str, Any] = Depends(get_current_user)) -> Response:
-    try:
-        art = await select_one_trusted("artifacts", "id,workspace_id,user_id,title,type,content", {"id": artifact_id})
-    except SupabaseServiceError as exc:
-        logger.exception("Failed to fetch artifact for export")
-        raise _database_error() from exc
-
-    if art is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
-
-    # Authorization same as get
-    if art.get("workspace_id"):
-        await require_workspace_access(str(art["workspace_id"]), str(current_user["sub"]))
-    else:
-        if str(art.get("user_id")) != str(current_user["sub"]):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-
+    art = await _load_authorized_artifact(
+        artifact_id,
+        str(current_user["sub"]),
+        ARTIFACT_EXPORT_COLUMNS,
+    )
     md = art.get("content") or ""
     headers = {"Content-Disposition": f"attachment; filename=artifact-{artifact_id}.md"}
     return Response(content=md, media_type="text/markdown", headers=headers)
