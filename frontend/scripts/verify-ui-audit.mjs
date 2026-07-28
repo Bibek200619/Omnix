@@ -95,6 +95,7 @@ assertIncludes(conversationSurface, "omnix-conversation-workbench", "Conversatio
 assertIncludes(conversationSurface, "data-thread", "Conversation responsive layout");
 assertIncludes(conversationSurface, "data-view", "Conversation responsive layout");
 assertIncludes(globalsCss, ".omnix-conversation-workbench", "Conversation responsive CSS");
+assertIncludes(globalsCss, "@container (max-width: 47.999rem)", "Conversation mobile thread switch");
 assertIncludes(globalsCss, '@container (min-width: 48rem)', "Conversation responsive CSS");
 assertIncludes(globalsCss, 'data-thread="open"', "Conversation responsive CSS");
 assertIncludes(conversationSurface, "applyChannelRealtimeChange", "Conversation realtime reconciliation");
