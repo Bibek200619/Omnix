@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+from collections import deque
+from datetime import datetime, timezone
 import inspect
 import logging
 import os
@@ -10,7 +13,7 @@ import re
 import stat
 import unicodedata
 import uuid
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
@@ -18,6 +21,9 @@ _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]+")
 DEFAULT_UPLOAD_DIR = "./uploads"
 DEFAULT_STORAGE_BUCKET = "omnix-files"
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+_MANAGED_STORAGE_LIST_MAX_RESULTS = 1_000
+_SUPABASE_LIST_PAGE_SIZE = 100
+_SUPABASE_LIST_MAX_API_PAGES = 100
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +40,17 @@ class StorageNotFoundError(StorageError):
 class SupabaseStorageRef:
     bucket: str
     object_path: str
+
+
+@dataclass(frozen=True)
+class ManagedStorageObject:
+    storage_backend: Literal["local", "supabase"]
+    storage_path: str
+    modified_at: datetime
+
+    def __post_init__(self) -> None:
+        if self.modified_at.tzinfo is None or self.modified_at.utcoffset() is None:
+            raise ValueError("modified_at must be timezone-aware")
 
 
 def upload_root(root: str | os.PathLike[str] | None = None) -> Path:
@@ -145,6 +162,217 @@ def _normalize_downloaded_bytes(result: Any) -> bytes:
             return read.encode("utf-8")
         return bytes(read)
     raise StorageError(f"Unexpected storage download response: {type(result)!r}")
+
+
+def _list_local_managed_storage_objects(
+    root: str | os.PathLike[str] | None,
+    limit: int,
+) -> list[ManagedStorageObject]:
+    managed_root = upload_root(root)
+    if not managed_root.exists():
+        return []
+    if not managed_root.is_dir():
+        raise StorageError("Managed upload root is not a directory")
+
+    objects: list[ManagedStorageObject] = []
+
+    def raise_walk_error(exc: OSError) -> None:
+        raise exc
+
+    try:
+        for current_root, directory_names, file_names in os.walk(
+            managed_root,
+            topdown=True,
+            onerror=raise_walk_error,
+            followlinks=False,
+        ):
+            current_path = Path(current_root)
+            current_path.resolve(strict=True).relative_to(managed_root)
+
+            safe_directories: list[str] = []
+            for directory_name in sorted(directory_names):
+                directory_path = current_path / directory_name
+                if directory_path.is_symlink():
+                    continue
+                try:
+                    resolved_directory = directory_path.resolve(strict=True)
+                except FileNotFoundError:
+                    continue
+                resolved_directory.relative_to(managed_root)
+                if resolved_directory.is_dir():
+                    safe_directories.append(directory_name)
+            directory_names[:] = safe_directories
+
+            for file_name in sorted(file_names):
+                file_path = current_path / file_name
+                if file_path.is_symlink():
+                    continue
+                try:
+                    resolved_path = file_path.resolve(strict=True)
+                    resolved_path.relative_to(managed_root)
+                    file_stat = resolved_path.stat()
+                except FileNotFoundError:
+                    continue
+                if not resolved_path.is_file():
+                    continue
+                objects.append(
+                    ManagedStorageObject(
+                        storage_backend="local",
+                        storage_path=str(resolved_path),
+                        modified_at=datetime.fromtimestamp(file_stat.st_mtime, timezone.utc),
+                    )
+                )
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise StorageError("Failed to list files from local storage") from exc
+
+    objects.sort(key=lambda item: (item.modified_at, item.storage_path))
+    return objects[:limit]
+
+
+def _supabase_entry_value(entry: Any, key: str) -> Any:
+    if isinstance(entry, dict):
+        return entry.get(key)
+    return getattr(entry, key, None)
+
+
+def _normalize_supabase_list_response(result: Any) -> list[Any]:
+    error = result.get("error") if isinstance(result, dict) else getattr(result, "error", None)
+    if error:
+        raise StorageError("Supabase storage returned a listing error")
+
+    if isinstance(result, dict) and "data" in result:
+        data = result["data"]
+    elif not isinstance(result, (list, tuple)) and hasattr(result, "data"):
+        data = result.data
+    else:
+        data = result
+
+    if not isinstance(data, (list, tuple)):
+        raise StorageError(f"Unexpected storage list response: {type(result)!r}")
+    return list(data)
+
+
+def _normalize_storage_datetime(value: Any) -> datetime:
+    try:
+        if isinstance(value, datetime):
+            parsed = value
+        elif isinstance(value, str):
+            normalized = value.strip()
+            if normalized.endswith(("Z", "z")):
+                normalized = f"{normalized[:-1]}+00:00"
+            parsed = datetime.fromisoformat(normalized)
+        elif isinstance(value, (int, float)):
+            parsed = datetime.fromtimestamp(value, timezone.utc)
+        else:
+            raise TypeError(f"Unsupported timestamp type: {type(value)!r}")
+    except (OverflowError, TypeError, ValueError) as exc:
+        raise StorageError("Invalid storage object timestamp") from exc
+
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _supabase_entry_modified_at(entry: Any) -> datetime:
+    for key in ("updated_at", "created_at", "last_modified"):
+        value = _supabase_entry_value(entry, key)
+        if value is not None:
+            return _normalize_storage_datetime(value)
+
+    metadata = _supabase_entry_value(entry, "metadata")
+    for key in ("lastModified", "last_modified"):
+        value = _supabase_entry_value(metadata, key)
+        if value is not None:
+            return _normalize_storage_datetime(value)
+
+    raise StorageError("Storage object is missing a modification timestamp")
+
+
+def _supabase_entry_is_folder(entry: Any) -> bool:
+    return _supabase_entry_value(entry, "id") is None and _supabase_entry_value(entry, "metadata") is None
+
+
+def _supabase_child_path(directory: str, entry: Any) -> str:
+    name = _supabase_entry_value(entry, "name")
+    if not isinstance(name, str) or not name or name in {".", ".."} or "/" in name:
+        raise StorageError("Invalid Supabase storage listing entry")
+    object_path = _safe_supabase_object_path(f"{directory}/{name}")
+    if not object_path.startswith("uploads/"):
+        raise StorageError("Supabase storage listing escaped the managed prefix")
+    return object_path
+
+
+async def _list_supabase_managed_storage_objects(
+    limit: int,
+) -> list[ManagedStorageObject]:
+    bucket_name = _supabase_bucket_name()
+    directories = deque(["uploads"])
+    visited_directories = {"uploads"}
+    objects: list[ManagedStorageObject] = []
+    api_pages = 0
+
+    try:
+        bucket = _supabase_bucket(bucket_name)
+        while directories and len(objects) < limit and api_pages < _SUPABASE_LIST_MAX_API_PAGES:
+            directory = directories.popleft()
+            offset = 0
+            while len(objects) < limit and api_pages < _SUPABASE_LIST_MAX_API_PAGES:
+                options = {
+                    "limit": _SUPABASE_LIST_PAGE_SIZE,
+                    "offset": offset,
+                    "sortBy": {"column": "name", "order": "asc"},
+                }
+                result = await _maybe_await(bucket.list(directory, options))
+                api_pages += 1
+                page = _normalize_supabase_list_response(result)
+
+                for entry in page:
+                    child_path = _supabase_child_path(directory, entry)
+                    if _supabase_entry_is_folder(entry):
+                        if child_path not in visited_directories:
+                            visited_directories.add(child_path)
+                            directories.append(child_path)
+                        continue
+                    objects.append(
+                        ManagedStorageObject(
+                            storage_backend="supabase",
+                            storage_path=_supabase_storage_ref(bucket_name, child_path),
+                            modified_at=_supabase_entry_modified_at(entry),
+                        )
+                    )
+                    if len(objects) >= limit:
+                        break
+
+                if len(page) < _SUPABASE_LIST_PAGE_SIZE:
+                    break
+                offset += len(page)
+    except StorageError:
+        raise
+    except Exception as exc:
+        raise StorageError("Failed to list files from shared storage") from exc
+
+    objects.sort(key=lambda item: (item.modified_at, item.storage_path))
+    return objects[:limit]
+
+
+async def list_managed_storage_objects(
+    *,
+    limit: int = 100,
+    root: str | os.PathLike[str] | None = None,
+) -> list[ManagedStorageObject]:
+    """List a bounded set of objects owned by the configured storage backend."""
+    backend_name = storage_backend_name()
+    if backend_name not in {"local", "supabase"}:
+        raise StorageError(f"Unsupported file storage backend: {backend_name}")
+    if not isinstance(limit, int) or limit < 0:
+        raise StorageError("Storage listing limit must be a non-negative integer")
+    if limit == 0:
+        return []
+
+    bounded_limit = min(limit, _MANAGED_STORAGE_LIST_MAX_RESULTS)
+    if backend_name == "supabase":
+        return await _list_supabase_managed_storage_objects(bounded_limit)
+    return await asyncio.to_thread(_list_local_managed_storage_objects, root, bounded_limit)
 
 
 async def save_bytes_to_user_upload(
