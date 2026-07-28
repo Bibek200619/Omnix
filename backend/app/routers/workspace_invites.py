@@ -8,19 +8,18 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..core.security import get_current_user
+from ..db.supabase_client import get_async_supabase
 from ..schemas.chat import WorkspaceInviteCreate, WorkspaceInviteRead, WorkspaceRead
 from ..services.email_service import send_workspace_invite_email
 from ..services.profile_service import get_auth_profile_for_user, resolve_profile_by_username
 from ..services.supabase_service import (
     SupabaseServiceError,
-    insert_one,
     insert_one_trusted,
     select_one_trusted,
     update_one_trusted,
 )
 from ..services.workspace_collaboration_service import log_workspace_activity
 from ..services.workspace_service import (
-    WORKSPACE_COLUMNS,
     WORKSPACE_INVITE_COLUMNS,
     hydrate_invites,
     list_pending_invites_for_email,
@@ -31,7 +30,6 @@ from ..services.workspace_service import (
     normalize_workspace_role,
     require_workspace_access,
     require_workspace_management_access,
-    resolve_workspace_access,
     user_email_from_claims,
     utc_now_iso,
 )
@@ -40,6 +38,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/workspace-invites", tags=["workspace-invites"])
 workspace_router = APIRouter(prefix="/workspaces", tags=["workspace-invites"])
+ATOMIC_INVITE_ACCEPTANCE_RPC = "accept_workspace_invite_atomic"
+INVITE_TRANSITION_LOCATOR_COLUMNS = "id,workspace_id,email,status"
 
 
 def _safe_current_user_repr(current_user: Any) -> str:
@@ -120,17 +120,6 @@ def _inviter_label(current_user: Any) -> str:
     if isinstance(name, str) and name.strip():
         return f"{name.strip()} ({email})" if email else name.strip()
     return email or "A teammate"
-
-
-def _is_missing_supabase_column(exc: SupabaseServiceError, column: str) -> bool:
-    root_error = exc.__cause__ or exc
-    message = str(root_error).lower()
-    normalized_column = column.lower()
-    return normalized_column in message and (
-        "could not find" in message
-        or "does not exist" in message
-        or "schema cache" in message
-    )
 
 
 def _email_log_domain(email: str | None) -> str:
@@ -223,6 +212,32 @@ async def _pending_workspace_invites_for_user(current_user: Any) -> list[dict[st
         return []
 
 
+async def _accept_workspace_invite_rpc(
+    invite_id: str,
+    user_id: str,
+    user_email: str,
+) -> dict[str, Any]:
+    try:
+        client = await get_async_supabase()
+        response = await client.rpc(
+            ATOMIC_INVITE_ACCEPTANCE_RPC,
+            {
+                "p_invite_id": invite_id,
+                "p_user_id": user_id,
+                "p_email": user_email,
+            },
+        ).execute()
+    except Exception as exc:
+        raise SupabaseServiceError("Internal server error") from exc
+
+    data = getattr(response, "data", None)
+    if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
+        return dict(data[0])
+    if isinstance(data, dict):
+        return dict(data)
+    raise SupabaseServiceError("Internal server error")
+
+
 async def _accept_workspace_invite(invite_id: str, current_user: Any) -> dict[str, Any]:
     user_id = _user_id_from_claims(current_user)
     user_email = user_email_from_claims(current_user)
@@ -238,97 +253,43 @@ async def _accept_workspace_invite(invite_id: str, current_user: Any) -> dict[st
     )
 
     try:
-        invite = await select_one_trusted(
-            "workspace_invites",
-            WORKSPACE_INVITE_COLUMNS,
-            {"id": invite_id},
+        result = await _accept_workspace_invite_rpc(
+            invite_id,
+            user_id,
+            normalize_email(user_email),
         )
     except SupabaseServiceError as exc:
-        logger.exception("Failed to load workspace invite for accept | invite_id=%s", invite_id)
+        logger.exception(
+            "Atomic workspace invite acceptance failed | invite_id=%s", invite_id
+        )
         raise _database_error() from exc
 
-    if invite is None or normalize_email(str(invite.get("email") or "")) != user_email:
+    outcome = str(result.get("outcome") or "")
+    if outcome == "not_found":
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Invite not found.",
         )
-
-    if invite.get("status") != "pending":
+    if outcome == "not_pending":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This invite is no longer pending.",
         )
-
-    workspace_id = str(invite["workspace_id"])
-    timestamp = utc_now_iso()
-
-    try:
-        workspace = await select_one_trusted("workspaces", WORKSPACE_COLUMNS, {"id": workspace_id})
-    except SupabaseServiceError as exc:
-        logger.exception("Failed to load workspace for invite accept | workspace_id=%s", workspace_id)
-        raise _database_error() from exc
-
-    if workspace is None:
+    if outcome == "workspace_not_found":
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Workspace not found.",
         )
+    workspace_id = str(result.get("accepted_workspace_id") or "")
+    if outcome != "accepted" or not workspace_id:
+        logger.error(
+            "Atomic workspace invite acceptance returned an invalid outcome | invite_id=%s | outcome=%s",
+            invite_id,
+            outcome or "missing",
+        )
+        raise _database_error()
 
-    access = await resolve_workspace_access(workspace_id, user_id)
-    membership_created = False
-    if access is None:
-        invite_role = normalize_workspace_role(invite.get("role"))
-        if invite_role == "owner":
-            invite_role = "co_owner"
-        try:
-            await insert_one(
-                "workspace_members",
-                {
-                    "workspace_id": workspace_id,
-                    "user_id": user_id,
-                    "role": invite_role,
-                    "created_at": timestamp,
-                    "updated_at": timestamp,
-                },
-            )
-        except SupabaseServiceError as exc:
-            if _is_unique_constraint_error(exc):
-                logger.info(
-                    "Workspace invite accept observed existing membership during insert | invite_id=%s",
-                    invite_id,
-                )
-            else:
-                logger.exception(
-                    "Failed to create workspace membership from invite | invite_id=%s",
-                    invite_id,
-                )
-                raise _database_error() from exc
-        else:
-            membership_created = True
-
-    accept_payload = {
-        "status": "accepted",
-        "accepted_by_user_id": user_id,
-        "accepted_at": timestamp,
-        "updated_at": timestamp,
-    }
-    try:
-        await update_one_trusted("workspace_invites", {"id": invite_id}, accept_payload)
-    except SupabaseServiceError as exc:
-        if _is_missing_supabase_column(exc, "accepted_at"):
-            logger.warning(
-                "workspace_invites.accepted_at is unavailable; marking invite accepted without accepted_at | invite_id=%s",
-                invite_id,
-            )
-            fallback_payload = {key: value for key, value in accept_payload.items() if key != "accepted_at"}
-            try:
-                await update_one_trusted("workspace_invites", {"id": invite_id}, fallback_payload)
-            except SupabaseServiceError as fallback_exc:
-                logger.exception("Failed to mark workspace invite accepted | invite_id=%s", invite_id)
-                raise _database_error() from fallback_exc
-        else:
-            logger.exception("Failed to mark workspace invite accepted | invite_id=%s", invite_id)
-            raise _database_error() from exc
+    membership_created = bool(result.get("membership_created"))
 
     logger.info(
         "Workspace invite accepted | invite_id=%s | workspace_id=%s | membership_created=%s",
@@ -346,7 +307,9 @@ async def _accept_workspace_invite(invite_id: str, current_user: Any) -> dict[st
     return await _enriched_workspace_for_user(workspace_id, user_id)
 
 
-async def _decline_workspace_invite(invite_id: str, current_user: Any) -> dict[str, Any]:
+async def _decline_workspace_invite(
+    invite_id: str, current_user: Any
+) -> dict[str, Any]:
     user_email = user_email_from_claims(current_user)
     if user_email is None:
         raise HTTPException(
@@ -362,11 +325,13 @@ async def _decline_workspace_invite(invite_id: str, current_user: Any) -> dict[s
     try:
         invite = await select_one_trusted(
             "workspace_invites",
-            WORKSPACE_INVITE_COLUMNS,
-            {"id": invite_id},
+            INVITE_TRANSITION_LOCATOR_COLUMNS,
+            {"id": invite_id, "email": user_email},
         )
     except SupabaseServiceError as exc:
-        logger.exception("Failed to load workspace invite for decline | invite_id=%s", invite_id)
+        logger.exception(
+            "Failed to load workspace invite for decline | invite_id=%s", invite_id
+        )
         raise _database_error() from exc
 
     if invite is None or normalize_email(str(invite.get("email") or "")) != user_email:
@@ -384,17 +349,24 @@ async def _decline_workspace_invite(invite_id: str, current_user: Any) -> dict[s
     try:
         declined = await update_one_trusted(
             "workspace_invites",
-            {"id": invite_id},
+            {
+                "id": invite_id,
+                "workspace_id": str(invite["workspace_id"]),
+                "email": str(invite["email"]),
+                "status": "pending",
+            },
             {"status": "declined", "updated_at": utc_now_iso()},
         )
     except SupabaseServiceError as exc:
-        logger.exception("Failed to mark workspace invite declined | invite_id=%s", invite_id)
+        logger.exception(
+            "Failed to mark workspace invite declined | invite_id=%s", invite_id
+        )
         raise _database_error() from exc
 
     if declined is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invite not found.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This invite is no longer pending.",
         )
 
     hydrated = await hydrate_invites([declined])
@@ -589,7 +561,9 @@ async def get_workspace_invites(
     return await list_workspace_invites(_membership_workspace_id(access))
 
 
-@workspace_router.delete("/{workspace_id}/invites/{invite_id}", status_code=status.HTTP_204_NO_CONTENT)
+@workspace_router.delete(
+    "/{workspace_id}/invites/{invite_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 async def revoke_workspace_invite(
     workspace_id: str,
     invite_id: str,
@@ -602,7 +576,7 @@ async def revoke_workspace_invite(
     try:
         invite = await select_one_trusted(
             "workspace_invites",
-            WORKSPACE_INVITE_COLUMNS,
+            INVITE_TRANSITION_LOCATOR_COLUMNS,
             {"id": invite_id, "workspace_id": membership_workspace_id},
         )
     except SupabaseServiceError as exc:
@@ -621,13 +595,23 @@ async def revoke_workspace_invite(
         )
 
     try:
-        await update_one_trusted(
+        revoked = await update_one_trusted(
             "workspace_invites",
-            {"id": invite_id},
+            {
+                "id": invite_id,
+                "workspace_id": membership_workspace_id,
+                "status": "pending",
+            },
             {"status": "revoked", "updated_at": utc_now_iso()},
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
+
+    if revoked is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This invite is no longer pending.",
+        )
 
     await log_workspace_activity(
         workspace_id=membership_workspace_id,
