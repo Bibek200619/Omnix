@@ -44,6 +44,14 @@ async def test_workspace_access_falls_back_to_hierarchy_workspace_columns(monkey
     async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
         if table == "workspaces":
             workspace_column_calls.append(columns)
+            if columns == workspace_access_service.WORKSPACE_ACCESS_LOCATOR_COLUMNS:
+                return {
+                    "id": "workspace-1",
+                    "user_id": "owner-1",
+                    "parent_workspace_id": None,
+                    "workspace_type": "super_workspace",
+                    "is_global": False,
+                }
             if columns == workspace_service.WORKSPACE_COLUMNS:
                 raise workspace_service.SupabaseServiceError("Internal server error")
             assert columns == workspace_service.HIERARCHY_WORKSPACE_COLUMNS
@@ -68,6 +76,7 @@ async def test_workspace_access_falls_back_to_hierarchy_workspace_columns(monkey
     access = await workspace_service.resolve_workspace_access("workspace-1", "member-1")
 
     assert workspace_column_calls == [
+        workspace_access_service.WORKSPACE_ACCESS_LOCATOR_COLUMNS,
         workspace_service.WORKSPACE_COLUMNS,
         workspace_service.HIERARCHY_WORKSPACE_COLUMNS,
     ]
@@ -83,6 +92,13 @@ async def test_workspace_access_falls_back_to_baseline_workspace_columns(monkeyp
     async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
         if table == "workspaces":
             workspace_column_calls.append(columns)
+            if columns == workspace_access_service.WORKSPACE_ACCESS_LOCATOR_COLUMNS:
+                raise workspace_service.SupabaseServiceError("Internal server error")
+            if columns == workspace_access_service.LEGACY_WORKSPACE_ACCESS_LOCATOR_COLUMNS:
+                return {
+                    "id": "workspace-1",
+                    "user_id": "owner-1",
+                }
             if columns != workspace_service.LEGACY_WORKSPACE_COLUMNS:
                 raise workspace_service.SupabaseServiceError("Internal server error")
             return {
@@ -102,6 +118,8 @@ async def test_workspace_access_falls_back_to_baseline_workspace_columns(monkeyp
     access = await workspace_service.resolve_workspace_access("workspace-1", "member-1")
 
     assert workspace_column_calls == [
+        workspace_access_service.WORKSPACE_ACCESS_LOCATOR_COLUMNS,
+        workspace_access_service.LEGACY_WORKSPACE_ACCESS_LOCATOR_COLUMNS,
         workspace_service.WORKSPACE_COLUMNS,
         workspace_service.HIERARCHY_WORKSPACE_COLUMNS,
         workspace_service.LEGACY_WORKSPACE_COLUMNS,
@@ -193,7 +211,12 @@ async def test_subspace_creation_rejects_non_super_parent(monkeypatch: pytest.Mo
 
 @pytest.mark.asyncio
 async def test_subspace_access_requires_explicit_membership(monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace_column_calls: list[str] = []
+
     async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
+        if table == "workspaces":
+            workspace_column_calls.append(columns)
+            assert columns == workspace_access_service.WORKSPACE_ACCESS_LOCATOR_COLUMNS
         if table == "workspaces" and filters == {"id": "sub-1"}:
             return {
                 "id": "sub-1",
@@ -224,6 +247,10 @@ async def test_subspace_access_requires_explicit_membership(monkeypatch: pytest.
 
     # Access should be None because implicit inheritance is removed for private subspaces
     assert access is None
+    assert workspace_column_calls == [
+        workspace_access_service.WORKSPACE_ACCESS_LOCATOR_COLUMNS,
+        workspace_access_service.WORKSPACE_ACCESS_LOCATOR_COLUMNS,
+    ]
 
 @pytest.mark.asyncio
 async def test_global_subspace_access_inherits_parent_membership(monkeypatch: pytest.MonkeyPatch) -> None:

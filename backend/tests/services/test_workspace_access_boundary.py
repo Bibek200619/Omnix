@@ -57,6 +57,185 @@ def test_workspace_domain_services_use_narrow_owners() -> None:
 
 
 @pytest.mark.asyncio
+async def test_denied_workspace_access_does_not_hydrate_broad_columns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[tuple[str, object]] = []
+
+    async def fake_select_one_trusted(
+        table: str,
+        columns: str,
+        filters: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        events.append((table, (columns, filters)))
+        if table == "workspaces":
+            assert columns == workspace_access_service.WORKSPACE_ACCESS_LOCATOR_COLUMNS
+            return {
+                "id": "workspace-1",
+                "user_id": "owner-1",
+                "parent_workspace_id": None,
+                "workspace_type": "workspace",
+                "is_global": False,
+            }
+        assert table == "workspace_members"
+        return None
+
+    monkeypatch.setattr(
+        workspace_access_service,
+        "select_one_trusted",
+        fake_select_one_trusted,
+    )
+
+    access = await workspace_access_service.resolve_workspace_access(
+        "workspace-1",
+        "outsider-1",
+    )
+
+    assert access is None
+    assert events == [
+        (
+            "workspaces",
+            (
+                workspace_access_service.WORKSPACE_ACCESS_LOCATOR_COLUMNS,
+                {"id": "workspace-1"},
+            ),
+        ),
+        (
+            "workspace_members",
+            (
+                workspace_access_service.WORKSPACE_MEMBER_COLUMNS,
+                {"workspace_id": "workspace-1", "user_id": "outsider-1"},
+            ),
+        ),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_authorized_workspace_hydrates_after_membership(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[tuple[str, object]] = []
+
+    async def fake_select_one_trusted(
+        table: str,
+        columns: str,
+        filters: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        events.append((table, (columns, filters)))
+        if table == "workspace_members":
+            return {
+                "workspace_id": "workspace-1",
+                "user_id": "member-1",
+                "role": "member",
+            }
+        if columns == workspace_access_service.WORKSPACE_ACCESS_LOCATOR_COLUMNS:
+            return {
+                "id": "workspace-1",
+                "user_id": "owner-1",
+                "parent_workspace_id": None,
+                "workspace_type": "workspace",
+                "is_global": False,
+            }
+        assert columns == workspace_access_service.WORKSPACE_COLUMNS
+        return {
+            "id": "workspace-1",
+            "user_id": "owner-1",
+            "name": "Private workspace",
+            "parent_workspace_id": None,
+            "workspace_type": "workspace",
+            "is_global": False,
+            "ai_instructions": "sensitive instructions",
+        }
+
+    monkeypatch.setattr(
+        workspace_access_service,
+        "select_one_trusted",
+        fake_select_one_trusted,
+    )
+
+    access = await workspace_access_service.require_workspace_access(
+        "workspace-1",
+        "member-1",
+    )
+
+    assert access.workspace["ai_instructions"] == "sensitive instructions"
+    assert events == [
+        (
+            "workspaces",
+            (
+                workspace_access_service.WORKSPACE_ACCESS_LOCATOR_COLUMNS,
+                {"id": "workspace-1"},
+            ),
+        ),
+        (
+            "workspace_members",
+            (
+                workspace_access_service.WORKSPACE_MEMBER_COLUMNS,
+                {"workspace_id": "workspace-1", "user_id": "member-1"},
+            ),
+        ),
+        (
+            "workspaces",
+            (
+                workspace_access_service.WORKSPACE_COLUMNS,
+                {"id": "workspace-1"},
+            ),
+        ),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_workspace_access_fails_closed_when_authority_fields_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace_reads = 0
+
+    async def fake_select_one_trusted(
+        table: str,
+        columns: str,
+        filters: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        nonlocal workspace_reads
+        if table == "workspace_members":
+            return {
+                "workspace_id": "workspace-1",
+                "user_id": "member-1",
+                "role": "member",
+            }
+        workspace_reads += 1
+        if columns == workspace_access_service.WORKSPACE_ACCESS_LOCATOR_COLUMNS:
+            return {
+                "id": "workspace-1",
+                "user_id": "owner-1",
+                "parent_workspace_id": None,
+                "workspace_type": "workspace",
+                "is_global": False,
+            }
+        return {
+            "id": "workspace-1",
+            "user_id": "new-owner-1",
+            "name": "Changed workspace",
+            "parent_workspace_id": None,
+            "workspace_type": "workspace",
+            "is_global": False,
+        }
+
+    monkeypatch.setattr(
+        workspace_access_service,
+        "select_one_trusted",
+        fake_select_one_trusted,
+    )
+
+    access = await workspace_access_service.resolve_workspace_access(
+        "workspace-1",
+        "member-1",
+    )
+
+    assert access is None
+    assert workspace_reads == 2
+
+
+@pytest.mark.asyncio
 async def test_membership_lookup_failure_is_sanitized(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
