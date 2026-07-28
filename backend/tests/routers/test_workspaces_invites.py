@@ -134,196 +134,265 @@ async def test_top_level_pending_invites_uses_authenticated_email(monkeypatch: p
 
 
 @pytest.mark.asyncio
-async def test_accept_invite_creates_membership_and_marks_invite_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
-    inserted_memberships: list[dict[str, object]] = []
-    updates: list[dict[str, object]] = []
+async def test_accept_invite_uses_atomic_transition_and_logs_membership(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rpc_calls: list[tuple[str, str, str]] = []
+    activities: list[dict[str, object]] = []
 
-    async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
-        if table == "workspace_invites":
-            return {
-                "id": "invite-1",
-                "workspace_id": "workspace-1",
-                "email": "invitee@example.com",
-                "role": "member",
-                "status": "pending",
-                "invited_by": "owner-1",
-            }
-        if table == "workspaces":
-            return {"id": "workspace-1", "user_id": "owner-1", "name": "Omnix Team"}
-        return None
-
-    async def fake_resolve_workspace_access(workspace_id: str, user_id: str):
-        assert workspace_id == "workspace-1"
-        assert user_id == "user-2"
-        return None
-
-    async def fake_insert_one(table: str, payload: dict[str, object]):
-        assert table == "workspace_members"
-        inserted_memberships.append(payload)
-        return payload
-
-    async def fake_update_one_trusted(table: str, filters: dict[str, object], payload: dict[str, object]):
-        assert table == "workspace_invites"
-        updates.append(payload)
-        return {"id": filters["id"], **payload}
-
-    async def fake_enriched_workspace_for_user(workspace_id: str, user_id: str):
+    async def fake_accept_workspace_invite_rpc(
+        invite_id: str,
+        user_id: str,
+        user_email: str,
+    ) -> dict[str, object]:
+        rpc_calls.append((invite_id, user_id, user_email))
         return {
-            "id": workspace_id,
-            "user_id": "owner-1",
-            "name": "Omnix Team",
-            "current_user_role": "member",
-            "member_count": 2,
-            "is_shared": True,
-            "members_preview": [],
+            "outcome": "accepted",
+            "accepted_workspace_id": "workspace-1",
+            "membership_created": True,
+            "invite_status": "accepted",
         }
 
-    monkeypatch.setattr(workspace_invites, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(workspace_invites, "resolve_workspace_access", fake_resolve_workspace_access)
-    monkeypatch.setattr(workspace_invites, "insert_one", fake_insert_one)
-    monkeypatch.setattr(workspace_invites, "update_one_trusted", fake_update_one_trusted)
-    monkeypatch.setattr(workspace_invites, "_enriched_workspace_for_user", fake_enriched_workspace_for_user)
-    monkeypatch.setattr(workspace_invites, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
+    async def fake_log_workspace_activity(**kwargs: object) -> None:
+        activities.append(kwargs)
+
+    async def fake_enriched_workspace_for_user(
+        workspace_id: str,
+        user_id: str,
+    ) -> dict[str, object]:
+        return {"id": workspace_id, "current_user_id": user_id}
+
+    monkeypatch.setattr(
+        workspace_invites,
+        "_accept_workspace_invite_rpc",
+        fake_accept_workspace_invite_rpc,
+    )
+    monkeypatch.setattr(
+        workspace_invites,
+        "_enriched_workspace_for_user",
+        fake_enriched_workspace_for_user,
+    )
+    monkeypatch.setattr(
+        workspace_invites,
+        "log_workspace_activity",
+        fake_log_workspace_activity,
+    )
 
     response = await workspace_invites.accept_authenticated_workspace_invite(
         "invite-1",
         current_user={"sub": "user-2", "email": "Invitee@Example.com"},
     )
 
-    assert inserted_memberships == [
+    assert rpc_calls == [("invite-1", "user-2", "invitee@example.com")]
+    assert activities == [
         {
             "workspace_id": "workspace-1",
-            "user_id": "user-2",
-            "role": "member",
-            "created_at": "2026-05-16T00:00:00+00:00",
-            "updated_at": "2026-05-16T00:00:00+00:00",
+            "actor_user_id": "user-2",
+            "event_type": "workspace.member_joined",
+            "summary": "A teammate joined the workspace.",
+            "metadata": {"invite_id": "invite-1", "membership_created": True},
         }
     ]
-    assert updates[0]["status"] == "accepted"
-    assert updates[0]["accepted_by_user_id"] == "user-2"
     assert response["id"] == "workspace-1"
 
 
 @pytest.mark.asyncio
-async def test_accept_invite_does_not_create_duplicate_membership(monkeypatch: pytest.MonkeyPatch) -> None:
-    inserted_memberships: list[dict[str, object]] = []
+async def test_accept_invite_reports_existing_membership_without_duplicate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    activities: list[dict[str, object]] = []
 
-    async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
-        if table == "workspace_invites":
-            return {
-                "id": "invite-1",
-                "workspace_id": "workspace-1",
-                "email": "invitee@example.com",
-                "role": "member",
-                "status": "pending",
-                "invited_by": "owner-1",
-            }
-        if table == "workspaces":
-            return {"id": "workspace-1", "user_id": "owner-1", "name": "Omnix Team"}
-        return None
-
-    async def fake_resolve_workspace_access(workspace_id: str, user_id: str):
-        return SimpleNamespace(workspace={"id": workspace_id}, role="member", is_owner=False)
-
-    async def fake_insert_one(table: str, payload: dict[str, object]):
-        inserted_memberships.append(payload)
-        return payload
-
-    async def fake_update_one_trusted(table: str, filters: dict[str, object], payload: dict[str, object]):
-        return {"id": filters["id"], **payload}
-
-    async def fake_enriched_workspace_for_user(workspace_id: str, user_id: str):
+    async def fake_accept_workspace_invite_rpc(*args: object) -> dict[str, object]:
         return {
-            "id": workspace_id,
-            "user_id": "owner-1",
-            "name": "Omnix Team",
-            "current_user_role": "member",
-            "member_count": 2,
-            "is_shared": True,
-            "members_preview": [],
+            "outcome": "accepted",
+            "accepted_workspace_id": "workspace-1",
+            "membership_created": False,
+            "invite_status": "accepted",
         }
 
-    monkeypatch.setattr(workspace_invites, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(workspace_invites, "resolve_workspace_access", fake_resolve_workspace_access)
-    monkeypatch.setattr(workspace_invites, "insert_one", fake_insert_one)
-    monkeypatch.setattr(workspace_invites, "update_one_trusted", fake_update_one_trusted)
-    monkeypatch.setattr(workspace_invites, "_enriched_workspace_for_user", fake_enriched_workspace_for_user)
-    monkeypatch.setattr(workspace_invites, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
+    async def fake_log_workspace_activity(**kwargs: object) -> None:
+        activities.append(kwargs)
 
-    await workspace_invites.accept_authenticated_workspace_invite(
-        "invite-1",
-        current_user={"sub": "user-2", "email": "invitee@example.com"},
+    async def fake_enriched_workspace_for_user(
+        workspace_id: str,
+        user_id: str,
+    ) -> dict[str, object]:
+        return {"id": workspace_id, "current_user_id": user_id}
+
+    monkeypatch.setattr(
+        workspace_invites,
+        "_accept_workspace_invite_rpc",
+        fake_accept_workspace_invite_rpc,
     )
-
-    assert inserted_memberships == []
-
-
-@pytest.mark.asyncio
-async def test_accept_invite_tolerates_missing_accepted_at_column(monkeypatch: pytest.MonkeyPatch) -> None:
-    updates: list[dict[str, object]] = []
-
-    async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
-        if table == "workspace_invites":
-            return {
-                "id": "invite-1",
-                "workspace_id": "workspace-1",
-                "email": "invitee@example.com",
-                "role": "member",
-                "status": "pending",
-                "invited_by": "owner-1",
-            }
-        if table == "workspaces":
-            return {"id": "workspace-1", "user_id": "owner-1", "name": "Omnix Team"}
-        return None
-
-    async def fake_resolve_workspace_access(workspace_id: str, user_id: str):
-        return SimpleNamespace(workspace={"id": workspace_id}, role="member", is_owner=False)
-
-    async def fake_update_one_trusted(table: str, filters: dict[str, object], payload: dict[str, object]):
-        updates.append(payload)
-        if "accepted_at" in payload:
-            try:
-                raise RuntimeError("Could not find the 'accepted_at' column of 'workspace_invites' in the schema cache")
-            except RuntimeError as exc:
-                raise workspace_invites.SupabaseServiceError("Internal server error") from exc
-        return {"id": filters["id"], **payload}
-
-    async def fake_enriched_workspace_for_user(workspace_id: str, user_id: str):
-        return {
-            "id": workspace_id,
-            "user_id": "owner-1",
-            "name": "Omnix Team",
-            "current_user_role": "member",
-            "member_count": 2,
-            "is_shared": True,
-            "members_preview": [],
-        }
-
-    monkeypatch.setattr(workspace_invites, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(workspace_invites, "resolve_workspace_access", fake_resolve_workspace_access)
-    monkeypatch.setattr(workspace_invites, "update_one_trusted", fake_update_one_trusted)
-    monkeypatch.setattr(workspace_invites, "_enriched_workspace_for_user", fake_enriched_workspace_for_user)
-    monkeypatch.setattr(workspace_invites, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
+    monkeypatch.setattr(
+        workspace_invites,
+        "_enriched_workspace_for_user",
+        fake_enriched_workspace_for_user,
+    )
+    monkeypatch.setattr(
+        workspace_invites,
+        "log_workspace_activity",
+        fake_log_workspace_activity,
+    )
 
     response = await workspace_invites.accept_authenticated_workspace_invite(
         "invite-1",
         current_user={"sub": "user-2", "email": "invitee@example.com"},
     )
 
-    assert "accepted_at" in updates[0]
-    assert updates[1] == {
-        "status": "accepted",
-        "accepted_by_user_id": "user-2",
-        "updated_at": "2026-05-16T00:00:00+00:00",
-    }
     assert response["id"] == "workspace-1"
+    assert activities[0]["metadata"] == {
+        "invite_id": "invite-1",
+        "membership_created": False,
+    }
+
+
+@pytest.mark.parametrize(
+    ("rpc_result", "status_code", "detail"),
+    [
+        ({"outcome": "not_found"}, 404, "Invite not found."),
+        ({"outcome": "not_pending"}, 400, "This invite is no longer pending."),
+        ({"outcome": "workspace_not_found"}, 404, "Workspace not found."),
+    ],
+)
+@pytest.mark.asyncio
+async def test_accept_invite_maps_atomic_outcomes(
+    monkeypatch: pytest.MonkeyPatch,
+    rpc_result: dict[str, object],
+    status_code: int,
+    detail: str,
+) -> None:
+    async def fake_accept_workspace_invite_rpc(*args: object) -> dict[str, object]:
+        return rpc_result
+
+    monkeypatch.setattr(
+        workspace_invites,
+        "_accept_workspace_invite_rpc",
+        fake_accept_workspace_invite_rpc,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await workspace_invites.accept_authenticated_workspace_invite(
+            "invite-1",
+            current_user={"sub": "user-2", "email": "invitee@example.com"},
+        )
+
+    assert exc_info.value.status_code == status_code
+    assert exc_info.value.detail == detail
 
 
 @pytest.mark.asyncio
-async def test_decline_invite_marks_invite_declined(monkeypatch: pytest.MonkeyPatch) -> None:
-    updates: list[dict[str, object]] = []
+async def test_accept_invite_rpc_uses_exact_service_role_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, object]]] = []
+    expected = {
+        "outcome": "accepted",
+        "accepted_workspace_id": "workspace-1",
+        "membership_created": True,
+        "invite_status": "accepted",
+    }
 
-    async def fake_select_one_trusted(table: str, columns: str, filters: dict[str, object]):
+    class FakeRequest:
+        async def execute(self) -> SimpleNamespace:
+            return SimpleNamespace(data=[expected])
+
+    class FakeClient:
+        def rpc(self, name: str, params: dict[str, object]) -> FakeRequest:
+            calls.append((name, params))
+            return FakeRequest()
+
+    async def fake_get_async_supabase() -> FakeClient:
+        return FakeClient()
+
+    monkeypatch.setattr(
+        workspace_invites,
+        "get_async_supabase",
+        fake_get_async_supabase,
+    )
+
+    result = await workspace_invites._accept_workspace_invite_rpc(
+        "invite-1",
+        "user-2",
+        "invitee@example.com",
+    )
+
+    assert calls == [
+        (
+            workspace_invites.ATOMIC_INVITE_ACCEPTANCE_RPC,
+            {
+                "p_invite_id": "invite-1",
+                "p_user_id": "user-2",
+                "p_email": "invitee@example.com",
+            },
+        )
+    ]
+    assert result == expected
+
+
+@pytest.mark.asyncio
+async def test_accept_invite_rpc_rejects_malformed_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeRequest:
+        async def execute(self) -> SimpleNamespace:
+            return SimpleNamespace(data=[])
+
+    class FakeClient:
+        def rpc(self, name: str, params: dict[str, object]) -> FakeRequest:
+            return FakeRequest()
+
+    async def fake_get_async_supabase() -> FakeClient:
+        return FakeClient()
+
+    monkeypatch.setattr(
+        workspace_invites,
+        "get_async_supabase",
+        fake_get_async_supabase,
+    )
+
+    with pytest.raises(workspace_invites.SupabaseServiceError):
+        await workspace_invites._accept_workspace_invite_rpc(
+            "invite-1",
+            "user-2",
+            "invitee@example.com",
+        )
+
+
+@pytest.mark.asyncio
+async def test_accept_invite_sanitizes_rpc_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_accept_workspace_invite_rpc(*args: object) -> dict[str, object]:
+        raise workspace_invites.SupabaseServiceError("sensitive database detail")
+
+    monkeypatch.setattr(
+        workspace_invites,
+        "_accept_workspace_invite_rpc",
+        fake_accept_workspace_invite_rpc,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await workspace_invites.accept_authenticated_workspace_invite(
+            "invite-1",
+            current_user={"sub": "user-2", "email": "invitee@example.com"},
+        )
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Internal server error"
+
+
+@pytest.mark.asyncio
+async def test_decline_invite_marks_invite_declined(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    selections: list[tuple[str, str, dict[str, object]]] = []
+    updates: list[tuple[dict[str, object], dict[str, object]]] = []
+
+    async def fake_select_one_trusted(
+        table: str, columns: str, filters: dict[str, object]
+    ):
+        selections.append((table, columns, filters))
         return {
             "id": "invite-1",
             "workspace_id": "workspace-1",
@@ -333,8 +402,11 @@ async def test_decline_invite_marks_invite_declined(monkeypatch: pytest.MonkeyPa
             "invited_by": "owner-1",
         }
 
-    async def fake_update_one_trusted(table: str, filters: dict[str, object], payload: dict[str, object]):
-        updates.append(payload)
+    async def fake_update_one_trusted(
+        table: str, filters: dict[str, object], payload: dict[str, object]
+    ):
+        assert table == "workspace_invites"
+        updates.append((filters, payload))
         return {
             "id": filters["id"],
             "workspace_id": "workspace-1",
@@ -345,20 +417,255 @@ async def test_decline_invite_marks_invite_declined(monkeypatch: pytest.MonkeyPa
         }
 
     async def fake_hydrate_invites(invites: list[dict[str, object]]):
-        return [{**invites[0], "invite_id": str(invites[0]["id"]), "invited_by": "owner-1"}]
+        return [
+            {**invites[0], "invite_id": str(invites[0]["id"]), "invited_by": "owner-1"}
+        ]
 
-    monkeypatch.setattr(workspace_invites, "select_one_trusted", fake_select_one_trusted)
-    monkeypatch.setattr(workspace_invites, "update_one_trusted", fake_update_one_trusted)
+    monkeypatch.setattr(
+        workspace_invites, "select_one_trusted", fake_select_one_trusted
+    )
+    monkeypatch.setattr(
+        workspace_invites, "update_one_trusted", fake_update_one_trusted
+    )
     monkeypatch.setattr(workspace_invites, "hydrate_invites", fake_hydrate_invites)
-    monkeypatch.setattr(workspace_invites, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00")
+    monkeypatch.setattr(
+        workspace_invites, "utc_now_iso", lambda: "2026-05-16T00:00:00+00:00"
+    )
 
     response = await workspace_invites.decline_authenticated_workspace_invite(
         "invite-1",
         current_user={"sub": "user-2", "email": "invitee@example.com"},
     )
 
-    assert updates == [{"status": "declined", "updated_at": "2026-05-16T00:00:00+00:00"}]
+    assert selections == [
+        (
+            "workspace_invites",
+            workspace_invites.INVITE_TRANSITION_LOCATOR_COLUMNS,
+            {"id": "invite-1", "email": "invitee@example.com"},
+        )
+    ]
+    assert updates == [
+        (
+            {
+                "id": "invite-1",
+                "workspace_id": "workspace-1",
+                "email": "invitee@example.com",
+                "status": "pending",
+            },
+            {
+                "status": "declined",
+                "updated_at": "2026-05-16T00:00:00+00:00",
+            },
+        )
+    ]
     assert response["status"] == "declined"
+
+
+@pytest.mark.asyncio
+async def test_decline_invite_rejects_lost_pending_race(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_select_one_trusted(*args: object) -> dict[str, object]:
+        return {
+            "id": "invite-1",
+            "workspace_id": "workspace-1",
+            "email": "invitee@example.com",
+            "status": "pending",
+        }
+
+    async def fake_update_one_trusted(*args: object) -> None:
+        return None
+
+    monkeypatch.setattr(
+        workspace_invites,
+        "select_one_trusted",
+        fake_select_one_trusted,
+    )
+    monkeypatch.setattr(
+        workspace_invites,
+        "update_one_trusted",
+        fake_update_one_trusted,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await workspace_invites.decline_authenticated_workspace_invite(
+            "invite-1",
+            current_user={"sub": "user-2", "email": "invitee@example.com"},
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "This invite is no longer pending."
+
+
+@pytest.mark.asyncio
+async def test_revoke_invite_uses_workspace_scoped_pending_transition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    selections: list[tuple[str, str, dict[str, object]]] = []
+    updates: list[tuple[dict[str, object], dict[str, object]]] = []
+    activities: list[dict[str, object]] = []
+
+    async def fake_require_workspace_management_access(
+        workspace_id: str,
+        user_id: str,
+    ) -> SimpleNamespace:
+        assert workspace_id == "workspace-1"
+        assert user_id == "owner-1"
+        return SimpleNamespace(
+            workspace={"id": workspace_id},
+            membership_workspace_id=workspace_id,
+        )
+
+    async def fake_select_one_trusted(
+        table: str,
+        columns: str,
+        filters: dict[str, object],
+    ) -> dict[str, object]:
+        selections.append((table, columns, filters))
+        return {
+            "id": "invite-1",
+            "workspace_id": "workspace-1",
+            "email": "invitee@example.com",
+            "status": "pending",
+        }
+
+    async def fake_update_one_trusted(
+        table: str,
+        filters: dict[str, object],
+        payload: dict[str, object],
+    ) -> dict[str, object]:
+        assert table == "workspace_invites"
+        updates.append((filters, payload))
+        return {"id": "invite-1", **payload}
+
+    async def fake_log_workspace_activity(**kwargs: object) -> None:
+        activities.append(kwargs)
+
+    monkeypatch.setattr(
+        workspace_invites,
+        "require_workspace_management_access",
+        fake_require_workspace_management_access,
+    )
+    monkeypatch.setattr(
+        workspace_invites,
+        "select_one_trusted",
+        fake_select_one_trusted,
+    )
+    monkeypatch.setattr(
+        workspace_invites,
+        "update_one_trusted",
+        fake_update_one_trusted,
+    )
+    monkeypatch.setattr(
+        workspace_invites,
+        "log_workspace_activity",
+        fake_log_workspace_activity,
+    )
+    monkeypatch.setattr(
+        workspace_invites,
+        "utc_now_iso",
+        lambda: "2026-05-16T00:00:00+00:00",
+    )
+
+    response = await workspace_invites.revoke_workspace_invite(
+        "workspace-1",
+        "invite-1",
+        current_user={"sub": "owner-1"},
+    )
+
+    assert response is None
+    assert selections == [
+        (
+            "workspace_invites",
+            workspace_invites.INVITE_TRANSITION_LOCATOR_COLUMNS,
+            {"id": "invite-1", "workspace_id": "workspace-1"},
+        )
+    ]
+    assert updates == [
+        (
+            {
+                "id": "invite-1",
+                "workspace_id": "workspace-1",
+                "status": "pending",
+            },
+            {
+                "status": "revoked",
+                "updated_at": "2026-05-16T00:00:00+00:00",
+            },
+        )
+    ]
+    assert activities == [
+        {
+            "workspace_id": "workspace-1",
+            "actor_user_id": "owner-1",
+            "event_type": "workspace.invite_revoked",
+            "summary": "A workspace invite was revoked.",
+            "metadata": {"invite_id": "invite-1"},
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_revoke_invite_rejects_lost_pending_race(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    activity_logged = False
+
+    async def fake_require_workspace_management_access(
+        workspace_id: str,
+        user_id: str,
+    ) -> SimpleNamespace:
+        return SimpleNamespace(
+            workspace={"id": workspace_id},
+            membership_workspace_id=workspace_id,
+        )
+
+    async def fake_select_one_trusted(*args: object) -> dict[str, object]:
+        return {
+            "id": "invite-1",
+            "workspace_id": "workspace-1",
+            "email": "invitee@example.com",
+            "status": "pending",
+        }
+
+    async def fake_update_one_trusted(*args: object) -> None:
+        return None
+
+    async def fake_log_workspace_activity(**kwargs: object) -> None:
+        nonlocal activity_logged
+        activity_logged = True
+
+    monkeypatch.setattr(
+        workspace_invites,
+        "require_workspace_management_access",
+        fake_require_workspace_management_access,
+    )
+    monkeypatch.setattr(
+        workspace_invites,
+        "select_one_trusted",
+        fake_select_one_trusted,
+    )
+    monkeypatch.setattr(
+        workspace_invites,
+        "update_one_trusted",
+        fake_update_one_trusted,
+    )
+    monkeypatch.setattr(
+        workspace_invites,
+        "log_workspace_activity",
+        fake_log_workspace_activity,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await workspace_invites.revoke_workspace_invite(
+            "workspace-1",
+            "invite-1",
+            current_user={"sub": "owner-1"},
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "This invite is no longer pending."
+    assert activity_logged is False
 
 
 @pytest.mark.asyncio
