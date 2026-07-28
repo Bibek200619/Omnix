@@ -46,6 +46,7 @@ CONNECTOR_COLUMNS = (
     "id,workspace_id,user_id,connector_type,display_name,status,config,last_error,"
     "job_id,source_file_id,last_synced_at,created_at,updated_at"
 )
+CONNECTOR_LOCATOR_COLUMNS = "id,workspace_id"
 JOB_COLUMNS = "id,type,status,payload,progress,attempts,error,result,created_at,started_at,completed_at"
 MAX_CONFIG_TEXT = 2000
 MAX_NOTE_TEXT = 4000
@@ -109,6 +110,20 @@ def _database_error() -> HTTPException:
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Internal server error",
     )
+
+
+def _connector_not_found() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Connector not found.",
+    )
+
+
+def _connector_scope_filters(access: WorkspaceAccess, connector_id: Any) -> dict[str, str]:
+    return {
+        "id": str(connector_id),
+        "workspace_id": access.workspace_id,
+    }
 
 
 def _clean_text(value: Any, *, max_chars: int = MAX_CONFIG_TEXT) -> str | None:
@@ -379,14 +394,18 @@ async def _require_sources_access(workspace_id: str, user_id: str) -> WorkspaceA
     return access
 
 
-async def _insert_setup_job(connector: dict[str, Any], user_id: str) -> dict[str, Any]:
+async def _insert_setup_job(
+    connector: dict[str, Any],
+    user_id: str,
+    access: WorkspaceAccess,
+) -> dict[str, Any]:
     record = {
         "id": str(uuid.uuid4()),
         "type": "connector_setup_request",
         "status": "queued",
         "payload": {
             "connector_id": str(connector["id"]),
-            "workspace_id": str(connector["workspace_id"]),
+            "workspace_id": access.workspace_id,
             "user_id": user_id,
             "connector_type": connector["connector_type"],
         },
@@ -419,25 +438,32 @@ async def _serialize_connector(row: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-async def _delete_connector_source_file(connector: dict[str, Any]) -> None:
+async def _delete_connector_source_file(
+    connector: dict[str, Any],
+    access: WorkspaceAccess,
+) -> None:
     source_file_id = connector.get("source_file_id")
-    workspace_id = connector.get("workspace_id")
-    if not source_file_id or not workspace_id:
+    if not source_file_id:
         return
 
-    workspace_filter = str(workspace_id)
     source_file_filter = str(source_file_id)
-    await delete_many_trusted("documents", {"file_id": source_file_filter, "workspace_id": workspace_filter})
-    await delete_many_trusted("files", {"id": source_file_filter, "workspace_id": workspace_filter})
+    await delete_many_trusted(
+        "documents",
+        {"file_id": source_file_filter, "workspace_id": access.workspace_id},
+    )
+    await delete_many_trusted(
+        "files",
+        {"id": source_file_filter, "workspace_id": access.workspace_id},
+    )
 
 
 async def list_workspace_connectors(workspace_id: str, user_id: str) -> list[dict[str, Any]]:
-    await _require_sources_access(workspace_id, user_id)
+    access = await _require_sources_access(workspace_id, user_id)
     try:
         rows = await select_all_trusted(
             "workspace_connectors",
             CONNECTOR_COLUMNS,
-            filters={"workspace_id": workspace_id},
+            filters={"workspace_id": access.workspace_id},
             order_by="created_at",
             desc=True,
         )
@@ -449,13 +475,34 @@ async def list_workspace_connectors(workspace_id: str, user_id: str) -> list[dic
 
 async def get_workspace_connector(connector_id: str, user_id: str) -> tuple[dict[str, Any], WorkspaceAccess]:
     try:
-        connector = await select_one_trusted("workspace_connectors", CONNECTOR_COLUMNS, {"id": connector_id})
+        locator = await select_one_trusted(
+            "workspace_connectors",
+            CONNECTOR_LOCATOR_COLUMNS,
+            {"id": connector_id},
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
+    if locator is None or not locator.get("workspace_id"):
+        raise _connector_not_found()
+
+    try:
+        access = await _require_sources_access(str(locator["workspace_id"]), user_id)
+    except HTTPException as exc:
+        if exc.status_code in {status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND}:
+            raise _connector_not_found() from exc
+        raise
+
+    try:
+        connector = await select_one_trusted(
+            "workspace_connectors",
+            CONNECTOR_COLUMNS,
+            _connector_scope_filters(access, connector_id),
+        )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
     if connector is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Connector not found.")
+        raise _connector_not_found()
 
-    access = await _require_sources_access(str(connector["workspace_id"]), user_id)
     return connector, access
 
 
@@ -464,11 +511,11 @@ async def create_workspace_connector(payload: ConnectorCreate, user_id: str, act
     if not workspace_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workspace scope is required.")
 
-    await _require_sources_access(workspace_id, user_id)
+    access = await _require_sources_access(workspace_id, user_id)
     config, display_name, status_value = _normalize_connector_payload(payload)
 
     connector_payload = {
-        "workspace_id": workspace_id,
+        "workspace_id": access.workspace_id,
         "user_id": user_id,
         "connector_type": payload.connector_type,
         "display_name": display_name,
@@ -484,13 +531,13 @@ async def create_workspace_connector(payload: ConnectorCreate, user_id: str, act
         raise _database_error() from exc
 
     if payload.connector_type == "knowledge_link":
-        return await _activate_knowledge_link(connector, user_id)
+        return await _activate_knowledge_link(connector, user_id, access)
 
     try:
-        job = await _insert_setup_job(connector, user_id)
+        job = await _insert_setup_job(connector, user_id, access)
         connector = await update_one_trusted(
             "workspace_connectors",
-            {"id": connector["id"]},
+            _connector_scope_filters(access, connector["id"]),
             {"job_id": job.get("id"), "updated_at": _utc_now_iso()},
         ) or connector
     except SupabaseServiceError as exc:
@@ -500,22 +547,22 @@ async def create_workspace_connector(payload: ConnectorCreate, user_id: str, act
 
 
 async def retry_workspace_connector(connector_id: str, user_id: str) -> dict[str, Any]:
-    connector, _ = await get_workspace_connector(connector_id, user_id)
+    connector, access = await get_workspace_connector(connector_id, user_id)
 
     if connector["connector_type"] == "knowledge_link":
         try:
             updated = await update_one_trusted(
                 "workspace_connectors",
-                {"id": connector_id},
+                _connector_scope_filters(access, connector_id),
                 {"status": "connecting", "last_error": None, "updated_at": _utc_now_iso()},
             )
         except SupabaseServiceError as exc:
             raise _database_error() from exc
-        return await _activate_knowledge_link(updated or connector, user_id)
+        return await _activate_knowledge_link(updated or connector, user_id, access)
 
     config, _, status_value = _normalize_connector_payload(
         ConnectorCreate(
-            workspace_id=str(connector["workspace_id"]),
+            workspace_id=access.workspace_id,
             connector_type=connector["connector_type"],
             display_name=connector["display_name"],
             config=connector.get("config") or {},
@@ -524,7 +571,7 @@ async def retry_workspace_connector(connector_id: str, user_id: str) -> dict[str
     try:
         connector = await update_one_trusted(
             "workspace_connectors",
-            {"id": connector_id},
+            _connector_scope_filters(access, connector_id),
             {
                 "status": status_value,
                 "config": config,
@@ -532,10 +579,10 @@ async def retry_workspace_connector(connector_id: str, user_id: str) -> dict[str
                 "updated_at": _utc_now_iso(),
             },
         ) or connector
-        job = await _insert_setup_job(connector, user_id)
+        job = await _insert_setup_job(connector, user_id, access)
         connector = await update_one_trusted(
             "workspace_connectors",
-            {"id": connector_id},
+            _connector_scope_filters(access, connector_id),
             {"job_id": job.get("id"), "updated_at": _utc_now_iso()},
         ) or connector
     except SupabaseServiceError as exc:
@@ -553,16 +600,16 @@ async def delete_workspace_connector(connector_id: str, user_id: str) -> None:
         )
 
     try:
-        await _delete_connector_source_file(connector)
+        await _delete_connector_source_file(connector, access)
         await delete_many_trusted(
             "workspace_connectors",
-            {"id": connector_id, "workspace_id": str(connector["workspace_id"])},
+            _connector_scope_filters(access, connector_id),
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc
 
     await log_workspace_activity(
-        workspace_id=str(connector["workspace_id"]),
+        workspace_id=access.workspace_id,
         actor_user_id=user_id,
         event_type="workspace.source_removed",
         summary=f"{connector.get('display_name') or 'A connector'} was removed from workspace sources.",
@@ -570,7 +617,11 @@ async def delete_workspace_connector(connector_id: str, user_id: str) -> None:
     )
 
 
-async def _activate_knowledge_link(connector: dict[str, Any], user_id: str) -> dict[str, Any]:
+async def _activate_knowledge_link(
+    connector: dict[str, Any],
+    user_id: str,
+    access: WorkspaceAccess,
+) -> dict[str, Any]:
     config = connector.get("config") or {}
     url = str(config.get("url") or "")
     fetch_result = await fetch_knowledge_link(url)
@@ -579,10 +630,10 @@ async def _activate_knowledge_link(connector: dict[str, Any], user_id: str) -> d
         status_value: ConnectorStatus = "needs_authentication" if fetch_result.auth_required else "request_submitted"
         last_error = fetch_result.error or "The link could not be reached from Omnix infrastructure."
         try:
-            job = await _insert_setup_job(connector, user_id)
+            job = await _insert_setup_job(connector, user_id, access)
             connector = await update_one_trusted(
                 "workspace_connectors",
-                {"id": connector["id"]},
+                _connector_scope_filters(access, connector["id"]),
                 {
                     "status": status_value,
                     "last_error": last_error,
@@ -604,12 +655,12 @@ async def _activate_knowledge_link(connector: dict[str, Any], user_id: str) -> d
         "extracted_text_preview": fetch_result.text[:2000],
     }
     try:
-        await _delete_connector_source_file(connector)
+        await _delete_connector_source_file(connector, access)
         file_row = await insert_one(
             "files",
             {
                 "user_id": user_id,
-                "workspace_id": connector["workspace_id"],
+                "workspace_id": access.workspace_id,
                 "file_name": file_name,
                 "file_type": fetch_result.content_type or "text/html",
                 "size_bytes": len(fetch_result.text.encode("utf-8")),
@@ -620,7 +671,7 @@ async def _activate_knowledge_link(connector: dict[str, Any], user_id: str) -> d
             file_id=str(file_row["id"]),
             user_id=user_id,
             text=fetch_result.text,
-            workspace_id=str(connector["workspace_id"]),
+            workspace_id=access.workspace_id,
             replace_existing=True,
         )
         next_config = {
@@ -633,7 +684,7 @@ async def _activate_knowledge_link(connector: dict[str, Any], user_id: str) -> d
         }
         connector = await update_one_trusted(
             "workspace_connectors",
-            {"id": connector["id"]},
+            _connector_scope_filters(access, connector["id"]),
             {
                 "status": "connected",
                 "config": next_config,
@@ -650,7 +701,7 @@ async def _activate_knowledge_link(connector: dict[str, Any], user_id: str) -> d
         try:
             connector = await update_one_trusted(
                 "workspace_connectors",
-                {"id": connector["id"]},
+                _connector_scope_filters(access, connector["id"]),
                 {
                     "status": "failed",
                     "last_error": str(exc)[:500],
@@ -662,7 +713,7 @@ async def _activate_knowledge_link(connector: dict[str, Any], user_id: str) -> d
         return await _serialize_connector(connector)
 
     await log_workspace_activity(
-        workspace_id=str(connector["workspace_id"]),
+        workspace_id=access.workspace_id,
         actor_user_id=user_id,
         event_type="workspace.source_connected",
         summary=f"{file_name} was connected as a knowledge link.",
