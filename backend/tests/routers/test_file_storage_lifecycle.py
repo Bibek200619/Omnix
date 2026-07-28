@@ -6,6 +6,18 @@ from typing import Any
 import pytest
 
 from app.routers import files
+from app.services.workspace_common import WorkspaceAccess
+
+
+def _workspace_access(workspace_id: str = "workspace-1") -> WorkspaceAccess:
+    return WorkspaceAccess(
+        workspace={
+            "id": workspace_id,
+            "user_id": "user-1",
+            "workspace_type": "workspace",
+        },
+        role="founder",
+    )
 
 
 @pytest.mark.asyncio
@@ -21,8 +33,11 @@ async def test_delete_file_removes_storage_chunks_then_file_and_logs_workspace_a
         "file_name": "report.pdf",
     }
 
-    async def fake_require_file_access(file_id: str, user_id: str) -> tuple[dict[str, Any], object]:
-        return file_row, object()
+    async def fake_require_file_access(
+        file_id: str,
+        user_id: str,
+    ) -> tuple[dict[str, Any], WorkspaceAccess]:
+        return file_row, _workspace_access()
 
     async def fake_delete_storage_object(storage_path: str) -> bool:
         events.append(("storage", storage_path))
@@ -47,7 +62,7 @@ async def test_delete_file_removes_storage_chunks_then_file_and_logs_workspace_a
     assert events == [
         ("storage", "supabase://omnix-test/uploads/user-1/report.pdf"),
         ("delete", "documents", {"file_id": "file-1", "workspace_id": "workspace-1"}),
-        ("delete", "files", {"id": "file-1"}),
+        ("delete", "files", {"id": "file-1", "workspace_id": "workspace-1"}),
         ("activity", "workspace-1", {"file_id": "file-1"}),
     ]
 
@@ -87,7 +102,11 @@ async def test_delete_file_cleans_logical_records_when_storage_is_already_missin
     assert events == [
         ("storage", "supabase://omnix-test/uploads/user-1/missing.pdf"),
         ("delete", "documents", {"file_id": "file-2", "user_id": "user-1", "workspace_id": {"is": None}}),
-        ("delete", "files", {"id": "file-2"}),
+        (
+            "delete",
+            "files",
+            {"id": "file-2", "user_id": "user-1", "workspace_id": {"is": None}},
+        ),
     ]
 
 
