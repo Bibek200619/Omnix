@@ -8,11 +8,7 @@ from typing import Any
 import pytest
 
 from app.services import supabase_service
-from app.services.supabase_query_helpers import (
-    apply_filters,
-    select_columns_after_missing_column,
-    select_recovery_attempts,
-)
+from app.services.supabase_query_helpers import apply_filters
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = BACKEND_ROOT / "app"
@@ -68,26 +64,13 @@ def test_apply_filters_maps_supported_operator_filters() -> None:
     ]
 
 
-def test_select_column_recovery_removes_missing_column() -> None:
-    assert select_columns_after_missing_column(
-        "profiles",
-        "id,email,phone_number,created_at",
-        "Could not find the 'phone_number' column of 'profiles' in the schema cache",
-    ) == ("phone_number", "id,email,created_at")
-    assert select_columns_after_missing_column(
-        "profiles",
-        "id,profiles.legacy_field,name",
-        'column "profiles.legacy_field" does not exist',
-    ) == ("legacy_field", "id,name")
-    assert select_recovery_attempts("id,email,name") == 4
-
-
-def test_supabase_service_preserves_private_helper_aliases() -> None:
+def test_supabase_service_exposes_filter_helper_without_schema_recovery_aliases() -> None:
     query = RecordingQuery()
 
     assert supabase_service._apply_filters(query, {"status": "open"}) is query
     assert query.calls == [("eq", ("status", "open"))]
-    assert supabase_service._select_recovery_attempts("*") == 1
+    assert not hasattr(supabase_service, "_select_columns_after_missing_column")
+    assert not hasattr(supabase_service, "_select_recovery_attempts")
 
 
 @pytest.mark.asyncio

@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-import logging
 from typing import Any
 
 from fastapi import HTTPException, Request, status
 
 from .supabase_service import SupabaseServiceError, select_one_trusted
 from .workspace_common import (
-    HIERARCHY_WORKSPACE_COLUMNS,
-    LEGACY_WORKSPACE_COLUMNS,
     WORKSPACE_COLUMNS,
     WORKSPACE_MEMBER_COLUMNS,
     WorkspaceAccess,
@@ -22,9 +19,7 @@ from .workspace_common import (
 )
 from .workspace_permissions import OrganizationalAccessAuthority
 
-logger = logging.getLogger(__name__)
 WORKSPACE_ACCESS_LOCATOR_COLUMNS = "id,user_id,parent_workspace_id,workspace_type,is_global"
-LEGACY_WORKSPACE_ACCESS_LOCATOR_COLUMNS = "id,user_id"
 _WORKSPACE_AUTHORITY_FIELDS = ("id", "user_id", "parent_workspace_id", "workspace_type", "is_global")
 
 
@@ -39,45 +34,22 @@ def active_workspace_id_from_request(request: Request) -> str | None:
 
 async def _select_workspace_columns(
     filters: Mapping[str, Any],
-    column_sets: tuple[tuple[str, str], ...],
+    columns: str,
 ) -> dict[str, Any] | None:
-    last_error: SupabaseServiceError | None = None
-    for index, (label, columns) in enumerate(column_sets):
-        try:
-            return await select_one_trusted("workspaces", columns, filters)
-        except SupabaseServiceError as exc:
-            last_error = exc
-            if index < len(column_sets) - 1:
-                logger.warning(
-                    "Workspace read using %s schema failed; retrying narrower columns.",
-                    label,
-                    exc_info=True,
-                )
-
-    raise database_error() from last_error
+    try:
+        return await select_one_trusted("workspaces", columns, filters)
+    except SupabaseServiceError as exc:
+        raise database_error() from exc
 
 
 async def select_workspace_record(filters: Mapping[str, Any]) -> dict[str, Any] | None:
-    return await _select_workspace_columns(
-        filters,
-        (
-            ("current", WORKSPACE_COLUMNS),
-            ("hierarchy", HIERARCHY_WORKSPACE_COLUMNS),
-            ("legacy", LEGACY_WORKSPACE_COLUMNS),
-        ),
-    )
+    return await _select_workspace_columns(filters, WORKSPACE_COLUMNS)
 
 
 async def _select_workspace_access_locator(
     filters: Mapping[str, Any],
 ) -> dict[str, Any] | None:
-    return await _select_workspace_columns(
-        filters,
-        (
-            ("hierarchy locator", WORKSPACE_ACCESS_LOCATOR_COLUMNS),
-            ("legacy locator", LEGACY_WORKSPACE_ACCESS_LOCATOR_COLUMNS),
-        ),
-    )
+    return await _select_workspace_columns(filters, WORKSPACE_ACCESS_LOCATOR_COLUMNS)
 
 
 def _membership_role(
