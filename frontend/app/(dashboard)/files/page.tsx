@@ -7,9 +7,7 @@ import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
-  BadgeCheck,
   Database,
-  Download,
   ExternalLink,
   FileText,
   FileUp,
@@ -19,13 +17,13 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Trash2,
   Unplug,
   X,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { ConnectorSetupModal } from "@/components/files/ConnectorSetupModal";
+import { FileSourceCard } from "@/components/files/FileSourceCard";
 import { SourceHealthConsole } from "@/components/files/SourceHealthConsole";
 import { CreateDecisionModal } from "@/components/decisions/CreateDecisionModal";
 import { DocumentPortal } from "@/components/files/DocumentPortal";
@@ -50,12 +48,7 @@ import {
   connectorIcon,
   connectorSummary,
   emptyForm,
-  fileIngestionStatus,
-  fileStatusDetail,
-  fileStatusLabel,
-  fileStatusStyle,
   formatDate,
-  formatFileSize,
   formFromConnector,
   newestConnector,
   sourceTypes,
@@ -461,30 +454,15 @@ function FilesPageContent() {
   }
 
   function renderFileCard(f: FileData) {
-    const ingestionStatus = fileIngestionStatus(f);
     return (
-      <div key={f.id} className={view === "grid" ? "omnix-source-card flex min-h-[174px] flex-col justify-between gap-3 p-[18px]" : "omnix-source-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"}>
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_0_14px_var(--omnix-rgba-0-255-255-0-12)]">
-            <FileText className="h-[19px] w-[19px]" />
-          </span>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="omnix-display max-w-full truncate text-[13px] font-bold text-white">{f.file_name ?? f.filename}</p>
-              <span className={cn("rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-wider", fileStatusStyle[ingestionStatus])}>
-                {fileStatusLabel[ingestionStatus]}
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-white/35">{f.file_type ?? f.content_type ?? "Document"} - {formatFileSize(f.size_bytes)}</p>
-            <p className="mt-2 max-w-3xl text-[11px] leading-5 text-white/50">{fileStatusDetail(f)}</p>
-          </div>
-        </div>
-        <div className={view === "grid" ? "grid grid-cols-2 gap-2 border-t border-white/5 pt-3 sm:flex sm:items-center" : "grid grid-cols-2 gap-2 sm:flex sm:items-center"}>
-          <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<BadgeCheck className="h-3.5 w-3.5" />} onClick={() => void scanDocumentDecisionCandidates(f)}>Decisions</Button>
-          <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
-          <Button type="button" size="sm" variant="ghost" className="min-h-11 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
-        </div>
-      </div>
+      <FileSourceCard
+        key={f.id}
+        file={f}
+        view={view}
+        onScanDecisions={(file) => void scanDocumentDecisionCandidates(file)}
+        onDownload={(id, filename) => void handleDownload(id, filename)}
+        onDelete={(id) => void handleDelete(id)}
+      />
     );
   }
 

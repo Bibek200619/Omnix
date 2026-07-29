@@ -19,7 +19,15 @@ from app.services.prompt_trust import TRUST_BOUNDARY_MARKER
 from app.services.chat_service import AIMessage, AIGeneration, OllamaChatService, ProviderManager
 
 
-def test_build_payload_uses_phi3_and_preserves_context():
+@pytest.fixture
+def isolated_ollama_url(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+    chat_service.get_settings.cache_clear()
+    yield
+    chat_service.get_settings.cache_clear()
+
+
+def test_build_payload_uses_phi3_and_preserves_context(isolated_ollama_url):
     service = OllamaChatService()
 
     payload = service._build_payload(
