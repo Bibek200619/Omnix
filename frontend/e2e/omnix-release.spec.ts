@@ -1,7 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import {
   isCurrentWorkspaceChannelChange,
-  isCurrentWorkspaceChannelLoad,
   incrementThreadReplyCount,
   mergeMessagePage,
   mergeWorkspaceChannelMessage,
@@ -605,18 +604,6 @@ test("reconciles realtime channel rows without a reload", () => {
     "workspace-1",
   )).toBe(false);
 
-  const loadState = {
-    requestId: 3,
-    latestRequestId: 3,
-    requestWorkspaceId: "workspace-1",
-    activeWorkspaceId: "workspace-1",
-    stateRevision: 8,
-    currentStateRevision: 8,
-  };
-  expect(isCurrentWorkspaceChannelLoad(loadState)).toBe(true);
-  expect(isCurrentWorkspaceChannelLoad({ ...loadState, currentStateRevision: 9 })).toBe(false);
-  expect(isCurrentWorkspaceChannelLoad({ ...loadState, activeWorkspaceId: "workspace-2" })).toBe(false);
-
   const createdMessage = {
     id: "message-1",
     workspace_id: "workspace-1",
@@ -701,7 +688,7 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page.getByRole("button", { name: "Open command palette" }).first()).toBeVisible();
   });
 
-  test("keeps shell motion CSS-only and honors reduced motion", async ({ page }) => {
+  test("keeps shell motion CSS-only and honors reduced motion", async ({ page, isMobile }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/dashboard");
 
@@ -711,6 +698,9 @@ test.describe("authenticated Omnix shell", () => {
     await expect(particles).toHaveCount(30);
     await expect(particles.first()).toHaveCSS("animation-name", "none");
 
+    if (isMobile) {
+      await page.getByRole("button", { name: "Open navigation" }).click();
+    }
     await page.getByRole("button", { name: /Switch workspace\. Current workspace: Acme Operations/ }).click();
     await expect(page.locator(".omnix-shell-popover-enter")).toHaveCSS("animation-name", "none");
   });
@@ -843,6 +833,207 @@ test.describe("authenticated Omnix shell", () => {
     await page.getByRole("button", { name: "Switch to Platform Lab" }).click();
     await expect(page.getByText("Platform Lab").first()).toBeVisible();
     await expect(await page.evaluate(() => window.localStorage.getItem("omnix.activeWorkspaceId.user-e2e"))).toBe("workspace-2");
+  });
+
+  test("cancels a stale channel snapshot when the workspace changes", async ({ page, isMobile }) => {
+    let releaseWorkspaceOne!: () => void;
+    const workspaceOneGate = new Promise<void>((resolve) => {
+      releaseWorkspaceOne = resolve;
+    });
+    const requests: Array<{ header: string | undefined; workspaceId: string }> = [];
+
+    await page.route("**/api/workspaces/*/channels", async (route) => {
+      const match = new URL(route.request().url()).pathname.match(
+        /\/workspaces\/([^/]+)\/channels$/,
+      );
+      const workspaceId = match?.[1] ?? "";
+      requests.push({
+        header: route.request().headers()["x-omnix-workspace"],
+        workspaceId,
+      });
+      if (workspaceId === "workspace-1") {
+        await workspaceOneGate;
+      }
+      const channel = workspaceChannel({
+        id: `channel-${workspaceId}`,
+        name: workspaceId === "workspace-1"
+          ? "Stale Acme channel"
+          : "Platform coordination",
+        workspace_id: workspaceId,
+      });
+      await fulfillJson(route, [channel]).catch(() => undefined);
+    });
+
+    await page.goto("/conversations");
+    await expect.poll(
+      () => requests.filter((request) => request.workspaceId === "workspace-1").length,
+    ).toBe(1);
+    const workspaceOneRequestOutcome = Promise.race([
+      page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname ===
+          "/api/workspaces/workspace-1/channels",
+      ),
+      page.waitForEvent("requestfailed", {
+        predicate: (request) =>
+          new URL(request.url()).pathname ===
+          "/api/workspaces/workspace-1/channels",
+      }),
+    ]);
+    if (isMobile) {
+      await page.getByRole("button", { name: "Open navigation" }).click();
+    }
+    await page.getByRole("button", { name: /Switch workspace\. Current workspace: Acme Operations/ }).click();
+    await page.getByRole("button", { name: "Switch to Platform Lab" }).click();
+
+    await expect(page.getByRole("button", { name: /^Platform coordination/ })).toBeVisible();
+    releaseWorkspaceOne();
+    await workspaceOneRequestOutcome;
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() =>
+        window.requestAnimationFrame(() => resolve()));
+    }));
+    await expect(page.getByText("Stale Acme channel", { exact: true })).toHaveCount(0);
+    expect(requests).toContainEqual({
+      header: "workspace-1",
+      workspaceId: "workspace-1",
+    });
+    expect(requests).toContainEqual({
+      header: "workspace-2",
+      workspaceId: "workspace-2",
+    });
+  });
+
+  test("retries one transient channel snapshot failure", async ({ page }) => {
+    workspaceChannels = [
+      workspaceChannel({ name: "Recovered coordination" }),
+    ];
+    let channelRequests = 0;
+    await page.route(
+      "**/api/workspaces/workspace-1/channels",
+      async (route) => {
+        channelRequests += 1;
+        if (channelRequests === 1) {
+          return fulfillJson(
+            route,
+            { detail: "Temporary channel outage" },
+            503,
+          );
+        }
+        await route.fallback();
+      },
+    );
+
+    await page.goto("/conversations");
+
+    await expect(page.getByRole("button", { name: /^Recovered coordination/ })).toBeVisible();
+    expect(channelRequests).toBe(2);
+  });
+
+  test("ignores a delayed discussion failure after a workspace switch", async ({ page, isMobile }) => {
+    workspaceChannels = [workspaceChannel()];
+    let releaseDiscussion!: () => void;
+    let markDiscussionStarted!: () => void;
+    const discussionGate = new Promise<void>((resolve) => {
+      releaseDiscussion = resolve;
+    });
+    const discussionStarted = new Promise<void>((resolve) => {
+      markDiscussionStarted = resolve;
+    });
+    let discussionWorkspaceHeader: string | undefined;
+
+    await page.route(
+      "**/api/workspaces/workspace-1/channels/channel-general/messages*",
+      async (route) => {
+        discussionWorkspaceHeader =
+          route.request().headers()["x-omnix-workspace"];
+        markDiscussionStarted();
+        await discussionGate;
+        await fulfillJson(
+          route,
+          { detail: "Stale discussion failure" },
+          503,
+        );
+      },
+    );
+
+    await page.goto("/conversations");
+    await discussionStarted;
+    if (isMobile) {
+      await page.getByRole("button", { name: "Open navigation" }).click();
+    }
+    await page.getByRole("button", { name: /Switch workspace\. Current workspace: Acme Operations/ }).click();
+    await page.getByRole("button", { name: "Switch to Platform Lab" }).click();
+
+    const staleResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes(
+          "/workspaces/workspace-1/channels/channel-general/messages",
+        ) && response.status() === 503,
+    );
+    releaseDiscussion();
+    await staleResponse;
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+    }));
+
+    await expect(page.getByText(
+      "Unable to load discussion. Check your connection and try again.",
+      { exact: true },
+    )).toHaveCount(0);
+    expect(discussionWorkspaceHeader).toBe("workspace-1");
+  });
+
+  test("loads initiatives for the newly selected workspace", async ({ page, isMobile }) => {
+    await page.route("**/api/workspaces/*/initiatives", async (route) => {
+      const match = new URL(route.request().url()).pathname.match(
+        /\/workspaces\/([^/]+)\/initiatives$/,
+      );
+      const workspaceId = match?.[1] ?? "";
+      const title = workspaceId === "workspace-1"
+        ? "Acme initiative"
+        : "Platform initiative";
+      await fulfillJson(route, [{
+        activity_metadata: {},
+        created_at: "2026-06-20T00:00:00Z",
+        id: `initiative-${workspaceId}`,
+        initiative_context: null,
+        linked_channels: [],
+        linked_decisions: [],
+        linked_resources: [],
+        linked_tasks: [],
+        momentum: {
+          blocked_task_count: 0,
+          channel_count: 0,
+          complete_task_count: 0,
+          discussion_message_count: 0,
+          due_soon_count: 0,
+          health: "quiet",
+          last_movement_at: null,
+          open_task_count: 0,
+          overdue_count: 0,
+          summary: "No active operational movement detected.",
+          task_count: 0,
+        },
+        owner_user_id: null,
+        status: "active",
+        target_date: null,
+        title,
+        updated_at: "2026-06-20T00:00:00Z",
+        workspace_id: workspaceId,
+      }]);
+    });
+
+    await page.goto("/initiatives");
+    await expect(page.getByRole("heading", { name: "Acme initiative", exact: true }).last()).toBeVisible();
+    if (isMobile) {
+      await page.getByRole("button", { name: "Open navigation" }).click();
+    }
+    await page.getByRole("button", { name: /Switch workspace\. Current workspace: Acme Operations/ }).click();
+    await page.getByRole("button", { name: "Switch to Platform Lab" }).click();
+
+    await expect(page.getByRole("heading", { name: "Platform initiative", exact: true }).last()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Acme initiative", exact: true })).toHaveCount(0);
   });
 
   test("creates a task record", async ({ page }) => {
@@ -1080,7 +1271,7 @@ test.describe("authenticated Omnix shell", () => {
     await expect(codeBlock.getByRole("button", { name: "Copy code" })).toBeVisible();
   });
 
-  test("replaces streamed text with the validated citation result", async ({ page }) => {
+  test("replaces streamed text with the validated citation result", async ({ page, isMobile }) => {
     conversations = [
       {
         id: "citation-stream",
@@ -1121,6 +1312,9 @@ test.describe("authenticated Omnix shell", () => {
     ].map((event) => `data: ${JSON.stringify(event)}\n\n`).join("");
 
     await page.goto("/chat?conversation=citation-stream");
+    if (isMobile) {
+      await page.getByRole("button", { name: "Close history" }).click();
+    }
     const input = page.getByPlaceholder("Type a message or '/' for commands...");
     await input.fill("Is the release ready?");
     await page.getByRole("button", { name: "Send message" }).click();

@@ -20,6 +20,7 @@ function assertExcludes(source, unexpected, label) {
 const [
   analyticsPage,
   conversationSurface,
+  conversationChannels,
   conversationSender,
   conversationUtils,
   filesPage,
@@ -49,9 +50,11 @@ const [
   chatStream,
   conversationAiPanel,
   decisionCandidatePanel,
+  querySource,
 ] = await Promise.all([
   read("app/(dashboard)/analytics/page.tsx"),
   read("components/conversations/WorkspaceConversationSurface.tsx"),
+  read("components/conversations/useWorkspaceChannels.ts"),
   read("components/conversations/useWorkspaceConversationSender.ts"),
   read("components/conversations/conversationUtils.ts"),
   read("app/(dashboard)/files/page.tsx"),
@@ -81,6 +84,7 @@ const [
   read("components/chat/useChatStream.ts"),
   read("components/conversations/ConversationAIPanel.tsx"),
   read("components/decisions/DecisionCandidatePanel.tsx"),
+  read("lib/query.ts"),
 ]);
 
 assertIncludes(analyticsPage, "Runtime telemetry is unavailable.", "Analytics truthfulness");
@@ -100,16 +104,26 @@ assertIncludes(globalsCss, '@container (min-width: 48rem)', "Conversation respon
 assertIncludes(globalsCss, 'data-thread="open"', "Conversation responsive CSS");
 assertIncludes(conversationSurface, "applyChannelRealtimeChange", "Conversation realtime reconciliation");
 assertIncludes(conversationSurface, "}, applyChannelRealtimeChange)", "Conversation realtime callback");
-assertIncludes(conversationSurface, "channelStateRevisionRef", "Conversation realtime snapshot freshness");
-assertIncludes(conversationSurface, "isCurrentWorkspaceChannelChange(payload, activeWorkspaceId, workspaceRef.current)", "Conversation realtime workspace isolation");
-assertIncludes(conversationSurface, "isCurrentWorkspaceChannelLoad({", "Conversation realtime snapshot freshness");
-assertIncludes(conversationSurface, "void loadChannelsRef.current?.()", "Conversation stale snapshot recovery");
+assertIncludes(conversationSurface, "useWorkspaceChannels(activeWorkspaceId)", "Conversation normalized query lifecycle");
+assertExcludes(conversationSurface, "channelStateRevisionRef", "Conversation normalized query lifecycle");
+assertExcludes(conversationSurface, "loadChannelsRef", "Conversation normalized query lifecycle");
+assertIncludes(conversationChannels, "useQuery({", "Conversation query cache");
+assertIncludes(conversationChannels, "queryClient.cancelQueries(", "Conversation stale snapshot cancellation");
+assertIncludes(conversationChannels, "queryClient.setQueryData<WorkspaceChannel[]>", "Conversation realtime cache projection");
+assertIncludes(conversationChannels, 'stateBeforeCancel.fetchStatus === "fetching"', "Conversation fetch collision recovery");
+assertIncludes(conversationChannels, "isCurrentWorkspaceChannelChange(", "Conversation realtime workspace isolation");
+assertIncludes(querySource, "new QueryClient({", "Normalized query client");
+assertIncludes(querySource, "retry: shouldRetryQuery", "Normalized query retry");
+assertIncludes(conversationSurface, "selectedChannelRef.current === channelId", "Conversation request workspace/channel isolation");
+assertIncludes(conversationSurface, "threadRootRef.current?.id === root.id", "Thread request workspace/channel isolation");
+assertIncludes(conversationSurface, "messageRequestRef.current += 1;", "Conversation stale request cleanup");
+assertIncludes(conversationSurface, "threadRequestRef.current += 1;", "Thread stale request cleanup");
 assertIncludes(conversationSender, "onChannelMessageCreated(created)", "Conversation sender summary projection");
 assertExcludes(conversationSender, "loadChannels", "Conversation sender channel reload");
 assertIncludes(conversationUtils, "reconcileWorkspaceChannelChange", "Conversation realtime helper");
 assertIncludes(conversationUtils, "mergeWorkspaceChannelMessage", "Conversation message summary helper");
 assertIncludes(conversationUtils, "isCurrentWorkspaceChannelChange", "Conversation realtime workspace helper");
-assertIncludes(conversationUtils, "isCurrentWorkspaceChannelLoad", "Conversation realtime snapshot helper");
+assertExcludes(conversationUtils, "isCurrentWorkspaceChannelLoad", "Conversation normalized query lifecycle");
 assertIncludes(conversationUtils, "splitMessagePage", "Conversation message pagination helper");
 assertIncludes(conversationUtils, "incrementThreadReplyCount", "Conversation thread reply reconciliation");
 assertIncludes(conversationSurface, "loadOlderMessages", "Conversation history continuation");

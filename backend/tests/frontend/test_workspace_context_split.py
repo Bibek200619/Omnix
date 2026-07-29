@@ -136,14 +136,21 @@ def test_workspace_switch_clears_scoped_api_and_query_state() -> None:
     provider = WORKSPACE_CONTEXT.read_text(encoding="utf-8")
     active_selection = read_frontend("lib/workspace-active-selection.ts")
     api = read_frontend("lib/api.ts")
+    query = read_frontend("lib/query.ts")
+    query_provider = read_frontend("lib/query-provider.tsx")
 
     assert 'import { invalidateQueries } from "./query";' in active_selection
     assert "replaceActiveWorkspace(null, { forceInvalidate: true });" in provider
     assert "invalidateQueries();" in active_selection
+    assert "client.clear();" in query
+    assert "QueryClientProvider" in query_provider
     assert "export function getApiWorkspaceId()" in api
     assert "const apiWorkspaceChangeListeners = new Set<() => void>();" in api
     assert "subscribeApiWorkspaceChange(() =>" in api
     assert "this.inFlightGets.clear();" in api
+    assert "const requestWorkspaceId = _activeWorkspaceId;" in api
+    assert "this.applyWorkspaceHeader(headers, requestWorkspaceId);" in api
+    assert "if (this.inFlightGets.get(key) === request)" in api
 
 
 def test_upload_uses_api_workspace_state_instead_of_legacy_storage() -> None:
