@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import inspect
 import logging
 from typing import Any
 
@@ -55,3 +56,21 @@ def get_redis() -> Any:
         # the same bounded connection settings.
         _redis_client = _build_redis_client()
     return _redis_client
+
+
+async def close_redis() -> None:
+    """Close the cached async Redis client without creating one during shutdown."""
+    global _redis_client
+
+    client = _redis_client
+    _redis_client = None
+    if client is None:
+        return
+
+    close = getattr(client, "aclose", None) or getattr(client, "close", None)
+    if close is None:
+        return
+
+    result = close()
+    if inspect.isawaitable(result):
+        await result

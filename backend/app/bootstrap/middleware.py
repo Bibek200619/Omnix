@@ -89,6 +89,30 @@ def _discard_completed_api_log_tasks() -> None:
     _background_tasks.difference_update(completed)
 
 
+async def drain_api_log_tasks(*, timeout_seconds: float) -> tuple[int, int]:
+    """Wait for app-owned API log writes after the server has drained requests."""
+    _discard_completed_api_log_tasks()
+    tasks = tuple(_background_tasks)
+    if not tasks:
+        return 0, 0
+
+    done, pending = await asyncio.wait(tasks, timeout=max(timeout_seconds, 0.0))
+    timed_out = len(pending)
+    if pending:
+        logger.warning(
+            "API log shutdown drain timed out; cancelling unfinished writes | pending=%d | timeout_seconds=%.2f",
+            timed_out,
+            timeout_seconds,
+        )
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+
+    _background_tasks.difference_update(done)
+    _background_tasks.difference_update(pending)
+    return len(done), timed_out
+
+
 def get_api_logging_health() -> dict[str, Any]:
     _discard_completed_api_log_tasks()
     pending_tasks = len(_background_tasks)
