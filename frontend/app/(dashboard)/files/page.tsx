@@ -24,6 +24,7 @@ import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { ConnectorSetupModal } from "@/components/files/ConnectorSetupModal";
 import { FileSourceCard } from "@/components/files/FileSourceCard";
+import { loadFilesWithSearchTarget, useFileSearchFocus, fileSearchFocusId } from "@/components/files/useFileSearchFocus";
 import { SourceHealthConsole } from "@/components/files/SourceHealthConsole";
 import { CreateDecisionModal } from "@/components/decisions/CreateDecisionModal";
 import { DocumentPortal } from "@/components/files/DocumentPortal";
@@ -108,6 +109,7 @@ function FilesPageContent() {
   const fileResultsRef = useRef<HTMLDivElement | null>(null);
   const [gridColumnCount, setGridColumnCount] = useState(1);
   const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
+  const { focusedFileId, focusedSourceId } = useFileSearchFocus({ files, connectors, activeSection, searchQuery, setActiveSection, setActiveType, setSearchQuery });
 
   const filteredFiles = useMemo(() => files.filter((file) => {
     const name = file.file_name ?? file.filename ?? "";
@@ -165,7 +167,7 @@ function FilesPageContent() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiClient.get<FileData[]>("/files");
+      const data = await loadFilesWithSearchTarget(focusedFileId);
       setFiles(data);
     } catch (err) {
       logClientError("Failed to load files", err, { endpoint: "/files" });
@@ -173,7 +175,7 @@ function FilesPageContent() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [focusedFileId]);
 
   const loadConnectors = useCallback(async () => {
     if (!activeWorkspaceId) {
@@ -458,7 +460,7 @@ function FilesPageContent() {
       <FileSourceCard
         key={f.id}
         file={f}
-        view={view}
+        view={view} focused={focusedFileId === f.id}
         onScanDecisions={(file) => void scanDocumentDecisionCandidates(file)}
         onDownload={(id, filename) => void handleDownload(id, filename)}
         onDelete={(id) => void handleDelete(id)}
@@ -656,7 +658,7 @@ function FilesPageContent() {
                   connector.status === "needs_authentication" &&
                   valueFromConfig(connector.config, "provider") === "google_drive";
                 return (
-                  <div key={connector.id} className="omnix-source-card flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div key={connector.id} id={fileSearchFocusId("source", connector.id)} data-search-focused={focusedSourceId === connector.id ? "true" : undefined} aria-current={focusedSourceId === connector.id || undefined} tabIndex={-1} className={cn("omnix-source-card flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between", focusedSourceId === connector.id && "border-amber-300/55 bg-amber-300/[0.07] shadow-[var(--omnix-glow-sm)] focus:outline-none focus:ring-2 focus:ring-amber-300/65")}>
                     <div className="flex min-w-0 gap-3">
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border" style={{ background: accent.iconSurface, borderColor: accent.iconBorder, color: accent.color }}>
                         <Icon className="h-[18px] w-[18px]" />

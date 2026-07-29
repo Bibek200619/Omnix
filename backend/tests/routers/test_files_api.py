@@ -263,6 +263,39 @@ def test_personal_file_list_excludes_workspace_rows(
     }
 
 
+def test_get_file_returns_authorized_metadata_without_storage_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_require_file_access(
+        file_id: str,
+        user_id: str,
+    ) -> tuple[dict[str, Any], WorkspaceAccess]:
+        assert (file_id, user_id) == ("file-1", "member-1")
+        return (
+            {
+                "id": file_id,
+                "user_id": "owner-1",
+                "workspace_id": "workspace-1",
+                "file_name": "launch-plan.pdf",
+                "file_type": "application/pdf",
+                "storage_path": "supabase://private-bucket/workspace-1/launch-plan.pdf",
+            },
+            WorkspaceAccess(
+                workspace={"id": "workspace-1", "user_id": "owner-1"},
+                role="member",
+            ),
+        )
+
+    monkeypatch.setattr(files, "_require_file_access", fake_require_file_access)
+    client = _files_client({"sub": "member-1", "role": "authenticated"})
+
+    response = client.get("/files/file-1")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == "file-1"
+    assert response.json()["storage_path"] is None
+
+
 def test_sanitize_filename_uses_allowlisted_storage_name() -> None:
     assert sanitize_filename("../../\x00\n report<script>.pdf") == "report_script_.pdf"
     assert sanitize_filename("...") == "unnamed"

@@ -65,6 +65,29 @@ const members = [
   { user_id: userId, full_name: "Release Tester", email: "tester@example.com", role: "founder" },
   { user_id: "user-2", full_name: "Taylor Ops", email: "taylor@example.com", role: "member" },
 ];
+const focusedSearchFile = {
+  id: "file-archive-1",
+  user_id: userId,
+  workspace_id: "workspace-1",
+  file_name: "archived-rollout-brief.md",
+  file_type: "text/markdown",
+  size_bytes: 4096,
+  processing_status: "searchable",
+  extraction_status: "searchable",
+  metadata: { processing_status: "searchable" },
+  created_at: "2026-05-01T00:00:00Z",
+};
+const focusedSearchConnector = {
+  id: "connector-archive-1",
+  workspace_id: "workspace-1",
+  user_id: userId,
+  connector_type: "knowledge_link",
+  display_name: "Archived roadmap source",
+  status: "connected",
+  config: { url: "https://example.com/roadmap" },
+  created_at: "2026-05-01T00:00:00Z",
+  updated_at: "2026-05-02T00:00:00Z",
+};
 
 let tasks: Array<Record<string, unknown>>;
 let files: Array<Record<string, unknown>>;
@@ -425,25 +448,58 @@ async function mockApi(page: Page) {
             },
           ]
         : [];
+      const fileResults = query.includes("archived rollout")
+        ? [
+            {
+              id: focusedSearchFile.id,
+              workspace_id: "workspace-1",
+              type: "file",
+              title: "Archived rollout brief",
+              preview: focusedSearchFile.file_name,
+              url: `/files?id=${focusedSearchFile.id}`,
+            },
+          ]
+        : [];
+      const sourceResults = query.includes("archived roadmap")
+        ? [
+            {
+              id: focusedSearchConnector.id,
+              workspace_id: "workspace-1",
+              type: "source",
+              title: focusedSearchConnector.display_name,
+              preview: "Knowledge link",
+              url: `/sources?source=${focusedSearchConnector.id}`,
+            },
+          ]
+        : [];
       return fulfillJson(route, {
         conversations: [],
         tasks: taskResults,
         initiatives: [],
         decisions: [],
-        files: [],
+        files: fileResults,
         documents: [],
-        sources: [],
+        sources: sourceResults,
         members: [],
         mentions: [],
         workspaces: [],
         automations: [],
         activity: [],
         jobs: [],
-        items: taskResults,
+        items: [...taskResults, ...fileResults, ...sourceResults],
       });
     }
     if (path === "/files" && method === "GET") return fulfillJson(route, files);
-    if (path === "/connectors" && method === "GET") return fulfillJson(route, []);
+    const focusedFileMatch = path.match(/^\/files\/([^/]+)$/);
+    if (focusedFileMatch && method === "GET") {
+      const file = focusedFileMatch[1] === focusedSearchFile.id
+        ? focusedSearchFile
+        : files.find((item) => item.id === focusedFileMatch[1]);
+      return file
+        ? fulfillJson(route, file)
+        : fulfillJson(route, { detail: "File not found." }, 404);
+    }
+    if (path === "/connectors" && method === "GET") return fulfillJson(route, [focusedSearchConnector]);
     if (path === "/upload" && method === "POST") {
       const uploaded = {
         id: `file-${files.length + 1}`,
@@ -687,6 +743,32 @@ test.describe("authenticated Omnix shell", () => {
     await expect(search).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/tasks\?id=task-1/);
+  });
+
+  test("hydrates and focuses a file selected from workspace search", async ({ page }) => {
+    await page.goto("/dashboard");
+    await page.getByRole("button", { name: "Open command palette" }).first().click();
+    const search = page.getByRole("textbox", { name: "Search Omnix commands and workspace results" });
+    await search.fill("archived rollout");
+    await page.getByRole("button", { name: /Archived rollout brief/ }).click();
+
+    await expect(page).toHaveURL(/\/files\?id=file-archive-1/);
+    const focusedFile = page.locator('[data-search-focused="true"]');
+    await expect(focusedFile).toContainText("archived-rollout-brief.md");
+    await expect(focusedFile).toBeFocused();
+  });
+
+  test("opens and focuses a connector selected from workspace search", async ({ page }) => {
+    await page.goto("/dashboard");
+    await page.getByRole("button", { name: "Open command palette" }).first().click();
+    const search = page.getByRole("textbox", { name: "Search Omnix commands and workspace results" });
+    await search.fill("archived roadmap");
+    await page.getByRole("button", { name: /Archived roadmap source/ }).click();
+
+    await expect(page).toHaveURL(/\/sources\?source=connector-archive-1/);
+    const focusedSource = page.locator('[data-search-focused="true"]');
+    await expect(focusedSource).toContainText("Archived roadmap source");
+    await expect(focusedSource).toBeFocused();
   });
 
   test("command palette supports keyboard navigation and focus return", async ({ page, isMobile }) => {

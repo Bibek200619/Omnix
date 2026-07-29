@@ -22,6 +22,12 @@ ROLE_GRANTS_MIGRATION = (
     / "migrations"
     / "0050_workspace_search_rpc_role_grants.sql"
 )
+FOCUSED_DESTINATIONS_MIGRATION = (
+    Path(__file__).resolve().parents[3]
+    / "supabase"
+    / "migrations"
+    / "20260729092313_focused_workspace_search_routes.sql"
+)
 
 
 def test_workspace_search_fulltext_migration_defines_ranked_rpc_and_indexes() -> None:
@@ -89,3 +95,39 @@ def test_workspace_search_role_grants_explicitly_revoke_anon_access() -> None:
     assert "REVOKE ALL ON FUNCTION public.search_workspace_ranked(uuid, text, integer, integer) FROM anon;" in sql
     assert "GRANT EXECUTE ON FUNCTION public.search_workspace_ranked(uuid, text, integer, integer) TO authenticated;" in sql
     assert "GRANT EXECUTE ON FUNCTION public.search_workspace_ranked(uuid, text, integer, integer) TO service_role;" in sql
+
+
+def test_workspace_search_destinations_only_include_focusable_records() -> None:
+    sql = FOCUSED_DESTINATIONS_MIGRATION.read_text(encoding="utf-8")
+    normalized_sql = " ".join(sql.split())
+
+    assert "CREATE OR REPLACE FUNCTION public.search_workspace_ranked" in sql
+    assert "SECURITY INVOKER" in sql
+    assert "SET search_path = ''" in sql
+    assert "workspace_access AS" in sql
+    assert "public.omnix_has_workspace_task_access(p_workspace_id)" in sql
+    assert "FROM public.jobs" not in sql
+    assert "FROM public.automations" not in sql
+    assert "FROM public.workspace_activity_events" not in sql
+    assert "doc.file_id IS NOT NULL" in sql
+
+    for destination in (
+        "'/tasks?id=' || t.id::text",
+        "'/initiatives?id=' || i.id::text",
+        "'/decisions?id=' || d.id::text",
+        "'/files?id=' || f.id::text",
+        "'/files?id=' || doc.file_id::text || '&document=' || doc.id::text",
+        "'/sources?source=' || c.id::text",
+    ):
+        assert destination in sql
+
+    assert "/automations?id=" not in sql
+    assert "/workspace/activity?id=" not in sql
+    assert (
+        "REVOKE ALL ON FUNCTION public.search_workspace_ranked(uuid, text, integer, integer) "
+        "FROM PUBLIC, anon, authenticated, service_role;"
+    ) in normalized_sql
+    assert (
+        "GRANT EXECUTE ON FUNCTION public.search_workspace_ranked(uuid, text, integer, integer) "
+        "TO authenticated, service_role;"
+    ) in normalized_sql
