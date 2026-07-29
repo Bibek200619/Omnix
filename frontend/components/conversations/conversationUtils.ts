@@ -24,15 +24,6 @@ export type WorkspaceChannelRealtimeChange = {
   old?: Partial<WorkspaceChannel> | null;
 };
 
-type WorkspaceChannelLoadState = {
-  requestId: number;
-  latestRequestId: number;
-  requestWorkspaceId: string | null;
-  activeWorkspaceId: string | null;
-  stateRevision: number;
-  currentStateRevision: number;
-};
-
 export const decisionStatusLabels: Record<WorkspaceDecisionStatus, string> = {
   proposed: "Proposed",
   accepted: "Accepted",
@@ -100,19 +91,6 @@ export function isCurrentWorkspaceChannelChange(
   return Boolean(subscribedWorkspaceId)
     && subscribedWorkspaceId === activeWorkspaceId
     && (!payloadWorkspaceId || payloadWorkspaceId === activeWorkspaceId);
-}
-
-export function isCurrentWorkspaceChannelLoad({
-  requestId,
-  latestRequestId,
-  requestWorkspaceId,
-  activeWorkspaceId,
-  stateRevision,
-  currentStateRevision,
-}: WorkspaceChannelLoadState) {
-  return requestId === latestRequestId
-    && requestWorkspaceId === activeWorkspaceId
-    && stateRevision === currentStateRevision;
 }
 
 export function reconcileWorkspaceChannelChange(

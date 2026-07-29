@@ -115,6 +115,7 @@ function WorkspaceInitiativesSurfaceContent() {
   const workspaceRef = useRef(activeWorkspaceId);
   const requestRef = useRef(0);
   const refreshTimerRef = useRef<number | null>(null);
+  workspaceRef.current = activeWorkspaceId;
   const [liveAnnouncementVersion, setLiveAnnouncementVersion] = useState(0);
 
   const announceMutation = useCallback((message: string) => {
@@ -186,12 +187,20 @@ function WorkspaceInitiativesSurfaceContent() {
       if (memberOptions) setMembers(memberOptions);
       setError(null);
     } catch (err) {
-      if (requestId === requestRef.current) {
+      if (
+        requestId === requestRef.current &&
+        workspaceRef.current === activeWorkspaceId
+      ) {
         logClientError("Failed to load initiatives", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives` });
         setError("Unable to load initiatives. Check your connection and try again.");
       }
     } finally {
-      if (requestId === requestRef.current) setLoading(false);
+      if (
+        requestId === requestRef.current &&
+        workspaceRef.current === activeWorkspaceId
+      ) {
+        setLoading(false);
+      }
     }
   }, [activeWorkspaceId, routeInitiativeId]);
 
