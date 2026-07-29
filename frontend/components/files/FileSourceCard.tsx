@@ -1,5 +1,6 @@
 import { BadgeCheck, Download, FileText, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { fileSearchFocusId } from "@/components/files/useFileSearchFocus";
 import { cn } from "@/lib/utils";
 import {
   fileIngestionStatus,
@@ -12,6 +13,7 @@ import {
 
 type FileSourceCardProps = {
   file: FileData;
+  focused?: boolean;
   view: "grid" | "list";
   onScanDecisions: (file: FileData) => void;
   onDownload: (id: string, filename: string) => void;
@@ -20,6 +22,7 @@ type FileSourceCardProps = {
 
 export function FileSourceCard({
   file,
+  focused = false,
   view,
   onScanDecisions,
   onDownload,
@@ -30,11 +33,16 @@ export function FileSourceCard({
 
   return (
     <div
-      className={
+      id={fileSearchFocusId("file", file.id)}
+      data-search-focused={focused ? "true" : undefined}
+      aria-current={focused || undefined}
+      tabIndex={-1}
+      className={cn(
         view === "grid"
           ? "omnix-source-card flex min-h-[174px] flex-col justify-between gap-3 p-[18px]"
-          : "omnix-source-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"
-      }
+          : "omnix-source-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between",
+        focused && "border-cyan-300/55 bg-cyan-300/[0.075] shadow-[var(--omnix-glow-sm)] focus:outline-none focus:ring-2 focus:ring-cyan-300/65",
+      )}
     >
       <div className="flex min-w-0 items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_0_14px_var(--omnix-rgba-0-255-255-0-12)]">

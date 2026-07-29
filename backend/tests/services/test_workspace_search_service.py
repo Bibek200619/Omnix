@@ -91,7 +91,31 @@ async def test_search_workspace_uses_ranked_rpc_when_available(monkeypatch: pyte
                 "title": "Launch checklist",
                 "preview": "Finish release readiness",
                 "context": "Active",
-                "url": "/tasks?id=task-1",
+                "url": "javascript:alert('stale database route')",
+                "matched_field": "full_text",
+                "created_at": "2026-06-01T00:00:00+00:00",
+                "updated_at": "2026-06-02T00:00:00+00:00",
+            },
+            {
+                "id": "document-1",
+                "workspace_id": "workspace-1",
+                "type": "document",
+                "title": "Launch evidence",
+                "preview": "Release notes",
+                "context": "Document",
+                "url": "/files?id=file-1",
+                "matched_field": "full_text",
+                "created_at": "2026-06-01T00:00:00+00:00",
+                "updated_at": "2026-06-02T00:00:00+00:00",
+            },
+            {
+                "id": "source-1",
+                "workspace_id": "workspace-1",
+                "type": "source",
+                "title": "Launch handbook",
+                "preview": "Knowledge link",
+                "context": "Connected",
+                "url": "/files?source=source-1",
                 "matched_field": "full_text",
                 "created_at": "2026-06-01T00:00:00+00:00",
                 "updated_at": "2026-06-02T00:00:00+00:00",
@@ -150,11 +174,40 @@ async def test_search_workspace_uses_ranked_rpc_when_available(monkeypatch: pyte
     )
 
     assert [item["title"] for item in result["tasks"]] == ["Launch checklist"]
-    assert [item["title"] for item in result["automations"]] == ["Launch digest"]
-    assert [item["type"] for item in result["items"]] == ["task", "automation", "workspace"]
+    assert result["tasks"][0]["url"] == "/tasks?id=task-1"
+    assert result["documents"][0]["url"] == "/files?id=file-1&document=document-1"
+    assert result["sources"][0]["url"] == "/sources?source=source-1"
+    assert result["automations"] == []
+    assert [item["type"] for item in result["items"]] == ["task", "document", "source", "workspace"]
     assert result["jobs"] == []
     assert "bearer token" not in str(result)
     assert result["pagination"] == {"limit": 2, "cursor": 2, "next_cursor": 4}
+
+
+def test_ranked_result_rejects_unsupported_and_noncanonical_document_destinations() -> None:
+    common = {
+        "workspace_id": "workspace-1",
+        "title": "Search result",
+    }
+
+    assert search._ranked_result({
+        **common,
+        "id": "automation-1",
+        "type": "automation",
+        "url": "/automations?id=automation-1",
+    }) is None
+    assert search._ranked_result({
+        **common,
+        "id": "document-1",
+        "type": "document",
+        "url": "https://example.com/files?id=file-1",
+    }) is None
+    assert search._ranked_result({
+        **common,
+        "id": "document-1",
+        "type": "document",
+        "url": "/files?id=file-1&document=document-2",
+    }) is None
 
 
 @pytest.mark.asyncio

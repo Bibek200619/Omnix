@@ -266,6 +266,18 @@ async def get_files(
         raise _database_error() from exc
 
 
+@router.get("/{file_id}", response_model=FileRead)
+async def get_file(
+    file_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    file_row, _ = await _require_file_access(
+        file_id,
+        _user_id_from_claims(current_user),
+    )
+    return {**file_row, "storage_path": None}
+
+
 @router.get("/{file_id}/versions", response_model=list[FileVersionRead])
 async def get_file_versions(
     file_id: str,

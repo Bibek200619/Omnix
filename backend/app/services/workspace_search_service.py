@@ -4,6 +4,7 @@ import asyncio
 import logging
 from collections.abc import Mapping
 from typing import Any
+from urllib.parse import parse_qs, quote, urlsplit
 
 from fastapi import HTTPException, status
 
@@ -35,11 +36,6 @@ CONNECTOR_COLUMNS = (
     "id,workspace_id,connector_type,display_name,status,last_error,source_file_id,"
     "last_synced_at,created_at,updated_at"
 )
-AUTOMATION_COLUMNS = (
-    "id,workspace_id,name,job_type,schedule,interval_seconds,enabled,user_id,"
-    "created_at,updated_at"
-)
-ACTIVITY_COLUMNS = "id,workspace_id,actor_user_id,event_type,summary,metadata,created_at"
 SEARCH_GROUPS = (
     "conversations",
     "tasks",
@@ -378,46 +374,10 @@ def _source_result(row: Mapping[str, Any]) -> dict[str, Any]:
         "title": str(row.get("display_name") or connector_type),
         "preview": _compact_text(row.get("last_error")) if row.get("last_error") else connector_type,
         "context": status_text,
-        "url": f"/files?source={connector_id}",
+        "url": f"/sources?source={connector_id}",
         "matched_field": row.get("_matched_field"),
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at") or row.get("last_synced_at"),
-    }
-
-
-def _automation_result(row: Mapping[str, Any]) -> dict[str, Any]:
-    automation_id = str(row["id"])
-    enabled = bool(row.get("enabled"))
-    job_type = str(row.get("job_type") or "automation").replace("_", " ").title()
-    return {
-        "id": automation_id,
-        "workspace_id": str(row["workspace_id"]),
-        "type": "automation",
-        "title": str(row.get("name") or "Automation"),
-        "preview": _compact_text(str(row.get("job_type") or row.get("schedule") or ""), limit=160),
-        "context": "Enabled Automation" if enabled else "Disabled Automation",
-        "url": f"/automations?id={automation_id}",
-        "matched_field": row.get("_matched_field"),
-        "created_at": row.get("created_at"),
-        "updated_at": row.get("updated_at"),
-    } | ({"preview": job_type} if not row.get("job_type") and not row.get("schedule") else {})
-
-
-def _activity_result(row: Mapping[str, Any]) -> dict[str, Any]:
-    activity_id = str(row["id"])
-    event_type = str(row.get("event_type") or "Activity").replace("_", " ").title()
-    metadata = row.get("metadata")
-    return {
-        "id": activity_id,
-        "workspace_id": str(row["workspace_id"]),
-        "type": "activity",
-        "title": str(row.get("summary") or event_type),
-        "preview": _compact_text(str(metadata), limit=160) if metadata else None,
-        "context": event_type,
-        "url": f"/workspace/activity?id={activity_id}",
-        "matched_field": row.get("_matched_field"),
-        "created_at": row.get("created_at"),
-        "updated_at": row.get("created_at"),
     }
 
 
@@ -554,7 +514,7 @@ def _ranked_result(row: Mapping[str, Any]) -> dict[str, Any] | None:
     result_id = str(row.get("id") or "")
     workspace_id = str(row.get("workspace_id") or "")
     title = str(row.get("title") or "").strip()
-    url = str(row.get("url") or "").strip()
+    url = _ranked_result_url(row, result_type=result_type, result_id=result_id)
     if not result_id or not workspace_id or not title or not url:
         return None
     return {
@@ -571,6 +531,49 @@ def _ranked_result(row: Mapping[str, Any]) -> dict[str, Any] | None:
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
     }
+
+
+def _ranked_result_url(
+    row: Mapping[str, Any],
+    *,
+    result_type: str,
+    result_id: str,
+) -> str | None:
+    destinations = {
+        "task": ("/tasks", "id"),
+        "initiative": ("/initiatives", "id"),
+        "decision": ("/decisions", "id"),
+        "file": ("/files", "id"),
+        "source": ("/sources", "source"),
+    }
+    destination = destinations.get(result_type)
+    if destination is not None and result_id:
+        path, parameter = destination
+        return f"{path}?{parameter}={quote(result_id, safe='')}"
+
+    if result_type != "document" or not result_id:
+        return None
+
+    raw_url = str(row.get("url") or "").strip()
+    parsed = urlsplit(raw_url)
+    if parsed.scheme or parsed.netloc or parsed.fragment or parsed.path != "/files":
+        return None
+    try:
+        query = parse_qs(parsed.query, keep_blank_values=True, strict_parsing=True)
+    except ValueError:
+        return None
+    if set(query) - {"id", "document"}:
+        return None
+    file_ids = query.get("id", [])
+    document_ids = query.get("document", [])
+    if len(file_ids) != 1 or not file_ids[0]:
+        return None
+    if document_ids and document_ids != [result_id]:
+        return None
+    return (
+        f"/files?id={quote(file_ids[0], safe='')}"
+        f"&document={quote(result_id, safe='')}"
+    )
 
 
 def _group_ranked_results(rows: list[dict[str, Any]], *, query: str, limit: int) -> dict[str, Any]:
