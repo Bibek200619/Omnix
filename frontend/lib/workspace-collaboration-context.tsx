@@ -18,6 +18,7 @@ import { realtimeRegistry } from "./realtime-registry";
 import { useWorkspaceIntelligence } from "./workspace-intelligence-context";
 import { useWorkspaceMembership } from "./workspace-membership-context";
 import { useWorkspaceTree } from "./workspace-tree-context";
+import { visibleRefreshRegistry } from "./visible-refresh-registry";
 import type {
   TypingSignal,
   WorkspaceActivityEvent,
@@ -436,35 +437,27 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
   useEffect(() => {
     if (!userId) return;
 
-    const heartbeatId = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
+    const unsubscribeHeartbeat = visibleRefreshRegistry.subscribe({
+      key: "collaboration-heartbeat",
+      intervalMs: HEARTBEAT_INTERVAL_MS,
+      callback: (reason) => {
         void heartbeatPresence();
-      }
-    }, HEARTBEAT_INTERVAL_MS);
-    
-    const statusId = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void refreshLiveStatuses();
-      }
-    }, STATUS_INTERVAL_MS);
-
-    const refreshVisibleWorkspaceState = () => {
-      if (document.visibilityState !== "visible") {
-        return;
-      }
-      void heartbeatPresence();
-      void refreshActivity();
-      void refreshLiveStatuses();
-    };
-
-    window.addEventListener("focus", refreshVisibleWorkspaceState);
-    document.addEventListener("visibilitychange", refreshVisibleWorkspaceState);
+        if (reason !== "interval") {
+          void refreshActivity();
+          void refreshLiveStatuses();
+        }
+      },
+    });
+    const unsubscribeStatuses = visibleRefreshRegistry.subscribe({
+      key: "collaboration-status",
+      intervalMs: STATUS_INTERVAL_MS,
+      callback: () => void refreshLiveStatuses(),
+      reactivate: false,
+    });
 
     return () => {
-      window.clearInterval(heartbeatId);
-      window.clearInterval(statusId);
-      window.removeEventListener("focus", refreshVisibleWorkspaceState);
-      document.removeEventListener("visibilitychange", refreshVisibleWorkspaceState);
+      unsubscribeHeartbeat();
+      unsubscribeStatuses();
     };
   }, [refreshActivity, refreshLiveStatuses, heartbeatPresence, userId]);
 

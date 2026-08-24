@@ -8,6 +8,7 @@ import { logClientError } from "@/lib/errors";
 import { realtimeRegistry } from "@/lib/realtime-registry";
 import { useToast } from "@/lib/toast-context";
 import { useWorkspaceTree } from "@/lib/workspace-context";
+import { visibleRefreshRegistry } from "@/lib/visible-refresh-registry";
 import type { WorkspaceMentionInboxItem } from "@/lib/workspace-types";
 
 type WorkspaceNotificationsContextType = {
@@ -186,21 +187,11 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
   useEffect(() => {
     if (!activeWorkspaceId || !userId) return;
 
-    function refreshIfVisible() {
-      if (document.visibilityState !== "hidden") {
-        void refreshRef.current({ announceNew: true });
-      }
-    }
-
-    const intervalId = window.setInterval(refreshIfVisible, 60_000);
-    window.addEventListener("focus", refreshIfVisible);
-    document.addEventListener("visibilitychange", refreshIfVisible);
-
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", refreshIfVisible);
-      document.removeEventListener("visibilitychange", refreshIfVisible);
-    };
+    return visibleRefreshRegistry.subscribe({
+      key: "workspace-notifications",
+      intervalMs: 60_000,
+      callback: () => void refreshRef.current({ announceNew: true }),
+    });
   }, [activeWorkspaceId, userId]);
 
   const markMentionRead = useCallback(
