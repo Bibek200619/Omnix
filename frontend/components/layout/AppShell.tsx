@@ -92,7 +92,7 @@ export function AppShell({ children }: AppShellProps) {
     <DashboardProviders>
       <div
         className={cn(
-          "omnix-app-bg omnix-auth-shell relative min-h-[100svh] overflow-x-hidden text-white lg:h-screen lg:min-h-0 lg:overflow-hidden",
+          "omnix-app-bg omnix-auth-shell relative h-[100dvh] min-h-0 overflow-hidden text-white lg:h-screen",
           showDashboardAmbient && "omnix-dashboard-ambient",
         )}
       >
@@ -121,7 +121,7 @@ export function AppShell({ children }: AppShellProps) {
         />
         <div
           className={cn(
-            "relative z-[1] flex min-h-[100svh] flex-col transition-[padding] duration-200 ease-out lg:h-full lg:min-h-0",
+            "relative z-[1] flex h-[100dvh] min-h-0 flex-col transition-[padding] duration-200 ease-out lg:h-full",
             isSidebarCollapsed ? "lg:pl-0" : "lg:pl-[var(--omnix-sidebar-w)]",
           )}
         >

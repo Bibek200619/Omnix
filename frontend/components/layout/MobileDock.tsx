@@ -21,7 +21,7 @@ export function MobileDock() {
   return (
     <nav
       aria-label="Primary mobile navigation"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-cyan-300/10 bg-[var(--omnix-rgba-5-12-23-0-92)] px-1 pb-[max(env(safe-area-inset-bottom),0.45rem)] pt-2 backdrop-blur-2xl lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-cyan-300/10 bg-[var(--omnix-rgba-5-12-23-0-92)] pb-[max(env(safe-area-inset-bottom),0.45rem)] pl-[max(env(safe-area-inset-left),0.25rem)] pr-[max(env(safe-area-inset-right),0.25rem)] pt-2 backdrop-blur-2xl lg:hidden"
     >
       <div className="mx-auto grid max-w-xl grid-cols-7 gap-px">
         {items.map((item) => {

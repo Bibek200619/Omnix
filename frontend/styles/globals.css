@@ -1409,6 +1409,10 @@ textarea {
 }
 
 .omnix-modal-backdrop {
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  padding-left: max(1rem, env(safe-area-inset-left));
   background:
     radial-gradient(circle at 50% 24%, rgba(0, 255, 255, 0.12), transparent 34%),
     rgba(0, 0, 0, 0.76);
@@ -1896,7 +1900,14 @@ textarea {
     max-height: min(88dvh, 46rem);
     overflow-y: auto;
     border-radius: 20px 20px 0 0;
+    padding-right: env(safe-area-inset-right);
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .omnix-modal-card[role="dialog"],
+  .omnix-modal-card[role="alertdialog"] {
+    overflow: hidden;
   }
 
   .omnix-mobile-sheet-backdrop {
