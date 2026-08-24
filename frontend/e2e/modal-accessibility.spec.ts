@@ -9,6 +9,8 @@ function frontendSource(path: string) {
 const modal = frontendSource("components/ui/Modal.tsx");
 const focusTrap = frontendSource("lib/use-focus-trap.ts");
 const filesPage = frontendSource("app/(dashboard)/files/page.tsx");
+const teamPage = frontendSource("app/(dashboard)/team/page.tsx");
+const workspacePage = frontendSource("app/(dashboard)/workspace/page.tsx");
 const documentSuggestions = frontendSource("components/files/DocumentDecisionSuggestionsModal.tsx");
 const workspaceAccess = frontendSource("components/workspace/WorkspaceAccessPanel.tsx");
 
@@ -16,6 +18,8 @@ const customModalSources = [
   "components/files/ConnectorSetupModal.tsx",
   "components/conversations/TaskFromMessageModal.tsx",
   "components/conversations/DecisionFromMessageModal.tsx",
+  "app/(dashboard)/team/page.tsx",
+  "app/(dashboard)/workspace/page.tsx",
 ].map(frontendSource);
 
 test("shared modal requires a deterministic name and exposes one dialog contract", () => {
@@ -54,6 +58,13 @@ test("visual modal overlays use the shared semantic boundary", () => {
   expect(filesPage).not.toContain("DocumentPortal");
   expect(documentSuggestions).toContain('description="Review evidence-backed decision suggestions extracted from this document."');
   expect(documentSuggestions).toContain('import { Modal } from "@/components/ui/Modal";');
+  expect(teamPage).toContain('role="alertdialog"');
+  expect(teamPage).toContain('title="Update member role"');
+  expect(teamPage).toContain('closeDisabled={Boolean(busyAction)}');
+  expect(workspacePage).toContain('form="create-workspace-form"');
+  expect(workspacePage).toContain('form="create-subworkspace-form"');
+  expect(workspacePage).toContain("closeDisabled={creating}");
+  expect(workspacePage).toContain("closeDisabled={creatingSubspace}");
   expect(workspaceAccess).toContain('role="alertdialog"');
   expect(workspaceAccess).not.toContain("<Portal>");
 });

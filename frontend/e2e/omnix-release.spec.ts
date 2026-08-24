@@ -940,6 +940,32 @@ test.describe("authenticated Omnix shell", () => {
     await expect(dialog).toBeHidden();
   });
 
+  test("workspace creation dialogs isolate the page and restore their launch controls", async ({ page }) => {
+    await page.goto("/workspace");
+
+    const workspaceTrigger = page.getByRole("button", { name: "New workspace" });
+    await workspaceTrigger.click();
+    const workspaceDialog = page.getByRole("dialog", { name: "Create workspace" });
+    await expect(workspaceDialog).toBeVisible();
+    await expect(workspaceDialog).toHaveAccessibleDescription("Add a new root workspace to the Omnix hierarchy.");
+    await expect(page.getByRole("textbox", { name: "Workspace name" })).toBeFocused();
+    await runAxe(page);
+    await page.keyboard.press("Escape");
+    await expect(workspaceDialog).toBeHidden();
+    await expect(workspaceTrigger).toBeFocused();
+
+    const subspaceTrigger = page.getByRole("button", { name: "New subworkspace" });
+    await subspaceTrigger.click();
+    const subspaceDialog = page.getByRole("dialog", { name: "Create subworkspace" });
+    await expect(subspaceDialog).toBeVisible();
+    await expect(subspaceDialog).toHaveAccessibleDescription("Add a child workspace under an existing parent workspace.");
+    await expect(page.getByRole("textbox", { name: "Subworkspace name" })).toBeFocused();
+    await runAxe(page);
+    await page.keyboard.press("Escape");
+    await expect(subspaceDialog).toBeHidden();
+    await expect(subspaceTrigger).toBeFocused();
+  });
+
   test("file connector and document suggestion overlays use the shared dialog contract", async ({ page }) => {
     await page.goto("/files");
     await page.getByRole("button", { name: /^Connectors/ }).click();
