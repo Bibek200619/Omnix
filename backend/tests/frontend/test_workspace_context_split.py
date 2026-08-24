@@ -203,13 +203,12 @@ def test_workspace_continuity_is_scoped_to_its_only_consumer() -> None:
     assert "/continuity/unresolved" in continuity
 
 
-def test_app_shell_mobile_layout_does_not_lock_document_scroll() -> None:
+def test_app_shell_mobile_layout_uses_dynamic_viewport_and_scoped_scroll() -> None:
     app_shell = read_frontend("components/layout/AppShell.tsx")
 
-    assert "h-[100dvh] overflow-hidden" not in app_shell
-    assert "min-h-[100svh]" in app_shell
-    assert "overflow-x-hidden text-white lg:h-screen" in app_shell
-    assert "lg:overflow-hidden" in app_shell
+    assert app_shell.count("h-[100dvh] min-h-0") == 2
+    assert "min-h-[100svh]" not in app_shell
+    assert "overflow-hidden text-white lg:h-screen" in app_shell
     assert "overflow-x-hidden overflow-y-auto overscroll-y-contain" in app_shell
     assert "pb-[calc(4.25rem_+_env(safe-area-inset-bottom))]" in app_shell
 

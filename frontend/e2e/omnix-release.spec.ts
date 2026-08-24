@@ -2691,7 +2691,7 @@ test.describe("authenticated Omnix shell", () => {
       }),
     ];
 
-    for (const width of [375, 390, 768]) {
+    for (const width of [375, 390, 768, 820]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto("/conversations");
       await page.getByRole("button", { name: /^General\b/ }).click();
@@ -2956,6 +2956,7 @@ test.describe("authenticated Omnix shell", () => {
 
   test("mobile navigation exposes core domains directly at phone and tablet widths", async ({ page, isMobile }) => {
     test.skip(!isMobile, "mobile project only");
+    test.setTimeout(45_000);
 
     const directRoutes = [
       ["Decisions", "/decisions"],
@@ -2963,7 +2964,7 @@ test.describe("authenticated Omnix shell", () => {
       ["Settings", "/settings"],
     ] as const;
 
-    for (const width of [375, 390, 768]) {
+    for (const width of [375, 390, 768, 820]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto("/dashboard");
       const dock = page.getByRole("navigation", { name: "Primary mobile navigation" });
@@ -2995,23 +2996,161 @@ test.describe("authenticated Omnix shell", () => {
 
     await expect(page.locator("#main-content")).toBeVisible();
 
-    const metrics = await page.evaluate(() => {
+    const taskSurface = page.locator("#main-content .omnix-container-responsive.omnix-scrollbar");
+    const metrics = await taskSurface.evaluate((surface) => {
       const shell = document.querySelector(".omnix-auth-shell") as HTMLElement | null;
-      const main = document.querySelector("#main-content") as HTMLElement | null;
       return {
-        documentScrollHeight: document.scrollingElement?.scrollHeight ?? 0,
-        mainOverflowY: main ? window.getComputedStyle(main).overflowY : "",
         shellOverflowY: shell ? window.getComputedStyle(shell).overflowY : "",
+        surfaceClientHeight: surface.clientHeight,
+        surfaceOverflowY: window.getComputedStyle(surface).overflowY,
+        surfaceScrollHeight: surface.scrollHeight,
+      };
+    });
+
+    expect(metrics.shellOverflowY).toBe("hidden");
+    expect(metrics.surfaceOverflowY).not.toBe("hidden");
+    expect(metrics.surfaceScrollHeight).toBeGreaterThan(metrics.surfaceClientHeight);
+
+    await taskSurface.evaluate((element) => element.scrollTo(0, 320));
+    await expect.poll(() => taskSurface.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  });
+
+  test("mobile viewport keeps the focused chat composer above the dock after keyboard shrink", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "mobile project only");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/chat");
+    await page.getByRole("button", { name: "Close history" }).click();
+
+    const viewportMeta = await page.locator('meta[name="viewport"]').getAttribute("content");
+    expect(viewportMeta).toContain("viewport-fit=cover");
+    expect(viewportMeta).toContain("interactive-widget=resizes-content");
+
+    const composer = page.getByRole("textbox", { name: "Message composer" });
+    await composer.focus();
+    await page.setViewportSize({ width: 390, height: 500 });
+    await expect(composer).toBeFocused();
+
+    const metrics = await page.evaluate(() => {
+      const sendButton = document.querySelector('button[aria-label="Send message"]');
+      const dock = document.querySelector('nav[aria-label="Primary mobile navigation"]');
+      const sendRect = sendButton?.getBoundingClientRect();
+      const dockRect = dock?.getBoundingClientRect();
+      return {
+        dockBottom: dockRect?.bottom ?? Number.POSITIVE_INFINITY,
+        dockTop: dockRect?.top ?? 0,
+        documentWidth: document.scrollingElement?.scrollWidth ?? 0,
+        sendBottom: sendRect?.bottom ?? Number.POSITIVE_INFINITY,
+        viewportHeight: window.innerHeight,
+        viewportWidth: window.innerWidth,
+      };
+    });
+
+    expect(metrics.sendBottom).toBeLessThanOrEqual(metrics.dockTop + 1);
+    expect(metrics.dockBottom).toBeLessThanOrEqual(metrics.viewportHeight + 1);
+    expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+  });
+
+  test("long task titles stay contained from narrow phones through touch tablets", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "mobile project only");
+    const longTitle = "Coordinate the cross-functional release readiness review without widening the mobile workspace";
+    tasks = [{ ...tasks[0], title: longTitle }, ...tasks.slice(1)];
+
+    for (const width of [375, 390, 768, 820]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto("/tasks");
+      await expect(page.getByText(longTitle, { exact: true })).toBeVisible();
+      const metrics = await page.evaluate(() => ({
+        documentWidth: document.scrollingElement?.scrollWidth ?? 0,
+        viewportWidth: window.innerWidth,
+      }));
+      expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+    }
+  });
+
+  test("wide chat tables scroll locally without widening the phone layout", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "mobile project only");
+    conversations = [
+      {
+        id: "wide-table",
+        workspace_id: "workspace-1",
+        title: "Release matrix",
+        preview: "A wide comparison table",
+        latest_message_role: "assistant",
+        latest_message_at: "2026-06-20T00:00:00Z",
+      },
+    ];
+    messagesByConversation = {
+      "wide-table": [
+        {
+          id: "message-wide-table",
+          conversation_id: "wide-table",
+          role: "assistant",
+          content: [
+            "| Workstream | Owner | Dependency | Verification |",
+            "| --- | --- | --- | --- |",
+            "| Mobile release readiness | CrossFunctionalOperationsOwner | AuthenticationAndWorkspaceIsolationDependency | DesktopMobileIntegrationVerification |",
+          ].join("\n"),
+          status: "completed",
+          created_at: "2026-06-20T00:00:00Z",
+        },
+      ],
+    };
+
+    await page.setViewportSize({ width: 375, height: 844 });
+    await page.goto("/chat?conversation=wide-table");
+    await page.getByRole("button", { name: "Close history" }).click();
+    const table = page.getByRole("table");
+    await expect(table).toBeVisible();
+    const metrics = await table.evaluate((element) => {
+      const scroller = element.parentElement;
+      return {
+        documentWidth: document.scrollingElement?.scrollWidth ?? 0,
+        scrollerClientWidth: scroller?.clientWidth ?? 0,
+        scrollerScrollWidth: scroller?.scrollWidth ?? 0,
+        viewportWidth: window.innerWidth,
+      };
+    });
+    expect(metrics.scrollerScrollWidth).toBeGreaterThan(metrics.scrollerClientWidth);
+    expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+  });
+
+  test("short mobile viewports keep modal header and footer fixed around a scrollable body", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "mobile project only");
+    await page.setViewportSize({ width: 390, height: 520 });
+    await page.goto("/decisions?create=decision&palette=mobile-scroll");
+
+    const dialog = page.getByRole("dialog", { name: "Record New Decision" });
+    const body = dialog.locator(":scope > form > .omnix-scrollbar");
+    const submit = dialog.getByRole("button", { name: "Record Decision" });
+    await expect(dialog).toBeVisible();
+    await expect(body).toBeVisible();
+    await expect(submit).toBeVisible();
+
+    const metrics = await dialog.evaluate((element) => {
+      const bodyElement = element.querySelector(":scope > form > .omnix-scrollbar");
+      const submitButton = element.querySelector('button[form][type="submit"]');
+      const dialogRect = element.getBoundingClientRect();
+      const submitRect = submitButton?.getBoundingClientRect();
+      return {
+        bodyClientHeight: bodyElement?.clientHeight ?? 0,
+        bodyOverflowY: bodyElement ? getComputedStyle(bodyElement).overflowY : "",
+        bodyScrollHeight: bodyElement?.scrollHeight ?? 0,
+        dialogBottom: dialogRect.bottom,
+        dialogTop: dialogRect.top,
+        submitBottom: submitRect?.bottom ?? Number.POSITIVE_INFINITY,
         viewportHeight: window.innerHeight,
       };
     });
 
-    expect(metrics.shellOverflowY).not.toBe("hidden");
-    expect(metrics.mainOverflowY).not.toBe("hidden");
-    expect(metrics.documentScrollHeight).toBeGreaterThan(metrics.viewportHeight);
+    expect(metrics.bodyOverflowY).toBe("auto");
+    expect(metrics.bodyScrollHeight).toBeGreaterThan(metrics.bodyClientHeight);
+    expect(metrics.dialogTop).toBeGreaterThanOrEqual(0);
+    expect(metrics.dialogBottom).toBeLessThanOrEqual(metrics.viewportHeight + 1);
+    expect(metrics.submitBottom).toBeLessThanOrEqual(metrics.viewportHeight + 1);
 
-    await page.evaluate(() => window.scrollTo(0, 320));
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    await body.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+    await expect(dialog.getByRole("heading", { name: "Record New Decision" })).toBeVisible();
+    await expect(submit).toBeVisible();
   });
 
   test("mobile task creation does not autofocus the title field", async ({ page, isMobile }) => {
