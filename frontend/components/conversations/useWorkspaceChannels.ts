@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -42,7 +43,9 @@ export function useWorkspaceChannels(activeWorkspaceId: string | null) {
   const [dismissedError, setDismissedError] =
     useState<DismissedChannelError | null>(null);
   const activeWorkspaceRef = useRef(activeWorkspaceId);
-  activeWorkspaceRef.current = activeWorkspaceId;
+  useLayoutEffect(() => {
+    activeWorkspaceRef.current = activeWorkspaceId;
+  }, [activeWorkspaceId]);
 
   const endpoint = activeWorkspaceId
     ? `/workspaces/${activeWorkspaceId}/channels`
@@ -148,7 +151,8 @@ export function useWorkspaceChannels(activeWorkspaceId: string | null) {
 
   const refreshChannels = useCallback(async () => {
     setDismissedError(null);
-    await refetchChannelsQuery({ cancelRefetch: true });
+    const result = await refetchChannelsQuery({ cancelRefetch: true });
+    return result.data ?? [];
   }, [refetchChannelsQuery]);
 
   const dismissChannelsError = useCallback(() => {

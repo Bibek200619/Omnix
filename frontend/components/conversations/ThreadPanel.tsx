@@ -61,8 +61,6 @@ export function ThreadPanel({
     const content = threadDraft.trim();
     if (!content || !mayPost || threadSending) return;
     const mentions = threadDraftMentions;
-    onThreadDraftChange("");
-    onThreadDraftMentionsChange([]);
     onTypingChange(false);
     onSend(content, rootId, mentions);
   }

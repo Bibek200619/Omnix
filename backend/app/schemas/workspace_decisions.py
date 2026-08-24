@@ -41,6 +41,7 @@ class WorkspaceDecisionCreate(BaseModel):
     status: DecisionStatus = "accepted"
     source_type: DecisionSourceType | None = None
     source_id: str | None = Field(default=None, max_length=160)
+    client_nonce: str | None = Field(default=None, max_length=100)
     mentions: list[WorkspaceMentionInput] = Field(default_factory=list, max_length=50)
 
 
@@ -59,6 +60,7 @@ class WorkspaceDecisionCandidateCreate(BaseModel):
     source_type: DecisionCandidateSourceType
     source_id: str = Field(..., min_length=1, max_length=160)
     source_evidence: list[DecisionEvidence] = Field(..., min_length=1, max_length=5)
+    client_nonce: str | None = Field(default=None, max_length=100)
     mentions: list[WorkspaceMentionInput] = Field(default_factory=list, max_length=50)
 
 
@@ -67,6 +69,7 @@ class WorkspaceDecisionFromMessageCreate(BaseModel):
     description: str | None = Field(default=None, max_length=4000)
     decision_reason: str | None = Field(default=None, max_length=6000)
     status: DecisionStatus = "accepted"
+    client_nonce: str | None = Field(default=None, max_length=100)
     mentions: list[WorkspaceMentionInput] = Field(default_factory=list, max_length=50)
 
 
@@ -123,6 +126,7 @@ class WorkspaceDecisionRead(BaseModel):
     source_channel_id: str | None = None
     source_evidence: list[DecisionEvidence] = Field(default_factory=list)
     initiative_id: str | None = None
+    client_nonce: str | None = None
     created_by: str
     created_at: datetime | None = None
     updated_at: datetime | None = None

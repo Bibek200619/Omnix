@@ -27,7 +27,9 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
     loading,
     error: workspaceError,
     activeWorkspace,
+    activeWorkspaceId,
     activeRootWorkspace,
+    captureActiveWorkspaceSelection,
     setActiveWorkspace,
     refreshWorkspaces,
     createWorkspace,
@@ -105,6 +107,23 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
     });
   }, [activeRootWorkspace?.id, activeRootWorkspace?.workspace_type]);
 
+  useEffect(() => {
+    setCreatingWorkspace(false);
+    setCreatingSubspace(false);
+    setInviting(false);
+    setRenaming(false);
+    setDeleting(false);
+    setCreateError(null);
+    setCreateSubspaceError(null);
+    setInviteError(null);
+    setRenameError(null);
+    setDeleteError(null);
+    setShowCreateSubspaceModal(false);
+    setInviteOpen(false);
+    setRenameOpen(false);
+    setDeleteOpen(false);
+  }, [activeWorkspaceId]);
+
   function finishWorkspaceAction() {
     setOpen(false);
     onWorkspaceSelect?.();
@@ -126,85 +145,100 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
 
   async function handleCreateWorkspace() {
     if (!newWorkspaceName.trim() || creatingWorkspace) return;
+    const owner = captureActiveWorkspaceSelection();
     try {
       setCreatingWorkspace(true);
       setCreateError(null);
       const created = await createWorkspace({ name: newWorkspaceName.trim(), workspace_type: "super_workspace" });
+      if (!owner.isCurrent()) return;
       setActiveWorkspace(created.id);
       setNewWorkspaceName("");
       setShowCreateForm(false);
       finishWorkspaceAction();
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to create workspace", err, { endpoint: "/workspaces" });
       setCreateError("Unable to create workspace. Check your connection and try again.");
     } finally {
-      setCreatingWorkspace(false);
+      if (owner.isCurrent()) setCreatingWorkspace(false);
     }
   }
 
   async function handleCreateSubspace() {
     if (!activeSuperWorkspace || !newSubspaceName.trim() || creatingSubspace) return;
+    const owner = captureActiveWorkspaceSelection();
     try {
       setCreatingSubspace(true);
       setCreateSubspaceError(null);
       const created = await createSubspace(activeSuperWorkspace.id, { name: newSubspaceName.trim() });
+      if (!owner.isCurrent()) return;
       setExpandedWorkspaceIds((current) => new Set(current).add(activeSuperWorkspace.id));
       setActiveWorkspace(created.id);
       setNewSubspaceName("");
       setShowCreateSubspaceModal(false);
       finishWorkspaceAction();
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to create subspace", err);
       setCreateSubspaceError("Unable to create subspace. Check your connection and try again.");
     } finally {
-      setCreatingSubspace(false);
+      if (owner.isCurrent()) setCreatingSubspace(false);
     }
   }
 
   async function handleInvite(target: string, role: WorkspaceRole) {
+    const owner = captureActiveWorkspaceSelection();
     try {
       setInviting(true);
       setInviteError(null);
       await inviteToActiveWorkspace(target, role);
+      if (!owner.isCurrent()) return;
       setInviteOpen(false);
       finishWorkspaceAction();
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to invite teammate", err);
       setInviteError("Unable to invite teammate. Check the email address and try again.");
     } finally {
-      setInviting(false);
+      if (owner.isCurrent()) setInviting(false);
     }
   }
 
   async function handleRenameWorkspace() {
     if (!active || !renameDraft.trim() || renaming) return;
+    const owner = captureActiveWorkspaceSelection();
     try {
       setRenaming(true);
       setRenameError(null);
       await renameWorkspace(active.id, { name: renameDraft.trim() });
+      if (!owner.isCurrent()) return;
       setRenameOpen(false);
       finishWorkspaceAction();
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to rename workspace", err, { endpoint: `/workspaces/${active.id}` });
       setRenameError("Unable to rename workspace. Your session may have expired; refresh and try again.");
     } finally {
-      setRenaming(false);
+      if (owner.isCurrent()) setRenaming(false);
     }
   }
 
   async function handleDeleteWorkspace() {
     if (!active || deleting || deleteConfirmText !== active.name) return;
+    const owner = captureActiveWorkspaceSelection();
     try {
       setDeleting(true);
       setDeleteError(null);
       await deleteWorkspace(active.id);
+      if (!owner.isCurrent()) return;
       setDeleteOpen(false);
       finishWorkspaceAction();
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to delete workspace", err, { endpoint: `/workspaces/${active.id}` });
       setDeleteError("Unable to delete workspace. Your session may have expired; refresh and try again.");
     } finally {
-      setDeleting(false);
+      if (owner.isCurrent()) setDeleting(false);
     }
   }
 

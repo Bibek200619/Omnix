@@ -141,6 +141,43 @@ function workspaceChannelMessage(
   };
 }
 
+function workspaceInitiative(
+  id: string,
+  title: string,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    activity_metadata: {},
+    created_at: "2026-06-20T00:00:00Z",
+    id,
+    initiative_context: null,
+    linked_channels: [],
+    linked_decisions: [],
+    linked_resources: [],
+    linked_tasks: [],
+    momentum: {
+      blocked_task_count: 0,
+      channel_count: 0,
+      complete_task_count: 0,
+      discussion_message_count: 0,
+      due_soon_count: 0,
+      health: "quiet",
+      last_movement_at: null,
+      open_task_count: 0,
+      overdue_count: 0,
+      summary: "No active operational movement detected.",
+      task_count: 0,
+    },
+    owner_user_id: null,
+    status: "active",
+    target_date: null,
+    title,
+    updated_at: "2026-06-20T00:00:00Z",
+    workspace_id: "workspace-1",
+    ...overrides,
+  };
+}
+
 function resetMockState() {
   conversations = [];
   messagesByConversation = {};
@@ -347,6 +384,31 @@ async function mockApi(page: Page) {
       return fulfillJson(route, workspaceChannels.filter((channel) => channel.workspace_id === channelsMatch[1]));
     }
     const channelMessagesMatch = path.match(/^\/workspaces\/([^/]+)\/channels\/([^/]+)\/messages$/);
+    if (channelMessagesMatch && method === "POST") {
+      const body = request.postDataJSON() as Record<string, unknown>;
+      const created = workspaceChannelMessage(
+        workspaceChannelMessages.length + 1,
+        {
+          id: `channel-message-${workspaceChannelMessages.length + 1}`,
+          workspace_id: channelMessagesMatch[1],
+          channel_id: channelMessagesMatch[2],
+          author_user_id: userId,
+          parent_message_id:
+            typeof body.parent_message_id === "string"
+              ? body.parent_message_id
+              : null,
+          content: String(body.content ?? ""),
+          client_nonce:
+            typeof body.client_nonce === "string"
+              ? body.client_nonce
+              : null,
+          author_name: "Release Tester",
+          author_avatar_label: "R",
+        },
+      );
+      workspaceChannelMessages = [...workspaceChannelMessages, created];
+      return fulfillJson(route, created, 201);
+    }
     if (channelMessagesMatch && method === "GET") {
       const limit = Number(url.searchParams.get("limit") ?? "60");
       const offset = Number(url.searchParams.get("offset") ?? "0");
@@ -664,6 +726,11 @@ test("merges message pages while excluding each pagination probe", () => {
     workspaceChannelMessage(6, { parent_message_id: "root" }),
   );
   expect(counted).toMatchObject([{ id: "root", thread_reply_count: 1 }]);
+  const countedFromRawRoot = incrementThreadReplyCount(
+    [{ ...root, thread_reply_count: undefined } as unknown as WorkspaceChannelMessage],
+    workspaceChannelMessage(7, { parent_message_id: "root" }),
+  );
+  expect(countedFromRawRoot).toMatchObject([{ id: "root", thread_reply_count: 1 }]);
 });
 
 test.describe("public auth pages", () => {
@@ -930,6 +997,1133 @@ test.describe("authenticated Omnix shell", () => {
     expect(channelRequests).toBe(2);
   });
 
+  test("reconciles a channel that committed before its response was lost", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    workspaceChannels = [workspaceChannel()];
+    let createRequests = 0;
+    await page.route(
+      "**/api/workspaces/workspace-1/channels",
+      async (route) => {
+        if (route.request().method() !== "POST") {
+          return route.fallback();
+        }
+        createRequests += 1;
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        workspaceChannels = [
+          ...workspaceChannels,
+          workspaceChannel({
+            id: "channel-release",
+            name: String(body.name),
+            slug: "release-coordination",
+            purpose: String(body.purpose),
+          }),
+        ];
+        return fulfillJson(route, { detail: "Response lost after commit" }, 503);
+      },
+    );
+
+    await page.goto("/conversations");
+    await page.getByRole("button", { name: "Create channel" }).click();
+    await page.getByPlaceholder("backend").fill("Release coordination");
+    await page.getByRole("textbox", { name: "Channel purpose" }).fill("Coordinate release");
+    await page.getByRole("button", { name: "Open", exact: true }).click();
+
+    await expect(page.getByRole("heading", { name: "Release coordination" })).toBeVisible();
+    await expect(page.getByText(
+      "Unable to create operational channel. Your session may have expired; refresh and try again.",
+      { exact: true },
+    )).toHaveCount(0);
+    expect(createRequests).toBe(1);
+  });
+
+  test("a changed channel retry clears the prior attempt's failure banner", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    workspaceChannels = [workspaceChannel()];
+    let createRequests = 0;
+    let channelGetRequests = 0;
+    await page.route(
+      "**/api/workspaces/workspace-1/channels",
+      async (route) => {
+        if (route.request().method() !== "POST") {
+          channelGetRequests += 1;
+          return fulfillJson(route, workspaceChannels);
+        }
+        createRequests += 1;
+        if (createRequests === 1) {
+          return fulfillJson(route, { detail: "Temporary channel failure" }, 503);
+        }
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        const created = workspaceChannel({
+          id: "channel-retry",
+          name: String(body.name),
+          slug: "retry-coordination",
+          purpose: String(body.purpose),
+        });
+        workspaceChannels = [...workspaceChannels, created];
+        return fulfillJson(route, created, 201);
+      },
+    );
+
+    await page.goto("/conversations");
+    await page.getByRole("button", { name: "Create channel" }).click();
+    await page.getByPlaceholder("backend").fill("Retry coordination");
+    await page.getByRole("textbox", { name: "Channel purpose" }).fill("Retry safely");
+    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await expect.poll(() => createRequests).toBe(1);
+    await expect.poll(() => channelGetRequests).toBeGreaterThan(1);
+    const createError = page.getByText(
+      "Unable to create operational channel. Your session may have expired; refresh and try again.",
+      { exact: true },
+    );
+    await expect(createError).toBeVisible();
+
+    await page.getByPlaceholder("backend").fill("Changed retry coordination");
+    await page.getByRole("textbox", { name: "Channel purpose" }).fill("Changed retry safely");
+    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Changed retry coordination" })).toBeVisible();
+    await expect(createError).toHaveCount(0);
+    expect(createRequests).toBe(2);
+  });
+
+  test("a channel create lane is reusable after an A-B-A workspace change", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    workspaceChannels = [
+      workspaceChannel(),
+      workspaceChannel({
+        id: "channel-platform",
+        name: "Platform coordination",
+        slug: "platform-coordination",
+        workspace_id: "workspace-2",
+      }),
+    ];
+    let releaseFirst!: () => void;
+    let markFirstStarted!: () => void;
+    let createAttempts = 0;
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const firstStarted = new Promise<void>((resolve) => { markFirstStarted = resolve; });
+    await page.route("**/api/workspaces/workspace-1/channels", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      createAttempts += 1;
+      const attemptNumber = createAttempts;
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      if (attemptNumber === 1) {
+        markFirstStarted();
+        await firstGate;
+      }
+      const created = workspaceChannel({
+        id: attemptNumber === 1 ? "channel-old-scope" : "channel-returned-scope",
+        name: String(body.name),
+        slug: attemptNumber === 1 ? "old-scope" : "returned-scope",
+        purpose: String(body.purpose),
+      });
+      if (attemptNumber === 2) workspaceChannels = [...workspaceChannels, created];
+      return fulfillJson(route, created, 201);
+    });
+
+    await page.goto("/conversations");
+    await page.getByRole("button", { name: "Create channel" }).click();
+    await page.getByPlaceholder("backend").fill("Old scope channel");
+    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await firstStarted;
+    await page.getByRole("button", { name: /Switch workspace\. Current workspace: Acme Operations/ }).click();
+    await page.getByRole("button", { name: "Switch to Platform Lab" }).click();
+    await page.getByRole("button", { name: /Switch workspace\. Current workspace: Platform Lab/ }).click();
+    await page.getByRole("button", { name: "Switch to Acme Operations" }).click();
+
+    await page.getByRole("button", { name: "Create channel" }).click();
+    await page.getByPlaceholder("backend").fill("Returned scope channel");
+    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Returned scope channel" })).toBeVisible();
+    releaseFirst();
+    await page.evaluate(() => new Promise<void>((resolve) =>
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve())),
+    ));
+    await expect(page.getByRole("heading", { name: "Old scope channel" })).toHaveCount(0);
+    expect(createAttempts).toBe(2);
+  });
+
+  test("a slow channel create does not replace a newer channel selection", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    workspaceChannels = [
+      workspaceChannel(),
+      workspaceChannel({ id: "channel-planning", name: "Planning", slug: "planning" }),
+    ];
+    let releaseCreate!: () => void;
+    let markCreateStarted!: () => void;
+    const createGate = new Promise<void>((resolve) => { releaseCreate = resolve; });
+    const createStarted = new Promise<void>((resolve) => { markCreateStarted = resolve; });
+    await page.route("**/api/workspaces/workspace-1/channels", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      markCreateStarted();
+      await createGate;
+      const created = workspaceChannel({
+        id: "channel-slow-create",
+        name: String(body.name),
+        slug: "slow-create",
+        purpose: String(body.purpose),
+      });
+      workspaceChannels = [...workspaceChannels, created];
+      return fulfillJson(route, created, 201);
+    });
+
+    await page.goto("/conversations");
+    await page.getByRole("button", { name: "Create channel" }).click();
+    await page.getByPlaceholder("backend").fill("Slow create");
+    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await createStarted;
+    await page.getByRole("button", { name: /^Planning/ }).click();
+    await expect(page.getByRole("heading", { name: "Planning" })).toBeVisible();
+
+    releaseCreate();
+    await expect(page.getByRole("button", { name: /^Slow create/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Planning" })).toBeVisible();
+  });
+
+  test("resolving a newer delivery failure reveals an older channel failure", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    workspaceChannels = [workspaceChannel()];
+    let messageAttempts = 0;
+    await page.route("**/api/workspaces/workspace-1/channels", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      return fulfillJson(route, { detail: "Channel create failed" }, 503);
+    });
+    await page.route("**/api/workspaces/workspace-1/channels/channel-general/messages", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      messageAttempts += 1;
+      if (messageAttempts === 1) return fulfillJson(route, { detail: "Message failed" }, 503);
+      return route.fallback();
+    });
+
+    await page.goto("/conversations");
+    await page.getByRole("button", { name: "Create channel" }).click();
+    await page.getByPlaceholder("backend").fill("Failure ordering");
+    await page.getByRole("button", { name: "Open", exact: true }).click();
+    const channelError = page.getByText(
+      "Unable to create operational channel. Your session may have expired; refresh and try again.",
+      { exact: true },
+    );
+    await expect(channelError).toBeVisible();
+
+    const composer = page.getByPlaceholder("Write an operational update...");
+    await composer.fill("Failure ordering update");
+    await page.getByRole("button", { name: "Send" }).click();
+    const deliveryError = page.getByText("Unable to deliver message. Check your connection and try again.", { exact: true });
+    await expect(deliveryError).toBeVisible();
+    await expect(channelError).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(deliveryError).toHaveCount(0);
+    await expect(channelError).toBeVisible();
+  });
+
+  test("deduplicates a failed message submit and reuses its nonce on retry", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    workspaceChannels = [workspaceChannel()];
+    const attempts: Array<Record<string, unknown>> = [];
+    let releaseFailure!: () => void;
+    let markStarted!: () => void;
+    const failureGate = new Promise<void>((resolve) => {
+      releaseFailure = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+
+    await page.route(
+      "**/api/workspaces/workspace-1/channels/channel-general/messages",
+      async (route) => {
+        if (route.request().method() !== "POST") {
+          return route.fallback();
+        }
+        attempts.push(route.request().postDataJSON() as Record<string, unknown>);
+        if (attempts.length === 1) {
+          markStarted();
+          await failureGate;
+          return fulfillJson(route, { detail: "Temporary send failure" }, 503);
+        }
+        await route.fallback();
+      },
+    );
+
+    await page.goto("/conversations");
+    const composer = page.getByPlaceholder("Write an operational update...");
+    await expect(page.getByRole("button", { name: /^General/ })).toBeVisible();
+    await page.getByRole("button", { name: /^General/ }).click();
+    await expect(composer).toBeVisible();
+    await composer.fill("Retry-safe operational update");
+    const composerForm = page.locator("form").filter({ has: composer });
+    await composerForm.evaluate((form) => {
+      const composerElement = form as HTMLFormElement;
+      composerElement.requestSubmit();
+      composerElement.requestSubmit();
+    });
+
+    await started;
+    await expect.poll(() => attempts.length).toBe(1);
+    releaseFailure();
+
+    const deliveryError = page.getByText("Unable to deliver message. Check your connection and try again.");
+    await expect(deliveryError).toBeVisible();
+    await expect(composer).toHaveValue("Retry-safe operational update");
+    const failedMessage = page.locator("article").filter({ hasText: "Retry-safe operational update" });
+    await expect(failedMessage.getByText("delivery failed")).toBeVisible();
+    await expect(failedMessage.getByRole("button", { name: "Track as task" })).toHaveCount(0);
+    await expect(failedMessage.getByRole("button", { name: "Convert to Decision" })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect.poll(() => attempts.length).toBe(2);
+    expect(attempts[1]?.client_nonce).toBe(attempts[0]?.client_nonce);
+    await expect(composer).toHaveValue("");
+    await expect(deliveryError).toHaveCount(0);
+    await expect(failedMessage.getByText("delivery failed")).toHaveCount(0);
+    await expect(failedMessage.getByRole("button", { name: "Track as task" })).toBeVisible();
+  });
+
+  test("a forced canonical snapshot reconciles a response-loss message without reload", async ({ page, isMobile }) => {
+    workspaceChannels = [workspaceChannel()];
+    let canonical: WorkspaceChannelMessage | null = null;
+    let postAttempts = 0;
+    let getAttempts = 0;
+
+    await page.route(
+      "**/api/workspaces/workspace-1/channels/channel-general/messages*",
+      async (route) => {
+        if (route.request().method() === "GET") {
+          getAttempts += 1;
+          return fulfillJson(route, canonical ? [canonical] : []);
+        }
+        if (route.request().method() === "POST") {
+          postAttempts += 1;
+          const body = route.request().postDataJSON() as Record<string, unknown>;
+          canonical = workspaceChannelMessage(21, {
+            id: "message-response-loss",
+            author_user_id: userId,
+            author_name: "Release Tester",
+            author_avatar_label: "R",
+            client_nonce: String(body.client_nonce),
+            content: String(body.content),
+          });
+          return fulfillJson(route, { detail: "Response lost after commit" }, 503);
+        }
+        return route.fallback();
+      },
+    );
+
+    await page.goto("/conversations");
+    if (isMobile) await page.getByRole("button", { name: /^General/ }).click();
+    const composer = page.getByPlaceholder("Write an operational update...");
+    await expect(composer).toBeVisible();
+    await composer.fill("Snapshot-reconciled update");
+    await page.getByRole("button", { name: "Send" }).click();
+    const deliveryError = page.getByText(
+      "Unable to deliver message. Check your connection and try again.",
+      { exact: true },
+    );
+    const committed = page.locator("article").filter({ hasText: "Snapshot-reconciled update" });
+    await expect.poll(() => postAttempts).toBe(1);
+    await expect.poll(() => getAttempts).toBeGreaterThan(1);
+    await expect(committed).toHaveCount(1);
+    await expect(committed.getByText("sending")).toHaveCount(0);
+    await expect(committed.getByText("delivery failed")).toHaveCount(0);
+    await expect(deliveryError).toHaveCount(0);
+    await expect(composer).toHaveValue("");
+  });
+
+  test("a forced thread snapshot reconciles a response-loss reply without reload", async ({ page, isMobile }) => {
+    const root = workspaceChannelMessage(1, {
+      id: "response-loss-thread-root",
+      content: "Coordinate the response-loss follow-through",
+      thread_reply_count: 0,
+    });
+    workspaceChannels = [workspaceChannel()];
+    workspaceChannelMessages = [root];
+    let canonicalReply: WorkspaceChannelMessage | null = null;
+    let postAttempts = 0;
+    let threadGetAttempts = 0;
+
+    await page.route(
+      "**/api/workspaces/workspace-1/channels/channel-general/messages*",
+      async (route) => {
+        const url = new URL(route.request().url());
+        if (route.request().method() === "GET") {
+          const canonicalRoot = {
+            ...root,
+            thread_reply_count: canonicalReply ? 1 : 0,
+          };
+          if (url.searchParams.get("thread_root_id") === root.id) {
+            threadGetAttempts += 1;
+            return fulfillJson(route, canonicalReply
+              ? [canonicalRoot, canonicalReply]
+              : [canonicalRoot]);
+          }
+          return fulfillJson(route, [canonicalRoot]);
+        }
+        if (route.request().method() === "POST") {
+          postAttempts += 1;
+          const body = route.request().postDataJSON() as Record<string, unknown>;
+          canonicalReply = workspaceChannelMessage(2, {
+            id: "response-loss-thread-reply",
+            author_user_id: userId,
+            author_name: "Release Tester",
+            author_avatar_label: "R",
+            parent_message_id: root.id,
+            client_nonce: String(body.client_nonce),
+            content: String(body.content),
+          });
+          return fulfillJson(route, { detail: "Response lost after commit" }, 503);
+        }
+        return route.fallback();
+      },
+    );
+
+    await page.goto("/conversations");
+    if (isMobile) await page.getByRole("button", { name: /^General/ }).click();
+    const rootRow = page.locator("article").filter({
+      hasText: "Coordinate the response-loss follow-through",
+    });
+    await rootRow.getByRole("button", { name: "Open thread" }).click();
+    const composer = page.getByPlaceholder("Add focused follow-through...");
+    await composer.fill("Canonical response-loss reply");
+    await page.getByRole("button", { name: "Reply in thread" }).click();
+
+    const committed = page.locator(".omnix-conversation-thread article").filter({
+      hasText: "Canonical response-loss reply",
+    });
+    await expect.poll(() => postAttempts).toBe(1);
+    await expect.poll(() => threadGetAttempts).toBeGreaterThan(1);
+    await expect(committed).toHaveCount(1);
+    await expect(committed.getByText("sending")).toHaveCount(0);
+    await expect(committed.getByText("delivery failed")).toHaveCount(0);
+    await expect(page.getByText(
+      "Unable to deliver message. Check your connection and try again.",
+      { exact: true },
+    )).toHaveCount(0);
+    await expect(composer).toHaveValue("");
+  });
+
+  test("conversation conversion retries clear their owned failure banners", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    workspaceChannels = [workspaceChannel()];
+    workspaceChannelMessages = [workspaceChannelMessage(1, {
+      id: "message-conversion-source",
+      content: "Approve the retry-safe rollout",
+    })];
+    let taskAttempts = 0;
+    let decisionAttempts = 0;
+    const taskNonces: string[] = [];
+    const decisionNonces: string[] = [];
+
+    await page.route(
+      "**/api/workspaces/workspace-1/tasks/from-message/channel-general/message-conversion-source",
+      async (route) => {
+        taskAttempts += 1;
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        taskNonces.push(String(body.client_nonce));
+        if (taskAttempts === 1) {
+          return fulfillJson(route, { detail: "Temporary task conversion failure" }, 503);
+        }
+        return fulfillJson(route, {
+          id: "task-from-conversation",
+          workspace_id: "workspace-1",
+          title: body.title,
+          client_nonce: body.client_nonce,
+        }, 201);
+      },
+    );
+    await page.route(
+      "**/api/workspaces/workspace-1/decisions/from-message/channel-general/message-conversion-source",
+      async (route) => {
+        decisionAttempts += 1;
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        decisionNonces.push(String(body.client_nonce));
+        if (decisionAttempts === 1) {
+          return fulfillJson(route, { detail: "Temporary decision conversion failure" }, 503);
+        }
+        return fulfillJson(route, {
+          id: "decision-from-conversation",
+          workspace_id: "workspace-1",
+          title: body.title,
+          client_nonce: body.client_nonce,
+        }, 201);
+      },
+    );
+
+    await page.goto("/conversations");
+    const sourceMessage = page.locator("article").filter({
+      hasText: "Approve the retry-safe rollout",
+    });
+    await expect(sourceMessage).toBeVisible();
+
+    await sourceMessage.getByRole("button", { name: "Track as task" }).click();
+    await page.getByRole("button", { name: "Open task" }).click();
+    const taskError = page.getByText(
+      "Unable to open task from discussion. Check your connection and try again.",
+      { exact: true },
+    );
+    await expect(taskError).toBeVisible();
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await sourceMessage.getByRole("button", { name: "Track as task" }).click();
+    await page.getByRole("button", { name: "Open task" }).click();
+    await expect(page.getByText(/Task opened: Approve the retry-safe rollout/)).toBeVisible();
+    await expect(taskError).toHaveCount(0);
+
+    await sourceMessage.getByRole("button", { name: "Convert to Decision" }).click();
+    await page.getByRole("button", { name: "Record decision" }).click();
+    const decisionError = page.getByText(
+      "Unable to record decision from discussion. Check your connection and try again.",
+      { exact: true },
+    );
+    await expect(decisionError).toBeVisible();
+    await page.getByRole("button", { name: "Record decision" }).click();
+    await expect(page.getByText(/Decision recorded: Approve the retry-safe rollout/)).toBeVisible();
+    await expect(decisionError).toHaveCount(0);
+    expect(taskAttempts).toBe(2);
+    expect(taskNonces[1]).toBe(taskNonces[0]);
+    expect(decisionAttempts).toBe(2);
+    expect(decisionNonces[1]).toBe(decisionNonces[0]);
+  });
+
+  test("task conversion reconciles a canonical commit after response loss", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    workspaceChannels = [workspaceChannel()];
+    workspaceChannelMessages = [workspaceChannelMessage(1, {
+      id: "message-task-response-loss",
+      content: "Preserve the canonical task",
+    })];
+    let postAttempts = 0;
+    await page.route(
+      "**/api/workspaces/workspace-1/tasks/from-message/channel-general/message-task-response-loss",
+      async (route) => {
+        postAttempts += 1;
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        tasks = [{
+          id: "task-response-loss",
+          workspace_id: "workspace-1",
+          title: body.title,
+          client_nonce: body.client_nonce,
+        }, ...tasks];
+        return fulfillJson(route, { detail: "Response lost after commit" }, 503);
+      },
+    );
+
+    await page.goto("/conversations");
+    const source = page.locator("article").filter({ hasText: "Preserve the canonical task" });
+    await source.getByRole("button", { name: "Track as task" }).click();
+    await page.getByRole("button", { name: "Open task" }).click();
+
+    await expect(page.getByText(/Task opened: Preserve the canonical task/)).toBeVisible();
+    await expect(page.getByText(
+      "Unable to open task from discussion. Check your connection and try again.",
+      { exact: true },
+    )).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Open task" })).toHaveCount(0);
+    expect(postAttempts).toBe(1);
+  });
+
+  test("decision conversion reconciles a canonical commit after response loss", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    workspaceChannels = [workspaceChannel()];
+    workspaceChannelMessages = [workspaceChannelMessage(1, {
+      id: "message-decision-response-loss",
+      content: "Preserve the canonical decision",
+    })];
+    let canonicalDecision: Record<string, unknown> | null = null;
+    let postAttempts = 0;
+    let listAttempts = 0;
+    let submittedNonce = "";
+    await page.route(
+      "**/api/workspaces/workspace-1/decisions",
+      async (route) => {
+        listAttempts += 1;
+        return fulfillJson(route, canonicalDecision ? [canonicalDecision] : []);
+      },
+    );
+    await page.route(
+      "**/api/workspaces/workspace-1/decisions/from-message/channel-general/message-decision-response-loss",
+      async (route) => {
+        postAttempts += 1;
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        submittedNonce = String(body.client_nonce);
+        canonicalDecision = {
+          id: "decision-response-loss",
+          workspace_id: "workspace-1",
+          title: body.title,
+          client_nonce: body.client_nonce,
+        };
+        return fulfillJson(route, { detail: "Response lost after commit" }, 503);
+      },
+    );
+
+    await page.goto("/conversations");
+    const source = page.locator("article").filter({ hasText: "Preserve the canonical decision" });
+    await source.getByRole("button", { name: "Convert to Decision" }).click();
+    await page.getByRole("button", { name: "Record decision" }).click();
+
+    await expect(page.getByText(/Decision recorded: Preserve the canonical decision/)).toBeVisible();
+    await expect(page.getByText(
+      "Unable to record decision from discussion. Check your connection and try again.",
+      { exact: true },
+    )).toHaveCount(0);
+    expect(postAttempts).toBe(1);
+    expect(listAttempts).toBeGreaterThan(0);
+    expect(submittedNonce).not.toBe("");
+  });
+
+  test("changing a source in the same channel clears only its owned conversion failure", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    workspaceChannels = [workspaceChannel()];
+    workspaceChannelMessages = [
+      workspaceChannelMessage(1, { id: "message-failure-a", content: "Failed source A" }),
+      workspaceChannelMessage(2, { id: "message-failure-b", content: "Replacement source B" }),
+    ];
+    await page.route(
+      "**/api/workspaces/workspace-1/tasks/from-message/channel-general/message-failure-a",
+      (route) => fulfillJson(route, { detail: "Temporary conversion failure" }, 503),
+    );
+
+    await page.goto("/conversations");
+    const sourceA = page.locator("article").filter({ hasText: "Failed source A" });
+    const sourceB = page.locator("article").filter({ hasText: "Replacement source B" });
+    await sourceA.getByRole("button", { name: "Track as task" }).click();
+    await page.getByRole("button", { name: "Open task" }).click();
+    const failure = page.getByText(
+      "Unable to open task from discussion. Check your connection and try again.",
+      { exact: true },
+    );
+    await expect(failure).toBeVisible();
+
+    await sourceB.getByRole("button", { name: "Track as task" }).evaluate((button) => {
+      (button as HTMLButtonElement).click();
+    });
+    await expect(page.getByPlaceholder("Name the specific next step")).toHaveValue("Replacement source B");
+    await expect(failure).toHaveCount(0);
+  });
+
+  test("a message conversion source is retired when its channel changes", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    workspaceChannels = [
+      workspaceChannel(),
+      workspaceChannel({ id: "channel-planning", name: "Planning", slug: "planning" }),
+    ];
+    workspaceChannelMessages = [workspaceChannelMessage(1, {
+      id: "message-owned-by-general",
+      content: "General-only decision source",
+    })];
+
+    await page.goto("/conversations");
+    const source = page.locator("article").filter({ hasText: "General-only decision source" });
+    await source.getByRole("button", { name: "Convert to Decision" }).click();
+    await expect(page.getByPlaceholder("Name the organizational choice")).toBeVisible();
+
+    await page.getByRole("button", { name: /^Planning/ }).evaluate((button) => {
+      (button as HTMLButtonElement).click();
+    });
+    await expect(page.getByPlaceholder("Name the organizational choice")).toHaveCount(0);
+    await page.getByRole("button", { name: /^General/ }).click();
+    await expect(page.getByPlaceholder("Name the organizational choice")).toHaveCount(0);
+  });
+
+  test("a thread assistance source is retired when its thread closes", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    const root = workspaceChannelMessage(1, {
+      id: "assistance-thread-root",
+      content: "Thread-scoped action source",
+      thread_reply_count: 1,
+    });
+    workspaceChannels = [workspaceChannel()];
+    workspaceChannelMessages = [
+      root,
+      workspaceChannelMessage(2, {
+        id: "assistance-thread-reply",
+        content: "Follow through on the thread action",
+        parent_message_id: root.id,
+      }),
+    ];
+    await page.route(
+      "**/api/workspaces/workspace-1/channels/channel-general/assist",
+      (route) => fulfillJson(route, {
+        mode: "actions",
+        content: "Open the thread-scoped follow-through task.",
+        source_message_count: 2,
+        generated_at: "2026-08-24T00:00:00.000Z",
+      }),
+    );
+
+    await page.goto("/conversations");
+    const rootRow = page.locator("article").filter({ hasText: "Thread-scoped action source" });
+    await rootRow.getByRole("button", { name: "1 thread replies" }).click();
+    const actionsButton = page.locator("button").filter({ hasText: /^Actions$/ });
+    await expect(actionsButton).toHaveCount(1);
+    await actionsButton.evaluate((button) => (button as HTMLButtonElement).click());
+    const convertButton = page.locator("button").filter({ hasText: "Convert selected action" });
+    await expect(convertButton).toHaveCount(1);
+    await convertButton.evaluate((button) => (button as HTMLButtonElement).click());
+    await expect(page.getByPlaceholder("Name the specific next step")).toBeVisible();
+
+    await page.getByRole("button", { name: "Close thread" }).evaluate((button) => {
+      (button as HTMLButtonElement).click();
+    });
+    await expect(page.getByPlaceholder("Name the specific next step")).toHaveCount(0);
+    await rootRow.getByRole("button", { name: "1 thread replies" }).click();
+    await expect(page.getByPlaceholder("Name the specific next step")).toHaveCount(0);
+  });
+
+  test("task conversion releases an A-B-A lane while preserving its semantic nonce", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    workspaceChannels = [workspaceChannel()];
+    workspaceChannelMessages = [
+      workspaceChannelMessage(1, { id: "message-task-a", content: "Task source A" }),
+      workspaceChannelMessage(2, { id: "message-task-b", content: "Task source B" }),
+    ];
+    const requests: Array<Record<string, unknown>> = [];
+    let releaseFirst!: () => void;
+    let markFirstStarted!: () => void;
+    let markFirstFinished!: () => void;
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const firstStarted = new Promise<void>((resolve) => { markFirstStarted = resolve; });
+    const firstFinished = new Promise<void>((resolve) => { markFirstFinished = resolve; });
+    await page.route(
+      "**/api/workspaces/workspace-1/tasks/from-message/channel-general/message-task-a",
+      async (route) => {
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        requests.push(body);
+        const attempt = requests.length;
+        if (attempt === 1) {
+          markFirstStarted();
+          await firstGate;
+        }
+        await fulfillJson(route, {
+          id: attempt === 1 ? "task-old-activation" : "task-current-activation",
+          workspace_id: "workspace-1",
+          title: attempt === 1 ? "Old activation" : "Current activation",
+          client_nonce: body.client_nonce,
+        }, 201);
+        if (attempt === 1) markFirstFinished();
+      },
+    );
+
+    await page.goto("/conversations");
+    const sourceA = page.locator("article").filter({ hasText: "Task source A" });
+    const sourceB = page.locator("article").filter({ hasText: "Task source B" });
+    await sourceA.getByRole("button", { name: "Track as task" }).click();
+    await page.getByRole("button", { name: "Open task" }).click();
+    await firstStarted;
+
+    await sourceB.getByRole("button", { name: "Track as task" }).evaluate((button) => {
+      (button as HTMLButtonElement).click();
+    });
+    await expect(page.getByPlaceholder("Name the specific next step")).toHaveValue("Task source B");
+    await sourceA.getByRole("button", { name: "Track as task" }).evaluate((button) => {
+      (button as HTMLButtonElement).click();
+    });
+    await expect(page.getByPlaceholder("Name the specific next step")).toHaveValue("Task source A");
+    await page.getByRole("button", { name: "Open task" }).click();
+
+    await expect(page.getByText(/Task opened: Current activation/)).toBeVisible();
+    expect(requests).toHaveLength(2);
+    expect(requests[1]?.client_nonce).toBe(requests[0]?.client_nonce);
+    releaseFirst();
+    await firstFinished;
+    await expect(page.getByText(/Task opened: Old activation/)).toHaveCount(0);
+  });
+
+  test("does not apply a slow message completion after an A-B-A channel scope change", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    workspaceChannels = [
+      workspaceChannel(),
+      workspaceChannel({
+        id: "channel-platform",
+        name: "Platform coordination",
+        slug: "platform-coordination",
+        workspace_id: "workspace-2",
+      }),
+    ];
+    let releaseSend!: () => void;
+    let markStarted!: () => void;
+    let sendAttempts = 0;
+    const sendGate = new Promise<void>((resolve) => {
+      releaseSend = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+
+    await page.route(
+      "**/api/workspaces/workspace-1/channels/channel-general/messages",
+      async (route) => {
+        if (route.request().method() !== "POST") {
+          return route.fallback();
+        }
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        sendAttempts += 1;
+        const attemptNumber = sendAttempts;
+        if (attemptNumber === 1) {
+          markStarted();
+          await sendGate;
+        }
+        return fulfillJson(route, workspaceChannelMessage(20, {
+          id: attemptNumber === 1 ? "message-from-old-channel" : "message-from-returned-channel",
+          author_user_id: userId,
+          author_name: "Release Tester",
+          author_avatar_label: "R",
+          client_nonce: String(body.client_nonce),
+          content: String(body.content),
+        }), 201);
+      },
+    );
+
+    await page.goto("/conversations");
+    const firstComposer = page.getByPlaceholder("Write an operational update...");
+    await firstComposer.fill("Old channel mutation");
+    await page.getByRole("button", { name: "Send" }).click();
+    await started;
+
+    await page.getByRole("button", { name: /Switch workspace\. Current workspace: Acme Operations/ }).click();
+    await page.getByRole("button", { name: "Switch to Platform Lab" }).click();
+    await expect(page.getByRole("heading", { name: "Platform coordination" })).toBeVisible();
+    const currentComposer = page.getByPlaceholder("Write an operational update...");
+    await currentComposer.fill("Current channel draft");
+
+    await page.getByRole("button", { name: /Switch workspace\. Current workspace: Platform Lab/ }).click();
+    await page.getByRole("button", { name: "Switch to Acme Operations" }).click();
+    await expect(page.getByRole("heading", { name: "general" })).toBeVisible();
+    const returnedComposer = page.getByPlaceholder("Write an operational update...");
+    await returnedComposer.fill("Returned channel mutation");
+    const returnedChannelResponse = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname ===
+          "/api/workspaces/workspace-1/channels/channel-general/messages" &&
+        response.request().method() === "POST" &&
+        response.request().postDataJSON()?.content === "Returned channel mutation",
+    );
+    await page.getByRole("button", { name: "Send" }).click();
+    await returnedChannelResponse;
+    const returnedMessage = page.locator("article").filter({ hasText: "Returned channel mutation" });
+    await expect(returnedMessage).toBeVisible();
+
+    const oldChannelResponse = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname ===
+          "/api/workspaces/workspace-1/channels/channel-general/messages" &&
+        response.request().method() === "POST",
+    );
+    releaseSend();
+    await oldChannelResponse;
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+    }));
+
+    expect(sendAttempts).toBe(2);
+    await expect(returnedMessage).toBeVisible();
+    await expect(page.getByText("Old channel mutation", { exact: true })).toHaveCount(0);
+  });
+
+  test("replaces channel messages when the selected channel changes", async ({ page, isMobile }) => {
+    workspaceChannels = [
+      workspaceChannel(),
+      workspaceChannel({
+        id: "channel-planning",
+        name: "Planning",
+        slug: "planning",
+        last_message_preview: "Planning-only update",
+      }),
+    ];
+    workspaceChannelMessages = [
+      workspaceChannelMessage(1, { content: "General-only update" }),
+      workspaceChannelMessage(2, {
+        id: "planning-message",
+        channel_id: "channel-planning",
+        content: "Planning-only update",
+      }),
+    ];
+
+    await page.goto("/conversations");
+    const messagesPane = page.locator(".omnix-conversation-messages");
+    await page.getByRole("button", { name: /^General\b/ }).click();
+    await expect(messagesPane.getByText("General-only update", { exact: true })).toBeVisible();
+
+    if (isMobile) await page.getByRole("button", { name: "Channels" }).click();
+    await page.getByRole("button", { name: /^Planning\b/ }).click();
+    await expect(messagesPane.getByText("Planning-only update", { exact: true })).toBeVisible();
+    await expect(messagesPane.getByText("General-only update", { exact: true })).toHaveCount(0);
+  });
+
+  test("resolves the exact discussion failure when channel selection changes", async ({ page }) => {
+    workspaceChannels = [
+      workspaceChannel(),
+      workspaceChannel({ id: "channel-planning", name: "Planning", slug: "planning" }),
+    ];
+    let releasePlanning!: () => void;
+    const planningGate = new Promise<void>((resolve) => { releasePlanning = resolve; });
+    await page.route(
+      "**/api/workspaces/workspace-1/channels/*/messages*",
+      async (route) => {
+        const path = new URL(route.request().url()).pathname;
+        if (path.includes("/channel-general/")) {
+          return fulfillJson(route, { detail: "General discussion failed" }, 503);
+        }
+        await planningGate;
+        return fulfillJson(route, []);
+      },
+    );
+
+    await page.goto("/conversations");
+    const discussionError = page.getByText(
+      "Unable to load discussion. Check your connection and try again.",
+      { exact: true },
+    );
+    await expect(discussionError).toBeVisible();
+    await page.getByRole("button", { name: /^Planning/ }).click();
+    await expect(discussionError).toHaveCount(0);
+    releasePlanning();
+  });
+
+  test("resolves the exact thread failure when the thread closes", async ({ page, isMobile }) => {
+    const root = workspaceChannelMessage(1, {
+      id: "failing-thread-root",
+      content: "Thread with a scoped load failure",
+      thread_reply_count: 1,
+    });
+    workspaceChannels = [workspaceChannel()];
+    workspaceChannelMessages = [root];
+    await page.route(
+      "**/api/workspaces/workspace-1/channels/channel-general/messages*",
+      async (route) => {
+        const url = new URL(route.request().url());
+        if (url.searchParams.get("thread_root_id") === root.id) {
+          return fulfillJson(route, { detail: "Thread failed" }, 503);
+        }
+        return route.fallback();
+      },
+    );
+
+    await page.goto("/conversations");
+    if (isMobile) await page.getByRole("button", { name: /^General/ }).click();
+    const rootRow = page.locator("article").filter({ hasText: root.content });
+    await rootRow.getByRole("button", { name: "1 thread replies" }).click();
+    const threadError = page.getByText(
+      "Unable to open thread. Check your connection and try again.",
+      { exact: true },
+    );
+    await expect(threadError).toBeVisible();
+    await page.getByRole("button", { name: "Close thread" }).click();
+    await expect(threadError).toHaveCount(0);
+  });
+
+  test("keeps stale assistance results out of an A-B-A channel scope", async ({ page, isMobile }) => {
+    workspaceChannels = [
+      workspaceChannel(),
+      workspaceChannel({ id: "channel-planning", name: "Planning", slug: "planning" }),
+    ];
+    workspaceChannelMessages = [
+      workspaceChannelMessage(1, { content: "General assistance source" }),
+      workspaceChannelMessage(2, {
+        id: "planning-assistance-source",
+        channel_id: "channel-planning",
+        content: "Planning assistance source",
+      }),
+    ];
+    let releaseStale!: () => void;
+    let markStaleStarted!: () => void;
+    let markStaleFinished!: () => void;
+    let assistAttempts = 0;
+    const staleGate = new Promise<void>((resolve) => { releaseStale = resolve; });
+    const staleStarted = new Promise<void>((resolve) => { markStaleStarted = resolve; });
+    const staleFinished = new Promise<void>((resolve) => { markStaleFinished = resolve; });
+    await page.route(
+      "**/api/workspaces/workspace-1/channels/channel-general/assist",
+      async (route) => {
+        const attempt = ++assistAttempts;
+        if (attempt === 1) {
+          markStaleStarted();
+          await staleGate;
+        }
+        await fulfillJson(route, {
+          mode: "summary",
+          content: attempt === 1
+            ? "Stale general assistance"
+            : "Current general assistance",
+          source_message_count: 1,
+          generated_at: "2026-06-20T00:00:00Z",
+        });
+        if (attempt === 1) markStaleFinished();
+      },
+    );
+
+    await page.goto("/conversations");
+    await page.getByRole("button", { name: /^General/ }).click();
+    const summarize = page.getByRole("button", { name: "Summarize" });
+    await summarize.evaluate((button) => {
+      (button as HTMLButtonElement).click();
+      (button as HTMLButtonElement).click();
+    });
+    await staleStarted;
+    expect(assistAttempts).toBe(1);
+
+    if (isMobile) await page.getByRole("button", { name: "Channels" }).click();
+    await page.getByRole("button", { name: /^Planning/ }).click();
+    if (isMobile) await page.getByRole("button", { name: "Channels" }).click();
+    await page.getByRole("button", { name: /^General/ }).click();
+    await page.getByRole("button", { name: "Summarize" }).click();
+    await expect(page.getByText("Current general assistance", { exact: true })).toBeVisible();
+
+    releaseStale();
+    await staleFinished;
+    await expect(page.getByText("Stale general assistance", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Current general assistance", { exact: true })).toBeVisible();
+    expect(assistAttempts).toBe(2);
+  });
+
+  test("keeps stale assistance failures out of an A-B-A channel scope", async ({ page, isMobile }) => {
+    workspaceChannels = [
+      workspaceChannel(),
+      workspaceChannel({ id: "channel-planning", name: "Planning", slug: "planning" }),
+    ];
+    workspaceChannelMessages = [
+      workspaceChannelMessage(1, { content: "General assistance source" }),
+      workspaceChannelMessage(2, {
+        id: "planning-assistance-source",
+        channel_id: "channel-planning",
+        content: "Planning assistance source",
+      }),
+    ];
+    let releaseStale!: () => void;
+    let markStaleStarted!: () => void;
+    let markStaleFinished!: () => void;
+    let assistAttempts = 0;
+    const staleGate = new Promise<void>((resolve) => { releaseStale = resolve; });
+    const staleStarted = new Promise<void>((resolve) => { markStaleStarted = resolve; });
+    const staleFinished = new Promise<void>((resolve) => { markStaleFinished = resolve; });
+    await page.route(
+      "**/api/workspaces/workspace-1/channels/channel-general/assist",
+      async (route) => {
+        assistAttempts += 1;
+        if (assistAttempts === 1) {
+          markStaleStarted();
+          await staleGate;
+          await fulfillJson(route, { detail: "Stale assistance failure" }, 503);
+          markStaleFinished();
+          return;
+        }
+        await fulfillJson(route, {
+          mode: "summary",
+          content: "Current assistance after returning",
+          source_message_count: 1,
+          generated_at: "2026-06-20T00:00:00Z",
+        });
+      },
+    );
+
+    await page.goto("/conversations");
+    await page.getByRole("button", { name: /^General/ }).click();
+    await page.getByRole("button", { name: "Summarize" }).click();
+    await staleStarted;
+    if (isMobile) await page.getByRole("button", { name: "Channels" }).click();
+    await page.getByRole("button", { name: /^Planning/ }).click();
+    if (isMobile) await page.getByRole("button", { name: "Channels" }).click();
+    await page.getByRole("button", { name: /^General/ }).click();
+    await page.getByRole("button", { name: "Summarize" }).click();
+    await expect(page.getByText("Current assistance after returning", { exact: true })).toBeVisible();
+
+    releaseStale();
+    await staleFinished;
+    await expect(page.getByText(
+      "Conversation assistance is temporarily unavailable. Please try again in a moment.",
+      { exact: true },
+    )).toHaveCount(0);
+    await expect(page.getByText("Current assistance after returning", { exact: true })).toBeVisible();
+    expect(assistAttempts).toBe(2);
+  });
+
+  test("keeps stale decision-candidate scans out of the selected channel", async ({ page, isMobile }) => {
+    workspaceChannels = [
+      workspaceChannel(),
+      workspaceChannel({ id: "channel-planning", name: "Planning", slug: "planning" }),
+    ];
+    workspaceChannelMessages = [
+      workspaceChannelMessage(1, { content: "General decision source" }),
+      workspaceChannelMessage(2, {
+        id: "planning-decision-source",
+        channel_id: "channel-planning",
+        content: "Planning decision source",
+      }),
+    ];
+    let releaseGeneral!: () => void;
+    let markGeneralStarted!: () => void;
+    let markGeneralFinished!: () => void;
+    const generalGate = new Promise<void>((resolve) => { releaseGeneral = resolve; });
+    const generalStarted = new Promise<void>((resolve) => { markGeneralStarted = resolve; });
+    const generalFinished = new Promise<void>((resolve) => { markGeneralFinished = resolve; });
+    await page.route(
+      "**/api/workspaces/workspace-1/decisions/candidates/conversation/*",
+      async (route) => {
+        const channelId = new URL(route.request().url()).pathname.split("/").at(-1) ?? "";
+        if (channelId === "channel-general") {
+          markGeneralStarted();
+          await generalGate;
+        }
+        await fulfillJson(route, {
+          candidates: [{
+            id: `candidate-${channelId}`,
+            title: channelId === "channel-general"
+              ? "Stale general candidate"
+              : "Current planning candidate",
+            reason: "Verified channel evidence",
+            confidence: "medium",
+            source_type: "conversation",
+            source_id: channelId,
+            supporting_evidence: [{
+              kind: "conversation_message",
+              channel_id: channelId,
+              message_id: channelId === "channel-general"
+                ? "channel-message-1"
+                : "planning-decision-source",
+              file_id: null,
+              chunk_id: null,
+              chunk_index: null,
+              page: null,
+              char_start: 0,
+              char_end: 8,
+              quote: "Decision",
+              quote_sha256: "a".repeat(64),
+              source_content_hash: "b".repeat(64),
+              source_updated_at: "2026-06-20T00:00:00Z",
+            }],
+          }],
+          candidate_count: 1,
+          source_type: "conversation",
+          source_id: channelId,
+          generated_at: "2026-06-20T00:00:00Z",
+          source_coverage: {
+            source_offset: 0,
+            loaded_record_count: 1,
+            selected_record_count: 1,
+            prompt_record_count: 1,
+            context_limited: false,
+            has_additional_records: false,
+            next_source_offset: null,
+          },
+        });
+        if (channelId === "channel-general") markGeneralFinished();
+      },
+    );
+
+    await page.goto("/conversations");
+    await page.getByRole("button", { name: /^General/ }).click();
+    await page.getByRole("button", { name: /Potential Decisions/ }).click();
+    await generalStarted;
+    if (isMobile) await page.getByRole("button", { name: "Channels" }).click();
+    await page.getByRole("button", { name: /^Planning/ }).click();
+    await page.getByRole("button", { name: /Potential Decisions/ }).click();
+    await expect(page.getByText("Current planning candidate", { exact: true })).toBeVisible();
+
+    releaseGeneral();
+    await generalFinished;
+    await expect(page.getByText("Stale general candidate", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Current planning candidate", { exact: true })).toBeVisible();
+  });
+
   test("ignores a delayed discussion failure after a workspace switch", async ({ page, isMobile }) => {
     workspaceChannels = [workspaceChannel()];
     let releaseDiscussion!: () => void;
@@ -1036,6 +2230,43 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page.getByRole("heading", { name: "Acme initiative", exact: true })).toHaveCount(0);
   });
 
+  test("a slow initiative create preserves a newer user selection", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    const first = workspaceInitiative("initiative-first", "First initiative");
+    const second = workspaceInitiative("initiative-second", "Second initiative");
+    let initiativeRows = [first, second];
+    let releaseCreate!: () => void;
+    let markStarted!: () => void;
+    const createGate = new Promise<void>((resolve) => { releaseCreate = resolve; });
+    const started = new Promise<void>((resolve) => { markStarted = resolve; });
+
+    await page.route("**/api/workspaces/workspace-1/initiatives", async (route) => {
+      if (route.request().method() === "GET") return fulfillJson(route, initiativeRows);
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      const created = workspaceInitiative(
+        "initiative-created",
+        String(body.title),
+        { client_nonce: body.client_nonce },
+      );
+      markStarted();
+      await createGate;
+      initiativeRows = [created, ...initiativeRows];
+      return fulfillJson(route, created, 201);
+    });
+
+    await page.goto("/initiatives");
+    await page.getByRole("button", { name: "Create Initiative", exact: true }).click();
+    await page.getByPlaceholder("Investor demo").fill("Slow created initiative");
+    await page.getByRole("button", { name: "Create initiative", exact: true }).click();
+    await started;
+    await page.getByRole("button", { name: /Second initiative/ }).click();
+    await expect(page.getByRole("heading", { name: "Second initiative", exact: true }).last()).toBeVisible();
+
+    releaseCreate();
+    await expect(page.getByText("Initiative created", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Second initiative", exact: true }).last()).toBeVisible();
+  });
+
   test("creates a task record", async ({ page }) => {
     await page.goto("/tasks");
     await expect(page.getByText("Reduce upload latency")).toBeVisible();
@@ -1045,6 +2276,148 @@ test.describe("authenticated Omnix shell", () => {
     await titleInput.fill("Verify release checklist");
     await page.getByRole("button", { name: "Create record" }).click();
     await expect(page.locator("#main-content").getByText("Verify release checklist").first()).toBeVisible();
+  });
+
+  test("deduplicates a failed task submit and reuses its nonce on retry", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    const attempts: Array<Record<string, unknown>> = [];
+    let releaseFailure!: () => void;
+    let markStarted!: () => void;
+    const failureGate = new Promise<void>((resolve) => {
+      releaseFailure = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+
+    await page.route(
+      "**/api/workspaces/workspace-1/tasks",
+      async (route) => {
+        if (route.request().method() !== "POST") {
+          return route.fallback();
+        }
+        attempts.push(route.request().postDataJSON() as Record<string, unknown>);
+        if (attempts.length === 1) {
+          markStarted();
+          await failureGate;
+          return fulfillJson(route, { detail: "Temporary task failure" }, 503);
+        }
+        await route.fallback();
+      },
+    );
+
+    await page.goto("/tasks");
+    await page.getByRole("button", { name: "Record Task" }).click();
+    const titleInput = page.getByPlaceholder("Operational next step");
+    await titleInput.fill("Retry-safe release task");
+    const createForm = page.locator("form").filter({ has: titleInput });
+    await createForm.evaluate((form) => {
+      const formElement = form as HTMLFormElement;
+      formElement.requestSubmit();
+      formElement.requestSubmit();
+    });
+
+    await started;
+    await expect.poll(() => attempts.length).toBe(1);
+    releaseFailure();
+
+    const createError = page.getByText("Unable to open task. Check your connection and try again.");
+    await expect(createError).toBeVisible();
+    await expect(titleInput).toHaveValue("Retry-safe release task");
+    await expect(
+      page.locator("article").filter({ hasText: "Retry-safe release task" }),
+    ).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Create record" }).click();
+    await expect.poll(() => attempts.length).toBe(2);
+    expect(attempts[1]?.client_nonce).toBe(attempts[0]?.client_nonce);
+    await expect(createError).toHaveCount(0);
+    await expect(
+      page.locator("article").filter({ hasText: "Retry-safe release task" }),
+    ).toBeVisible();
+  });
+
+  test("does not apply a slow task completion to a newly selected workspace", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    let releaseCreate!: () => void;
+    let markStarted!: () => void;
+    const createGate = new Promise<void>((resolve) => {
+      releaseCreate = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+
+    await page.route("**/api/workspaces/*/tasks", async (route) => {
+      const request = route.request();
+      const path = new URL(request.url()).pathname;
+      const match = path.match(/\/workspaces\/([^/]+)\/tasks$/);
+      const workspaceId = match?.[1] ?? "";
+      if (request.method() === "GET" && workspaceId === "workspace-2") {
+        return fulfillJson(route, []);
+      }
+      if (request.method() !== "POST" || workspaceId !== "workspace-1") {
+        return route.fallback();
+      }
+
+      const body = request.postDataJSON() as Record<string, unknown>;
+      markStarted();
+      await createGate;
+      return fulfillJson(route, {
+        activity_metadata: { origin: "manual" },
+        blockers: [],
+        client_nonce: body.client_nonce,
+        created_at: "2026-06-20T00:00:00Z",
+        created_by: userId,
+        decisions: [],
+        description: body.description ?? null,
+        due_date: null,
+        id: "task-from-old-workspace",
+        initiative_id: null,
+        linked_context: [],
+        linked_decisions: [],
+        mentions: [],
+        momentum_metadata: {},
+        owner_name: null,
+        owner_user_id: null,
+        status: "idea",
+        title: body.title,
+        updated_at: "2026-06-20T00:00:00Z",
+        workspace_id: "workspace-1",
+      }, 201);
+    });
+
+    await page.goto("/tasks");
+    await page.getByRole("button", { name: "Record Task" }).click();
+    const titleInput = page.getByPlaceholder("Operational next step");
+    await titleInput.fill("Old workspace mutation");
+    await page.getByRole("button", { name: "Create record" }).click();
+    await started;
+
+    await page.getByRole("button", { name: /Switch workspace\. Current workspace: Acme Operations/ }).click();
+    await page.getByRole("button", { name: "Switch to Platform Lab" }).click();
+    await expect(page.getByText("Platform Lab").first()).toBeVisible();
+    await expect(titleInput).toBeHidden();
+    await page.getByRole("button", { name: "Record Task" }).click();
+    const currentTitleInput = page.getByPlaceholder("Operational next step");
+    await expect(currentTitleInput).toBeEnabled();
+    await currentTitleInput.fill("Platform workspace draft");
+
+    const oldWorkspaceResponse = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname ===
+          "/api/workspaces/workspace-1/tasks" &&
+        response.request().method() === "POST",
+    );
+    releaseCreate();
+    await oldWorkspaceResponse;
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+    }));
+
+    await expect(currentTitleInput).toHaveValue("Platform workspace draft");
+    await expect(page.getByText("Old workspace mutation", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Task created", { exact: true })).toHaveCount(0);
   });
 
   test("keeps initiative creation explicit and replays palette create requests", async ({ page }) => {
@@ -1196,6 +2569,31 @@ test.describe("authenticated Omnix shell", () => {
       { threadRootId: "root-message-160", offset: 80, limit: 81 },
       { threadRootId: "root-message-160", offset: 160, limit: 81 },
     ]));
+  });
+
+  test("projects a canonical thread-root reply count back into the channel", async ({ page, isMobile }) => {
+    test.skip(isMobile, "desktop interaction contract");
+    const root = workspaceChannelMessage(1, {
+      id: "canonical-thread-root",
+      content: "Canonical thread count",
+      thread_reply_count: 0,
+    });
+    workspaceChannels = [workspaceChannel()];
+    workspaceChannelMessages = [root];
+
+    await page.goto("/conversations");
+    const rootRow = page.locator("article").filter({ hasText: "Canonical thread count" });
+    await expect(rootRow.getByRole("button", { name: "Open thread" })).toBeVisible();
+    workspaceChannelMessages = [
+      { ...root, thread_reply_count: 2 },
+      workspaceChannelMessage(2, { parent_message_id: root.id, content: "Canonical reply one" }),
+      workspaceChannelMessage(3, { parent_message_id: root.id, content: "Canonical reply two" }),
+    ];
+
+    await rootRow.getByRole("button", { name: "Open thread" }).click();
+    await expect(page.getByText("Canonical reply two", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Close thread" }).click();
+    await expect(rootRow.getByRole("button", { name: "2 thread replies" })).toBeVisible();
   });
 
   test("mobile conversation threads replace messages and return to the channel", async ({ page, isMobile }) => {

@@ -1,14 +1,7 @@
 "use client";
 
-import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowRight,
-  CircleDot,
-  Compass,
-  Loader2,
-  Plus,
-  Sparkles,
-} from "lucide-react";
+import { FormEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { CircleDot, Compass, Loader2, Plus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
@@ -17,58 +10,36 @@ import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
-import { invalidateQueries, queryGet } from "@/lib/query";
+import {
+  mutationAttempt,
+  releaseExclusiveMutations,
+  rollbackOptimisticPatch,
+  runExclusiveMutation,
+  type MutationAttempt,
+} from "@/lib/mutation-lifecycle";
+import { queryGet } from "@/lib/query";
 import { realtimeRegistry } from "@/lib/realtime-registry";
 import { useToast } from "@/lib/toast-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspaceTree } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
-import type {
-  WorkspaceChannel,
-  WorkspaceInitiative,
-  WorkspaceInitiativeAssistance,
-  WorkspaceInitiativeAssistanceMode,
-  WorkspaceInitiativeResource,
-  WorkspaceInitiativeStatus,
-  WorkspaceMember,
-  WorkspaceTask,
-} from "@/lib/workspace-types";
+import type { WorkspaceChannel, WorkspaceInitiative, WorkspaceInitiativeResource,
+  WorkspaceMember, WorkspaceTask } from "@/lib/workspace-types";
 import { InitiativeCard } from "./InitiativeCard";
 import { InitiativeCreateForm } from "./InitiativeCreateForm";
 import { InitiativeDetailPanel } from "./InitiativeDetailPanel";
-import { initiativeAssistanceLabels } from "./initiativeOptions";
-
-function mergeInitiative(current: WorkspaceInitiative[], incoming: WorkspaceInitiative) {
-  return [
-    incoming,
-    ...current.filter(
-      (item) =>
-        item.id !== incoming.id &&
-        !(incoming.client_nonce && item.client_nonce === incoming.client_nonce),
-    ),
-  ];
-}
-
-function invalidateInitiativeQueries(workspaceId: string) {
-  invalidateQueries(`/workspaces/${workspaceId}/initiatives`);
-  invalidateQueries(`/workspaces/${workspaceId}/tasks`);
-}
-
-function quietMomentum() {
-  return {
-    health: "quiet" as const,
-    summary: "No execution records are linked to this initiative yet.",
-    task_count: 0,
-    open_task_count: 0,
-    complete_task_count: 0,
-    blocked_task_count: 0,
-    due_soon_count: 0,
-    overdue_count: 0,
-    channel_count: 0,
-    discussion_message_count: 0,
-    last_movement_at: null,
-  };
-}
+import { InitiativeSupportPanel } from "./InitiativeSupportPanel";
+import {
+  INITIATIVE_PATCH_SYNC_WARNING, INITIATIVE_PATCH_UNCONFIRMED_WARNING,
+  type InitiativeCreateDraft, type OptimisticInitiativePatch,
+  confirmedInitiativePatch, createInitiativeOptimisticMutationState,
+  createOptimisticInitiative, initiativeCreateFingerprint,
+  initiativeFailureBelongsToResource, initiativeMomentumSummary, initiativeProgress,
+  invalidateInitiativeQueries, mergeInitiative, queueInitiativeCanonicalProof,
+  reconciledInitiativeSelection, runInitiativeCanonicalProof,
+  runInitiativeTwoReadCanonicalProof, sortInitiatives, useInitiativeAssistanceMutation,
+  useInitiativeBusyState, useInitiativeMutationFailures,
+} from "./initiativeSurfaceModel";
 
 export const WorkspaceInitiativesSurface = memo(function WorkspaceInitiativesSurface() {
   return (
@@ -93,7 +64,7 @@ function WorkspaceInitiativesSurfaceContent() {
   const [channels, setChannels] = useState<WorkspaceChannel[]>([]);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -101,23 +72,42 @@ function WorkspaceInitiativesSurfaceContent() {
   const [targetDate, setTargetDate] = useState("");
   const [context, setContext] = useState("");
   const [creating, setCreating] = useState(false);
-  const [updating, setUpdating] = useState(false);
   const [taskToAttach, setTaskToAttach] = useState("");
   const [channelToAttach, setChannelToAttach] = useState("");
   const [resourceType, setResourceType] = useState<WorkspaceInitiativeResource["resource_type"]>("decision");
   const [resourceLabel, setResourceLabel] = useState("");
   const [resourceId, setResourceId] = useState("");
-  const [assistance, setAssistance] = useState<WorkspaceInitiativeAssistance | null>(null);
-  const [assisting, setAssisting] = useState<WorkspaceInitiativeAssistanceMode | null>(null);
   const [mobileTab, setMobileTab] = useState<"brief" | "plan" | "assist">("brief");
   const liveRegionRef = useRef<HTMLDivElement | null>(null);
   const liveAnnouncementRef = useRef("");
   const workspaceRef = useRef(activeWorkspaceId);
+  const workspaceEpochRef = useRef(0);
   const requestRef = useRef(0);
   const refreshTimerRef = useRef<number | null>(null);
-  workspaceRef.current = activeWorkspaceId;
+  const mutationRegistryRef = useRef(new Map<string, Promise<unknown>>());
+  const canonicalRefreshRegistryRef = useRef(new Map<string, Promise<void>>());
+  const [optimisticState] = useState(createInitiativeOptimisticMutationState);
+  const createAttemptsRef = useRef(new Map<string, MutationAttempt>());
+  const { beginMutation, dismissMutationFailure, failMutation, finishMutation,
+    mutationError, ownsMutation, resolveMutationFailure, resolveMutationFailures,
+    resetMutationFailures,
+  } = useInitiativeMutationFailures();
+  const { beginUpdating, clearUpdating, finishUpdating, updating } = useInitiativeBusyState();
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+  useLayoutEffect(() => {
+    if (workspaceRef.current === activeWorkspaceId) return;
+    const previousWorkspaceId = workspaceRef.current;
+    if (previousWorkspaceId) releaseExclusiveMutations(
+      mutationRegistryRef.current,
+      (key) => key === `initiative:create:${previousWorkspaceId}`,
+    );
+    workspaceRef.current = activeWorkspaceId;
+    workspaceEpochRef.current += 1;
+  }, [activeWorkspaceId]);
   const [liveAnnouncementVersion, setLiveAnnouncementVersion] = useState(0);
-
+  const isCurrentWorkspaceMutation = (workspaceId: string, workspaceEpoch: number) =>
+    mountedRef.current && workspaceRef.current === workspaceId && workspaceEpochRef.current === workspaceEpoch;
   const announceMutation = useCallback((message: string) => {
     liveAnnouncementRef.current = message;
     setLiveAnnouncementVersion((version) => version + 1);
@@ -134,27 +124,28 @@ function WorkspaceInitiativesSurfaceContent() {
     return () => window.clearTimeout(timer);
   }, [liveAnnouncementVersion]);
 
-  const sortedInitiatives = useMemo(() => {
-    const statusOrder: Record<WorkspaceInitiativeStatus, number> = {
-      focused: 0,
-      active: 1,
-      at_risk: 2,
-      draft: 3,
-      complete: 4,
-    };
-
-    return [...initiatives].sort((a, b) => {
-      const orderA = statusOrder[a.status] ?? 99;
-      const orderB = statusOrder[b.status] ?? 99;
-      if (orderA !== orderB) return orderA - orderB;
-      
-      const timeA = new Date(a.updated_at || a.created_at || 0).getTime();
-      const timeB = new Date(b.updated_at || b.created_at || 0).getTime();
-      return timeB - timeA;
-    });
-  }, [initiatives]);
+  const sortedInitiatives = useMemo(() => sortInitiatives(initiatives), [initiatives]);
 
   const selected = sortedInitiatives.find((initiative) => initiative.id === selectedId) ?? sortedInitiatives[0] ?? null;
+  const selectedInitiativeRef = useRef<string | null>(selectedId);
+  const selectInitiative = useCallback((next: string | null) => {
+    const previous = selectedInitiativeRef.current;
+    if (previous && previous !== next) {
+      clearUpdating();
+      if (activeWorkspaceId) {
+        resolveMutationFailures((key) => initiativeFailureBelongsToResource(key, activeWorkspaceId, previous));
+      }
+    }
+    selectedInitiativeRef.current = next;
+    setSelectedId(next);
+  }, [activeWorkspaceId, clearUpdating, resolveMutationFailures]);
+  const { abandonAssistance, assistance, assisting, requestAssistance } = useInitiativeAssistanceMutation({
+    activeWorkspaceId, beginMutation, failMutation, finishMutation, mountedRef, ownsMutation,
+    resolveMutationFailure, selectedInitiativeId: selected?.id ?? null,
+    selectedInitiativeRef, workspaceEpochRef, workspaceRef,
+  });
+  const isCurrentInitiativeMutation = (workspaceId: string, workspaceEpoch: number, initiativeId: string) =>
+    isCurrentWorkspaceMutation(workspaceId, workspaceEpoch) && selectedInitiativeRef.current === initiativeId;
 
   const loadInitiatives = useCallback(async (includeOptions = false) => {
     if (!activeWorkspaceId) {
@@ -175,24 +166,22 @@ function WorkspaceInitiativesSurfaceContent() {
         includeOptions ? apiClient.get<WorkspaceMember[]>(`/workspaces/${activeWorkspaceId}/members`) : Promise.resolve(null),
       ]);
       if (requestId !== requestRef.current || workspaceRef.current !== activeWorkspaceId) return;
-      setInitiatives(incoming);
-      setSelectedId((current) => {
-        if (routeInitiativeId && incoming.some((initiative) => initiative.id === routeInitiativeId)) {
-          return routeInitiativeId;
-        }
-        return incoming.some((initiative) => initiative.id === current) ? current : incoming[0]?.id ?? null;
-      });
+      const reconciled = optimisticState.reconcile(incoming, activeWorkspaceId);
+      setInitiatives(reconciled.next);
+      selectInitiative(reconciledInitiativeSelection(
+        selectedInitiativeRef.current, routeInitiativeId, reconciled,
+      ));
       if (taskOptions) setTasks(taskOptions);
       if (channelOptions) setChannels(channelOptions);
       if (memberOptions) setMembers(memberOptions);
-      setError(null);
+      setLoadError(null);
     } catch (err) {
       if (
         requestId === requestRef.current &&
         workspaceRef.current === activeWorkspaceId
       ) {
         logClientError("Failed to load initiatives", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives` });
-        setError("Unable to load initiatives. Check your connection and try again.");
+        setLoadError("Unable to load initiatives. Check your connection and try again.");
       }
     } finally {
       if (
@@ -202,8 +191,39 @@ function WorkspaceInitiativesSurfaceContent() {
         setLoading(false);
       }
     }
-  }, [activeWorkspaceId, routeInitiativeId]);
+  }, [activeWorkspaceId, optimisticState, routeInitiativeId, selectInitiative]);
 
+  const reconcileInitiativeMutation = useCallback((workspaceId: string, workspaceEpoch: number,
+    canonicalProofKey: string | null = null) => {
+    const isCurrent = () => mountedRef.current && workspaceRef.current === workspaceId
+      && workspaceEpochRef.current === workspaceEpoch;
+    if (!isCurrent()) return Promise.resolve(null);
+    return queueInitiativeCanonicalProof(canonicalRefreshRegistryRef.current, workspaceId, async () => {
+      if (!isCurrent()) return null;
+      const incoming = await apiClient.get<WorkspaceInitiative[]>(`/workspaces/${workspaceId}/initiatives`,
+        { dedupe: false });
+      if (!isCurrent()) return null;
+      const reconciled = optimisticState.reconcile(incoming, workspaceId, canonicalProofKey);
+      invalidateInitiativeQueries(workspaceId);
+      requestRef.current += 1;
+      setInitiatives(reconciled.next);
+      selectInitiative(reconciledInitiativeSelection(
+        selectedInitiativeRef.current, routeInitiativeId, reconciled,
+      ));
+      setLoadError(null);
+      return reconciled;
+    });
+  }, [optimisticState, routeInitiativeId, selectInitiative]);
+  const proveInitiativeMutation = useCallback((workspaceId: string, workspaceEpoch: number,
+    canonicalProofKey: string | null = null) => runInitiativeCanonicalProof(
+    workspaceEpoch,
+    canonicalProofKey,
+    () => mountedRef.current && workspaceRef.current === workspaceId ? workspaceEpochRef.current : null,
+    (epoch) => reconcileInitiativeMutation(workspaceId, epoch, canonicalProofKey),
+  ), [reconcileInitiativeMutation]);
+  const scheduleInitiativeReconciliation = useCallback((workspaceId: string, workspaceEpoch: number) => {
+    void proveInitiativeMutation(workspaceId, workspaceEpoch).catch(() => invalidateInitiativeQueries(workspaceId));
+  }, [proveInitiativeMutation]);
   const scheduleRefresh = useCallback(() => {
     if (refreshTimerRef.current !== null) return;
     refreshTimerRef.current = window.setTimeout(() => {
@@ -216,12 +236,22 @@ function WorkspaceInitiativesSurfaceContent() {
   }, [activeWorkspaceId, loadInitiatives]);
 
   useEffect(() => {
+    setCreating(false);
+    clearUpdating();
+    setLoadError(null);
+    resetMutationFailures();
+  }, [activeWorkspaceId, clearUpdating, resetMutationFailures]);
+
+  useEffect(() => {
     setInitiatives([]);
-    setSelectedId(null);
-    setAssistance(null);
+    selectInitiative(null);
     setCreateOpen(false);
+    setTaskToAttach("");
+    setChannelToAttach("");
+    setResourceId("");
+    setResourceLabel("");
     void loadInitiatives(true);
-  }, [activeWorkspaceId, loadInitiatives]);
+  }, [activeWorkspaceId, loadInitiatives, selectInitiative]);
 
   useEffect(() => {
     if (routeCreateInitiative) {
@@ -258,213 +288,438 @@ function WorkspaceInitiativesSurfaceContent() {
     [channels, selected?.linked_channels],
   );
 
-  const simplifiedMomentum = useMemo(() => {
-    if (!selected) return null;
-    const { health, open_task_count, complete_task_count, blocked_task_count } = selected.momentum;
-    
-    if (health === "blocked_execution" || blocked_task_count > 0) {
-      return { label: "Blocked", color: "text-amber-300", description: "Strategic progress is currently impeded by operational blockers." };
-    }
-    if (health === "active_movement" || open_task_count > 0) {
-      return { label: "Moving", color: "text-cyan-300", description: "Operational execution is actively advancing the initiative mission." };
-    }
-    if (health === "completion_flow" || (complete_task_count > 0 && open_task_count === 0)) {
-      return { label: "Complete", color: "text-emerald-300", description: "The defined mission has reached its completion state." };
-    }
-    return { label: "Quiet", color: "text-[var(--omnix-text-3)]", description: "No active operational movement detected for this mission." };
-  }, [selected]);
-
-  const progressPercentage = useMemo(() => {
-    if (!selected) return 0;
-    const total = selected.momentum.task_count;
-    if (total === 0) return 0;
-    return Math.round((selected.momentum.complete_task_count / total) * 100);
-  }, [selected]);
+  const simplifiedMomentum = useMemo(() => initiativeMomentumSummary(selected), [selected]);
+  const progressPercentage = useMemo(() => initiativeProgress(selected), [selected]);
+  const completeVisibleInitiativeCreate = (created: WorkspaceInitiative, pendingId: string) => {
+    setInitiatives((current) => mergeInitiative(current, created));
+    if (selectedInitiativeRef.current === pendingId) selectInitiative(created.id);
+    setTitle(""); setDescription(""); setOwnerId("");
+    setTargetDate(""); setContext(""); setCreateOpen(false);
+    announceMutation(`Initiative ${created.title} created.`);
+    showToast({ title: "Initiative created", message: created.title });
+  };
 
   async function createInitiative(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!activeWorkspaceId || !title.trim() || creating) return;
-    const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-    const optimistic: WorkspaceInitiative = {
-      id: `pending-${nonce}`,
-      workspace_id: activeWorkspaceId,
-      title: title.trim(),
-      description: description.trim() || null,
-      status: "draft",
-      owner_user_id: ownerId || null,
-      created_by: session?.user.id || null,
-      target_date: targetDate || null,
-      initiative_context: context.trim() || null,
-      linked_resources: [],
-      activity_metadata: { origin: "manual" },
-      client_nonce: nonce,
-      linked_tasks: [],
-      linked_channels: [],
-      linked_decisions: [],
-      owner_name: members.find((member) => member.user_id === ownerId)?.full_name ?? null,
-      momentum: quietMomentum(),
-    };
-    setInitiatives((current) => mergeInitiative(current, optimistic));
-    setSelectedId(optimistic.id);
-    setCreating(true);
-    try {
-      const created = await apiClient.post<WorkspaceInitiative>(`/workspaces/${activeWorkspaceId}/initiatives`, {
-        title: optimistic.title,
-        description: optimistic.description,
-        owner_user_id: optimistic.owner_user_id,
-        target_date: optimistic.target_date,
-        initiative_context: optimistic.initiative_context,
-        client_nonce: nonce,
-      });
-      setInitiatives((current) => mergeInitiative(current, created));
-      invalidateInitiativeQueries(activeWorkspaceId);
-      setSelectedId(created.id);
-      setTitle("");
-      setDescription("");
-      setOwnerId("");
-      setTargetDate("");
-      setContext("");
-      setCreateOpen(false);
-      announceMutation(`Initiative ${created.title} created.`);
-      showToast({ title: "Initiative created", message: created.title });
-      void loadInitiatives(true);
-    } catch (err) {
-      setInitiatives((current) => current.filter((initiative) => initiative.client_nonce !== nonce));
-      logClientError("Failed to open initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives` });
-      setError("Unable to open initiative. Check your connection and try again.");
-    } finally {
-      setCreating(false);
+    if (!activeWorkspaceId || !title.trim()) return;
+
+    const requestWorkspaceId = activeWorkspaceId;
+    const requestWorkspaceEpoch = workspaceEpochRef.current;
+    const mutationKey = `initiative:create:${requestWorkspaceId}`;
+    const failureKey = `initiative:create:${requestWorkspaceId}`;
+    if (mutationRegistryRef.current.has(mutationKey)) {
+      return;
     }
+    const draft: InitiativeCreateDraft = {
+      title: title.trim(),
+      description: description.trim(),
+      ownerId: ownerId || null,
+      targetDate: targetDate || null,
+      context: context.trim(),
+    };
+    const fingerprint = initiativeCreateFingerprint(requestWorkspaceId, draft);
+    const attempt = mutationAttempt(createAttemptsRef.current.get(requestWorkspaceId) ?? null, fingerprint);
+    createAttemptsRef.current.set(requestWorkspaceId, attempt);
+    const mutationToken = beginMutation(failureKey);
+
+    await runExclusiveMutation(
+      mutationRegistryRef.current,
+      mutationKey,
+      async () => {
+        const optimistic = createOptimisticInitiative(
+          requestWorkspaceId,
+          attempt.nonce,
+          session?.user.id || null,
+          members.find((member) => member.user_id === draft.ownerId)?.full_name ?? null,
+          draft,
+        );
+        setCreating(true);
+        const previousCreate = optimisticState.creates.get(requestWorkspaceId);
+        optimisticState.creates.set(requestWorkspaceId, optimistic);
+        setInitiatives((current) => mergeInitiative(
+          previousCreate?.id.startsWith("pending-")
+            ? current.filter((initiative) => initiative.id !== previousCreate.id)
+            : current,
+          optimistic,
+        ));
+        selectInitiative(optimistic.id);
+        try {
+          const created = await apiClient.post<WorkspaceInitiative>(`/workspaces/${requestWorkspaceId}/initiatives`, {
+            title: optimistic.title,
+            description: optimistic.description,
+            owner_user_id: optimistic.owner_user_id,
+            target_date: optimistic.target_date,
+            initiative_context: optimistic.initiative_context,
+            client_nonce: attempt.nonce,
+          });
+          if (
+            created.workspace_id !== requestWorkspaceId ||
+            created.client_nonce !== attempt.nonce
+          ) {
+            throw new Error("Initiative creation response did not match its mutation attempt.");
+          }
+          if (optimisticState.creates.get(requestWorkspaceId) === optimistic) {
+            optimisticState.creates.set(requestWorkspaceId, created);
+          }
+          try {
+            await proveInitiativeMutation(requestWorkspaceId, requestWorkspaceEpoch);
+          } catch {
+            invalidateInitiativeQueries(requestWorkspaceId);
+          }
+          if (ownsMutation(failureKey, mutationToken) && createAttemptsRef.current.get(requestWorkspaceId) === attempt) {
+            createAttemptsRef.current.delete(requestWorkspaceId);
+          }
+          if (!isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch) || !ownsMutation(failureKey, mutationToken)) {
+            if (optimisticState.creates.get(requestWorkspaceId) === created) {
+              optimisticState.creates.delete(requestWorkspaceId);
+            }
+            return;
+          }
+          completeVisibleInitiativeCreate(created, optimistic.id);
+        } catch (err) {
+          try {
+            await runInitiativeTwoReadCanonicalProof(
+              requestWorkspaceEpoch,
+              () => mountedRef.current && workspaceRef.current === requestWorkspaceId ? workspaceEpochRef.current : null,
+              (epoch) => reconcileInitiativeMutation(requestWorkspaceId, epoch),
+              () => Boolean(optimisticState.canonicalCreate(optimistic)),
+            );
+          } catch {
+            invalidateInitiativeQueries(requestWorkspaceId);
+          }
+          const canonical = optimisticState.canonicalCreate(optimistic);
+          if (optimisticState.creates.get(requestWorkspaceId) === optimistic) {
+            optimisticState.creates.delete(requestWorkspaceId);
+          }
+          if (canonical) {
+            if (ownsMutation(failureKey, mutationToken) && createAttemptsRef.current.get(requestWorkspaceId) === attempt) {
+              createAttemptsRef.current.delete(requestWorkspaceId);
+            }
+            if (isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch) && ownsMutation(failureKey, mutationToken)) {
+              completeVisibleInitiativeCreate(canonical, optimistic.id);
+            }
+            return;
+          }
+          if (!isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch) || !ownsMutation(failureKey, mutationToken)) {
+            return;
+          }
+          setInitiatives((current) => current.filter((initiative) => initiative.id !== optimistic.id));
+          logClientError("Failed to open initiative", err, { endpoint: `/workspaces/${requestWorkspaceId}/initiatives` });
+          failMutation(failureKey, mutationToken, "Unable to open initiative. Check your connection and try again.");
+        } finally {
+          if (isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch) && ownsMutation(failureKey, mutationToken)) {
+            setCreating(false);
+          }
+          finishMutation(failureKey, mutationToken);
+        }
+      },
+    );
   }
 
-  async function patchInitiative(payload: Partial<WorkspaceInitiative>) {
-    if (!activeWorkspaceId || !selected || selected.id.startsWith("pending-") || updating) return;
-    const before = selected;
-    setUpdating(true);
-    setInitiatives((current) => current.map((item) => (item.id === selected.id ? { ...item, ...payload } : item)));
-    try {
-      const changed = await apiClient.patch<WorkspaceInitiative>(
-        `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}`,
-        payload,
-      );
-      setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
-      invalidateInitiativeQueries(activeWorkspaceId);
-      announceMutation(`Initiative ${changed.title} updated.`);
-      showToast({ title: "Initiative updated", message: changed.title });
-    } catch (err) {
-      setInitiatives((current) => current.map((item) => (item.id === before.id ? before : item)));
-      logClientError("Failed to update initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}` });
-      setError("Unable to update initiative. Your session may have expired; refresh and try again.");
-    } finally {
-      setUpdating(false);
+  async function patchInitiative(
+    payload: Partial<WorkspaceInitiative>,
+  ): Promise<boolean> {
+    if (!activeWorkspaceId || !selected || selected.id.startsWith("pending-")) {
+      return false;
     }
+    const requestWorkspaceId = activeWorkspaceId;
+    const requestWorkspaceEpoch = workspaceEpochRef.current;
+    const requestInitiativeId = selected.id;
+    const mutationKey = `initiative:update:${requestWorkspaceId}:${requestInitiativeId}`;
+    if (mutationRegistryRef.current.has(mutationKey)) {
+      return false;
+    }
+    const before = selected;
+    const optimisticPatch = { ...payload };
+    const previousOptimistic = optimisticState.patches.get(mutationKey);
+    const optimistic: OptimisticInitiativePatch = {
+      before: previousOptimistic?.before ?? before,
+      initiativeId: requestInitiativeId,
+      patch: { ...previousOptimistic?.patch, ...optimisticPatch },
+      workspaceId: requestWorkspaceId,
+    };
+    const mutationToken = beginMutation(mutationKey);
+    return runExclusiveMutation(
+      mutationRegistryRef.current,
+      mutationKey,
+      async () => {
+        optimisticState.patches.set(mutationKey, optimistic);
+        const updatingOwner = beginUpdating();
+        setInitiatives((current) => current.map((item) => (
+          item.id === requestInitiativeId ? { ...item, ...optimisticPatch } : item
+        )));
+        try {
+          const changed = await apiClient.patch<WorkspaceInitiative>(
+            `/workspaces/${requestWorkspaceId}/initiatives/${requestInitiativeId}`,
+            payload,
+          );
+          if (
+            changed.id !== requestInitiativeId ||
+            changed.workspace_id !== requestWorkspaceId
+          ) {
+            throw new Error("Initiative update response did not match its requested resource.");
+          }
+
+          const canonicalOptimistic = confirmedInitiativePatch(optimistic, changed);
+          if (optimisticState.patches.get(mutationKey) === optimistic) {
+            optimisticState.patches.set(mutationKey, canonicalOptimistic);
+          }
+          let syncConflict = false;
+          try {
+            const { result: reconciled } = await proveInitiativeMutation(
+              requestWorkspaceId, requestWorkspaceEpoch, mutationKey,
+            );
+            syncConflict = Boolean(
+              reconciled?.conflictedPatches.some(([key]) => key === mutationKey),
+            );
+          } catch (reconciliationError) {
+            optimisticState.patches.delete(mutationKey);
+            invalidateInitiativeQueries(requestWorkspaceId);
+            syncConflict = true;
+            if (isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch)) {
+              setInitiatives((current) => current.map((item) => item.id === requestInitiativeId ? changed : item));
+              logClientError("Failed to verify successful initiative update", reconciliationError, { endpoint: `/workspaces/${requestWorkspaceId}/initiatives` });
+            }
+          }
+          if (!isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch) || !ownsMutation(mutationKey, mutationToken)) {
+            optimisticState.patches.delete(mutationKey);
+            return !syncConflict;
+          }
+
+          if (syncConflict) {
+            if (isCurrentInitiativeMutation(requestWorkspaceId, requestWorkspaceEpoch, requestInitiativeId)) {
+              failMutation(mutationKey, mutationToken, INITIATIVE_PATCH_SYNC_WARNING);
+            }
+            return false;
+          }
+
+          if (isCurrentInitiativeMutation(requestWorkspaceId, requestWorkspaceEpoch, requestInitiativeId)) {
+            announceMutation(`Initiative ${changed.title} updated.`);
+            showToast({ title: "Initiative updated", message: changed.title });
+          }
+          return true;
+        } catch (err) {
+          let canonicalProof = null;
+          try {
+            canonicalProof = (await proveInitiativeMutation(
+              requestWorkspaceId, requestWorkspaceEpoch, mutationKey,
+            )).result;
+          } catch {
+            invalidateInitiativeQueries(requestWorkspaceId);
+          }
+          if (optimisticState.canonicalPatchWasObserved(optimistic)) {
+            if (optimisticState.patches.get(mutationKey) === optimistic) {
+              optimisticState.patches.delete(mutationKey);
+            }
+            if (isCurrentInitiativeMutation(requestWorkspaceId, requestWorkspaceEpoch, requestInitiativeId) && ownsMutation(mutationKey, mutationToken)) {
+              announceMutation(`Initiative ${before.title} updated.`);
+              showToast({ title: "Initiative updated", message: before.title });
+            }
+            return true;
+          }
+          if (canonicalProof?.conflictedPatches.some(([key]) => key === mutationKey)) {
+            if (isCurrentInitiativeMutation(requestWorkspaceId, requestWorkspaceEpoch, requestInitiativeId)) {
+              failMutation(mutationKey, mutationToken, INITIATIVE_PATCH_UNCONFIRMED_WARNING);
+            }
+            return false;
+          }
+          optimisticState.restorePatch(mutationKey, optimistic, previousOptimistic ?? null);
+          invalidateInitiativeQueries(requestWorkspaceId);
+          if (isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch) && ownsMutation(mutationKey, mutationToken)) {
+            setInitiatives((current) => current.map((item) => (
+              item.id === requestInitiativeId
+                ? rollbackOptimisticPatch(item, before, optimisticPatch)
+                : item
+            )));
+            if (selectedInitiativeRef.current === requestInitiativeId) {
+              logClientError("Failed to update initiative", err, { endpoint: `/workspaces/${requestWorkspaceId}/initiatives/${requestInitiativeId}` });
+              failMutation(mutationKey, mutationToken, "Unable to update initiative. Your session may have expired; refresh and try again.");
+            }
+          }
+          return false;
+        } finally {
+          finishUpdating(updatingOwner, mountedRef.current);
+          finishMutation(mutationKey, mutationToken);
+        }
+      },
+    );
+  }
+
+  async function mutateInitiativeLink(
+    requestInitiative: WorkspaceInitiative,
+    failureKey: string,
+    endpoint: string,
+    request: (workspaceId: string, initiativeId: string) => Promise<void>,
+    canonicalMatches: (initiative: WorkspaceInitiative) => boolean,
+    complete: (initiative: WorkspaceInitiative) => void,
+    errorLabel: string,
+    errorMessage: string,
+  ) {
+    if (!activeWorkspaceId || requestInitiative.workspace_id !== activeWorkspaceId
+      || requestInitiative.id.startsWith("pending-")) return;
+    const requestWorkspaceId = activeWorkspaceId;
+    const requestWorkspaceEpoch = workspaceEpochRef.current;
+    const requestInitiativeId = requestInitiative.id;
+    const mutationKey = `initiative:update:${requestWorkspaceId}:${requestInitiativeId}`;
+    if (mutationRegistryRef.current.has(mutationKey)) return;
+    const mutationToken = beginMutation(failureKey);
+    await runExclusiveMutation(mutationRegistryRef.current, mutationKey, async () => {
+      const updatingOwner = beginUpdating();
+      try {
+        await request(requestWorkspaceId, requestInitiativeId);
+        scheduleInitiativeReconciliation(requestWorkspaceId, requestWorkspaceEpoch);
+        if (isCurrentInitiativeMutation(requestWorkspaceId, requestWorkspaceEpoch, requestInitiativeId)
+          && ownsMutation(failureKey, mutationToken)) complete(requestInitiative);
+      } catch (err) {
+        let canonical: WorkspaceInitiative | null = null;
+        try {
+          const { result } = await runInitiativeTwoReadCanonicalProof(
+            requestWorkspaceEpoch,
+            () => mountedRef.current && workspaceRef.current === requestWorkspaceId ? workspaceEpochRef.current : null,
+            (epoch) => reconcileInitiativeMutation(requestWorkspaceId, epoch),
+            ({ next }) => next.some((item) => item.id === requestInitiativeId && canonicalMatches(item)),
+          );
+          canonical = result?.next.find((item) => item.id === requestInitiativeId && canonicalMatches(item)) ?? null;
+        } catch {
+          invalidateInitiativeQueries(requestWorkspaceId);
+        }
+        if (canonical) {
+          if (isCurrentInitiativeMutation(requestWorkspaceId, requestWorkspaceEpoch, requestInitiativeId)
+            && ownsMutation(failureKey, mutationToken)) complete(canonical);
+          resolveMutationFailure(failureKey, mutationToken);
+          return;
+        }
+        if (isCurrentInitiativeMutation(requestWorkspaceId, requestWorkspaceEpoch, requestInitiativeId)
+          && ownsMutation(failureKey, mutationToken)) {
+          logClientError(errorLabel, err, { endpoint });
+          failMutation(failureKey, mutationToken, errorMessage);
+        }
+      } finally {
+        finishUpdating(updatingOwner, mountedRef.current);
+        finishMutation(failureKey, mutationToken);
+      }
+    });
   }
 
   async function attachTask() {
     if (!activeWorkspaceId || !selected || !taskToAttach) return;
-    setUpdating(true);
-    try {
-      const changed = await apiClient.post<WorkspaceInitiative>(
-        `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/tasks/${taskToAttach}`,
-      );
-      setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
-      invalidateInitiativeQueries(activeWorkspaceId);
-      setTaskToAttach("");
-      announceMutation(`Task attached to ${changed.title}.`);
-      showToast({ title: "Task linked", message: changed.title });
-      void loadInitiatives(true);
-    } catch (err) {
-      logClientError("Failed to attach task to initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/tasks/${taskToAttach}` });
-      setError("Unable to attach task. Check your connection and try again.");
-    } finally {
-      setUpdating(false);
-    }
+    const taskId = taskToAttach;
+    const endpoint = `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/tasks/${taskId}`;
+    await mutateInitiativeLink(
+      selected, `initiative:attach-task:${activeWorkspaceId}:${selected.id}:${taskId}`, endpoint,
+      async (workspaceId, initiativeId) => {
+        const changed = await apiClient.post<WorkspaceInitiative>(
+          `/workspaces/${workspaceId}/initiatives/${initiativeId}/tasks/${taskId}`,
+        );
+        if (changed.id !== initiativeId || changed.workspace_id !== workspaceId) {
+          throw new Error("Task-link response did not match its requested initiative.");
+        }
+      },
+      (initiative) => initiative.linked_tasks.some(({ id }) => id === taskId),
+      (initiative) => {
+        setTaskToAttach("");
+        announceMutation(`Task attached to ${initiative.title}.`);
+        showToast({ title: "Task linked", message: initiative.title });
+      },
+      "Failed to attach task to initiative",
+      "Unable to attach task. Check your connection and try again.",
+    );
   }
 
   async function detachTask(task: WorkspaceTask) {
-    if (!activeWorkspaceId) return;
-    setUpdating(true);
-    try {
-      await apiClient.patch<WorkspaceTask>(`/workspaces/${activeWorkspaceId}/tasks/${task.id}`, { initiative_id: null });
-      invalidateInitiativeQueries(activeWorkspaceId);
-      announceMutation(`Task ${task.title} detached from initiative.`);
-      showToast({ title: "Task unlinked", message: task.title });
-      void loadInitiatives(true);
-    } catch (err) {
-      logClientError("Failed to detach task from initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks/${task.id}` });
-      setError("Unable to detach task. Check your connection and try again.");
-    } finally {
-      setUpdating(false);
-    }
+    if (!activeWorkspaceId || !selected) return;
+    const endpoint = `/workspaces/${activeWorkspaceId}/tasks/${task.id}`;
+    await mutateInitiativeLink(
+      selected, `initiative:detach-task:${activeWorkspaceId}:${selected.id}:${task.id}`, endpoint,
+      async (workspaceId) => {
+        const changed = await apiClient.patch<WorkspaceTask>(endpoint, { initiative_id: null });
+        if (changed.id !== task.id || changed.workspace_id !== workspaceId) {
+          throw new Error("Task-unlink response did not match its requested resource.");
+        }
+      },
+      (initiative) => !initiative.linked_tasks.some(({ id }) => id === task.id),
+      () => {
+        announceMutation(`Task ${task.title} detached from initiative.`);
+        showToast({ title: "Task unlinked", message: task.title });
+      },
+      "Failed to detach task from initiative",
+      "Unable to detach task. Check your connection and try again.",
+    );
   }
 
   async function attachChannel() {
     if (!activeWorkspaceId || !selected || !channelToAttach) return;
-    setUpdating(true);
-    try {
-      const changed = await apiClient.post<WorkspaceInitiative>(
-        `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels`,
-        { channel_id: channelToAttach },
-      );
-      setInitiatives((current) => current.map((item) => (item.id === changed.id ? changed : item)));
-      invalidateInitiativeQueries(activeWorkspaceId);
-      setChannelToAttach("");
-      announceMutation(`Conversation attached to ${changed.title}.`);
-      showToast({ title: "Conversation linked", message: changed.title });
-    } catch (err) {
-      logClientError("Failed to attach conversation to initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels` });
-      setError("Unable to attach conversation. Check your connection and try again.");
-    } finally {
-      setUpdating(false);
-    }
+    const channelId = channelToAttach;
+    const endpoint = `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels`;
+    await mutateInitiativeLink(
+      selected, `initiative:attach-channel:${activeWorkspaceId}:${selected.id}:${channelId}`, endpoint,
+      async (workspaceId, initiativeId) => {
+        const changed = await apiClient.post<WorkspaceInitiative>(
+          `/workspaces/${workspaceId}/initiatives/${initiativeId}/channels`, { channel_id: channelId },
+        );
+        if (changed.id !== initiativeId || changed.workspace_id !== workspaceId) {
+          throw new Error("Channel-link response did not match its requested initiative.");
+        }
+      },
+      (initiative) => initiative.linked_channels.some(({ id }) => id === channelId),
+      (initiative) => {
+        setChannelToAttach("");
+        announceMutation(`Conversation attached to ${initiative.title}.`);
+        showToast({ title: "Conversation linked", message: initiative.title });
+      },
+      "Failed to attach conversation to initiative",
+      "Unable to attach conversation. Check your connection and try again.",
+    );
   }
 
   async function detachChannel(channelId: string) {
     if (!activeWorkspaceId || !selected) return;
-    setUpdating(true);
-    try {
-      await apiClient.delete(`/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels/${channelId}`);
-      invalidateInitiativeQueries(activeWorkspaceId);
-      announceMutation(`Conversation detached from ${selected.title}.`);
-      showToast({ title: "Conversation unlinked", message: selected.title });
-      void loadInitiatives(true);
-    } catch (err) {
-      logClientError("Failed to detach conversation from initiative", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels/${channelId}` });
-      setError("Unable to detach conversation. Check your connection and try again.");
-    } finally {
-      setUpdating(false);
-    }
+    const endpoint = `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/channels/${channelId}`;
+    await mutateInitiativeLink(
+      selected, `initiative:detach-channel:${activeWorkspaceId}:${selected.id}:${channelId}`, endpoint,
+      async (workspaceId, initiativeId) => {
+        const changed = await apiClient.delete<WorkspaceInitiative>(
+          `/workspaces/${workspaceId}/initiatives/${initiativeId}/channels/${channelId}`,
+        );
+        if (changed.id !== initiativeId || changed.workspace_id !== workspaceId) {
+          throw new Error("Channel-unlink response did not match its requested initiative.");
+        }
+      },
+      (initiative) => !initiative.linked_channels.some(({ id }) => id === channelId),
+      (initiative) => {
+        announceMutation(`Conversation detached from ${initiative.title}.`);
+        showToast({ title: "Conversation unlinked", message: initiative.title });
+      },
+      "Failed to detach conversation from initiative",
+      "Unable to detach conversation. Check your connection and try again.",
+    );
   }
 
   async function addResource(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selected || !resourceId.trim()) return;
+    if (!activeWorkspaceId || !selected || !resourceId.trim()) return;
+    const requestWorkspaceId = activeWorkspaceId;
+    const requestWorkspaceEpoch = workspaceEpochRef.current;
+    const requestInitiativeId = selected.id;
     const resource: WorkspaceInitiativeResource = {
       resource_type: resourceType,
       resource_id: resourceId.trim(),
       label: resourceLabel.trim() || null,
       metadata: {},
     };
-    await patchInitiative({ linked_resources: [...selected.linked_resources, resource] });
-    setResourceId("");
-    setResourceLabel("");
-  }
-
-  async function requestAssistance(mode: WorkspaceInitiativeAssistanceMode) {
-    if (!activeWorkspaceId || !selected) return;
-    try {
-      setAssisting(mode);
-      setAssistance(
-        await apiClient.post<WorkspaceInitiativeAssistance>(
-          `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/assist`,
-          { mode },
-        ),
-      );
-    } catch (err) {
-      logClientError("Failed to load initiative assistance", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives/${selected.id}/assist` });
-      setError("Initiative assistance is temporarily unavailable. Please try again in a moment.");
-    } finally {
-      setAssisting(null);
+    const succeeded = await patchInitiative({
+      linked_resources: [...selected.linked_resources, resource],
+    });
+    if (
+      succeeded &&
+      isCurrentInitiativeMutation(
+        requestWorkspaceId,
+        requestWorkspaceEpoch,
+        requestInitiativeId,
+      )
+    ) {
+      setResourceId("");
+      setResourceLabel("");
     }
   }
 
@@ -493,15 +748,15 @@ function WorkspaceInitiativesSurfaceContent() {
         </div>
       </header>
 
-      {error ? (
+      {mutationError || loadError ? (
         <OmnixErrorState
           compact
           className="mb-4"
-          title={error.startsWith("Unable to load initiatives.") ? "Initiatives are unavailable" : "Initiative action needs attention"}
-          message={error}
-          onRetry={error.startsWith("Unable to load initiatives.") ? () => void loadInitiatives(true) : undefined}
+          title={mutationError ? "Initiative action needs attention" : "Initiatives are unavailable"}
+          message={mutationError ?? loadError ?? ""}
+          onRetry={!mutationError && loadError ? () => void loadInitiatives(true) : undefined}
           isRetrying={loading}
-          onDismiss={() => setError(null)}
+          onDismiss={mutationError ? dismissMutationFailure : () => setLoadError(null)}
         />
       ) : null}
 
@@ -512,7 +767,7 @@ function WorkspaceInitiativesSurfaceContent() {
         )}>
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Direction</p>
-            <Button size="sm" variant="ghost" onClick={() => setCreateOpen((open) => !open)} leftIcon={<Plus className="h-3.5 w-3.5" />}>Create Initiative</Button>
+            <Button size="sm" variant="ghost" disabled={updating || creating} onClick={() => setCreateOpen((open) => !open)} leftIcon={<Plus className="h-3.5 w-3.5" />}>Create Initiative</Button>
           </div>
           {createOpen ? (
             <InitiativeCreateForm
@@ -523,6 +778,7 @@ function WorkspaceInitiativesSurfaceContent() {
               context={context}
               members={members}
               creating={creating}
+              disabled={updating}
               onSubmit={createInitiative}
               onTitleChange={setTitle}
               onDescriptionChange={setDescription}
@@ -548,8 +804,8 @@ function WorkspaceInitiativesSurfaceContent() {
                 initiative={initiative}
                 selected={selected?.id === initiative.id}
                 onSelect={() => {
-                  setSelectedId(initiative.id);
-                  setAssistance(null);
+                  abandonAssistance();
+                  selectInitiative(initiative.id);
                 }}
               />
             ))}
@@ -573,7 +829,10 @@ function WorkspaceInitiativesSurfaceContent() {
           progressPercentage={progressPercentage}
           assistance={assistance}
           assisting={assisting}
-          onBack={() => setSelectedId(null)}
+          onBack={() => {
+            abandonAssistance();
+            selectInitiative(null);
+          }}
           onMobileTabChange={setMobileTab}
           onPatchInitiative={(payload) => void patchInitiative(payload)}
           onTaskToAttachChange={setTaskToAttach}
@@ -589,48 +848,13 @@ function WorkspaceInitiativesSurfaceContent() {
           onRequestAssistance={(mode) => void requestAssistance(mode)}
         />
 
-        <aside className={cn(
-          "order-2 space-y-3 lg:order-none xl:col-span-1",
-          selectedId && "hidden xl:block"
-        )}>
-          <section className="omnix-panel rounded-xl p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--omnix-text-3)]">Movement</p>
-            <p className="mt-3 break-words text-sm font-medium leading-6 text-white">{selected?.momentum.summary || "Select an initiative to see recorded movement."}</p>
-            {selected ? (
-              <div className="mt-5 grid grid-cols-2 gap-2 text-center">
-                {[
-                  ["Tasks", selected.momentum.open_task_count],
-                  ["Blocked", selected.momentum.blocked_task_count],
-                  ["Due soon", selected.momentum.due_soon_count],
-                  ["Comms", selected.momentum.channel_count],
-                ].map(([label, value]) => (
-                  <div key={String(label)} className="rounded-xl border border-[var(--omnix-border)] bg-black/15 px-2 py-2.5 transition hover:bg-white/[0.02]">
-                    <p className="text-xl font-bold text-white">{value}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--omnix-text-3)] mt-0.5">{label}</p>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </section>
-          
-          <section className="omnix-panel rounded-xl p-4">
-            <p className="mb-4 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-purple-300/70"><Sparkles className="h-3.5 w-3.5" /> Mission Assist</p>
-            <div className="grid gap-2">
-              {Object.entries(initiativeAssistanceLabels).map(([mode, label]) => (
-                <button key={mode} type="button" disabled={!selected || Boolean(assisting)} onClick={() => void requestAssistance(mode as WorkspaceInitiativeAssistanceMode)} className="group flex items-center justify-between rounded-xl border border-purple-300/15 bg-purple-300/[0.03] px-4 py-2.5 text-left text-xs font-medium text-purple-100/90 transition hover:bg-purple-300/[0.08] disabled:opacity-40">
-                  {label}
-                  {assisting === mode ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-40 transition-opacity" />}
-                </button>
-              ))}
-            </div>
-            {assistance ? (
-              <div className="mt-4 rounded-xl border border-purple-300/20 bg-purple-300/[0.04] p-4">
-                <p className="whitespace-pre-wrap break-words text-xs leading-6 text-[var(--omnix-text)]">{assistance.content}</p>
-                <p className="mt-3 text-[10px] font-medium leading-relaxed text-[var(--omnix-text-3)]">Read from {assistance.source_task_count} tasks and {assistance.source_message_count} messages.</p>
-              </div>
-            ) : null}
-          </section>
-        </aside>
+        <InitiativeSupportPanel
+          assistance={assistance}
+          assisting={assisting}
+          onRequestAssistance={(mode) => void requestAssistance(mode)}
+          selected={selected}
+          selectedId={selectedId}
+        />
       </div>
     </section>
   );

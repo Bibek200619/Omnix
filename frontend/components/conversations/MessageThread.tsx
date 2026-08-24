@@ -15,6 +15,7 @@ import { MentionText } from "@/components/mentions/MentionText";
 import { MentionTextarea } from "@/components/mentions/MentionTextarea";
 import {
   type DisplayMessage,
+  messageHasPersistedActions,
   messageAuthor,
   messageIdentity,
   readableTime,
@@ -44,6 +45,7 @@ export function ConversationMessageRow({
   threaded = false,
 }: ConversationMessageRowProps) {
   const identity = messageIdentity(message);
+  const hasPersistedActions = messageHasPersistedActions(message);
 
   return (
     <article
@@ -81,7 +83,7 @@ export function ConversationMessageRow({
               ))}
             </div>
           ) : null}
-          {message.delivery !== "sending" ? (
+          {hasPersistedActions ? (
             <div className="mt-2 flex flex-wrap items-center gap-3">
               {!threaded && onOpenThread ? (
                 <button
@@ -166,8 +168,6 @@ export function MessageThread({
     const content = draft.trim();
     if (!content || !mayPost || sending) return;
     const mentions = draftMentions;
-    onDraftChange("");
-    onDraftMentionsChange([]);
     onTypingChange(false);
     onSend(content, undefined, mentions);
   }

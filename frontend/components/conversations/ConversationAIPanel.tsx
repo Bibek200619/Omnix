@@ -1,9 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ClipboardCheck, Loader2, Sparkles, X } from "lucide-react";
 import { DecisionCandidatePanel } from "@/components/decisions/DecisionCandidatePanel";
-import type { DecisionSource, TaskSource } from "@/components/conversations/conversationUtils";
+import {
+  type ConversationSourceScope,
+  type ConversationMutationScope,
+  type DecisionSource,
+  type TaskSource,
+  conversationMutationScopeMatches,
+} from "@/components/conversations/conversationUtils";
+import type {
+  ReportConversationFailure,
+  ResolveConversationFailure,
+} from "@/components/conversations/useConversationFailures";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
 import type {
@@ -21,6 +31,9 @@ const assistanceLabels: Record<WorkspaceConversationAssistanceMode, string> = {
   actions: "Actions",
   blockers: "Blockers",
 };
+const ASSISTANCE_FAILURE_KEY = "conversation:assistance";
+const ASSISTANCE_ERROR_MESSAGE = "Conversation assistance is temporarily unavailable. Please try again in a moment.";
+const CANDIDATE_ERROR_MESSAGE = "Unable to scan this conversation for decision candidates. Please try again in a moment.";
 
 function mergeDecisionCandidates(current: DecisionCandidate[], incoming: DecisionCandidate[]) {
   const knownIds = new Set(current.map((candidate) => candidate.id));
@@ -30,7 +43,8 @@ function mergeDecisionCandidates(current: DecisionCandidate[], incoming: Decisio
 type ConversationAIPanelProps = {
   activeWorkspaceId: string | null;
   messagesCount: number;
-  onError: (message: string) => void;
+  onFailure: ReportConversationFailure;
+  onFailureResolved: ResolveConversationFailure;
   onOpenDecision: (source: DecisionSource) => void;
   onOpenTask: (source: TaskSource) => void;
   selectedChannelId: string | null;
@@ -40,7 +54,8 @@ type ConversationAIPanelProps = {
 export function ConversationAIPanel({
   activeWorkspaceId,
   messagesCount,
-  onError,
+  onFailure,
+  onFailureResolved,
   onOpenDecision,
   onOpenTask,
   selectedChannelId,
@@ -54,54 +69,162 @@ export function ConversationAIPanel({
   const [decisionCandidatesLoading, setDecisionCandidatesLoading] = useState(false);
   const [decisionCandidatesError, setDecisionCandidatesError] = useState<string | null>(null);
   const nextDecisionSourceOffset = decisionCandidateCoverage?.next_source_offset;
+  const threadRootId = threadRoot?.id ?? null;
+  const mountedRef = useRef(true);
+  const scopeRef = useRef<ConversationMutationScope>({
+    workspaceId: activeWorkspaceId,
+    channelId: selectedChannelId,
+    sourceId: threadRootId,
+  });
+  const channelScopeRevisionRef = useRef(0);
+  const assistanceScopeRevisionRef = useRef(0);
+  const requestSequenceRef = useRef(0);
+  const assistanceRequestTokenRef = useRef<string | null>(null);
+  const candidateRequestTokenRef = useRef<string | null>(null);
+  const assistanceFailureTokenRef = useRef<string | null>(null);
+
+  const resolveAssistanceFailure = useCallback((ownedToken?: string | null) => {
+    const token = ownedToken ?? assistanceFailureTokenRef.current;
+    if (!token || assistanceFailureTokenRef.current !== token) return;
+    assistanceFailureTokenRef.current = null;
+    onFailureResolved(ASSISTANCE_FAILURE_KEY, token);
+  }, [onFailureResolved]);
 
   useEffect(() => {
-    setAssistance(null);
-    setDecisionCandidates([]);
-    setDecisionCandidateCoverage(null);
-    setDecisionCandidatesError(null);
-  }, [selectedChannelId]);
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      assistanceRequestTokenRef.current = null;
+      candidateRequestTokenRef.current = null;
+      resolveAssistanceFailure();
+    };
+  }, [resolveAssistanceFailure]);
+
+  useLayoutEffect(() => {
+    const previous = scopeRef.current;
+    const next: ConversationMutationScope = {
+      workspaceId: activeWorkspaceId,
+      channelId: selectedChannelId,
+      sourceId: threadRootId,
+    };
+    const channelChanged = previous.workspaceId !== next.workspaceId
+      || previous.channelId !== next.channelId;
+    const assistanceChanged = channelChanged || previous.sourceId !== next.sourceId;
+    scopeRef.current = next;
+    if (channelChanged) {
+      channelScopeRevisionRef.current += 1;
+      candidateRequestTokenRef.current = null;
+      setDecisionCandidatesCollapsed(true);
+      setDecisionCandidates([]);
+      setDecisionCandidateCoverage(null);
+      setDecisionCandidatesLoading(false);
+      setDecisionCandidatesError(null);
+    }
+    if (assistanceChanged) {
+      assistanceScopeRevisionRef.current += 1;
+      assistanceRequestTokenRef.current = null;
+      resolveAssistanceFailure();
+      setAssistance(null);
+      setAssistanceLoading(null);
+    }
+  }, [activeWorkspaceId, resolveAssistanceFailure, selectedChannelId, threadRootId]);
 
   async function requestAssistance(mode: WorkspaceConversationAssistanceMode) {
-    if (!activeWorkspaceId || !selectedChannelId) return;
+    const requestScope = { ...scopeRef.current };
+    if (
+      !requestScope.workspaceId
+      || !requestScope.channelId
+      || assistanceRequestTokenRef.current
+    ) return;
+    const requestRevision = assistanceScopeRevisionRef.current;
+    const requestToken = `assistance:${requestRevision}:${++requestSequenceRef.current}`;
+    const endpoint = `/workspaces/${requestScope.workspaceId}/channels/${requestScope.channelId}/assist`;
+    assistanceRequestTokenRef.current = requestToken;
+    resolveAssistanceFailure();
+    setAssistanceLoading(mode);
+    const isCurrentRequest = () => mountedRef.current
+      && assistanceRequestTokenRef.current === requestToken
+      && assistanceScopeRevisionRef.current === requestRevision
+      && conversationMutationScopeMatches(requestScope, scopeRef.current);
     try {
-      setAssistanceLoading(mode);
-      setAssistance(
-        await apiClient.post<WorkspaceConversationAssistance>(
-          `/workspaces/${activeWorkspaceId}/channels/${selectedChannelId}/assist`,
-          { mode, thread_root_id: threadRoot?.id ?? null },
-        ),
+      const result = await apiClient.post<WorkspaceConversationAssistance>(
+        endpoint,
+        { mode, thread_root_id: requestScope.sourceId ?? null },
       );
+      if (!isCurrentRequest()) return;
+      if (result.mode !== mode) throw new Error("Assistance response mode did not match the request.");
+      setAssistance(result);
+      onFailureResolved(ASSISTANCE_FAILURE_KEY, requestToken);
     } catch (err) {
-      logClientError("Failed to load conversation assistance", err, { endpoint: `/workspaces/${activeWorkspaceId}/channels/${selectedChannelId}/assist` });
-      onError("Conversation assistance is temporarily unavailable. Please try again in a moment.");
+      if (!isCurrentRequest()) return;
+      logClientError("Failed to load conversation assistance", err, { endpoint });
+      assistanceFailureTokenRef.current = requestToken;
+      onFailure(ASSISTANCE_FAILURE_KEY, requestToken, ASSISTANCE_ERROR_MESSAGE);
     } finally {
-      setAssistanceLoading(null);
+      if (isCurrentRequest()) {
+        assistanceRequestTokenRef.current = null;
+        setAssistanceLoading(null);
+      }
     }
   }
 
   async function scanDecisionCandidates(sourceOffset = 0, append = false) {
-    if (!activeWorkspaceId || !selectedChannelId) return;
+    const requestScope: ConversationMutationScope = {
+      workspaceId: scopeRef.current.workspaceId,
+      channelId: scopeRef.current.channelId,
+    };
+    if (
+      !requestScope.workspaceId
+      || !requestScope.channelId
+      || candidateRequestTokenRef.current
+    ) return;
+    const requestRevision = channelScopeRevisionRef.current;
+    const requestToken = `candidates:${requestRevision}:${++requestSequenceRef.current}`;
+    const endpoint = `/workspaces/${requestScope.workspaceId}/decisions/candidates/conversation/${requestScope.channelId}`;
+    candidateRequestTokenRef.current = requestToken;
     setDecisionCandidatesCollapsed(false);
     setDecisionCandidatesLoading(true);
     setDecisionCandidatesError(null);
+    const isCurrentRequest = () => mountedRef.current
+      && candidateRequestTokenRef.current === requestToken
+      && channelScopeRevisionRef.current === requestRevision
+      && conversationMutationScopeMatches(requestScope, scopeRef.current);
     try {
       const result = await apiClient.post<DecisionCandidateList>(
-        `/workspaces/${activeWorkspaceId}/decisions/candidates/conversation/${selectedChannelId}?source_offset=${sourceOffset}`,
+        `${endpoint}?source_offset=${sourceOffset}`,
         {},
       );
+      if (!isCurrentRequest()) return;
+      if (result.source_type !== "conversation" || result.source_id !== requestScope.channelId) {
+        throw new Error("Decision-candidate response did not match the requested conversation.");
+      }
       setDecisionCandidates((current) => (append ? mergeDecisionCandidates(current, result.candidates) : result.candidates));
       setDecisionCandidateCoverage(result.source_coverage);
     } catch (err) {
-      logClientError("Failed to extract decision candidates", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/conversation/${selectedChannelId}` });
-      setDecisionCandidatesError("Unable to scan this conversation for decision candidates. Please try again in a moment.");
+      if (!isCurrentRequest()) return;
+      logClientError("Failed to extract decision candidates", err, { endpoint });
+      setDecisionCandidatesError(CANDIDATE_ERROR_MESSAGE);
     } finally {
-      setDecisionCandidatesLoading(false);
+      if (isCurrentRequest()) {
+        candidateRequestTokenRef.current = null;
+        setDecisionCandidatesLoading(false);
+      }
     }
   }
 
+  function sourceScope(threadRootId: string | null): ConversationSourceScope | null {
+    if (!activeWorkspaceId || !selectedChannelId) return null;
+    return { workspaceId: activeWorkspaceId, channelId: selectedChannelId, threadRootId };
+  }
+
   function openCandidateDecision(candidate: DecisionCandidate) {
-    onOpenDecision({ kind: "candidate", candidate });
+    const scope = sourceScope(null);
+    if (scope) onOpenDecision({ kind: "candidate", candidate, scope });
+  }
+
+  function openAssistanceTask() {
+    const scope = sourceScope(threadRootId);
+    if (scope && assistance) onOpenTask({ kind: "assistance", assistance, scope });
   }
 
   async function dismissDecisionCandidate(candidate: DecisionCandidate) {
@@ -179,7 +302,7 @@ export function ConversationAIPanel({
             {assistance.mode === "actions" ? (
               <button
                 type="button"
-                onClick={() => onOpenTask({ kind: "assistance", assistance })}
+                onClick={openAssistanceTask}
                 className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-purple-300/15 px-3 text-[11px] text-purple-100/85 transition hover:bg-purple-300/[0.08]"
               >
                 <ClipboardCheck className="h-3.5 w-3.5" /> Convert selected action

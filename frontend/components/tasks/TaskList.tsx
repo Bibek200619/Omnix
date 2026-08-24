@@ -28,7 +28,7 @@ type TaskListProps = {
   phases: TaskPhase[];
   currentUserId?: string;
   focusedTaskId: string | null;
-  updatingId: string | null;
+  updatingIds: ReadonlySet<string>;
   blockerDrafts: Record<string, string>;
   onCreateClick: () => void;
   onPatchTask: (task: WorkspaceTask, payload: Partial<WorkspaceTask>) => void;
@@ -49,7 +49,7 @@ export function TaskList({
   phases,
   currentUserId,
   focusedTaskId,
-  updatingId,
+  updatingIds,
   blockerDrafts,
   onCreateClick,
   onPatchTask,
@@ -112,7 +112,7 @@ export function TaskList({
                   phases={phases}
                   currentUserId={currentUserId}
                   focused={focusedTaskId === task.id}
-                  updating={updatingId === task.id}
+                  updating={updatingIds.has(task.id)}
                   blockerDraft={blockerDrafts[task.id] || ""}
                   onPatchTask={onPatchTask}
                   onBlockerDraftChange={onBlockerDraftChange}

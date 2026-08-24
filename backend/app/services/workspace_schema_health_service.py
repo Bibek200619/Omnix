@@ -169,6 +169,7 @@ EXPECTED_WORKSPACE_SCHEMA: dict[str, dict[str, Any]] = {
             "source_channel_id",
             "source_evidence",
             "initiative_id",
+            "client_nonce",
             "created_by",
             "created_at",
             "updated_at",

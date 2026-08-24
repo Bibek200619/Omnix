@@ -510,6 +510,7 @@ export type WorkspaceDecision = {
   source_channel_id?: string | null;
   source_evidence?: DecisionEvidence[];
   initiative_id?: string | null;
+  client_nonce?: string | null;
   created_by: string;
   created_at?: string | null;
   updated_at?: string | null;
