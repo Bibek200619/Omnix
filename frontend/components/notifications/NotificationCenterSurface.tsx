@@ -125,7 +125,7 @@ function NotificationCenterSurfaceContent() {
   }
 
   return (
-    <section className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 sm:px-5 sm:pb-5">
+    <section aria-busy={loading} className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 sm:px-5 sm:pb-5">
       <header className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3 border-b border-[var(--omnix-border)] px-1 pb-4 sm:px-0">
         <div className="min-w-0">
           <p className="mb-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
@@ -133,8 +133,10 @@ function NotificationCenterSurfaceContent() {
             In-app mentions
           </p>
           <h1 className="omnix-display text-xl font-semibold text-white">Notifications</h1>
-          <p className="mt-1 text-sm text-[var(--omnix-text-2)]">
-            {unreadCount > 0
+          <p role="status" aria-live="polite" aria-atomic="true" className="mt-1 text-sm text-[var(--omnix-text-2)]">
+            {loading && mentions.length === 0
+              ? "Loading notifications…"
+              : unreadCount > 0
               ? `${unreadCount} unread mention${unreadCount === 1 ? "" : "s"} in ${activeWorkspace?.name || "this workspace"}.`
               : "No unread mentions right now."}
           </p>
@@ -176,8 +178,9 @@ function NotificationCenterSurfaceContent() {
       ) : null}
 
       {loading && mentions.length === 0 ? (
-        <div className="grid min-h-[18rem] gap-2">
-          {Array.from({ length: 4 }).map((_, index) => (
+        <div className="min-h-[18rem]">
+          <div className="grid gap-2" aria-hidden="true">
+            {Array.from({ length: 4 }).map((_, index) => (
             <div key={index} className="flex flex-col gap-3 rounded-xl border border-[var(--omnix-border)] bg-black/[0.12] px-3 py-3 sm:flex-row sm:items-start sm:px-4">
               <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
               <div className="min-w-0 flex-1">
@@ -194,7 +197,8 @@ function NotificationCenterSurfaceContent() {
                 <Skeleton className="h-9 w-24 rounded-lg sm:w-full" />
               </div>
             </div>
-          ))}
+            ))}
+          </div>
         </div>
       ) : null}
 
