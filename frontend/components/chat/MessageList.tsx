@@ -20,8 +20,12 @@ type MessageListProps = {
 
 function ConversationSkeleton() {
   return (
-    <div className="omnix-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-6 sm:px-6">
-      {[0, 1, 2].map((item) => (
+    <div className="omnix-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-6 sm:px-6">
+      <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        Loading conversation…
+      </p>
+      <div className="flex flex-col gap-4" aria-hidden="true">
+        {[0, 1, 2].map((item) => (
         <div
           key={item}
           className={`shimmer rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] p-4 shadow-[var(--omnix-glow-xs)] ${
@@ -32,7 +36,8 @@ function ConversationSkeleton() {
           <div className="mt-4 h-2.5 w-full rounded-full bg-[var(--omnix-surface-hover)]" />
           <div className="mt-2 h-2.5 w-2/3 rounded-full bg-[var(--omnix-surface-hover)]" />
         </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

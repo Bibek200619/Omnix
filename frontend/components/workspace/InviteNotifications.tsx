@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Loader2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
+import { LiveRegion } from "@/components/ui/LiveRegion";
 import { logClientError } from "@/lib/errors";
+import { useToast } from "@/lib/toast-context";
 import { useWorkspaceMembership } from "@/lib/workspace-context";
 import { getWorkspaceInviteId, type WorkspaceInvite } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
@@ -36,6 +38,7 @@ function InviteActionButtons({
   onSettled?: () => void;
 }) {
   const { acceptInvite, declineInvite } = useWorkspaceMembership();
+  const { showToast } = useToast();
   const [state, setState] = useState<InviteActionState>({
     busyInviteId: null,
     error: null,
@@ -50,6 +53,11 @@ function InviteActionButtons({
       } else {
         await declineInvite(inviteId);
       }
+      showToast({
+        title: action === "accept" ? "Invitation accepted" : "Invitation declined",
+        message: `${inviteWorkspaceName(invite)} was ${action === "accept" ? "added to your workspaces" : "removed from your invitations"}.`,
+        variant: "success",
+      });
       onSettled?.();
     } catch (err) {
       logClientError("Invite action failed", err, { endpoint: `/workspace-invites/${inviteId}/${action}` });
@@ -94,7 +102,7 @@ function InviteActionButtons({
         Decline
       </Button>
       {state.error ? (
-        <p className="basis-full text-xs leading-5 text-rose-100">{state.error}</p>
+        <p role="alert" aria-live="assertive" aria-atomic="true" className="basis-full text-xs leading-5 text-rose-100">{state.error}</p>
       ) : null}
     </div>
   );
@@ -125,6 +133,7 @@ export function InviteNotificationBar() {
       key={getWorkspaceInviteId(invite)}
       className="omnix-shell-invite-enter border-b border-[var(--omnix-border)] bg-[var(--omnix-rgba-5-12-23-0-96)] shadow-[0_16px_40px_var(--omnix-rgba-0-0-0-0-26),var(--omnix-glow-xs)] backdrop-blur-xl"
     >
+      <LiveRegion message={`New workspace invitation from ${inviteSender(invite)} to join ${inviteWorkspaceName(invite)}.`} />
       <div className="flex w-full flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex min-w-0 items-start gap-3">
           <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[var(--omnix-glow-xs)]">

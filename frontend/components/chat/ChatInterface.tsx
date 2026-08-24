@@ -16,6 +16,7 @@ import {
 import { useChatStream } from "@/components/chat/useChatStream";
 import { useChatSync } from "@/components/chat/useChatSync";
 import { Alert } from "@/components/ui/Alert";
+import { LiveRegion } from "@/components/ui/LiveRegion";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useProfile } from "@/lib/profile-context";
@@ -153,9 +154,7 @@ export function ChatInterface() {
 
   return (
     <section className="relative flex h-full w-full overflow-hidden bg-[var(--omnix-bg)] text-[var(--omnix-text)]">
-      <div aria-live="polite" aria-atomic="false" className="sr-only" id="ai-stream-announcer">
-        {chatStream.streamingContent}
-      </div>
+      <LiveRegion message={chatStream.streamAnnouncement} />
       <div className="pointer-events-none absolute left-[18%] top-[-18%] h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle,var(--omnix-rgba-0-255-255-0-075),transparent_68%)] blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-20%] right-[4%] h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,var(--omnix-rgba-0-51-255-0-085),transparent_70%)] blur-3xl" />
       <ChatHistoryPanel

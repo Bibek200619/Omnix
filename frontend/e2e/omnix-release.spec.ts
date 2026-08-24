@@ -93,6 +93,8 @@ let files: Array<Record<string, unknown>>;
 let conversations: Array<Record<string, unknown>>;
 let messagesByConversation: Record<string, Array<Record<string, unknown>>>;
 let chatStreamFixture: string | null;
+let mentionFixtures: Array<Record<string, unknown>>;
+let mentionUnreadCount: number;
 let decisionCandidateOffsets: number[];
 let workspaceChannels: WorkspaceChannel[];
 let workspaceChannelMessages: WorkspaceChannelMessage[];
@@ -182,6 +184,8 @@ function resetMockState() {
   conversations = [];
   messagesByConversation = {};
   chatStreamFixture = null;
+  mentionFixtures = [];
+  mentionUnreadCount = 0;
   decisionCandidateOffsets = [];
   workspaceChannels = [];
   workspaceChannelMessages = [];
@@ -493,7 +497,9 @@ async function mockApi(page: Page) {
     if (decisionsMatch) return fulfillJson(route, []);
     const mentionsMatch = path.match(/^\/workspaces\/([^/]+)\/mentions(?:\/unread-count)?$/);
     if (mentionsMatch) {
-      return path.endsWith("/unread-count") ? fulfillJson(route, { unread_count: 0 }) : fulfillJson(route, []);
+      return path.endsWith("/unread-count")
+        ? fulfillJson(route, { unread_count: mentionUnreadCount })
+        : fulfillJson(route, mentionFixtures);
     }
     const searchMatch = path.match(/^\/workspaces\/([^/]+)\/search$/);
     if (searchMatch) {
@@ -2792,6 +2798,147 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page.getByText("Release is ready [S1] and.")).toBeVisible();
     await expect(page.getByTestId("citation-validation-notice")).toContainText("Citation coverage is incomplete");
     await expect(page.getByText("[S99]", { exact: false })).toHaveCount(0);
+    await expect(page.locator('[role="status"][aria-live="polite"]').filter({ hasText: "Response complete." })).toHaveCount(1);
+    await expect(page.locator('[role="status"][aria-live="polite"]').filter({ hasText: "Release is ready" })).toHaveCount(0);
+  });
+
+  test("exposes conversation loading outside decorative skeletons", async ({ page, isMobile }) => {
+    conversations = [
+      {
+        id: "loading-conversation",
+        workspace_id: "workspace-1",
+        title: "Loading state",
+        preview: "Waiting for messages",
+        latest_message_role: "assistant",
+        latest_message_at: "2026-06-20T00:00:00Z",
+      },
+    ];
+    let releaseMessages!: () => void;
+    const messagesGate = new Promise<void>((resolve) => {
+      releaseMessages = resolve;
+    });
+    await page.route("**/api/conversations/loading-conversation/messages", async (route) => {
+      await messagesGate;
+      await fulfillJson(route, []);
+    });
+
+    await page.goto("/chat?conversation=loading-conversation");
+    if (isMobile) {
+      await page.getByRole("button", { name: "Close history" }).click();
+    }
+    const loadingStatus = page.locator('[role="status"][aria-live="polite"]').filter({ hasText: "Loading conversation…" });
+    await expect(loadingStatus).toHaveCount(1);
+    await expect(loadingStatus).not.toHaveAttribute("aria-hidden", "true");
+    await expect(loadingStatus.locator("xpath=following-sibling::*[1]")).toHaveAttribute("aria-hidden", "true");
+
+    releaseMessages();
+    await expect(loadingStatus).toHaveCount(0);
+  });
+
+  test("announces upload start and queued processing with semantic progress", async ({ page }) => {
+    let releaseUpload!: () => void;
+    const uploadGate = new Promise<void>((resolve) => {
+      releaseUpload = resolve;
+    });
+    await page.route("**/api/upload", async (route) => {
+      await uploadGate;
+      await fulfillJson(route, {
+        id: "file-announcement",
+        user_id: userId,
+        workspace_id: "workspace-1",
+        file_name: "screen-reader-upload.md",
+        file_type: "text/markdown",
+        size_bytes: 96,
+        processing_status: "queued",
+        extraction_status: "processing",
+        metadata: { processing_status: "queued" },
+        created_at: "2026-06-20T00:00:00Z",
+      }, 201);
+    });
+
+    await page.goto("/files");
+    await page.locator('input[type="file"]').first().setInputFiles({
+      name: "screen-reader-upload.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Accessible upload"),
+    });
+
+    await expect(page.locator('[role="status"]').filter({ hasText: "screen-reader-upload.md upload started." })).toHaveCount(1);
+    const progress = page.getByRole("progressbar", { name: "Uploading screen-reader-upload.md" });
+    await expect(progress).toHaveAttribute("aria-valuemin", "0");
+    await expect(progress).toHaveAttribute("aria-valuemax", "100");
+    await expect(progress).toHaveAttribute("aria-valuenow", /\d+/);
+    await expect(progress).toHaveAttribute("aria-valuetext", /\d+% uploaded/);
+
+    releaseUpload();
+    await expect(page.locator('[role="status"]').filter({ hasText: "screen-reader-upload.md uploaded and queued for processing." })).toHaveCount(1);
+    await expect(page.getByText("Queued").first()).toBeVisible();
+  });
+
+  test("announces a newly delivered mention without relying on the bell label", async ({ page }) => {
+    await page.goto("/notifications");
+    await expect(page.getByRole("button", { name: "Mention notifications, 0 unread" })).toBeVisible();
+    await expect(page.getByText("No unread mentions right now.")).toBeVisible();
+
+    mentionFixtures = [
+      {
+        id: "mention-announcement",
+        workspace_id: "workspace-1",
+        mentioned_user_id: userId,
+        mentioned_by_user_id: "user-2",
+        mentioned_by_name: "Taylor Ops",
+        mentioned_by_email: "taylor@example.com",
+        source_type: "conversation_message",
+        source_id: "message-announcement",
+        source_title: "Release coordination",
+        source_preview: "Please review the launch checklist.",
+        source_url: "/conversations?channel=channel-general",
+        read_at: null,
+        created_at: "2026-06-20T00:05:00Z",
+      },
+    ];
+    mentionUnreadCount = 1;
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+
+    const mentionToast = page.locator('[role="status"][aria-live="polite"]').filter({ hasText: "New mention" });
+    await expect(mentionToast).toContainText("Taylor Ops mentioned you in Release coordination.");
+    await expect(page.getByText("1 unread mention in Acme Operations.")).toBeVisible();
+  });
+
+  test("keyboard cancellation announces a stopped response", async ({ page, isMobile }) => {
+    let releaseStream!: () => void;
+    const streamGate = new Promise<void>((resolve) => {
+      releaseStream = resolve;
+    });
+    await page.route("**/api/chat/stream", async (route) => {
+      await streamGate;
+      try {
+        await route.fulfill({
+          status: 200,
+          contentType: "text/event-stream",
+          body: `data: ${JSON.stringify({ type: "done", conversation_id: "cancelled-stream", content: "Late response" })}\n\n`,
+        });
+      } catch {
+        // The keyboard-initiated abort can close the mocked request before release.
+      }
+    });
+
+    await page.goto("/chat");
+    if (isMobile) {
+      await page.getByRole("button", { name: "Close history" }).click();
+    }
+    await page.getByPlaceholder("Type a message or '/' for commands...").fill("Draft a release note.");
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.locator('[role="status"]').filter({ hasText: "Omnix is responding." })).toHaveCount(1);
+
+    const stop = page.getByRole("button", { name: "Stop generating" });
+    await stop.focus();
+    await expect(stop).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.locator('[role="status"]').filter({ hasText: "Response stopped." })).toHaveCount(1);
+    await expect(page.getByText("Unable to send message. Check your connection and try again.")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+    releaseStream();
   });
 
   test("mobile file upload surface queues a selected file", async ({ page, isMobile }) => {

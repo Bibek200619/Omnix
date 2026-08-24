@@ -3,7 +3,6 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import {
-  AlertCircle,
   ChevronRight,
   Menu,
   MessageSquarePlus,
@@ -14,6 +13,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { LiveRegion } from "@/components/ui/LiveRegion";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
@@ -158,6 +158,7 @@ export const Header = memo(function Header({ sidebarCollapsed = false, onMenuCli
   return (
     <>
       <header className="relative z-30 shrink-0 select-none border-b border-[var(--omnix-rgba-0-255-255-0-08)] bg-[var(--omnix-header-glass)] pt-safe backdrop-blur-[24px]">
+        <LiveRegion message={`Realtime ${realtimeStatusLabel}.`} />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent_0%,var(--omnix-rgba-0-255-255-0-25)_40%,var(--omnix-rgba-0-255-255-0-5)_55%,var(--omnix-rgba-0-255-255-0-25)_70%,transparent_100%)]" />
         <InviteNotificationBar />
         <div className="relative flex h-[var(--omnix-header-h)] w-full items-center gap-1.5 px-3 sm:gap-3 sm:px-[22px]">
@@ -261,7 +262,7 @@ export const Header = memo(function Header({ sidebarCollapsed = false, onMenuCli
               </div>
             ) : (
               <span
-                role="status"
+                role="group"
                 aria-label={`Realtime status: ${realtimeStatusLabel}`}
                 title={realtimeTitle}
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center"
@@ -298,16 +299,15 @@ export const Header = memo(function Header({ sidebarCollapsed = false, onMenuCli
         </div>
         {signOutError ? (
           <div className="border-t border-rose-400/20 bg-rose-400/10 px-4 py-2 text-sm text-rose-100 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0" />
+            <Alert variant="error" className="p-2.5 text-xs">
               {signOutError}
-            </div>
+            </Alert>
           </div>
         ) : null}
       </header>
       {realtimeOffline && !offlineAlertDismissed ? (
         <div className="relative z-20 shrink-0 border-b border-amber-300/10 bg-[var(--omnix-header-glass)] px-3 py-2 backdrop-blur-[24px] sm:px-[22px]">
-          <Alert variant="warning" title="Realtime connection offline" className="items-start p-2.5 text-xs">
+          <Alert announce={false} variant="warning" title="Realtime connection offline" className="items-start p-2.5 text-xs">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span>Live workspace updates are paused until the connection recovers.</span>
               <div className="flex shrink-0 items-center gap-1.5">

@@ -11,6 +11,7 @@ type AlertProps = {
   children: ReactNode;
   variant?: AlertVariant;
   className?: string;
+  announce?: boolean;
 };
 
 const styles: Record<AlertVariant, string> = {
@@ -32,6 +33,7 @@ export function Alert({
   children,
   variant = "info",
   className,
+  announce = true,
 }: AlertProps) {
   const Icon = icons[variant];
 
@@ -42,9 +44,11 @@ export function Alert({
         styles[variant],
         className,
       )}
-      role={variant === "error" ? "alert" : "status"}
+      role={announce ? (variant === "error" ? "alert" : "status") : undefined}
+      aria-live={announce ? (variant === "error" ? "assertive" : "polite") : undefined}
+      aria-atomic={announce ? "true" : undefined}
     >
-      <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+      <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
       <div className="min-w-0">
         {title ? <p className="font-medium text-white">{title}</p> : null}
         <div className={cn(title && "mt-1", "text-current/80")}>{children}</div>
