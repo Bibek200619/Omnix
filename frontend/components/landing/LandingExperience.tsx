@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useState, type CSSProperties } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { LandingHeroScene } from "@/components/landing/LandingHeroScene";
 import { AppScreenshots } from "@/components/landing/LandingAppScreenshots";
 import { useDecorativeMotionEnabled } from "@/lib/use-decorative-motion";
 
@@ -27,6 +27,19 @@ import {
   fadeUp,
   tint,
 } from "@/components/landing/LandingPrimitives";
+
+const LandingHeroScene = dynamic(
+  () => import("@/components/landing/LandingHeroScene").then((module) => module.LandingHeroScene),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute inset-x-[10%] top-[6%] h-[38rem] rounded-full bg-[radial-gradient(circle,rgba(0,255,255,0.16),transparent_64%)] opacity-55 blur-3xl" />
+        <div className="absolute inset-x-0 bottom-0 h-[58%] bg-[linear-gradient(180deg,rgba(6,16,32,0)_0%,rgba(6,16,32,0.46)_42%,rgba(6,16,32,0.9)_100%)]" />
+      </div>
+    ),
+  },
+);
 
 // ─── NAVBAR ───────────────────────────────────────────────────────────────────
 function Navbar() {
