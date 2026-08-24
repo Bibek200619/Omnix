@@ -95,6 +95,7 @@ let messagesByConversation: Record<string, Array<Record<string, unknown>>>;
 let chatStreamFixture: string | null;
 let mentionFixtures: Array<Record<string, unknown>>;
 let mentionUnreadCount: number;
+let workspaceActivity: Array<Record<string, unknown>>;
 let decisionCandidateOffsets: number[];
 let workspaceChannels: WorkspaceChannel[];
 let workspaceChannelMessages: WorkspaceChannelMessage[];
@@ -186,6 +187,7 @@ function resetMockState() {
   chatStreamFixture = null;
   mentionFixtures = [];
   mentionUnreadCount = 0;
+  workspaceActivity = [];
   decisionCandidateOffsets = [];
   workspaceChannels = [];
   workspaceChannelMessages = [];
@@ -335,7 +337,7 @@ async function mockApi(page: Page) {
     const presenceMatch = path.match(/^\/workspaces\/([^/]+)\/presence(?:\/heartbeat)?$/);
     if (presenceMatch) return fulfillJson(route, presenceSnapshot(presenceMatch[1]));
     const activityMatch = path.match(/^\/workspaces\/([^/]+)\/activity$/);
-    if (activityMatch) return fulfillJson(route, []);
+    if (activityMatch) return fulfillJson(route, workspaceActivity);
     const membersMatch = path.match(/^\/workspaces\/([^/]+)\/members$/);
     if (membersMatch) return fulfillJson(route, members);
     const timelineMatch = path.match(/^\/workspaces\/([^/]+)\/timeline$/);
@@ -2929,6 +2931,46 @@ test.describe("authenticated Omnix shell", () => {
     const mentionToast = page.locator('[role="status"][aria-live="polite"]').filter({ hasText: "New mention" });
     await expect(mentionToast).toContainText("Taylor Ops mentioned you in Release coordination.");
     await expect(page.getByText("1 unread mention in Acme Operations.")).toBeVisible();
+  });
+
+  test("notification center composes mentions with authoritative workspace activity", async ({ page }) => {
+    mentionFixtures = [{
+      id: "mention-inbox",
+      workspace_id: "workspace-1",
+      mentioned_user_id: userId,
+      mentioned_by_user_id: "user-2",
+      mentioned_by_name: "Taylor Ops",
+      mentioned_by_avatar_label: "T",
+      source_type: "task",
+      source_id: "task-1",
+      source_title: "Reduce upload latency",
+      source_preview: "Please review the worker plan.",
+      source_url: "/tasks?task=task-1",
+      read_at: null,
+      created_at: "2026-06-20T00:04:00Z",
+    }];
+    mentionUnreadCount = 1;
+    workspaceActivity = [{
+      id: "activity-decision",
+      workspace_id: "workspace-1",
+      actor_user_id: "user-2",
+      actor_name: "Taylor Ops",
+      actor_avatar_label: "T",
+      event_type: "decision.created",
+      summary: "Release approach decision recorded",
+      metadata: {},
+      created_at: "2026-06-20T00:05:00Z",
+    }];
+
+    await page.goto("/notifications");
+    await expect(page.getByText("Release approach decision recorded")).toBeVisible();
+    await expect(page.getByText(/Taylor Ops mentioned you in Task: Reduce upload latency/)).toBeVisible();
+
+    await page.getByRole("button", { name: /^activity$/i }).click();
+    await expect(page.getByText("Release approach decision recorded")).toBeVisible();
+    await expect(page.getByText(/mentioned you in/)).toHaveCount(0);
+    await page.getByRole("article").filter({ hasText: "Release approach decision recorded" }).getByRole("link", { name: "Open" }).click();
+    await expect(page).toHaveURL(/\/decisions$/);
   });
 
   test("keyboard cancellation announces a stopped response", async ({ page, isMobile }) => {
