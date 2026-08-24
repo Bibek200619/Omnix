@@ -19,7 +19,13 @@ const shortcuts = [
 
 export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsModalProps) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Keyboard shortcuts" className="max-w-md">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Keyboard shortcuts"
+      description="Review the keyboard commands available throughout Omnix."
+      className="max-w-md"
+    >
       <Modal.Header>
         <div className="min-w-0">
           <h2 className="omnix-display text-lg font-semibold text-white">

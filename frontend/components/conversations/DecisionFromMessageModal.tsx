@@ -22,7 +22,7 @@ import type {
 import { MentionTextarea, mentionPayload } from "@/components/mentions/MentionTextarea";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Portal } from "@/components/ui/Portal";
+import { Modal } from "@/components/ui/Modal";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
 import {
@@ -294,9 +294,16 @@ export function DecisionFromMessageModal({
   ) return null;
 
   return (
-    <Portal>
-      <div className="omnix-mobile-sheet-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6">
-        <form onSubmit={createDecision} className="omnix-mobile-sheet omnix-panel-strong max-h-[calc(100dvh_-_2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-cyan-300/15 p-4 shadow-2xl sm:p-5">
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Record linked decision"
+      description="Record one decision linked to the selected discussion."
+      closeDisabled={creating}
+      backdropClassName="omnix-mobile-sheet-backdrop z-50 bg-black/65 px-4 py-6"
+      className="omnix-mobile-sheet omnix-panel-strong max-h-[calc(100dvh_-_2rem)] max-w-lg overflow-y-auto rounded-2xl border border-cyan-300/15 p-4 shadow-2xl sm:p-5"
+    >
+        <form onSubmit={createDecision}>
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Discussion to decision</p>
@@ -306,9 +313,10 @@ export function DecisionFromMessageModal({
               <X className="h-4 w-4" />
             </button>
           </div>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Name the organizational choice" className="h-10 text-sm" autoFocus disabled={creating} />
+          <Input aria-label="Decision title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Name the organizational choice" className="h-10 text-sm" autoFocus disabled={creating} />
           <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
             <MentionTextarea
+              aria-label="Decision reason"
               value={reason}
               onChange={setReason}
               members={activeMembers}
@@ -321,6 +329,7 @@ export function DecisionFromMessageModal({
             <label className="block">
               <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Status</span>
               <select
+                aria-label="Decision status"
                 value={status}
                 onChange={(event) => setStatus(event.target.value as WorkspaceDecisionStatus)}
                 disabled={creating}
@@ -333,6 +342,7 @@ export function DecisionFromMessageModal({
             </label>
           </div>
           <MentionTextarea
+            aria-label="Decision description"
             value={description}
             onChange={setDescription}
             members={activeMembers}
@@ -354,7 +364,6 @@ export function DecisionFromMessageModal({
             </Button>
           </div>
         </form>
-      </div>
-    </Portal>
+    </Modal>
   );
 }

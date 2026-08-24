@@ -3,7 +3,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { AlertCircle, CheckCircle2, Clock3, LockKeyhole, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { DocumentPortal } from "@/components/files/DocumentPortal";
+import { Modal } from "@/components/ui/Modal";
 import type { ConnectorFormState, ConnectorType, SourceTypeMeta } from "@/components/files/filesPageModel";
 
 type ConnectorSetupModalProps = {
@@ -32,9 +32,15 @@ export function ConnectorSetupModal({
   const SetupIcon = setupMeta.icon;
 
   return (
-    <DocumentPortal>
-      <div className="fixed inset-0 z-[160] flex items-end justify-center bg-black/70 px-3 py-4 backdrop-blur-md sm:items-center">
-        <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-white/10 bg-[linear-gradient(180deg,var(--omnix-rgba-12-18-28-0-98),var(--omnix-rgba-3-6-12-0-98))] p-5 shadow-2xl sm:rounded-2xl sm:p-6">
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={setupMeta.title}
+      description={setupMeta.description}
+      closeDisabled={savingConnector}
+      backdropClassName="z-[160] items-end bg-black/70 px-3 py-4 sm:items-center"
+      className="max-h-[92dvh] max-w-2xl overflow-y-auto rounded-t-2xl border border-white/10 bg-[linear-gradient(180deg,var(--omnix-rgba-12-18-28-0-98),var(--omnix-rgba-3-6-12-0-98))] p-5 shadow-2xl sm:rounded-2xl sm:p-6"
+    >
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border" style={{ background: setupMeta.iconSurface, borderColor: setupMeta.iconBorder, color: setupMeta.color }}>
@@ -48,6 +54,7 @@ export function ConnectorSetupModal({
             <button
               type="button"
               onClick={onClose}
+              disabled={savingConnector}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
               aria-label="Close connector setup"
               title="Close"
@@ -255,7 +262,7 @@ export function ConnectorSetupModal({
             ) : null}
 
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+              <Button type="button" variant="ghost" onClick={onClose} disabled={savingConnector}>Cancel</Button>
               <Button
                 type="button"
                 variant="secondary"
@@ -275,9 +282,7 @@ export function ConnectorSetupModal({
               </div>
             ) : null}
           </div>
-        </div>
-      </div>
-    </DocumentPortal>
+    </Modal>
   );
 }
 

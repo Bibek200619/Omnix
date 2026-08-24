@@ -62,7 +62,14 @@ export function SidebarModals({
   return (
     <>
       {activeSuperWorkspace ? (
-        <Modal isOpen={createOpen} onClose={onCloseCreate} title="Create team subspace" className="max-w-md p-5">
+        <Modal
+          isOpen={createOpen}
+          onClose={onCloseCreate}
+          title="Create team subspace"
+          description={`Add a team space under ${activeSuperWorkspace.name}.`}
+          closeDisabled={creatingSubspace}
+          className="max-w-md p-5"
+        >
           <WorkspaceModalHeader
             title="Create team subspace"
             description={<>Add a team space under <span className="font-medium text-slate-200">{activeSuperWorkspace.name}</span>.</>}
@@ -101,7 +108,14 @@ export function SidebarModals({
         </Modal>
       ) : null}
 
-      <Modal isOpen={renameOpen} onClose={onCloseRename} title="Rename workspace" className="max-w-md p-5">
+      <Modal
+        isOpen={renameOpen}
+        onClose={onCloseRename}
+        title="Rename workspace"
+        description="Update the visible name for this workspace."
+        closeDisabled={renaming}
+        className="max-w-md p-5"
+      >
         <WorkspaceModalHeader
           title="Rename workspace"
           description="Update the visible name for this workspace."
@@ -138,7 +152,15 @@ export function SidebarModals({
         </form>
       </Modal>
 
-      <Modal isOpen={deleteOpen} onClose={onCloseDelete} title="Delete workspace" className="max-w-md border-rose-400/25 p-5 shadow-[0_24px_80px_var(--omnix-rgba-0-0-0-0-5),0_0_24px_var(--omnix-rgba-244-63-94-0-14)]">
+      <Modal
+        isOpen={deleteOpen}
+        onClose={onCloseDelete}
+        title="Delete workspace"
+        description={`Permanently remove ${active.name} from the workspace list and active session.`}
+        role="alertdialog"
+        closeDisabled={deleting}
+        className="max-w-md border-rose-400/25 p-5 shadow-[0_24px_80px_var(--omnix-rgba-0-0-0-0-5),0_0_24px_var(--omnix-rgba-244-63-94-0-14)]"
+      >
         <WorkspaceModalHeader
           title="Delete workspace"
           description={<>This removes <span className="font-medium text-slate-200">{active.name}</span> from the workspace list and clears it from the active session.</>}

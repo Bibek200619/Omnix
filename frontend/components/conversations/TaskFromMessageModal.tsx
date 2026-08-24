@@ -21,7 +21,7 @@ import type {
 import { MentionTextarea, mentionPayload } from "@/components/mentions/MentionTextarea";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Portal } from "@/components/ui/Portal";
+import { Modal } from "@/components/ui/Modal";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
 import {
@@ -298,9 +298,16 @@ export function TaskFromMessageModal({
   ) return null;
 
   return (
-    <Portal>
-      <div className="omnix-mobile-sheet-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6">
-        <form onSubmit={createTask} className="omnix-mobile-sheet omnix-panel-strong max-h-[calc(100dvh_-_2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-cyan-300/15 p-4 shadow-2xl sm:p-5">
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Open linked task"
+      description="Create one task linked to the selected discussion."
+      closeDisabled={creating}
+      backdropClassName="omnix-mobile-sheet-backdrop z-50 bg-black/65 px-4 py-6"
+      className="omnix-mobile-sheet omnix-panel-strong max-h-[calc(100dvh_-_2rem)] max-w-lg overflow-y-auto rounded-2xl border border-cyan-300/15 p-4 shadow-2xl sm:p-5"
+    >
+        <form onSubmit={createTask}>
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Discussion to execution</p>
@@ -310,8 +317,9 @@ export function TaskFromMessageModal({
               <X className="h-4 w-4" />
             </button>
           </div>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Name the specific next step" className="h-10 text-sm" autoFocus disabled={creating} />
+          <Input aria-label="Task title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Name the specific next step" className="h-10 text-sm" autoFocus disabled={creating} />
           <MentionTextarea
+            aria-label="Task description"
             value={description}
             onChange={setDescription}
             members={activeMembers}
@@ -331,7 +339,6 @@ export function TaskFromMessageModal({
             </Button>
           </div>
         </form>
-      </div>
-    </Portal>
+    </Modal>
   );
 }

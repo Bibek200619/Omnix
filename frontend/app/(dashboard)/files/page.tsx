@@ -18,17 +18,15 @@ import {
   RefreshCw,
   Search,
   Unplug,
-  X,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { ConnectorSetupModal } from "@/components/files/ConnectorSetupModal";
+import { DocumentDecisionSuggestionsModal } from "@/components/files/DocumentDecisionSuggestionsModal";
 import { FileSourceCard } from "@/components/files/FileSourceCard";
 import { loadFilesWithSearchTarget, useFileSearchFocus, fileSearchFocusId } from "@/components/files/useFileSearchFocus";
 import { SourceHealthConsole } from "@/components/files/SourceHealthConsole";
 import { CreateDecisionModal } from "@/components/decisions/CreateDecisionModal";
-import { DocumentPortal } from "@/components/files/DocumentPortal";
-import { DecisionCandidatePanel } from "@/components/decisions/DecisionCandidatePanel";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -821,50 +819,25 @@ function FilesPageContent() {
       </div>
 
       {candidateFile ? (
-        <DocumentPortal>
-          <div className="fixed inset-0 z-[155] flex items-end justify-center bg-black/70 px-3 py-4 backdrop-blur-md sm:items-center">
-            <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-white/10 bg-[linear-gradient(180deg,var(--omnix-rgba-12-18-28-0-98),var(--omnix-rgba-3-6-12-0-98))] p-4 shadow-2xl sm:rounded-2xl sm:p-5">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Document suggestions</p>
-                  <h3 className="mt-1 truncate text-base font-semibold text-white">{candidateFile.file_name ?? candidateFile.filename ?? "Document"}</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCandidateFile(null);
-                    setDecisionCandidates([]);
-                    setDecisionCandidateCoverage(null);
-                    setDecisionCandidatesError(null);
-                  }}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
-                  aria-label="Close document decision suggestions"
-                  title="Close"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <DecisionCandidatePanel
-                collapsed={false}
-                candidates={decisionCandidates}
-                loading={decisionCandidatesLoading}
-                error={decisionCandidatesError}
-                emptyText="No evidence-backed document decisions found."
-                sourceCoverage={decisionCandidateCoverage}
-                sourceType="document"
-                onToggle={() => undefined}
-                onRefresh={() => void scanDocumentDecisionCandidates(candidateFile)}
-                onScanMore={
-                  typeof nextDecisionSourceOffset !== "number"
-                    ? undefined
-                    : () => void scanDocumentDecisionCandidates(candidateFile, nextDecisionSourceOffset, true)
-                }
-                onCreate={(candidate) => void openCandidateDecision(candidate)}
-                onDismiss={(candidate) => void dismissDecisionCandidate(candidate)}
-              />
-            </div>
-          </div>
-        </DocumentPortal>
+        <DocumentDecisionSuggestionsModal
+          file={candidateFile}
+          candidates={decisionCandidates}
+          coverage={decisionCandidateCoverage}
+          error={decisionCandidatesError}
+          loading={decisionCandidatesLoading}
+          onClose={() => {
+            setCandidateFile(null);
+            setDecisionCandidates([]);
+            setDecisionCandidateCoverage(null);
+            setDecisionCandidatesError(null);
+          }}
+          onRefresh={() => void scanDocumentDecisionCandidates(candidateFile)}
+          onScanMore={typeof nextDecisionSourceOffset !== "number"
+            ? undefined
+            : () => void scanDocumentDecisionCandidates(candidateFile, nextDecisionSourceOffset, true)}
+          onCreate={(candidate) => void openCandidateDecision(candidate)}
+          onDismiss={(candidate) => void dismissDecisionCandidate(candidate)}
+        />
       ) : null}
 
       {activeWorkspaceId && decisionCandidateDraft ? (

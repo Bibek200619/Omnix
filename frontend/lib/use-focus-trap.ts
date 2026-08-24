@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, type RefObject } from "react";
 
 const focusableSelector =
-  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[contenteditable="true"],[tabindex]:not([tabindex="-1"])';
 
 type FocusTrapOptions = {
   isolateBackground?: boolean;
@@ -72,7 +72,7 @@ export function useFocusTrap<T extends HTMLElement = HTMLElement>(
 
     const focusInitialElement = () => {
       const container = containerRef.current;
-      if (!container || (initialFocusRef && !initialFocusRef.current)) {
+      if (!container) {
         focusFrame = window.requestAnimationFrame(focusInitialElement);
         return;
       }
@@ -84,7 +84,7 @@ export function useFocusTrap<T extends HTMLElement = HTMLElement>(
         ? preferred
         : container.querySelector<HTMLElement>(focusableSelector);
 
-      first?.focus({ preventScroll: true });
+      (first ?? container).focus({ preventScroll: true });
     };
     focusInitialElement();
 
@@ -98,6 +98,7 @@ export function useFocusTrap<T extends HTMLElement = HTMLElement>(
 
       if (!first || !last) {
         event.preventDefault();
+        container.focus({ preventScroll: true });
         return;
       }
 
@@ -119,7 +120,18 @@ export function useFocusTrap<T extends HTMLElement = HTMLElement>(
       }
       document.removeEventListener("keydown", handleKeyDown);
       restoreBackground?.();
-      previouslyFocused?.focus({ preventScroll: true });
+      window.requestAnimationFrame(() => {
+        if (!previouslyFocused?.isConnected) return;
+        const currentFocus = document.activeElement;
+        if (
+          currentFocus instanceof HTMLElement
+          && currentFocus !== document.body
+          && currentFocus.isConnected
+        ) {
+          return;
+        }
+        previouslyFocused.focus({ preventScroll: true });
+      });
     };
   }, [active, initialFocusRef, isolateBackground]);
 

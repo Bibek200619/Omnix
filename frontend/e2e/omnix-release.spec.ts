@@ -873,13 +873,89 @@ test.describe("authenticated Omnix shell", () => {
 
     const dialog = page.getByRole("dialog", { name: "Keyboard shortcuts" });
     await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAccessibleDescription("Review the keyboard commands available throughout Omnix.");
     await expect(dialog.getByRole("button", { name: "Close keyboard shortcuts" })).toBeFocused();
     await expect.poll(mainContentHasIsolatedAncestor).toBe(true);
+    await page.keyboard.press("Tab");
+    await expect(dialog.getByRole("button", { name: "Close keyboard shortcuts" })).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(dialog.getByRole("button", { name: "Close keyboard shortcuts" })).toBeFocused();
+    await runAxe(page);
 
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
     await expect(trigger).toBeFocused();
     await expect.poll(mainContentHasIsolatedAncestor).toBe(false);
+
+    await page.keyboard.type("?");
+    await expect(dialog).toBeVisible();
+    await page.locator(".omnix-modal-backdrop").click({ position: { x: 2, y: 2 } });
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  test("decision modal exposes semantics and keeps every dismissal route disabled while saving", async ({ page }) => {
+    let releaseDecision!: () => void;
+    const decisionGate = new Promise<void>((resolve) => {
+      releaseDecision = resolve;
+    });
+    await page.route("**/api/workspaces/workspace-1/decisions", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      await decisionGate;
+      return fulfillJson(route, {
+        id: "decision-modal-accessibility",
+        workspace_id: "workspace-1",
+        title: body.title,
+        decision_reason: body.decision_reason,
+        status: body.status,
+        created_by: userId,
+        mentions: [],
+        linked_tasks: [],
+      }, 201);
+    });
+
+    await page.goto("/decisions?create=decision&palette=modal-accessibility");
+    const dialog = page.getByRole("dialog", { name: "Record New Decision" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAccessibleDescription("Capture an organizational choice, its rationale, status, and linked work.");
+    await runAxe(page);
+    await page.getByRole("textbox", { name: "Title" }).fill("Keep modal state stable");
+    await page.getByRole("textbox", { name: "Reason" }).fill("A pending save must keep its context available.");
+    await dialog.getByRole("button", { name: "Record Decision" }).click();
+    await expect(dialog.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: "Close decision modal" })).toBeDisabled();
+
+    await page.keyboard.press("Escape");
+    await page.locator(".omnix-modal-backdrop").click({ position: { x: 2, y: 2 } });
+    await expect(dialog).toBeVisible();
+
+    releaseDecision();
+    await expect(dialog).toBeHidden();
+  });
+
+  test("file connector and document suggestion overlays use the shared dialog contract", async ({ page }) => {
+    await page.goto("/files");
+    await page.getByRole("button", { name: /^Connectors/ }).click();
+    const connectorTrigger = page.getByRole("button", { name: /Knowledge link/ });
+    await connectorTrigger.click();
+    const connectorDialog = page.getByRole("dialog", { name: "Knowledge link" });
+    await expect(connectorDialog).toHaveAccessibleDescription("Docs, wiki, or policy URL");
+    await runAxe(page);
+    await page.keyboard.press("Escape");
+    await expect(connectorDialog).toBeHidden();
+    await expect(connectorTrigger).toBeFocused();
+
+    await page.getByRole("button", { name: /^Files/ }).click();
+    const fileCard = page.locator("[data-search-focused], .omnix-source-card").filter({ hasText: "release-plan.md" });
+    const suggestionTrigger = fileCard.getByRole("button", { name: "Decisions" });
+    await suggestionTrigger.click();
+    const suggestionDialog = page.getByRole("dialog", { name: "release-plan.md" });
+    await expect(suggestionDialog).toHaveAccessibleDescription("Review evidence-backed decision suggestions extracted from this document.");
+    await runAxe(page);
+    await suggestionDialog.getByRole("button", { name: "Close document decision suggestions" }).click();
+    await expect(suggestionDialog).toBeHidden();
+    await expect(suggestionTrigger).toBeFocused();
   });
 
   test("announces command palette no-result state", async ({ page }) => {
@@ -1456,6 +1532,9 @@ test.describe("authenticated Omnix shell", () => {
     await expect(sourceMessage).toBeVisible();
 
     await sourceMessage.getByRole("button", { name: "Track as task" }).click();
+    const taskDialog = page.getByRole("dialog", { name: "Open linked task" });
+    await expect(taskDialog).toHaveAccessibleDescription("Create one task linked to the selected discussion.");
+    await runAxe(page);
     await page.getByRole("button", { name: "Open task" }).click();
     const taskError = page.getByText(
       "Unable to open task from discussion. Check your connection and try again.",
@@ -1469,6 +1548,9 @@ test.describe("authenticated Omnix shell", () => {
     await expect(taskError).toHaveCount(0);
 
     await sourceMessage.getByRole("button", { name: "Convert to Decision" }).click();
+    const decisionDialog = page.getByRole("dialog", { name: "Record linked decision" });
+    await expect(decisionDialog).toHaveAccessibleDescription("Record one decision linked to the selected discussion.");
+    await runAxe(page);
     await page.getByRole("button", { name: "Record decision" }).click();
     const decisionError = page.getByText(
       "Unable to record decision from discussion. Check your connection and try again.",
@@ -1593,9 +1675,7 @@ test.describe("authenticated Omnix shell", () => {
     );
     await expect(failure).toBeVisible();
 
-    await sourceB.getByRole("button", { name: "Track as task" }).evaluate((button) => {
-      (button as HTMLButtonElement).click();
-    });
+    await sourceB.getByRole("button", { name: "Track as task", includeHidden: true }).dispatchEvent("click");
     await expect(page.getByPlaceholder("Name the specific next step")).toHaveValue("Replacement source B");
     await expect(failure).toHaveCount(0);
   });
@@ -1616,9 +1696,7 @@ test.describe("authenticated Omnix shell", () => {
     await source.getByRole("button", { name: "Convert to Decision" }).click();
     await expect(page.getByPlaceholder("Name the organizational choice")).toBeVisible();
 
-    await page.getByRole("button", { name: /^Planning/ }).evaluate((button) => {
-      (button as HTMLButtonElement).click();
-    });
+    await page.getByRole("button", { name: /^Planning/, includeHidden: true }).dispatchEvent("click");
     await expect(page.getByPlaceholder("Name the organizational choice")).toHaveCount(0);
     await page.getByRole("button", { name: /^General/ }).click();
     await expect(page.getByPlaceholder("Name the organizational choice")).toHaveCount(0);
@@ -1661,9 +1739,7 @@ test.describe("authenticated Omnix shell", () => {
     await convertButton.evaluate((button) => (button as HTMLButtonElement).click());
     await expect(page.getByPlaceholder("Name the specific next step")).toBeVisible();
 
-    await page.getByRole("button", { name: "Close thread" }).evaluate((button) => {
-      (button as HTMLButtonElement).click();
-    });
+    await page.getByRole("button", { name: "Close thread", includeHidden: true }).dispatchEvent("click");
     await expect(page.getByPlaceholder("Name the specific next step")).toHaveCount(0);
     await rootRow.getByRole("button", { name: "1 thread replies" }).click();
     await expect(page.getByPlaceholder("Name the specific next step")).toHaveCount(0);
@@ -1710,13 +1786,9 @@ test.describe("authenticated Omnix shell", () => {
     await page.getByRole("button", { name: "Open task" }).click();
     await firstStarted;
 
-    await sourceB.getByRole("button", { name: "Track as task" }).evaluate((button) => {
-      (button as HTMLButtonElement).click();
-    });
+    await sourceB.getByRole("button", { name: "Track as task", includeHidden: true }).dispatchEvent("click");
     await expect(page.getByPlaceholder("Name the specific next step")).toHaveValue("Task source B");
-    await sourceA.getByRole("button", { name: "Track as task" }).evaluate((button) => {
-      (button as HTMLButtonElement).click();
-    });
+    await sourceA.getByRole("button", { name: "Track as task", includeHidden: true }).dispatchEvent("click");
     await expect(page.getByPlaceholder("Name the specific next step")).toHaveValue("Task source A");
     await page.getByRole("button", { name: "Open task" }).click();
 
