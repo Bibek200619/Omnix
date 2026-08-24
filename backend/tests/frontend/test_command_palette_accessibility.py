@@ -88,5 +88,6 @@ def test_command_palette_uses_focus_trap_initial_target_without_competing_timer(
     )
     assert "setTimeout(() => inputRef.current?.focus()" not in source
     assert "initialFocusRef?: RefObject<HTMLElement | null>" in focus_trap
-    assert "initialFocusRef && !initialFocusRef.current" in focus_trap
+    assert "const preferred = initialFocusRef?.current" in focus_trap
     assert "container.contains(preferred)" in focus_trap
+    assert "(first ?? container).focus" in focus_trap

@@ -25,6 +25,7 @@ const [
   conversationUtils,
   filesPage,
   filesModel,
+  documentSuggestions,
   pageSkeleton,
   appShell,
   sidebarNav,
@@ -59,6 +60,7 @@ const [
   read("components/conversations/conversationUtils.ts"),
   read("app/(dashboard)/files/page.tsx"),
   read("components/files/filesPageModel.ts"),
+  read("components/files/DocumentDecisionSuggestionsModal.tsx"),
   read("components/ui/PageSkeleton.tsx"),
   read("components/layout/AppShell.tsx"),
   read("components/layout/sidebar/SidebarNav.tsx"),
@@ -198,7 +200,7 @@ assertIncludes(chatStream, "content: typeof obj.content === \"string\" ? obj.con
 assertIncludes(conversationAiPanel, "source_offset=${sourceOffset}", "Conversation decision source windows");
 assertIncludes(conversationAiPanel, "sourceCoverage={decisionCandidateCoverage}", "Conversation decision source coverage");
 assertIncludes(filesPage, "source_offset=${sourceOffset}", "Document decision source windows");
-assertIncludes(filesPage, "sourceCoverage={decisionCandidateCoverage}", "Document decision source coverage");
+assertIncludes(documentSuggestions, "sourceCoverage={coverage}", "Document decision source coverage");
 assertIncludes(decisionCandidatePanel, 'data-testid="decision-source-coverage"', "Decision source coverage disclosure");
 assertIncludes(decisionCandidatePanel, "Scan Earlier Messages", "Conversation decision source continuation");
 assertIncludes(decisionCandidatePanel, "Scan Next Document Section", "Document decision source continuation");

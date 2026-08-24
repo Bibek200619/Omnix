@@ -111,6 +111,8 @@ export function WorkspaceAssignmentModal({
       isOpen={open}
       onClose={onClose}
       title="Add Collaborator"
+      description={`Add an organizational member to ${workspaceName}.`}
+      closeDisabled={Boolean(assigningId)}
       className="max-w-xl rounded-3xl border-[var(--omnix-border-2)] bg-[var(--omnix-color-0a0d14)]/90 shadow-[0_32px_128px_var(--omnix-rgba-0-0-0-0-6)] ring-1 ring-white/10"
       footerClassName="gap-3 px-4 py-4 sm:justify-end sm:px-6"
       footer={(
@@ -145,6 +147,7 @@ export function WorkspaceAssignmentModal({
             <button
               type="button"
               onClick={onClose}
+              disabled={Boolean(assigningId)}
               aria-label="Close assignment modal"
               title="Close assignment modal"
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white"
@@ -158,6 +161,7 @@ export function WorkspaceAssignmentModal({
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               <input
                 type="text"
+                aria-label="Search organizational members"
                 placeholder="Search organizational members..."
                 className="w-full rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-slate-600 focus:border-[var(--omnix-cyan)] focus:outline-none focus:ring-1 focus:ring-[var(--omnix-cyan)/30]"
                 value={searchQuery}

@@ -418,7 +418,7 @@ test.describe("workspace optimistic mutation lifecycle", () => {
 
     try {
       await page.getByRole("button", { name: "Delete workspace" }).click();
-      await page.getByRole("dialog", { name: "Delete workspace" })
+      await page.getByRole("alertdialog", { name: "Delete workspace" })
         .getByRole("button", { name: "Delete workspace" }).click();
       await expect(page.getByRole("heading", { name: originalName })).toBeVisible();
       await invokeWorkspaceTreeContext(page, "refreshWorkspaceTree", "workspace-1");
@@ -548,7 +548,7 @@ test.describe("workspace optimistic mutation lifecycle", () => {
 
     try {
       await page.getByRole("button", { name: "Delete workspace" }).click();
-      await page.getByRole("dialog", { name: "Delete workspace" })
+      await page.getByRole("alertdialog", { name: "Delete workspace" })
         .getByRole("button", { name: "Delete workspace" }).click();
       await expect(page.getByRole("heading", { name: otherName })).toBeVisible();
       await page.getByRole("textbox", { name: "Workspace name" }).fill("Renamed Platform");
@@ -590,7 +590,7 @@ test.describe("workspace optimistic mutation lifecycle", () => {
 
     try {
       await page.getByRole("button", { name: "Delete workspace" }).click();
-      const confirmation = page.getByRole("dialog", { name: "Delete workspace" });
+      const confirmation = page.getByRole("alertdialog", { name: "Delete workspace" });
       await expect(confirmation).toBeVisible();
       await confirmation.getByRole("button", { name: "Delete workspace" }).click();
       await revealWorkspaceSidebar(page, isMobile);
