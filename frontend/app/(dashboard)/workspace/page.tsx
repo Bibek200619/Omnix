@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type { CSSProperties, FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Portal } from "@/components/ui/Portal";
+import { Modal } from "@/components/ui/Modal";
 import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStack";
 import { WorkspaceIntelligencePanel } from "@/components/workspace/WorkspaceIntelligencePanel";
 import { WorkspacePresenceCluster } from "@/components/workspace/WorkspacePresenceCluster";
@@ -153,6 +153,8 @@ function WorkspacePageContent() {
   const [subspaceDescription, setSubspaceDescription] = useState("");
   const [creatingSubspace, setCreatingSubspace] = useState(false);
   const [subspaceError, setSubspaceError] = useState<string | null>(null);
+  const workspaceNameRef = useRef<HTMLInputElement>(null);
+  const subspaceNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setCreating(false);
@@ -625,11 +627,32 @@ function WorkspacePageContent() {
         </div>
       </div>
 
-      {createOpen ? (
-        <Portal>
-          <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
-            <div className="omnix-modal-card w-full max-w-md p-5">
-              <div className="relative z-10 flex items-start justify-between gap-4">
+      <Modal
+        isOpen={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="Create workspace"
+        description="Add a new root workspace to the Omnix hierarchy."
+        closeDisabled={creating}
+        initialFocusRef={workspaceNameRef}
+        className="max-w-md"
+        footer={(
+          <>
+            <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)} disabled={creating}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="create-workspace-form"
+              leftIcon={<Plus className="h-4 w-4" />}
+              isLoading={creating}
+              disabled={!newName.trim()}
+            >
+              Create
+            </Button>
+          </>
+        )}
+      >
+        <Modal.Header>
                 <div>
                   <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
                     <Plus className="h-4 w-4" />
@@ -649,10 +672,12 @@ function WorkspacePageContent() {
                 >
                   <X className="h-4 w-4" />
                 </Button>
-              </div>
+        </Modal.Header>
 
-              <form className="relative z-10 mt-5 space-y-4" onSubmit={handleCreate}>
+        <Modal.Body>
+              <form id="create-workspace-form" className="space-y-4" onSubmit={handleCreate}>
                 <Input
+                  ref={workspaceNameRef}
                   id="workspace-name"
                   label="Workspace name"
                   value={newName}
@@ -679,25 +704,36 @@ function WorkspacePageContent() {
                     {createError}
                   </div>
                 ) : null}
-                <div className="flex items-center justify-end gap-2">
-                  <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)} disabled={creating}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" leftIcon={<Plus className="h-4 w-4" />} isLoading={creating} disabled={!newName.trim()}>
-                    Create
-                  </Button>
-                </div>
               </form>
-            </div>
-          </div>
-        </Portal>
-      ) : null}
+        </Modal.Body>
+      </Modal>
 
-      {subspaceOpen ? (
-        <Portal>
-          <div className="omnix-modal-backdrop fixed inset-0 z-[90] flex items-center justify-center px-4">
-            <div className="omnix-modal-card w-full max-w-lg p-5">
-              <div className="relative z-10 flex items-start justify-between gap-4">
+      <Modal
+        isOpen={subspaceOpen}
+        onClose={() => setSubspaceOpen(false)}
+        title="Create subworkspace"
+        description="Add a child workspace under an existing parent workspace."
+        closeDisabled={creatingSubspace}
+        initialFocusRef={subspaceNameRef}
+        className="max-w-lg"
+        footer={(
+          <>
+            <Button type="button" variant="ghost" onClick={() => setSubspaceOpen(false)} disabled={creatingSubspace}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="create-subworkspace-form"
+              leftIcon={<Plus className="h-4 w-4" />}
+              isLoading={creatingSubspace}
+              disabled={!subspaceName.trim() || !subspaceParentId}
+            >
+              Create subworkspace
+            </Button>
+          </>
+        )}
+      >
+        <Modal.Header>
                 <div>
                   <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-xs)]">
                     <Layers3 className="h-4 w-4" />
@@ -719,9 +755,10 @@ function WorkspacePageContent() {
                 >
                   <X className="h-4 w-4" />
                 </Button>
-              </div>
+        </Modal.Header>
 
-              <form className="relative z-10 mt-5 space-y-4" onSubmit={handleCreateSubspace}>
+        <Modal.Body>
+              <form id="create-subworkspace-form" className="space-y-4" onSubmit={handleCreateSubspace}>
                 <label className="block space-y-2">
                   <span className="text-sm font-medium text-slate-200">Parent workspace</span>
                   <select
@@ -742,6 +779,7 @@ function WorkspacePageContent() {
                   </select>
                 </label>
                 <Input
+                  ref={subspaceNameRef}
                   id="subworkspace-name"
                   label="Subworkspace name"
                   value={subspaceName}
@@ -768,19 +806,9 @@ function WorkspacePageContent() {
                     {subspaceError}
                   </div>
                 ) : null}
-                <div className="flex items-center justify-end gap-2">
-                  <Button type="button" variant="ghost" onClick={() => setSubspaceOpen(false)} disabled={creatingSubspace}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" leftIcon={<Plus className="h-4 w-4" />} isLoading={creatingSubspace} disabled={!subspaceName.trim() || !subspaceParentId}>
-                    Create subworkspace
-                  </Button>
-                </div>
               </form>
-            </div>
-          </div>
-        </Portal>
-      ) : null}
+        </Modal.Body>
+      </Modal>
     </section>
   );
 }
