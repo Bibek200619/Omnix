@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import type { CSSProperties, FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
@@ -119,6 +119,7 @@ function WorkspacePageContent() {
   const {
     activeWorkspace,
     activeWorkspaceId,
+    captureActiveWorkspaceSelection,
     createWorkspace,
     createSubspace,
     loading,
@@ -152,6 +153,14 @@ function WorkspacePageContent() {
   const [subspaceDescription, setSubspaceDescription] = useState("");
   const [creatingSubspace, setCreatingSubspace] = useState(false);
   const [subspaceError, setSubspaceError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCreating(false);
+    setCreatingSubspace(false);
+    setCreateError(null);
+    setSubspaceError(null);
+    setSelectedId(activeWorkspaceId ? selectionId(activeWorkspaceId) : null);
+  }, [activeWorkspaceId]);
 
   const selected = selectedWorkspace(workspaces, selectedId, activeWorkspace);
   const DetailIcon = Layers3;
@@ -193,6 +202,7 @@ function WorkspacePageContent() {
       setCreateError("Workspace name is required.");
       return;
     }
+    const owner = captureActiveWorkspaceSelection();
 
     try {
       setCreating(true);
@@ -201,6 +211,7 @@ function WorkspacePageContent() {
         name,
         description: newDescription.trim() || undefined,
       });
+      if (!owner.isCurrent()) return;
       setActiveWorkspace(created.id);
       setSelectedId(selectionId(created.id));
       setExpanded((current) => ({ ...current, [created.id]: true }));
@@ -208,10 +219,11 @@ function WorkspacePageContent() {
       setNewDescription("");
       setCreateOpen(false);
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to create workspace", err, { endpoint: "/workspaces" });
       setCreateError("Unable to create workspace. Check your connection and try again.");
     } finally {
-      setCreating(false);
+      if (owner.isCurrent()) setCreating(false);
     }
   }
 
@@ -227,6 +239,7 @@ function WorkspacePageContent() {
       setSubspaceError("Subworkspace name is required.");
       return;
     }
+    const owner = captureActiveWorkspaceSelection();
 
     try {
       setCreatingSubspace(true);
@@ -235,15 +248,17 @@ function WorkspacePageContent() {
         name,
         description: subspaceDescription.trim() || undefined,
       });
+      if (!owner.isCurrent()) return;
       setExpanded((current) => ({ ...current, [parentId]: true }));
       setActiveWorkspace(created.id);
       setSelectedId(selectionId(created.id));
       setSubspaceOpen(false);
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to create subworkspace", err);
       setSubspaceError("Unable to create subworkspace. Check your connection and try again.");
     } finally {
-      setCreatingSubspace(false);
+      if (owner.isCurrent()) setCreatingSubspace(false);
     }
   }
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 import hashlib
 import logging
 import re
@@ -30,7 +31,7 @@ from .workspace_mention_service import (
 
 DECISION_COLUMNS = (
     "id,workspace_id,title,description,decision_reason,status,source_type,source_id,source_message_id,"
-    "source_channel_id,source_evidence,initiative_id,created_by,created_at,updated_at"
+    "source_channel_id,source_evidence,initiative_id,client_nonce,created_by,created_at,updated_at"
 )
 TASK_PREVIEW_COLUMNS = "id,title,status,owner_user_id"
 INITIATIVE_PREVIEW_COLUMNS = "id,title,status,momentum_state"
@@ -41,6 +42,12 @@ MAX_EVIDENCE_ITEMS = 5
 MAX_EVIDENCE_QUOTE_CHARS = 420
 _SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class _DecisionCreationOutcome:
+    decision: dict[str, Any]
+    created_now: bool
 
 
 def _database_error() -> HTTPException:
@@ -56,6 +63,33 @@ def _clean_text(value: Any) -> str | None:
         return None
     cleaned = str(value).strip()
     return cleaned or None
+
+
+def _is_client_nonce_unique_violation(exc: SupabaseServiceError) -> bool:
+    root_error = exc.__cause__ or exc
+    code = str(getattr(root_error, "code", ""))
+    message = str(root_error).lower()
+    return code == "23505" and (
+        "ux_workspace_decisions_client_nonce" in message
+        or "client_nonce" in message
+    )
+
+
+async def _decision_by_client_nonce(
+    *, workspace_id: str, user_id: str, client_nonce: str
+) -> dict[str, Any] | None:
+    try:
+        return await select_one_trusted(
+            "workspace_decisions",
+            DECISION_COLUMNS,
+            {
+                "workspace_id": workspace_id,
+                "created_by": user_id,
+                "client_nonce": client_nonce,
+            },
+        )
+    except SupabaseServiceError as exc:
+        raise _database_error() from exc
 
 
 def _title_from_text(content: Any) -> str:
@@ -562,7 +596,7 @@ async def link_initiative_to_decision(
     return (await _hydrate_decisions([updated], expand_links=True))[0]
 
 
-async def create_decision(
+async def _create_decision_with_outcome(
     *,
     workspace_id: str,
     user_id: str,
@@ -573,8 +607,20 @@ async def create_decision(
     source_channel_id: str | None = None,
     source_message_id: str | None = None,
     require_verified_evidence: bool = False,
-) -> dict[str, Any]:
+) -> _DecisionCreationOutcome:
     access = await require_workspace_access(workspace_id, user_id)
+    client_nonce = _clean_text(payload.get("client_nonce"))
+    if client_nonce:
+        existing = await _decision_by_client_nonce(
+            workspace_id=workspace_id,
+            user_id=user_id,
+            client_nonce=client_nonce,
+        )
+        if existing is not None:
+            return _DecisionCreationOutcome(
+                decision=(await _hydrate_decisions([existing]))[0],
+                created_now=False,
+            )
     if origin == "decision_candidate" and not require_verified_evidence:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -622,12 +668,24 @@ async def create_decision(
         "source_message_id": resolved_source_message_id,
         "source_channel_id": resolved_source_channel_id,
         "source_evidence": source_evidence,
+        "client_nonce": client_nonce,
         "created_by": user_id,
         "updated_at": timestamp,
     }
     try:
         created = await insert_one_trusted("workspace_decisions", record)
     except SupabaseServiceError as exc:
+        if client_nonce and _is_client_nonce_unique_violation(exc):
+            existing = await _decision_by_client_nonce(
+                workspace_id=workspace_id,
+                user_id=user_id,
+                client_nonce=client_nonce,
+            )
+            if existing is not None:
+                return _DecisionCreationOutcome(
+                    decision=(await _hydrate_decisions([existing]))[0],
+                    created_now=False,
+                )
         raise _database_error() from exc
     await sync_mentions_for_source(
         workspace_id=workspace_id,
@@ -651,7 +709,36 @@ async def create_decision(
             "source_message_id": resolved_source_message_id,
         },
     )
-    return (await _hydrate_decisions([created]))[0]
+    return _DecisionCreationOutcome(
+        decision=(await _hydrate_decisions([created]))[0],
+        created_now=True,
+    )
+
+
+async def create_decision(
+    *,
+    workspace_id: str,
+    user_id: str,
+    payload: Mapping[str, Any],
+    origin: str = "manual",
+    source_type: str | None = None,
+    source_id: str | None = None,
+    source_channel_id: str | None = None,
+    source_message_id: str | None = None,
+    require_verified_evidence: bool = False,
+) -> dict[str, Any]:
+    outcome = await _create_decision_with_outcome(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        payload=payload,
+        origin=origin,
+        source_type=source_type,
+        source_id=source_id,
+        source_channel_id=source_channel_id,
+        source_message_id=source_message_id,
+        require_verified_evidence=require_verified_evidence,
+    )
+    return outcome.decision
 
 
 async def create_decision_from_candidate(
@@ -662,7 +749,7 @@ async def create_decision_from_candidate(
 ) -> dict[str, Any]:
     """Create a decision only after source evidence has been revalidated."""
 
-    decision = await create_decision(
+    outcome = await _create_decision_with_outcome(
         workspace_id=workspace_id,
         user_id=user_id,
         payload=payload,
@@ -671,18 +758,19 @@ async def create_decision_from_candidate(
         source_id=_clean_text(payload.get("source_id")),
         require_verified_evidence=True,
     )
-    try:
-        await log_candidate_metrics(
-            workspace_id=workspace_id,
-            user_id=user_id,
-            source_type=str(payload.get("source_type")),
-            source_id=str(payload.get("source_id")),
-            action="accept",
-            candidate_id=_clean_text(payload.get("candidate_id")),
-        )
-    except Exception:
-        logger.warning("Decision candidate acceptance metric could not be recorded.", exc_info=True)
-    return decision
+    if outcome.created_now:
+        try:
+            await log_candidate_metrics(
+                workspace_id=workspace_id,
+                user_id=user_id,
+                source_type=str(payload.get("source_type")),
+                source_id=str(payload.get("source_id")),
+                action="accept",
+                candidate_id=_clean_text(payload.get("candidate_id")),
+            )
+        except Exception:
+            logger.warning("Decision candidate acceptance metric could not be recorded.", exc_info=True)
+    return outcome.decision
 
 
 async def create_decision_from_message(

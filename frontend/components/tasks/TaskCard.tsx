@@ -244,8 +244,9 @@ export function TaskCard({
             <button
               type="button"
               key={blocker}
+              disabled={updating}
               onClick={() => onPatchTask(task, { blockers: task.blockers.filter((entry) => entry !== blocker) })}
-              className="inline-flex max-w-full items-center gap-1 rounded-md border border-amber-300/20 bg-amber-300/[0.08] px-2 py-1 text-left text-[10px] font-medium text-amber-100"
+              className="inline-flex max-w-full items-center gap-1 rounded-md border border-amber-300/20 bg-amber-300/[0.08] px-2 py-1 text-left text-[10px] font-medium text-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <span className="min-w-0 break-words">{blocker}</span>
               <X className="h-2.5 w-2.5 shrink-0 opacity-60" />
@@ -279,6 +280,7 @@ export function TaskCard({
       >
         <input
           value={blockerDraft}
+          disabled={updating}
           onChange={(event) => onBlockerDraftChange(task.id, event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {

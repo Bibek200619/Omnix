@@ -130,7 +130,7 @@ assertIncludes(conversationSurface, "loadOlderMessages", "Conversation history c
 assertIncludes(conversationSurface, "loadNewerThreadReplies", "Thread reply continuation");
 assertIncludes(conversationSurface, "limit=${MESSAGE_PAGE_SIZE + 1}&offset=${offset}", "Conversation pagination probe");
 assertIncludes(conversationSurface, "applyThreadReplyCount(incoming)", "Conversation realtime page preservation");
-assertIncludes(conversationSurface, "setThreadMessages((current) => mergeMessage(current, incoming))", "Conversation realtime page preservation");
+assertIncludes(conversationSurface, "updateThreadMessages((current) => mergeMessage(current, incoming))", "Conversation realtime page preservation");
 assertIncludes(conversationSender, "onThreadReplyCreated(created)", "Thread reply preserves paged history");
 assertExcludes(conversationSender, "loadMessages", "Thread reply preserves paged history");
 

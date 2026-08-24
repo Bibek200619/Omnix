@@ -1,5 +1,6 @@
 import {
   QueryClient,
+  isCancelledError,
   queryOptions,
   type QueryFilters,
   type QueryKey as TanStackQueryKey,
@@ -21,15 +22,16 @@ const QUERY_SCOPE = "omnix";
 const DEFAULT_QUERY_TTL_MS = 15_000;
 const DEFAULT_QUERY_GC_MS = 5 * 60_000;
 
-function isAbortError(error: unknown) {
+export function isQueryCancellation(error: unknown) {
   return (
-    error instanceof Error &&
-    (error.name === "AbortError" || error.message === "CancelledError")
+    isCancelledError(error) ||
+    (error instanceof Error &&
+      (error.name === "AbortError" || error.message === "CancelledError"))
   );
 }
 
 export function shouldRetryQuery(failureCount: number, error: unknown) {
-  if (failureCount > 0 || isAbortError(error)) {
+  if (failureCount > 0 || isQueryCancellation(error)) {
     return false;
   }
   if (!(error instanceof ApiError)) {

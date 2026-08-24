@@ -44,7 +44,7 @@ async def test_create_from_message_preserves_decision_source_references(monkeypa
         channel_id="channel-1",
         message_id="message-1",
         user_id="user-1",
-        payload={"title": None, "description": None, "decision_reason": "Realtime keeps presence coherent.", "status": "accepted"},
+        payload={"title": None, "description": None, "decision_reason": "Realtime keeps presence coherent.", "status": "accepted", "client_nonce": "decision-attempt-1"},
     )
 
     assert result["id"] == "decision-1"
@@ -56,6 +56,255 @@ async def test_create_from_message_preserves_decision_source_references(monkeypa
     assert payload["title"] == "Use Supabase Realtime for live workspace updates."
     assert payload["description"] == "Use Supabase Realtime for live workspace updates."
     assert payload["decision_reason"] == "Realtime keeps presence coherent."
+    assert payload["client_nonce"] == "decision-attempt-1"
+
+
+@pytest.mark.asyncio
+async def test_create_decision_reuses_existing_client_nonce_without_side_effects(monkeypatch: pytest.MonkeyPatch) -> None:
+    existing = {
+        "id": "decision-existing",
+        "workspace_id": "workspace-1",
+        "title": "Keep the committed decision",
+        "decision_reason": "Already recorded.",
+        "status": "accepted",
+        "client_nonce": "decision-attempt-1",
+        "created_by": "user-1",
+    }
+
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
+        assert table == "workspace_decisions"
+        assert "client_nonce" in columns
+        assert filters == {
+            "workspace_id": "workspace-1",
+            "created_by": "user-1",
+            "client_nonce": "decision-attempt-1",
+        }
+        return existing
+
+    async def fail_side_effect(*args, **kwargs):
+        raise AssertionError("an idempotent replay must not write or emit side effects")
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    monkeypatch.setattr(decisions, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(decisions, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(decisions, "prepare_mentions_for_workspace", fail_side_effect)
+    monkeypatch.setattr(decisions, "insert_one_trusted", fail_side_effect)
+    monkeypatch.setattr(decisions, "log_workspace_activity", fail_side_effect)
+    monkeypatch.setattr(decisions, "get_profiles", fake_profiles)
+
+    result = await decisions.create_decision(
+        workspace_id="workspace-1",
+        user_id="user-1",
+        payload={
+            "title": "A retried request body",
+            "decision_reason": "The nonce is authoritative for this attempt.",
+            "client_nonce": "decision-attempt-1",
+        },
+    )
+
+    assert result["id"] == "decision-existing"
+    assert result["client_nonce"] == "decision-attempt-1"
+
+
+@pytest.mark.asyncio
+async def test_create_decision_recovers_exact_row_after_concurrent_nonce_race(monkeypatch: pytest.MonkeyPatch) -> None:
+    select_attempts = 0
+    existing = {
+        "id": "decision-race-winner",
+        "workspace_id": "workspace-1",
+        "title": "The concurrent winner",
+        "decision_reason": "Recorded once.",
+        "status": "accepted",
+        "client_nonce": "decision-race-1",
+        "created_by": "user-1",
+    }
+
+    class UniqueViolation(Exception):
+        code = "23505"
+
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
+        nonlocal select_attempts
+        assert table == "workspace_decisions"
+        assert filters == {
+            "workspace_id": "workspace-1",
+            "created_by": "user-1",
+            "client_nonce": "decision-race-1",
+        }
+        select_attempts += 1
+        return None if select_attempts == 1 else existing
+
+    async def fake_prepare_mentions(**kwargs):
+        return []
+
+    async def fake_insert(*args, **kwargs):
+        try:
+            raise UniqueViolation(
+                'duplicate key value violates unique constraint "ux_workspace_decisions_client_nonce"'
+            )
+        except UniqueViolation as exc:
+            raise decisions.SupabaseServiceError("Internal server error") from exc
+
+    async def fail_side_effect(*args, **kwargs):
+        raise AssertionError("the losing insert must not emit creation side effects")
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    monkeypatch.setattr(decisions, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(decisions, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(decisions, "prepare_mentions_for_workspace", fake_prepare_mentions)
+    monkeypatch.setattr(decisions, "insert_one_trusted", fake_insert)
+    monkeypatch.setattr(decisions, "sync_mentions_for_source", fail_side_effect)
+    monkeypatch.setattr(decisions, "log_workspace_activity", fail_side_effect)
+    monkeypatch.setattr(decisions, "get_profiles", fake_profiles)
+
+    result = await decisions.create_decision(
+        workspace_id="workspace-1",
+        user_id="user-1",
+        payload={
+            "title": "The concurrent winner",
+            "decision_reason": "Recorded once.",
+            "client_nonce": "decision-race-1",
+        },
+    )
+
+    assert select_attempts == 2
+    assert result["id"] == "decision-race-winner"
+
+
+@pytest.mark.asyncio
+async def test_candidate_replay_does_not_log_acceptance_metric_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    existing = {
+        "id": "decision-existing-candidate",
+        "workspace_id": "workspace-1",
+        "title": "Existing candidate decision",
+        "decision_reason": "Already accepted.",
+        "status": "proposed",
+        "source_type": "conversation",
+        "source_id": "channel-1",
+        "client_nonce": "candidate-attempt-1",
+        "created_by": "user-1",
+    }
+
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
+        assert filters["client_nonce"] == "candidate-attempt-1"
+        return existing
+
+    async def fail_metric(**kwargs):
+        raise AssertionError("an idempotent candidate replay must not log acceptance twice")
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    monkeypatch.setattr(decisions, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(decisions, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(decisions, "log_candidate_metrics", fail_metric)
+    monkeypatch.setattr(decisions, "get_profiles", fake_profiles)
+
+    result = await decisions.create_decision_from_candidate(
+        workspace_id="workspace-1",
+        user_id="user-1",
+        payload={
+            "candidate_id": "candidate-1",
+            "title": "Existing candidate decision",
+            "source_type": "conversation",
+            "source_id": "channel-1",
+            "source_evidence": [],
+            "client_nonce": "candidate-attempt-1",
+        },
+    )
+
+    assert result["id"] == "decision-existing-candidate"
+
+
+@pytest.mark.asyncio
+async def test_candidate_nonce_race_does_not_log_losing_acceptance_metric(monkeypatch: pytest.MonkeyPatch) -> None:
+    select_attempts = 0
+    existing = {
+        "id": "decision-candidate-winner",
+        "workspace_id": "workspace-1",
+        "title": "Candidate race winner",
+        "decision_reason": "Accepted once.",
+        "status": "proposed",
+        "source_type": "conversation",
+        "source_id": "channel-1",
+        "source_evidence": [{"kind": "conversation_message"}],
+        "client_nonce": "candidate-race-1",
+        "created_by": "user-1",
+    }
+
+    class UniqueViolation(Exception):
+        code = "23505"
+
+    async def fake_require_workspace_access(*args, **kwargs):
+        return SimpleNamespace(workspace={"id": "workspace-1"})
+
+    async def fake_select_one(table: str, columns: str, filters: dict[str, object]):
+        nonlocal select_attempts
+        select_attempts += 1
+        return None if select_attempts == 1 else existing
+
+    async def fake_resolve_source_reference(**kwargs):
+        return "conversation", "channel-1", "channel-1", None
+
+    async def fake_validated_evidence(**kwargs):
+        return [{"kind": "conversation_message"}]
+
+    async def fake_prepare_mentions(**kwargs):
+        return []
+
+    async def fake_insert(*args, **kwargs):
+        try:
+            raise UniqueViolation(
+                'duplicate key value violates unique constraint "ux_workspace_decisions_client_nonce"'
+            )
+        except UniqueViolation as exc:
+            raise decisions.SupabaseServiceError("Internal server error") from exc
+
+    async def fail_side_effect(**kwargs):
+        raise AssertionError("the losing candidate request must not emit acceptance side effects")
+
+    async def fake_profiles(user_ids: list[str]):
+        return {}
+
+    monkeypatch.setattr(decisions, "require_workspace_access", fake_require_workspace_access)
+    monkeypatch.setattr(decisions, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(decisions, "_resolve_source_reference", fake_resolve_source_reference)
+    monkeypatch.setattr(decisions, "_validated_candidate_evidence", fake_validated_evidence)
+    monkeypatch.setattr(decisions, "prepare_mentions_for_workspace", fake_prepare_mentions)
+    monkeypatch.setattr(decisions, "insert_one_trusted", fake_insert)
+    monkeypatch.setattr(decisions, "sync_mentions_for_source", fail_side_effect)
+    monkeypatch.setattr(decisions, "log_workspace_activity", fail_side_effect)
+    monkeypatch.setattr(decisions, "log_candidate_metrics", fail_side_effect)
+    monkeypatch.setattr(decisions, "get_profiles", fake_profiles)
+
+    result = await decisions.create_decision_from_candidate(
+        workspace_id="workspace-1",
+        user_id="user-1",
+        payload={
+            "candidate_id": "candidate-race",
+            "title": "Candidate race winner",
+            "decision_reason": "Accepted once.",
+            "source_type": "conversation",
+            "source_id": "channel-1",
+            "source_evidence": [{"kind": "conversation_message"}],
+            "client_nonce": "candidate-race-1",
+        },
+    )
+
+    assert select_attempts == 2
+    assert result["id"] == "decision-candidate-winner"
 
 
 @pytest.mark.asyncio

@@ -1,12 +1,8 @@
 "use client";
 
-import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import {
-  CircleDot,
-  ClipboardCheck,
-  Plus,
-} from "lucide-react";
+import { CircleDot, ClipboardCheck, Plus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
@@ -15,43 +11,33 @@ import { mentionPayload } from "@/components/mentions/MentionTextarea";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
-import { invalidateQueries, queryGet } from "@/lib/query";
+import {
+  mutationAttempt,
+  releaseExclusiveMutations,
+  rollbackOptimisticPatch,
+  runExclusiveMutation,
+  type MutationAttempt,
+} from "@/lib/mutation-lifecycle";
+import { queryGet } from "@/lib/query";
 import { realtimeRegistry } from "@/lib/realtime-registry";
 import { useToast } from "@/lib/toast-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspaceTree } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
-import type {
-  WorkspaceMember,
-  WorkspaceMentionMetadata,
-  WorkspaceInitiative,
-  WorkspaceTask,
-  WorkspaceTaskAssistance,
-  WorkspaceTaskAssistanceMode,
-  WorkspaceTaskMomentum,
-  WorkspaceTaskStatus,
-} from "@/lib/workspace-types";
+import type { WorkspaceInitiative, WorkspaceMember, WorkspaceMentionMetadata, WorkspaceTask,
+  WorkspaceTaskMomentum, WorkspaceTaskStatus } from "@/lib/workspace-types";
 import { ExecutionOverview } from "./ExecutionOverview";
 import { TaskCreateForm } from "./TaskCreateForm";
 import { TaskList } from "./TaskList";
 import { TaskMomentumPanel } from "./TaskMomentumPanel";
-
-const flow: Array<{ value: WorkspaceTaskStatus; label: string }> = [
-  { value: "idea", label: "Idea" },
-  { value: "planned", label: "Planned" },
-  { value: "active", label: "Active" },
-  { value: "review", label: "Review" },
-  { value: "complete", label: "Complete" },
-];
-
-function mergeTask(current: WorkspaceTask[], incoming: WorkspaceTask) {
-  return [incoming, ...current.filter((task) => task.id !== incoming.id && !(incoming.client_nonce && task.client_nonce === incoming.client_nonce))];
-}
-
-function invalidateTaskQueries(workspaceId: string) {
-  invalidateQueries(`/workspaces/${workspaceId}/tasks`);
-  invalidateQueries(`/workspaces/${workspaceId}/initiatives`);
-}
+import {
+  TASK_PATCH_SYNC_WARNING, TASK_PATCH_UNCONFIRMED_WARNING,
+  type OptimisticTaskPatch, type TaskCreateDraft,
+  confirmedTaskPatch, createOptimisticTask, createTaskOptimisticMutationState,
+  invalidateTaskQueries, mergeTask, prioritizeTasks, queueTaskCanonicalProof,
+  runTaskCanonicalProof, runTaskTwoReadCanonicalProof, taskCreateFingerprint, taskExecutionOverview, taskFlow,
+  taskMomentumSummary, useTaskAssistanceMutation, useTaskMutationFailures,
+} from "./taskSurfaceModel";
 
 export const WorkspaceTasksSurface = memo(function WorkspaceTasksSurface() {
   return (
@@ -75,7 +61,7 @@ function WorkspaceTasksSurfaceContent() {
   const [initiatives, setInitiatives] = useState<WorkspaceInitiative[]>([]);
   const [momentum, setMomentum] = useState<WorkspaceTaskMomentum | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<WorkspaceTaskStatus | "open">("open");
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -87,21 +73,41 @@ function WorkspaceTasksSurfaceContent() {
   const [initialBlocker, setInitialBlocker] = useState("");
   const [initiativeId, setInitiativeId] = useState("");
   const [creating, setCreating] = useState(false);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [updatingIds, setUpdatingIds] = useState<Set<string>>(() => new Set());
   const [blockerDrafts, setBlockerDrafts] = useState<Record<string, string>>({});
-  const [assistance, setAssistance] = useState<WorkspaceTaskAssistance | null>(null);
-  const [assisting, setAssisting] = useState<WorkspaceTaskAssistanceMode | null>(null);
   const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
   const taskRefs = useRef<Record<string, HTMLElement | null>>({});
   const taskListRef = useRef<HTMLDivElement | null>(null);
   const liveRegionRef = useRef<HTMLDivElement | null>(null);
   const liveAnnouncementRef = useRef("");
   const workspaceRef = useRef(activeWorkspaceId);
+  const workspaceEpochRef = useRef(0);
   const requestRef = useRef(0);
+  const mutationRegistryRef = useRef(new Map<string, Promise<unknown>>());
+  const canonicalRefreshRegistryRef = useRef(new Map<string, Promise<void>>());
+  const [optimisticState] = useState(createTaskOptimisticMutationState);
+  const createAttemptsRef = useRef(new Map<string, MutationAttempt>());
+  const mountedRef = useRef(true);
+  const { beginMutation, dismissMutationFailure, failMutation, finishMutation,
+    mutationError, ownsMutation, resolveMutationFailure, resetMutationFailures,
+  } = useTaskMutationFailures();
+  const { assistance, assisting, requestAssistance } = useTaskAssistanceMutation({
+    activeWorkspaceId, beginMutation, failMutation, finishMutation,
+    mountedRef, ownsMutation, resolveMutationFailure, workspaceEpochRef, workspaceRef,
+  });
   const [liveAnnouncementVersion, setLiveAnnouncementVersion] = useState(0);
-
-  workspaceRef.current = activeWorkspaceId;
-
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+  useLayoutEffect(() => {
+    if (workspaceRef.current === activeWorkspaceId) return;
+    const previousWorkspaceId = workspaceRef.current;
+    if (previousWorkspaceId) releaseExclusiveMutations(mutationRegistryRef.current, (key) => (
+      key === `task:create:${previousWorkspaceId}`
+    ));
+    workspaceRef.current = activeWorkspaceId;
+    workspaceEpochRef.current += 1;
+  }, [activeWorkspaceId]);
+  const isCurrentWorkspaceMutation = (workspaceId: string, workspaceEpoch: number) =>
+    mountedRef.current && workspaceRef.current === workspaceId && workspaceEpochRef.current === workspaceEpoch;
   const announceMutation = useCallback((message: string) => {
     liveAnnouncementRef.current = message;
     setLiveAnnouncementVersion((version) => version + 1);
@@ -148,7 +154,8 @@ function WorkspaceTasksSurfaceContent() {
         requests[3] ?? Promise.resolve(null),
       ]);
       if (requestId !== requestRef.current || workspaceRef.current !== activeWorkspaceId) return;
-      setTasks(incomingTasks);
+      const reconciled = optimisticState.reconcile(incomingTasks, activeWorkspaceId);
+      setTasks(reconciled.next);
       setMomentum(incomingMomentum);
       setInitiatives(incomingInitiatives);
       if (incomingMembers) setMembers(incomingMembers);
@@ -163,22 +170,56 @@ function WorkspaceTasksSurfaceContent() {
       } else {
         setFocusedTaskId(null);
       }
-      setError(null);
+      setLoadError(null);
     } catch (err) {
-      if (requestId === requestRef.current) {
+      if (requestId === requestRef.current && workspaceRef.current === activeWorkspaceId) {
         logClientError("Failed to load tasks", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks` });
-        setError("Unable to load tasks. Check your connection and try again.");
+        setLoadError("Unable to load tasks. Check your connection and try again.");
       }
     } finally {
-      if (requestId === requestRef.current) setLoading(false);
+      if (requestId === requestRef.current && workspaceRef.current === activeWorkspaceId) {
+        setLoading(false);
+      }
     }
-  }, [activeWorkspaceId, routeTaskId]);
+  }, [activeWorkspaceId, optimisticState, routeTaskId]);
+
+  const reconcileTaskMutation = useCallback((workspaceId: string, workspaceEpoch: number,
+    canonicalProofKey: string | null = null) => {
+    const isCurrent = () => mountedRef.current && workspaceRef.current === workspaceId
+      && workspaceEpochRef.current === workspaceEpoch;
+    if (!isCurrent()) return Promise.resolve(null);
+    return queueTaskCanonicalProof(canonicalRefreshRegistryRef.current, workspaceId, async () => {
+      if (!isCurrent()) return null;
+      const incoming = await apiClient.get<WorkspaceTask[]>(`/workspaces/${workspaceId}/tasks`,
+        { dedupe: false });
+      if (!isCurrent()) return null;
+      const reconciled = optimisticState.reconcile(incoming, workspaceId, canonicalProofKey);
+      invalidateTaskQueries(workspaceId);
+      requestRef.current += 1;
+      setTasks(reconciled.next);
+      setLoadError(null);
+      return reconciled;
+    });
+  }, [optimisticState]);
+  const proveTaskMutation = useCallback((workspaceId: string, workspaceEpoch: number,
+    canonicalProofKey: string | null = null) => runTaskCanonicalProof(
+    workspaceEpoch,
+    canonicalProofKey,
+    () => mountedRef.current && workspaceRef.current === workspaceId ? workspaceEpochRef.current : null,
+    (epoch) => reconcileTaskMutation(workspaceId, epoch, canonicalProofKey),
+  ), [reconcileTaskMutation]);
+  useEffect(() => {
+    setCreating(false);
+    setUpdatingIds(new Set());
+    setLoadError(null);
+    resetMutationFailures();
+    setCreateOpen(false);
+  }, [activeWorkspaceId, resetMutationFailures]);
 
   useEffect(() => {
     setTasks([]);
     setMomentum(null);
     setInitiatives([]);
-    setAssistance(null);
     setFilter("open");
     setFocusedTaskId(routeTaskId);
     void loadExecution(true);
@@ -212,48 +253,10 @@ function WorkspaceTasksSurfaceContent() {
     return () => realtimeRegistry.unsubscribe({ type: "tasks", workspaceId: activeWorkspaceId });
   }, [activeWorkspaceId, loadExecution, session?.user.id]);
 
-  const displayedTasks = useMemo(() => {
-    const filtered = tasks.filter((task) => (filter === "open" ? task.status !== "complete" : task.status === filter));
-    
-    // Prioritization Logic:
-    // 1. Active status tasks
-    // 2. Tasks with blockers
-    // 3. Tasks due soon (within 3 days)
-    // 4. Assigned to me
-    // 5. Everything else (by created_at)
-    
-    const now = new Date();
-    const threeDaysFromNow = new Date();
-    threeDaysFromNow.setDate(now.getDate() + 3);
-
-    return [...filtered].sort((a, b) => {
-      // 1. Active
-      if (a.status === "active" && b.status !== "active") return -1;
-      if (b.status === "active" && a.status !== "active") return 1;
-
-      // 2. Blocked
-      const aBlocked = a.blockers.length > 0;
-      const bBlocked = b.blockers.length > 0;
-      if (aBlocked && !bBlocked) return -1;
-      if (bBlocked && !aBlocked) return 1;
-
-      // 3. Due Soon
-      const aDue = a.due_date ? new Date(a.due_date) : null;
-      const bDue = b.due_date ? new Date(b.due_date) : null;
-      const aDueSoon = aDue && aDue <= threeDaysFromNow;
-      const bDueSoon = bDue && bDue <= threeDaysFromNow;
-      if (aDueSoon && !bDueSoon) return -1;
-      if (bDueSoon && !aDueSoon) return 1;
-
-      // 4. Assigned to me
-      const aMine = a.owner_user_id === session?.user.id;
-      const bMine = b.owner_user_id === session?.user.id;
-      if (aMine && !bMine) return -1;
-      if (bMine && !aMine) return 1;
-
-      return 0;
-    });
-  }, [filter, tasks, session?.user.id]);
+  const displayedTasks = useMemo(
+    () => prioritizeTasks(tasks, filter, session?.user.id),
+    [filter, tasks, session?.user.id],
+  );
 
   const taskVirtualizer = useVirtualizer({
     count: displayedTasks.length,
@@ -274,143 +277,281 @@ function WorkspaceTasksSurfaceContent() {
     return () => window.clearTimeout(timer);
   }, [displayedTasks, focusedTaskId, loading, taskVirtualizer]);
 
-  const executionOverview = useMemo(() => {
-    if (!tasks.length) return null;
-    
-    const active = tasks.filter(t => t.status === "active").length;
-    const blocked = tasks.filter(t => t.blockers.length > 0 && t.status !== "complete").length;
-    
-    const now = new Date();
-    const threeDaysFromNow = new Date();
-    threeDaysFromNow.setDate(now.getDate() + 3);
-    const dueSoon = tasks.filter(t => {
-      if (!t.due_date || t.status === "complete") return false;
-      return new Date(t.due_date) <= threeDaysFromNow;
-    }).length;
-    
-    const myTasks = tasks.filter(t => t.owner_user_id === session?.user.id && t.status !== "complete").length;
-    
-    return [
-      { label: "Active Tasks", count: active, color: "text-cyan-300" },
-      { label: "Blocked Tasks", count: blocked, color: "text-amber-300" },
-      { label: "Due Soon", count: dueSoon, color: "text-rose-300" },
-      { label: "My Tasks", count: myTasks, color: "text-emerald-300" },
-    ];
-  }, [tasks, session?.user.id]);
-
-  const simplifiedMomentum = useMemo(() => {
-    if (!momentum) return null;
-    const blocked = momentum.blocked_count > 0;
-    const moving = momentum.flow_counts.active > 0 || momentum.flow_counts.review > 0;
-    const complete = momentum.flow_counts.complete > 0 && momentum.open_count === 0;
-
-    if (blocked) return { label: "Blocked", color: "text-amber-300", description: "Progress is currently impeded by identified blockers." };
-    if (moving) return { label: "Moving", color: "text-cyan-300", description: "Operational tasks are advancing through the flow." };
-    if (complete) return { label: "Complete", color: "text-emerald-300", description: "All recorded tasks in this view have reached completion." };
-    return { label: "Quiet", color: "text-[var(--omnix-text-3)]", description: "No active operational momentum detected in recorded tasks." };
-  }, [momentum]);
-
+  const executionOverview = useMemo(
+    () => taskExecutionOverview(tasks, session?.user.id),
+    [tasks, session?.user.id],
+  );
+  const simplifiedMomentum = useMemo(() => taskMomentumSummary(momentum), [momentum]);
+  const completeVisibleTaskCreate = (created: WorkspaceTask) => {
+    setTasks((current) => mergeTask(current, created));
+    setTitle(""); setDescription(""); setDescriptionMentions([]);
+    setStatus("idea"); setOwnerId(""); setDueDate("");
+    setInitialBlocker(""); setInitiativeId(""); setCreateOpen(false);
+    announceMutation(`Task ${created.title} created.`);
+    showToast({ title: "Task created", message: created.title });
+  };
   async function createTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!activeWorkspaceId || !title.trim() || creating) return;
-    const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-    const optimistic: WorkspaceTask = {
-      id: `pending-${nonce}`,
-      workspace_id: activeWorkspaceId,
-      title: title.trim(),
-      description: description.trim() || null,
-      status,
-      owner_user_id: ownerId || null,
-      created_by: session?.user.id || "",
-      due_date: dueDate || null,
-      blockers: initialBlocker.trim() ? [initialBlocker.trim()] : [],
-      linked_context: [],
-      activity_metadata: descriptionMentions.length ? { origin: "manual", mentions: descriptionMentions } : { origin: "manual" },
-      momentum_metadata: {},
-      mentions: descriptionMentions,
-      initiative_id: initiativeId || null,
-      client_nonce: nonce,
-      linked_decisions: [],
-      owner_name: members.find((member) => member.user_id === ownerId)?.full_name ?? null,
-    };
-    setTasks((current) => mergeTask(current, optimistic));
-    try {
-      setCreating(true);
-      const created = await apiClient.post<WorkspaceTask>(`/workspaces/${activeWorkspaceId}/tasks`, {
-        title: optimistic.title,
-        description: optimistic.description,
-        status: optimistic.status,
-        owner_user_id: optimistic.owner_user_id,
-        due_date: optimistic.due_date,
-        blockers: optimistic.blockers,
-        linked_context: [],
-        initiative_id: optimistic.initiative_id,
-        client_nonce: nonce,
-        mentions: mentionPayload(descriptionMentions, description),
-      });
-      setTasks((current) => mergeTask(current, created));
-      invalidateTaskQueries(activeWorkspaceId);
-      setTitle("");
-      setDescription("");
-      setDescriptionMentions([]);
-      setStatus("idea");
-      setOwnerId("");
-      setDueDate("");
-      setInitialBlocker("");
-      setInitiativeId("");
-      setCreateOpen(false);
-      announceMutation(`Task ${created.title} created.`);
-      showToast({ title: "Task created", message: created.title });
-      void loadExecution();
-    } catch (err) {
-      setTasks((current) => current.filter((task) => task.client_nonce !== nonce));
-      logClientError("Failed to open task", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks` });
-      setError("Unable to open task. Check your connection and try again.");
-    } finally {
-      setCreating(false);
+    if (!activeWorkspaceId || !title.trim()) return;
+
+    const requestWorkspaceId = activeWorkspaceId;
+    const requestWorkspaceEpoch = workspaceEpochRef.current;
+    const mutationKey = `task:create:${requestWorkspaceId}`;
+    if (mutationRegistryRef.current.has(mutationKey)) {
+      return;
     }
+    const draft: TaskCreateDraft = {
+      title: title.trim(),
+      description: description.trim(),
+      mentions: descriptionMentions,
+      status,
+      ownerId: ownerId || null,
+      dueDate: dueDate || null,
+      initialBlocker: initialBlocker.trim(),
+      initiativeId: initiativeId || null,
+    };
+    const fingerprint = taskCreateFingerprint(requestWorkspaceId, draft);
+    const attempt = mutationAttempt(createAttemptsRef.current.get(requestWorkspaceId) ?? null, fingerprint);
+    createAttemptsRef.current.set(requestWorkspaceId, attempt);
+    const mutationToken = beginMutation(mutationKey);
+    await runExclusiveMutation(
+      mutationRegistryRef.current,
+      mutationKey,
+      async () => {
+        const optimistic = createOptimisticTask(
+          requestWorkspaceId,
+          attempt.nonce,
+          session?.user.id || "",
+          members.find((member) => member.user_id === draft.ownerId)?.full_name ?? null,
+          draft,
+        );
+        setCreating(true);
+        const previousCreate = optimisticState.creates.get(requestWorkspaceId);
+        optimisticState.creates.set(requestWorkspaceId, optimistic);
+        setTasks((current) => mergeTask(
+          previousCreate?.id.startsWith("pending-")
+            ? current.filter((task) => task.id !== previousCreate.id)
+            : current,
+          optimistic,
+        ));
+        try {
+          const created = await apiClient.post<WorkspaceTask>(`/workspaces/${requestWorkspaceId}/tasks`, {
+            title: optimistic.title,
+            description: optimistic.description,
+            status: optimistic.status,
+            owner_user_id: optimistic.owner_user_id,
+            due_date: optimistic.due_date,
+            blockers: optimistic.blockers,
+            linked_context: [],
+            initiative_id: optimistic.initiative_id,
+            client_nonce: attempt.nonce,
+            mentions: mentionPayload(descriptionMentions, description),
+          });
+          if (
+            created.workspace_id !== requestWorkspaceId ||
+            created.client_nonce !== attempt.nonce
+          ) {
+            throw new Error("Task creation response did not match its mutation attempt.");
+          }
+          if (optimisticState.creates.get(requestWorkspaceId) === optimistic) {
+            optimisticState.creates.set(requestWorkspaceId, created);
+          }
+          try {
+            await proveTaskMutation(requestWorkspaceId, requestWorkspaceEpoch);
+          } catch {
+            invalidateTaskQueries(requestWorkspaceId);
+          }
+          if (ownsMutation(mutationKey, mutationToken) && createAttemptsRef.current.get(requestWorkspaceId) === attempt) {
+            createAttemptsRef.current.delete(requestWorkspaceId);
+          }
+          if (!isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch) || !ownsMutation(mutationKey, mutationToken)) {
+            if (optimisticState.creates.get(requestWorkspaceId) === created) {
+              optimisticState.creates.delete(requestWorkspaceId);
+            }
+            return;
+          }
+          completeVisibleTaskCreate(created);
+        } catch (err) {
+          try {
+            await runTaskTwoReadCanonicalProof(
+              requestWorkspaceEpoch,
+              () => mountedRef.current && workspaceRef.current === requestWorkspaceId ? workspaceEpochRef.current : null,
+              (epoch) => reconcileTaskMutation(requestWorkspaceId, epoch),
+              () => Boolean(optimisticState.canonicalCreate(optimistic)),
+            );
+          } catch {
+            invalidateTaskQueries(requestWorkspaceId);
+          }
+          const canonical = optimisticState.canonicalCreate(optimistic);
+          if (optimisticState.creates.get(requestWorkspaceId) === optimistic) {
+            optimisticState.creates.delete(requestWorkspaceId);
+          }
+          if (canonical) {
+            if (ownsMutation(mutationKey, mutationToken) && createAttemptsRef.current.get(requestWorkspaceId) === attempt) {
+              createAttemptsRef.current.delete(requestWorkspaceId);
+            }
+            if (isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch) && ownsMutation(mutationKey, mutationToken)) {
+              completeVisibleTaskCreate(canonical);
+            }
+            return;
+          }
+          if (!isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch) || !ownsMutation(mutationKey, mutationToken)) {
+            return;
+          }
+          setTasks((current) => current.filter((task) => task.id !== optimistic.id));
+          logClientError("Failed to open task", err, { endpoint: `/workspaces/${requestWorkspaceId}/tasks` });
+          failMutation(mutationKey, mutationToken, "Unable to open task. Check your connection and try again.");
+        } finally {
+          if (isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch) && ownsMutation(mutationKey, mutationToken)) {
+            setCreating(false);
+          }
+          finishMutation(mutationKey, mutationToken);
+        }
+      },
+    );
   }
 
-  async function patchTask(task: WorkspaceTask, payload: Partial<WorkspaceTask>) {
-    if (!activeWorkspaceId || task.id.startsWith("pending-")) return;
-    const before = task;
-    setUpdatingId(task.id);
-    setTasks((current) => current.map((item) => (item.id === task.id ? { ...item, ...payload } : item)));
-    try {
-      const updated = await apiClient.patch<WorkspaceTask>(`/workspaces/${activeWorkspaceId}/tasks/${task.id}`, payload);
-      setTasks((current) => current.map((item) => (item.id === task.id ? updated : item)));
-      invalidateTaskQueries(activeWorkspaceId);
-      const blockerRemoved = Array.isArray(payload.blockers) && payload.blockers.length < task.blockers.length;
-      announceMutation(blockerRemoved ? `Blocker removed from ${updated.title}.` : `Task ${updated.title} updated.`);
-      showToast({ title: blockerRemoved ? "Blocker removed" : "Task updated", message: updated.title });
-      void loadExecution();
-    } catch (err) {
-      setTasks((current) => current.map((item) => (item.id === task.id ? before : item)));
-      logClientError("Failed to update task", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks/${task.id}` });
-      setError("Unable to update task. Your session may have expired; refresh and try again.");
-    } finally {
-      setUpdatingId(null);
+  async function patchTask(
+    task: WorkspaceTask,
+    payload: Partial<WorkspaceTask>,
+  ): Promise<boolean> {
+    if (!activeWorkspaceId || task.id.startsWith("pending-")) return false;
+    const requestWorkspaceId = activeWorkspaceId;
+    const requestWorkspaceEpoch = workspaceEpochRef.current;
+    const requestTaskId = task.id;
+    const mutationKey = `task:update:${requestWorkspaceId}:${requestTaskId}`;
+    if (mutationRegistryRef.current.has(mutationKey)) {
+      return false;
     }
+    const before = task;
+    const optimisticPatch = { ...payload };
+    const previousOptimistic = optimisticState.patches.get(mutationKey);
+    const optimistic: OptimisticTaskPatch = {
+      before: previousOptimistic?.before ?? before,
+      patch: { ...previousOptimistic?.patch, ...optimisticPatch },
+      taskId: requestTaskId,
+      workspaceId: requestWorkspaceId,
+    };
+    const mutationToken = beginMutation(mutationKey);
+    return runExclusiveMutation(
+      mutationRegistryRef.current,
+      mutationKey,
+      async () => {
+        optimisticState.patches.set(mutationKey, optimistic);
+        setUpdatingIds((current) => new Set(current).add(requestTaskId));
+        setTasks((current) => current.map((item) => (
+          item.id === requestTaskId ? { ...item, ...optimisticPatch } : item
+        )));
+        try {
+          const updated = await apiClient.patch<WorkspaceTask>(
+            `/workspaces/${requestWorkspaceId}/tasks/${requestTaskId}`,
+            payload,
+          );
+          if (
+            updated.id !== requestTaskId ||
+            updated.workspace_id !== requestWorkspaceId
+          ) {
+            throw new Error("Task update response did not match its requested resource.");
+          }
+          const canonicalOptimistic = confirmedTaskPatch(optimistic, updated);
+          if (optimisticState.patches.get(mutationKey) === optimistic) {
+            optimisticState.patches.set(mutationKey, canonicalOptimistic);
+          }
+          let syncConflict = false;
+          try {
+            const { result: reconciled } = await proveTaskMutation(
+              requestWorkspaceId, requestWorkspaceEpoch, mutationKey,
+            );
+            syncConflict = Boolean(
+              reconciled?.conflictedPatches.some(([key]) => key === mutationKey),
+            );
+          } catch (reconciliationError) {
+            optimisticState.patches.delete(mutationKey);
+            invalidateTaskQueries(requestWorkspaceId);
+            syncConflict = true;
+            if (isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch)) {
+              setTasks((current) => current.map((item) => item.id === requestTaskId ? updated : item));
+              logClientError("Failed to verify successful task update", reconciliationError, { endpoint: `/workspaces/${requestWorkspaceId}/tasks` });
+            }
+          }
+          if (!isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch) || !ownsMutation(mutationKey, mutationToken)) {
+            optimisticState.patches.delete(mutationKey);
+            return !syncConflict;
+          }
+          if (syncConflict) {
+            failMutation(mutationKey, mutationToken, TASK_PATCH_SYNC_WARNING);
+            return false;
+          }
+          const blockerRemoved = Array.isArray(payload.blockers) && payload.blockers.length < task.blockers.length;
+          announceMutation(blockerRemoved ? `Blocker removed from ${updated.title}.` : `Task ${updated.title} updated.`);
+          showToast({ title: blockerRemoved ? "Blocker removed" : "Task updated", message: updated.title });
+          return true;
+        } catch (err) {
+          let canonicalProof = null;
+          try {
+            canonicalProof = (await proveTaskMutation(
+              requestWorkspaceId, requestWorkspaceEpoch, mutationKey,
+            )).result;
+          } catch {
+            invalidateTaskQueries(requestWorkspaceId);
+          }
+          if (optimisticState.canonicalPatchWasObserved(optimistic)) {
+            if (optimisticState.patches.get(mutationKey) === optimistic) {
+              optimisticState.patches.delete(mutationKey);
+            }
+            if (isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch) && ownsMutation(mutationKey, mutationToken)) {
+              announceMutation(`Task ${task.title} updated.`);
+              showToast({ title: "Task updated", message: task.title });
+            }
+            return true;
+          }
+          if (canonicalProof?.conflictedPatches.some(([key]) => key === mutationKey)) {
+            if (isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch)) {
+              failMutation(mutationKey, mutationToken, TASK_PATCH_UNCONFIRMED_WARNING);
+            }
+            return false;
+          }
+          optimisticState.restorePatch(mutationKey, optimistic, previousOptimistic ?? null);
+          invalidateTaskQueries(requestWorkspaceId);
+          if (isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch) && ownsMutation(mutationKey, mutationToken)) {
+            setTasks((current) => current.map((item) => (
+              item.id === requestTaskId
+                ? rollbackOptimisticPatch(item, before, optimisticPatch)
+                : item
+            )));
+            logClientError("Failed to update task", err, { endpoint: `/workspaces/${requestWorkspaceId}/tasks/${requestTaskId}` });
+            failMutation(mutationKey, mutationToken, "Unable to update task. Your session may have expired; refresh and try again.");
+          }
+          return false;
+        } finally {
+          if (isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch) && ownsMutation(mutationKey, mutationToken)) {
+            setUpdatingIds((current) => {
+              if (!current.has(requestTaskId)) return current;
+              const next = new Set(current);
+              next.delete(requestTaskId);
+              return next;
+            });
+          }
+          finishMutation(mutationKey, mutationToken);
+        }
+      },
+    );
   }
 
   function addBlocker(task: WorkspaceTask) {
     const blocker = blockerDrafts[task.id]?.trim();
     if (!blocker || task.blockers.includes(blocker)) return;
-    setBlockerDrafts((current) => ({ ...current, [task.id]: "" }));
-    void patchTask(task, { blockers: [...task.blockers, blocker] });
-  }
-
-  async function requestAssistance(mode: WorkspaceTaskAssistanceMode) {
-    if (!activeWorkspaceId) return;
-    try {
-      setAssisting(mode);
-      setAssistance(await apiClient.post<WorkspaceTaskAssistance>(`/workspaces/${activeWorkspaceId}/tasks/assist`, { mode }));
-    } catch (err) {
-      logClientError("Failed to load task assistance", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks/assist` });
-      setError("Execution assistance is temporarily unavailable. Please try again in a moment.");
-    } finally {
-      setAssisting(null);
-    }
+    const requestWorkspaceId = activeWorkspaceId;
+    const requestWorkspaceEpoch = workspaceEpochRef.current;
+    if (!requestWorkspaceId) return;
+    void patchTask(task, { blockers: [...task.blockers, blocker] }).then((succeeded) => {
+      if (
+        succeeded &&
+        isCurrentWorkspaceMutation(requestWorkspaceId, requestWorkspaceEpoch)
+      ) {
+        setBlockerDrafts((current) => ({ ...current, [task.id]: "" }));
+      }
+    });
   }
 
   if (!activeWorkspaceId) {
@@ -444,20 +585,20 @@ function WorkspaceTasksSurfaceContent() {
 
       <ExecutionOverview items={executionOverview} />
 
-      {error ? (
+      {mutationError || loadError ? (
         <OmnixErrorState
           compact
           className="mb-4"
-          title={error.startsWith("Unable to load tasks.") ? "Tasks are unavailable" : "Task action needs attention"}
-          message={error}
-          onRetry={error.startsWith("Unable to load tasks.") ? () => void loadExecution(true) : undefined}
+          title={mutationError ? "Task action needs attention" : "Tasks are unavailable"}
+          message={mutationError ?? loadError ?? ""}
+          onRetry={!mutationError && loadError ? () => void loadExecution(true) : undefined}
           isRetrying={loading}
-          onDismiss={() => setError(null)}
+          onDismiss={mutationError ? dismissMutationFailure : () => setLoadError(null)}
         />
       ) : null}
 
       <div className="omnix-scrollbar mb-4 flex shrink-0 gap-2 overflow-x-auto pb-1 xl:grid xl:grid-cols-5 xl:overflow-visible xl:pb-0">
-        {flow.map((phase) => (
+        {taskFlow.map((phase) => (
           <button
             key={phase.value}
             type="button"
@@ -480,7 +621,7 @@ function WorkspaceTasksSurfaceContent() {
               <button type="button" onClick={() => setFilter("open")} className={cn("min-h-11 rounded-full border px-3 text-xs font-medium transition", filter === "open" ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100" : "border-[var(--omnix-border)] text-[var(--omnix-text-2)]")}>Current Flow</button>
               <p className="text-xs text-[var(--omnix-text-3)]">{displayedTasks.length} items</p>
             </div>
-            <Button size="sm" onClick={() => setCreateOpen((open) => !open)} leftIcon={<Plus className="h-3.5 w-3.5" />}>
+            <Button size="sm" disabled={creating} onClick={() => setCreateOpen((open) => !open)} leftIcon={<Plus className="h-3.5 w-3.5" />}>
               Record Task
             </Button>
           </div>
@@ -497,7 +638,7 @@ function WorkspaceTasksSurfaceContent() {
               initiativeId={initiativeId}
               members={members}
               initiatives={initiatives}
-              phases={flow}
+              phases={taskFlow}
               creating={creating}
               onSubmit={createTask}
               onCancel={() => {
@@ -524,10 +665,10 @@ function WorkspaceTasksSurfaceContent() {
             measureElement={taskVirtualizer.measureElement}
             members={members}
             initiatives={initiatives}
-            phases={flow}
+            phases={taskFlow}
             currentUserId={session?.user.id}
             focusedTaskId={focusedTaskId}
-            updatingId={updatingId}
+            updatingIds={updatingIds}
             blockerDrafts={blockerDrafts}
             onCreateClick={() => setCreateOpen(true)}
             onPatchTask={(task, payload) => void patchTask(task, payload)}

@@ -48,7 +48,8 @@ export function ChannelList({
           <button
             type="button"
             onClick={() => setCreateOpen((open) => !open)}
-            className="rounded-md p-1 text-cyan-100/70 hover:bg-cyan-300/10 hover:text-cyan-100"
+            disabled={creatingChannel}
+            className="rounded-md p-1 text-cyan-100/70 hover:bg-cyan-300/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Create channel"
           >
             <Plus className="h-4 w-4" />
@@ -58,19 +59,20 @@ export function ChannelList({
 
       {createOpen ? (
         <form onSubmit={onCreateChannel} className="mb-3 space-y-2 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.04] p-2.5">
-          <Input value={channelName} onChange={(event) => setChannelName(event.target.value)} placeholder="backend" className="h-9 text-sm" autoFocus />
+          <Input value={channelName} onChange={(event) => setChannelName(event.target.value)} placeholder="backend" className="h-9 text-sm" autoFocus disabled={creatingChannel} />
           <Textarea
             aria-label="Channel purpose"
             value={channelPurpose}
             onChange={(event) => setChannelPurpose(event.target.value)}
             placeholder="Operational purpose"
             className="h-16 !min-h-16 p-2 text-xs"
+            disabled={creatingChannel}
           />
           <div className="flex gap-2">
-            <Button type="submit" size="sm" disabled={!channelName.trim()} isLoading={creatingChannel} className="h-11 flex-1 text-xs">
+            <Button type="submit" size="sm" disabled={!channelName.trim() || creatingChannel} isLoading={creatingChannel} className="h-11 flex-1 text-xs">
               Open
             </Button>
-            <Button type="button" size="sm" variant="ghost" className="h-11 text-xs" onClick={() => setCreateOpen(false)}>
+            <Button type="button" size="sm" variant="ghost" className="h-11 text-xs" onClick={() => setCreateOpen(false)} disabled={creatingChannel}>
               Cancel
             </Button>
           </div>

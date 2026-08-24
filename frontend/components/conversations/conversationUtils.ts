@@ -4,19 +4,33 @@ import type {
   WorkspaceChannelMessage,
   WorkspaceConversationAssistance,
   WorkspaceDecisionStatus,
+  WorkspaceMember,
 } from "@/lib/workspace-types";
+import { ambientConversationIdentity } from "@/lib/workspace-roles";
 
 export type DisplayMessage = WorkspaceChannelMessage & {
   delivery?: "sending" | "failed";
 };
 
+export type ConversationMutationScope = {
+  workspaceId: string | null;
+  channelId?: string | null;
+  sourceId?: string | null;
+};
+
+export type ConversationSourceScope = {
+  workspaceId: string;
+  channelId: string;
+  threadRootId: string | null;
+};
+
 export type TaskSource =
-  | { kind: "message"; message: WorkspaceChannelMessage }
-  | { kind: "assistance"; assistance: WorkspaceConversationAssistance };
+  | { kind: "message"; message: WorkspaceChannelMessage; scope: ConversationSourceScope }
+  | { kind: "assistance"; assistance: WorkspaceConversationAssistance; scope: ConversationSourceScope };
 
 export type DecisionSource =
-  | { kind: "message"; message: WorkspaceChannelMessage }
-  | { kind: "candidate"; candidate: DecisionCandidate };
+  | { kind: "message"; message: WorkspaceChannelMessage; scope: ConversationSourceScope }
+  | { kind: "candidate"; candidate: DecisionCandidate; scope: ConversationSourceScope };
 
 export type WorkspaceChannelRealtimeChange = {
   eventType: "INSERT" | "UPDATE" | "DELETE";
@@ -37,13 +51,122 @@ export function chronological(messages: DisplayMessage[]) {
   );
 }
 
-export function mergeMessage(current: DisplayMessage[], incoming: WorkspaceChannelMessage) {
+export function mergeMessage(current: DisplayMessage[], incoming: DisplayMessage) {
+  const previous = current.find(
+    (message) =>
+      message.id === incoming.id ||
+      Boolean(incoming.client_nonce && message.client_nonce === incoming.client_nonce),
+  );
+  const metadata = incoming.metadata && typeof incoming.metadata === "object"
+    ? incoming.metadata
+    : previous?.metadata ?? {};
+  const metadataMentions = Array.isArray(metadata.mentions)
+    ? metadata.mentions as WorkspaceChannelMessage["mentions"]
+    : undefined;
+  const owns = (key: keyof DisplayMessage) =>
+    Object.prototype.hasOwnProperty.call(incoming, key);
+  const merged: DisplayMessage = {
+    ...previous,
+    ...incoming,
+    context_links: Array.isArray(incoming.context_links)
+      ? incoming.context_links
+      : previous?.context_links ?? [],
+    metadata,
+    mentions: Array.isArray(incoming.mentions)
+      ? incoming.mentions
+      : metadataMentions ?? previous?.mentions ?? [],
+    author_name: owns("author_name") ? incoming.author_name : previous?.author_name,
+    author_email: owns("author_email") ? incoming.author_email : previous?.author_email,
+    author_avatar_url: owns("author_avatar_url")
+      ? incoming.author_avatar_url
+      : previous?.author_avatar_url,
+    author_avatar_label: owns("author_avatar_label")
+      ? incoming.author_avatar_label
+      : previous?.author_avatar_label
+        ?? incoming.author_user_id?.slice(0, 1).toUpperCase()
+        ?? "U",
+    author_identity: owns("author_identity")
+      ? incoming.author_identity
+      : previous?.author_identity,
+    thread_reply_count: owns("thread_reply_count")
+      && typeof incoming.thread_reply_count === "number"
+      ? incoming.thread_reply_count
+      : previous?.thread_reply_count ?? 0,
+    delivery: owns("delivery") ? incoming.delivery : undefined,
+  };
   const filtered = current.filter(
     (message) =>
       message.id !== incoming.id &&
       !(incoming.client_nonce && message.client_nonce === incoming.client_nonce),
   );
-  return chronological([...filtered, incoming]);
+  return chronological([...filtered, merged]);
+}
+
+export function markOptimisticMessageFailed(
+  current: DisplayMessage[],
+  nonce: string,
+) {
+  const pendingId = `pending-${nonce}`;
+  let changed = false;
+  const next = current.map((message) => {
+    if (
+      message.id !== pendingId
+      || message.client_nonce !== nonce
+      || message.delivery !== "sending"
+    ) {
+      return message;
+    }
+    changed = true;
+    return { ...message, delivery: "failed" as const };
+  });
+  return changed ? next : current;
+}
+
+export function messageHasPersistedActions(message: DisplayMessage) {
+  return !message.delivery && !message.id.startsWith("pending-");
+}
+
+export function persistedMessageForNonce(
+  current: DisplayMessage[],
+  nonce: string,
+) {
+  return current.find(
+    (message) =>
+      message.client_nonce === nonce
+      && messageHasPersistedActions(message),
+  );
+}
+
+export function messageMatchesConversationMutation(
+  message: WorkspaceChannelMessage,
+  scope: ConversationMutationScope,
+  nonce: string,
+  parentMessageId?: string,
+) {
+  return message.workspace_id === scope.workspaceId
+    && message.channel_id === scope.channelId
+    && (message.parent_message_id || null) === (parentMessageId || null)
+    && message.client_nonce === nonce;
+}
+
+export function conversationMutationScopeMatches(
+  request: ConversationMutationScope,
+  current: ConversationMutationScope,
+) {
+  return request.workspaceId === current.workspaceId
+    && (request.channelId === undefined || request.channelId === current.channelId)
+    && (request.sourceId === undefined || request.sourceId === current.sourceId);
+}
+
+export function conversationSourceScopeMatches(
+  source: ConversationSourceScope,
+  workspaceId: string | null,
+  channelId: string | null,
+  threadRootId: string | null,
+) {
+  return source.workspaceId === workspaceId
+    && source.channelId === channelId
+    && (source.threadRootId === null || source.threadRootId === threadRootId);
 }
 
 export function mergeMessagePage(current: DisplayMessage[], incoming: WorkspaceChannelMessage[]) {
@@ -54,9 +177,25 @@ export function incrementThreadReplyCount(current: DisplayMessage[], reply: Work
   if (!reply.parent_message_id) return current;
   return current.map((message) => (
     message.id === reply.parent_message_id
-      ? { ...message, thread_reply_count: message.thread_reply_count + 1 }
+      ? { ...message, thread_reply_count: (message.thread_reply_count ?? 0) + 1 }
       : message
   ));
+}
+
+export function hydrateConversationMessageAuthor(
+  message: WorkspaceChannelMessage,
+  members: WorkspaceMember[],
+) {
+  const author = members.find((member) => member.user_id === message.author_user_id);
+  if (!author) return message;
+  return {
+    ...message,
+    author_name: author.full_name || author.handle || null,
+    author_email: author.email || null,
+    author_avatar_url: author.avatar_url || null,
+    author_avatar_label: author.avatar_label || message.author_user_id.slice(0, 1).toUpperCase() || "U",
+    author_identity: ambientConversationIdentity(author.role, author.operational_label),
+  };
 }
 
 export function splitMessagePage<T>(

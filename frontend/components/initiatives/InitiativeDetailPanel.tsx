@@ -340,6 +340,7 @@ export function InitiativeDetailPanel({
                 <div className="flex gap-2">
                   <select
                     value={taskToAttach}
+                    disabled={updating}
                     onChange={(event) => onTaskToAttachChange(event.target.value)}
                     className="omnix-input h-9 min-w-0 flex-1 rounded-lg px-2 text-xs focus-visible:ring-2 focus-visible:ring-cyan-300/70"
                   >
@@ -361,7 +362,7 @@ export function InitiativeDetailPanel({
                         <p className="truncate text-xs font-medium text-white">{task.title}</p>
                         <p className="mt-1 text-[10px] font-bold uppercase tracking-tighter text-[var(--omnix-text-3)]">{task.status}</p>
                       </div>
-                      <button type="button" onClick={() => onDetachTask(task)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--omnix-text-3)] transition-colors hover:bg-rose-400/10 hover:text-rose-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/70" aria-label="Detach task">
+                      <button type="button" disabled={updating} onClick={() => onDetachTask(task)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--omnix-text-3)] transition-colors hover:bg-rose-400/10 hover:text-rose-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/70 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Detach task">
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -384,6 +385,7 @@ export function InitiativeDetailPanel({
                 <div className="flex gap-2">
                   <select
                     value={channelToAttach}
+                    disabled={updating}
                     onChange={(event) => onChannelToAttachChange(event.target.value)}
                     className="omnix-input h-9 min-w-0 flex-1 rounded-lg px-2 text-xs focus-visible:ring-2 focus-visible:ring-cyan-300/70"
                   >
@@ -405,7 +407,7 @@ export function InitiativeDetailPanel({
                         <p className="truncate text-xs font-medium text-white">{channel.name}</p>
                         <p className="mt-1 text-[10px] text-[var(--omnix-text-3)]">{channel.message_count} messages recorded</p>
                       </div>
-                      <button type="button" onClick={() => onDetachChannel(channel.id)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--omnix-text-3)] transition-colors hover:bg-rose-400/10 hover:text-rose-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/70" aria-label="Detach conversation">
+                      <button type="button" disabled={updating} onClick={() => onDetachChannel(channel.id)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--omnix-text-3)] transition-colors hover:bg-rose-400/10 hover:text-rose-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/70 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Detach conversation">
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -428,6 +430,7 @@ export function InitiativeDetailPanel({
                 <form onSubmit={onAddResource} className="flex flex-wrap gap-2">
                   <select
                     value={resourceType}
+                    disabled={updating}
                     onChange={(event) => onResourceTypeChange(event.target.value as WorkspaceInitiativeResource["resource_type"])}
                     className="omnix-input h-9 rounded-lg px-2 text-xs focus-visible:ring-2 focus-visible:ring-cyan-300/70"
                   >
@@ -436,8 +439,8 @@ export function InitiativeDetailPanel({
                     <option value="reference">Reference</option>
                     <option value="ai_session">AI context</option>
                   </select>
-                  <Input value={resourceLabel} onChange={(event) => onResourceLabelChange(event.target.value)} placeholder="Label" className="h-9 min-w-[8rem] flex-1 text-xs" />
-                  <Input value={resourceId} onChange={(event) => onResourceIdChange(event.target.value)} placeholder="Record id or reference" className="h-9 min-w-[10rem] flex-1 text-xs" />
+                  <Input value={resourceLabel} disabled={updating} onChange={(event) => onResourceLabelChange(event.target.value)} placeholder="Label" className="h-9 min-w-[8rem] flex-1 text-xs" />
+                  <Input value={resourceId} disabled={updating} onChange={(event) => onResourceIdChange(event.target.value)} placeholder="Record id or reference" className="h-9 min-w-[10rem] flex-1 text-xs" />
                   <Button type="submit" size="sm" variant="secondary" disabled={!resourceId.trim() || updating}>
                     Link Resource
                   </Button>
@@ -447,8 +450,9 @@ export function InitiativeDetailPanel({
                     <button
                       key={`${resource.resource_type}-${resource.resource_id}`}
                       type="button"
+                      disabled={updating}
                       onClick={() => onPatchInitiative({ linked_resources: selected.linked_resources.filter((item) => item !== resource) })}
-                      className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.06] px-3 text-left text-xs text-cyan-100/90 transition-colors hover:bg-cyan-300/10"
+                      className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.06] px-3 text-left text-xs text-cyan-100/90 transition-colors hover:bg-cyan-300/10 disabled:cursor-not-allowed disabled:opacity-40"
                       title="Remove link"
                     >
                       <span className="shrink-0 text-[10px] font-bold uppercase text-cyan-400/60">{resource.resource_type}</span>
