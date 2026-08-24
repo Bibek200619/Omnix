@@ -8,6 +8,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
+    "test:e2e:live": "playwright test --config=playwright.live.config.ts",
     "test:ui-audit": "node scripts/verify-ui-audit.mjs"
   },
   "dependencies": {
