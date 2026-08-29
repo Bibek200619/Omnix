@@ -22,10 +22,13 @@ import { Input } from "@/components/ui/Input";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { logClientError } from "@/lib/errors";
+import { useToast } from "@/lib/toast-context";
+import { showUndoToast } from "@/lib/undo-toast";
 import { cn } from "@/lib/utils";
 
 export function HistoryList() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
@@ -40,6 +43,7 @@ export function HistoryList() {
     renameConversation,
     refreshConversations,
     setActiveConversation,
+    restoreConversation,
   } = useConversationHistory();
 
   const chats = useMemo(() => {
@@ -88,9 +92,19 @@ export function HistoryList() {
     try {
       setBusyId(chatId);
       setActionError(null);
-      await archiveConversation(chatId);
+      const archived = await archiveConversation(chatId);
       if (activeConversationId === chatId) {
         router.push("/chat");
+      }
+      if (archived) {
+        showUndoToast(showToast, {
+          title: "Conversation deleted",
+          message: archived.title || "Omnix conversation",
+          onUndo: async () => {
+            await restoreConversation(archived);
+            setActionError(null);
+          },
+        });
       }
     } catch (err) {
       logClientError("Failed to delete chat", err, { endpoint: `/conversations/${chatId}` });
