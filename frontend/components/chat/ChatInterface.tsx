@@ -20,6 +20,7 @@ import { LiveRegion } from "@/components/ui/LiveRegion";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import { useProfile } from "@/lib/profile-context";
+import { recoverableDraftKey } from "@/lib/recoverable-draft";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
 import { useWorkspaceIntelligence } from "@/lib/workspace-intelligence-context";
 import { useWorkspaceMembership } from "@/lib/workspace-membership-context";
@@ -151,6 +152,15 @@ export function ChatInterface() {
 
   const visibleHistory = conversations.slice(0, 7);
   const activeHistoryItem = visibleHistory.find((item) => item.id === activeConversationId) ?? visibleHistory[0];
+  const chatDraftStorageKey = useMemo(
+    () => recoverableDraftKey([
+      "chat",
+      user?.id ?? "anonymous",
+      activeWorkspaceId ?? "no-workspace",
+      chatMessages.currentConversation || conversationId || "new",
+    ]),
+    [activeWorkspaceId, chatMessages.currentConversation, conversationId, user?.id],
+  );
 
   return (
     <section className="relative flex h-full w-full overflow-hidden bg-[var(--omnix-bg)] text-[var(--omnix-text)]">
@@ -215,6 +225,7 @@ export function ChatInterface() {
               onSearchModeChange={setSearchMode}
               onUploadSuccess={chatMessages.handleUploadSuccess}
               onRemoveAttachment={chatMessages.handleRemoveAttachment}
+              draftStorageKey={chatDraftStorageKey}
               onTypingChange={(isTyping) => {
                 void sendTypingSignal(chatMessages.currentConversationRef.current, isTyping);
               }}

@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { UploadDropzone } from "@/components/upload/UploadDropzone";
 import type { MessageAttachment, SearchMode } from "@/components/chat/types";
 import { logger } from "@/lib/logger";
+import { useRecoverableTextDraft } from "@/lib/recoverable-draft";
 import { cn } from "@/lib/utils";
 
 type ChatInputProps = {
@@ -37,6 +38,7 @@ type ChatInputProps = {
   onUploadSuccess?: (file: MessageAttachment) => void;
   onRemoveAttachment?: (fileId: string) => void;
   onTypingChange?: (isTyping: boolean) => void;
+  draftStorageKey?: string | null;
 };
 
 const searchModes: Array<{
@@ -162,8 +164,9 @@ export function ChatInput({
   onUploadSuccess,
   onRemoveAttachment,
   onTypingChange,
+  draftStorageKey = null,
 }: ChatInputProps) {
-  const [value, setValue] = useState("");
+  const [value, setValue, clearValue] = useRecoverableTextDraft(draftStorageKey);
   const [focused, setFocused] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [slashMenuDismissed, setSlashMenuDismissed] = useState(false);
@@ -203,7 +206,7 @@ export function ChatInput({
     if (!trimmed || loading) return;
     onSend(trimmed);
     onTypingChange?.(false);
-    setValue("");
+    clearValue();
   }
 
   function handleUploadSuccess(file: MessageAttachment) {
