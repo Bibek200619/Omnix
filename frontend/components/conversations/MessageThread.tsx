@@ -11,6 +11,7 @@ import {
   SendHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { SurfaceStateCard } from "@/components/ui/SurfaceStateCard";
 import { MentionText } from "@/components/mentions/MentionText";
 import { MentionTextarea } from "@/components/mentions/MentionTextarea";
 import {
@@ -187,7 +188,12 @@ export function MessageThread({
       </div>
       {aiPanel}
       <div className="omnix-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto px-2 py-3 sm:px-3">
-        {messagesLoading ? <Loader2 className="mx-auto mt-10 h-5 w-5 animate-spin text-cyan-100/50" /> : null}
+        {messagesLoading ? (
+          <div role="status" aria-live="polite" aria-atomic="true" className="py-10 text-center text-sm text-[var(--omnix-text-2)]">
+            <Loader2 className="mx-auto h-5 w-5 animate-spin text-cyan-100/50" aria-hidden="true" />
+            <span className="mt-3 block">Loading discussion…</span>
+          </div>
+        ) : null}
         {hasOlderMessages ? (
           <div className="flex flex-wrap items-center justify-center gap-2 px-2 pb-2">
             <Button type="button" size="sm" variant="ghost" onClick={onLoadOlderMessages} isLoading={loadingOlderMessages}>
@@ -199,11 +205,19 @@ export function MessageThread({
           </div>
         ) : null}
         {!messagesLoading && messages.length === 0 ? (
-          <div className="mx-auto mt-14 max-w-sm text-center">
-            <MessagesSquare className="mx-auto h-7 w-7 text-cyan-100/35" />
-            <p className="mt-3 text-sm text-[var(--omnix-text-2)]">No operational discussion yet.</p>
-            <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">Capture coordination, context, and decisions when work begins.</p>
-          </div>
+          <SurfaceStateCard
+            tone={selectedChannel && mayPost ? "empty" : "inaccessible"}
+            icon={MessagesSquare}
+            title={selectedChannel ? "No Operational Discussion Yet" : "No Channel Selected"}
+            description={
+              !selectedChannel
+                ? "Select an accessible channel before reading or sending discussion."
+                : mayPost
+                  ? "Capture coordination, context, and decisions when work begins."
+                  : "This channel is readable here, but posting is restricted to workspace leads."
+            }
+            className="mx-auto mt-10 max-w-sm py-8"
+          />
         ) : null}
         {messages.map((message) => (
           <ConversationMessageRow
@@ -240,7 +254,7 @@ export function MessageThread({
             !selectedChannel
               ? "Select a channel"
               : mayPost
-                ? "Write an operational update..."
+                ? "Write an operational update…"
                 : "Updates in this channel are published by workspace leads."
           }
           disabled={!mayPost || sending}

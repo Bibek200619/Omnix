@@ -2,11 +2,12 @@
 
 import { FormEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { CircleDot, ClipboardCheck, Plus } from "lucide-react";
+import { CircleDot, ClipboardCheck, Plus, ShieldAlert } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
+import { SurfaceStateCard } from "@/components/ui/SurfaceStateCard";
 import { mentionPayload } from "@/components/mentions/MentionTextarea";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -570,7 +571,13 @@ function WorkspaceTasksSurfaceContent() {
   if (!activeWorkspaceId) {
     return (
       <section className="omnix-page-frame flex items-center justify-center">
-        <p className="text-sm text-[var(--omnix-text-2)]">Select a workspace to orient operational execution.</p>
+        <SurfaceStateCard
+          tone="inaccessible"
+          icon={ShieldAlert}
+          title="No Active Workspace"
+          description="Choose an accessible workspace from the sidebar to orient operational execution."
+          className="max-w-md"
+        />
       </section>
     );
   }

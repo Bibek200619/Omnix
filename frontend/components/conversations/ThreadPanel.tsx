@@ -1,11 +1,12 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { ArrowRight, Loader2, X } from "lucide-react";
+import { ArrowRight, Loader2, MessagesSquare, X } from "lucide-react";
 import { ConversationMessageRow } from "@/components/conversations/MessageThread";
 import type { DisplayMessage } from "@/components/conversations/conversationUtils";
 import { MentionTextarea } from "@/components/mentions/MentionTextarea";
 import { Button } from "@/components/ui/Button";
+import { SurfaceStateCard } from "@/components/ui/SurfaceStateCard";
 import type {
   WorkspaceChannelMessage,
   WorkspaceMentionMetadata,
@@ -82,7 +83,21 @@ export function ThreadPanel({
         </button>
       </div>
       <div className="omnix-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
-        {threadLoading ? <Loader2 className="mx-auto mt-6 h-4 w-4 animate-spin text-cyan-100/50" /> : null}
+        {threadLoading ? (
+          <div role="status" aria-live="polite" aria-atomic="true" className="py-6 text-center text-sm text-[var(--omnix-text-2)]">
+            <Loader2 className="mx-auto h-4 w-4 animate-spin text-cyan-100/50" aria-hidden="true" />
+            <span className="mt-3 block">Loading thread replies…</span>
+          </div>
+        ) : null}
+        {!threadLoading && threadMessages.length === 0 ? (
+          <SurfaceStateCard
+            tone={mayPost ? "empty" : "inaccessible"}
+            icon={MessagesSquare}
+            title="No Thread Replies Yet"
+            description={mayPost ? "Add focused follow-through when this message needs a reply." : "This thread is readable here, but replies are restricted to workspace leads."}
+            className="mx-auto my-4 max-w-sm py-8"
+          />
+        ) : null}
         {threadMessages.map((message) => (
           <ConversationMessageRow
             key={message.id}
@@ -113,7 +128,7 @@ export function ThreadPanel({
           members={activeMembers}
           mentions={threadDraftMentions}
           onMentionsChange={onThreadDraftMentionsChange}
-          placeholder="Add focused follow-through..."
+          placeholder="Add focused follow-through…"
           disabled={!mayPost || threadSending}
           className="omnix-input h-20 w-full resize-none rounded-lg p-2.5 text-sm leading-6"
         />
