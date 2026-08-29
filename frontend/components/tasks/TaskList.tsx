@@ -1,8 +1,8 @@
 import type { RefObject } from "react";
 import type { VirtualItem } from "@tanstack/react-virtual";
 import { ClipboardCheck } from "lucide-react";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { SurfaceStateCard } from "@/components/ui/SurfaceStateCard";
 import type {
   WorkspaceInitiative,
   WorkspaceMember,
@@ -60,7 +60,8 @@ export function TaskList({
   return (
     <div ref={listRef} className="omnix-scrollbar overflow-y-auto xl:min-h-0 xl:flex-1">
       {loading ? (
-        <div className="space-y-2">
+        <div role="status" aria-live="polite" aria-atomic="true" aria-label="Loading tasks" className="space-y-2">
+          <span className="sr-only">Loading tasks…</span>
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index} className="rounded-xl border border-[var(--omnix-border)] bg-black/[0.12] p-3.5">
               <div className="flex items-start justify-between gap-3">
@@ -82,10 +83,11 @@ export function TaskList({
       ) : null}
 
       {!loading && tasks.length === 0 ? (
-        <EmptyState
+        <SurfaceStateCard
+          tone="empty"
           icon={ClipboardCheck}
           title="No tasks yet"
-          description="Create your first task to start tracking execution"
+          description="Create your first task to start tracking execution."
           action={{ label: "Create Task", onClick: onCreateClick }}
           className="mx-auto mt-10 max-w-lg"
         />

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ShieldAlert } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { ChannelList } from "@/components/conversations/ChannelList";
 import { ConversationAIPanel } from "@/components/conversations/ConversationAIPanel";
@@ -11,6 +11,7 @@ import { TaskFromMessageModal } from "@/components/conversations/TaskFromMessage
 import { ThreadPanel } from "@/components/conversations/ThreadPanel";
 import { WorkspaceConversationChrome } from "@/components/conversations/WorkspaceConversationChrome";
 import { Button } from "@/components/ui/Button";
+import { SurfaceStateCard } from "@/components/ui/SurfaceStateCard";
 import {
   type ConversationMutationScope,
   type DecisionSource,
@@ -660,7 +661,13 @@ function WorkspaceConversationSurfaceContent() {
   if (!activeWorkspaceId) {
     return (
       <section className="omnix-page-frame flex items-center justify-center">
-        <p className="text-sm text-[var(--omnix-text-2)]">Select a workspace to enter operational conversations.</p>
+        <SurfaceStateCard
+          tone="inaccessible"
+          icon={ShieldAlert}
+          title="No Active Workspace"
+          description="Choose an accessible workspace from the sidebar to enter operational conversations."
+          className="max-w-md"
+        />
       </section>
     );
   }

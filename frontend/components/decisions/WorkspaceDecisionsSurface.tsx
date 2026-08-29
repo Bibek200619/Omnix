@@ -3,11 +3,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
-import { BadgeCheck, Loader2, Plus, RefreshCw, Target, ListTodo } from "lucide-react";
+import { BadgeCheck, Loader2, Plus, RefreshCw, Target, ListTodo, ShieldAlert } from "lucide-react";
 import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
+import { SurfaceStateCard } from "@/components/ui/SurfaceStateCard";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
 import { useWorkspaceTree } from "@/lib/workspace-context";
@@ -136,11 +136,13 @@ function WorkspaceDecisionsSurfaceContent() {
   if (!activeWorkspaceId) {
     return (
       <section className="omnix-page-frame flex items-center justify-center">
-        <div className="max-w-md text-center">
-          <BadgeCheck className="mx-auto mb-4 h-12 w-12 text-cyan-100/20" />
-          <h2 className="text-xl font-semibold text-white">Select a workspace</h2>
-          <p className="mt-2 text-sm text-[var(--omnix-text-2)]">Choose a workspace from the sidebar to inspect recorded decisions and organizational memory.</p>
-        </div>
+        <SurfaceStateCard
+          tone="inaccessible"
+          icon={ShieldAlert}
+          title="No Active Workspace"
+          description="Choose an accessible workspace from the sidebar to inspect recorded decisions and organizational memory."
+          className="max-w-md"
+        />
       </section>
     );
   }
@@ -223,10 +225,11 @@ function WorkspaceDecisionsSurfaceContent() {
       ) : null}
 
       {!loading && decisions.length === 0 ? (
-        <EmptyState
+        <SurfaceStateCard
+          tone="empty"
           icon={BadgeCheck}
           title="No decisions recorded"
-          description="Capture decisions to build your organization's memory"
+          description="Capture decisions to build your organization's memory."
           action={{ label: "Record Decision", onClick: () => setCreateOpen(true) }}
           className="flex-1"
         />
@@ -262,7 +265,12 @@ function WorkspaceDecisionsSurfaceContent() {
               </div>            </div>
 
             <div className="omnix-scrollbar -mx-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-1">
-              {loading ? <Loader2 className="mx-auto mt-12 h-6 w-6 animate-spin text-cyan-400/40" /> : null}
+              {loading ? (
+                <div role="status" aria-live="polite" aria-atomic="true" className="py-12 text-center text-sm text-[var(--omnix-text-2)]">
+                  <Loader2 className="mx-auto h-6 w-6 animate-spin text-cyan-400/40" aria-hidden="true" />
+                  <span className="mt-3 block">Loading decisions…</span>
+                </div>
+              ) : null}
               
               {!loading && filteredDecisions.length === 0 && decisions.length > 0 ? (
                 <div className="py-12 text-center">

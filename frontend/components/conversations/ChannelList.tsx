@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { SurfaceStateCard } from "@/components/ui/SurfaceStateCard";
 import { Textarea } from "@/components/ui/Textarea";
 import { cn } from "@/lib/utils";
 import type { WorkspaceChannel } from "@/lib/workspace-types";
@@ -81,7 +82,8 @@ export function ChannelList({
 
       <div className="omnix-scrollbar omnix-conversation-channel-list-items flex min-h-0 gap-2 overflow-x-auto pb-1">
         {channelsLoading ? (
-          <>
+          <div role="status" aria-live="polite" aria-atomic="true" aria-label="Loading channels" className="contents">
+            <span className="sr-only">Loading channels…</span>
             {Array.from({ length: 4 }).map((_, index) => (
               <div key={index} className="omnix-conversation-channel-item w-[min(12rem,76vw)] shrink-0 rounded-lg border border-transparent px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
@@ -92,7 +94,17 @@ export function ChannelList({
                 <Skeleton variant="line" className="mt-2 h-2.5 w-20" />
               </div>
             ))}
-          </>
+          </div>
+        ) : null}
+        {!channelsLoading && channels.length === 0 ? (
+          <SurfaceStateCard
+            tone="empty"
+            icon={Plus}
+            title="No Channels Yet"
+            description={mayCreateChannel ? "Create a channel to start workspace discussion." : "No accessible channels are available in this workspace."}
+            action={mayCreateChannel ? { label: "Create Channel", onClick: () => setCreateOpen(true) } : undefined}
+            className="min-w-[min(17rem,78vw)] py-8"
+          />
         ) : null}
         {channels.map((channel) => (
           <button

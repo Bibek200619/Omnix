@@ -1,12 +1,12 @@
 "use client";
 
 import { FormEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { CircleDot, Compass, Loader2, Plus } from "lucide-react";
+import { CircleDot, Compass, Plus, ShieldAlert } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
+import { SurfaceStateCard } from "@/components/ui/SurfaceStateCard";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
@@ -735,7 +735,13 @@ function WorkspaceInitiativesSurfaceContent() {
   if (!activeWorkspaceId) {
     return (
       <section className="omnix-page-frame flex items-center justify-center">
-        <p className="text-sm text-[var(--omnix-text-2)]">Select a workspace to orient shared initiatives.</p>
+        <SurfaceStateCard
+          tone="inaccessible"
+          icon={ShieldAlert}
+          title="No Active Workspace"
+          description="Choose an accessible workspace from the sidebar to orient shared initiatives."
+          className="max-w-md"
+        />
       </section>
     );
   }
@@ -797,12 +803,20 @@ function WorkspaceInitiativesSurfaceContent() {
             />
           ) : null}
           <div className="omnix-scrollbar flex min-h-0 gap-2 overflow-x-auto pb-1 lg:block lg:flex-1 lg:space-y-2 lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0">
-            {loading ? <Loader2 className="mx-auto mt-8 h-5 w-5 animate-spin text-cyan-100/50" /> : null}
+            {loading ? (
+              <SurfaceStateCard
+                tone="loading"
+                title="Loading Initiatives"
+                description="Retrieving shared direction for this workspace…"
+                className="min-w-[min(17rem,78vw)] py-8 lg:min-w-0"
+              />
+            ) : null}
             {!loading && initiatives.length === 0 ? (
-              <EmptyState
+              <SurfaceStateCard
+                tone="empty"
                 icon={Compass}
                 title="No initiatives yet"
-                description="Initiatives track strategic direction across your workspace"
+                description="Initiatives track strategic direction across your workspace."
                 action={{ label: "Create Initiative", onClick: () => setCreateOpen(true) }}
                 className="min-w-[min(17rem,78vw)] lg:min-w-0"
               />
