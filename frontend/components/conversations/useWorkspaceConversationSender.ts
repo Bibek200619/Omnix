@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -31,6 +32,7 @@ import {
   runExclusiveMutation,
 } from "@/lib/mutation-lifecycle";
 import { queryGet } from "@/lib/query";
+import { recoverableDraftKey, useRecoverableTextDraft } from "@/lib/recoverable-draft";
 import { ambientConversationIdentity } from "@/lib/workspace-roles";
 import type {
   WorkspaceChannelMessage,
@@ -119,8 +121,33 @@ export function useWorkspaceConversationSender({
   setMessages,
   setThreadMessages,
 }: UseWorkspaceConversationSenderParams) {
-  const [draft, setDraftState] = useState("");
-  const [threadDraft, setThreadDraftState] = useState("");
+  const mainDraftStorageKey = useMemo(
+    () => activeWorkspaceId && selectedChannelId
+      ? recoverableDraftKey([
+        "workspace-conversation",
+        identity.currentUserId,
+        activeWorkspaceId,
+        selectedChannelId,
+        "main",
+      ])
+      : null,
+    [activeWorkspaceId, identity.currentUserId, selectedChannelId],
+  );
+  const threadDraftStorageKey = useMemo(
+    () => activeWorkspaceId && selectedChannelId && activeThreadRootId
+      ? recoverableDraftKey([
+        "workspace-conversation",
+        identity.currentUserId,
+        activeWorkspaceId,
+        selectedChannelId,
+        "thread",
+        activeThreadRootId,
+      ])
+      : null,
+    [activeThreadRootId, activeWorkspaceId, identity.currentUserId, selectedChannelId],
+  );
+  const [draft, setDraftState] = useRecoverableTextDraft(mainDraftStorageKey);
+  const [threadDraft, setThreadDraftState] = useRecoverableTextDraft(threadDraftStorageKey);
   const [draftMentions, setDraftMentionsState] = useState<WorkspaceMentionMetadata[]>([]);
   const [threadDraftMentions, setThreadDraftMentionsState] = useState<WorkspaceMentionMetadata[]>([]);
   const [sending, setSending] = useState(false);
@@ -153,13 +180,25 @@ export function useWorkspaceConversationSender({
     draftRef.current = value;
     draftRevisionRef.current += 1;
     setDraftState(value);
-  }, []);
+  }, [setDraftState]);
 
   const setThreadDraft = useCallback((value: string) => {
     threadDraftRef.current = value;
     threadDraftRevisionRef.current += 1;
     setThreadDraftState(value);
-  }, []);
+  }, [setThreadDraftState]);
+
+  useEffect(() => {
+    if (draftRef.current === draft) return;
+    draftRef.current = draft;
+    draftRevisionRef.current += 1;
+  }, [draft]);
+
+  useEffect(() => {
+    if (threadDraftRef.current === threadDraft) return;
+    threadDraftRef.current = threadDraft;
+    threadDraftRevisionRef.current += 1;
+  }, [threadDraft]);
 
   const setDraftMentions = useCallback((mentions: WorkspaceMentionMetadata[]) => {
     const next = [...mentions];
@@ -200,17 +239,13 @@ export function useWorkspaceConversationSender({
     threadPendingTokenRef.current = null;
     setSending(false);
     setThreadSending(false);
-    setDraft("");
     setDraftMentions([]);
-    setThreadDraft("");
     setThreadDraftMentions([]);
   }, [
     activeWorkspaceId,
     clearOwnedDeliveryError,
     selectedChannelId,
-    setDraft,
     setDraftMentions,
-    setThreadDraft,
     setThreadDraftMentions,
   ]);
 
@@ -224,9 +259,8 @@ export function useWorkspaceConversationSender({
     threadAttemptDetailsRef.current = null;
     threadPendingTokenRef.current = null;
     setThreadSending(false);
-    setThreadDraft("");
     setThreadDraftMentions([]);
-  }, [activeThreadRootId, clearOwnedDeliveryError, setThreadDraft, setThreadDraftMentions]);
+  }, [activeThreadRootId, clearOwnedDeliveryError, setThreadDraftMentions]);
 
   function optimisticMessage(
     content: string,

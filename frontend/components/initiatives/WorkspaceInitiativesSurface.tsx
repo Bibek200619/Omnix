@@ -18,6 +18,7 @@ import {
   type MutationAttempt,
 } from "@/lib/mutation-lifecycle";
 import { queryGet } from "@/lib/query";
+import { recoverableDraftKey, useRecoverableTextDraft } from "@/lib/recoverable-draft";
 import { realtimeRegistry } from "@/lib/realtime-registry";
 import { useToast } from "@/lib/toast-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
@@ -66,11 +67,19 @@ function WorkspaceInitiativesSurfaceContent() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [ownerId, setOwnerId] = useState("");
-  const [targetDate, setTargetDate] = useState("");
-  const [context, setContext] = useState("");
+  const createDraftKey = useCallback((field: string) => (
+    recoverableDraftKey([
+      "initiative-create",
+      session?.user.id ?? "anonymous",
+      activeWorkspaceId ?? "no-workspace",
+      field,
+    ])
+  ), [activeWorkspaceId, session?.user.id]);
+  const [title, setTitle] = useRecoverableTextDraft(createDraftKey("title"));
+  const [description, setDescription] = useRecoverableTextDraft(createDraftKey("description"));
+  const [ownerId, setOwnerId] = useRecoverableTextDraft(createDraftKey("owner"));
+  const [targetDate, setTargetDate] = useRecoverableTextDraft(createDraftKey("target-date"));
+  const [context, setContext] = useRecoverableTextDraft(createDraftKey("context"));
   const [creating, setCreating] = useState(false);
   const [taskToAttach, setTaskToAttach] = useState("");
   const [channelToAttach, setChannelToAttach] = useState("");

@@ -653,7 +653,6 @@ function WorkspaceConversationSurfaceContent() {
     setLoadingNewerThreadReplies(false);
     nextThreadOffsetRef.current = null;
     setMobileConversationView("messages");
-    sender.setThreadDraft("");
     sender.setThreadDraftMentions([]);
     void loadThread(selectedChannelId, message);
   }

@@ -19,6 +19,7 @@ import {
   type MutationAttempt,
 } from "@/lib/mutation-lifecycle";
 import { queryGet } from "@/lib/query";
+import { recoverableDraftKey, useRecoverableTextDraft } from "@/lib/recoverable-draft";
 import { realtimeRegistry } from "@/lib/realtime-registry";
 import { useToast } from "@/lib/toast-context";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
@@ -64,14 +65,26 @@ function WorkspaceTasksSurfaceContent() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<WorkspaceTaskStatus | "open">("open");
   const [createOpen, setCreateOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const createDraftKey = useCallback((field: string) => (
+    recoverableDraftKey([
+      "task-create",
+      session?.user.id ?? "anonymous",
+      activeWorkspaceId ?? "no-workspace",
+      field,
+    ])
+  ), [activeWorkspaceId, session?.user.id]);
+  const [title, setTitle] = useRecoverableTextDraft(createDraftKey("title"));
+  const [description, setDescription] = useRecoverableTextDraft(createDraftKey("description"));
   const [descriptionMentions, setDescriptionMentions] = useState<WorkspaceMentionMetadata[]>([]);
-  const [status, setStatus] = useState<WorkspaceTaskStatus>("idea");
-  const [ownerId, setOwnerId] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [initialBlocker, setInitialBlocker] = useState("");
-  const [initiativeId, setInitiativeId] = useState("");
+  const [statusDraft, setStatusDraft] = useRecoverableTextDraft(createDraftKey("status"), "idea");
+  const status = useMemo<WorkspaceTaskStatus>(
+    () => taskFlow.some((phase) => phase.value === statusDraft) ? statusDraft as WorkspaceTaskStatus : "idea",
+    [statusDraft],
+  );
+  const [ownerId, setOwnerId] = useRecoverableTextDraft(createDraftKey("owner"));
+  const [dueDate, setDueDate] = useRecoverableTextDraft(createDraftKey("due-date"));
+  const [initialBlocker, setInitialBlocker] = useRecoverableTextDraft(createDraftKey("initial-blocker"));
+  const [initiativeId, setInitiativeId] = useRecoverableTextDraft(createDraftKey("initiative"));
   const [creating, setCreating] = useState(false);
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(() => new Set());
   const [blockerDrafts, setBlockerDrafts] = useState<Record<string, string>>({});
@@ -285,7 +298,7 @@ function WorkspaceTasksSurfaceContent() {
   const completeVisibleTaskCreate = (created: WorkspaceTask) => {
     setTasks((current) => mergeTask(current, created));
     setTitle(""); setDescription(""); setDescriptionMentions([]);
-    setStatus("idea"); setOwnerId(""); setDueDate("");
+    setStatusDraft("idea"); setOwnerId(""); setDueDate("");
     setInitialBlocker(""); setInitiativeId(""); setCreateOpen(false);
     announceMutation(`Task ${created.title} created.`);
     showToast({ title: "Task created", message: created.title });
@@ -648,7 +661,7 @@ function WorkspaceTasksSurfaceContent() {
               onTitleChange={setTitle}
               onDescriptionChange={setDescription}
               onDescriptionMentionsChange={setDescriptionMentions}
-              onStatusChange={setStatus}
+              onStatusChange={setStatusDraft}
               onOwnerChange={setOwnerId}
               onDueDateChange={setDueDate}
               onInitialBlockerChange={setInitialBlocker}
