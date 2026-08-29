@@ -25,7 +25,8 @@ type ConversationHistoryContextType = {
   setActiveConversation: (conversationId: string | null) => void;
   upsertConversation: (conversation: ConversationSummary) => void;
   renameConversation: (conversationId: string, title: string) => Promise<void>;
-  archiveConversation: (conversationId: string) => Promise<void>;
+  archiveConversation: (conversationId: string) => Promise<ConversationSummary | null>;
+  restoreConversation: (conversation: ConversationSummary) => Promise<void>;
 };
 
 const ConversationHistoryContext =
@@ -197,7 +198,7 @@ export function ConversationHistoryProvider({
 
   const archiveConversation = useCallback(
     async (conversationId: string) => {
-      await apiClient.patch<ConversationSummary>(
+      const archived = await apiClient.patch<ConversationSummary>(
         `/conversations/${conversationId}`,
         { is_archived: true },
       );
@@ -208,8 +209,26 @@ export function ConversationHistoryProvider({
       if (activeConversationId === conversationId) {
         setActiveConversation(null);
       }
+      return archived;
     },
     [activeConversationId, setActiveConversation],
+  );
+
+  const restoreConversation = useCallback(
+    async (conversation: ConversationSummary) => {
+      const restored = await apiClient.patch<ConversationSummary>(
+        `/conversations/${conversation.id}`,
+        { is_archived: false },
+      );
+      const restoredConversation = { ...conversation, ...restored, is_archived: false };
+      setConversations((current) =>
+        sortConversations([
+          restoredConversation,
+          ...current.filter((item) => item.id !== restoredConversation.id),
+        ]),
+      );
+    },
+    [],
   );
 
   useEffect(() => {
@@ -284,6 +303,7 @@ export function ConversationHistoryProvider({
       archiveConversation,
       refreshConversations,
       renameConversation,
+      restoreConversation,
       setActiveConversation,
       upsertConversation,
     }),
@@ -295,6 +315,7 @@ export function ConversationHistoryProvider({
       loading,
       refreshConversations,
       renameConversation,
+      restoreConversation,
       setActiveConversation,
       upsertConversation,
     ],
