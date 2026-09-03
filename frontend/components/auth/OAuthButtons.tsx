@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Github, Loader2 } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
-import { AUTH_C } from "@/components/auth/OmnixAuthVisuals";
 import { oauthCallbackUrl, redirectFromWindow } from "@/lib/auth-redirects";
 import { logClientError } from "@/lib/errors";
 import { supabase } from "@/lib/supabase";
@@ -115,11 +114,10 @@ export function OAuthButtons({ disabled = false, onError }: OAuthButtonsProps) {
               leftIcon={providerIcon(provider, isLoading)}
               className={cn(
                 "w-full justify-center rounded-xl border-white/[0.08] bg-white/[0.03] py-3 text-sm font-semibold text-white/55 shadow-none hover:-translate-y-0.5 hover:border-white/[0.16] hover:bg-white/[0.055] hover:text-white",
-                isLoading && "border-cyan-300/30 bg-cyan-300/10 text-cyan-50",
+                isLoading && "border-cyan-300/30 bg-cyan-300/10 text-white",
               )}
-              style={{ color: isLoading ? AUTH_C.white : undefined }}
             >
-              {isLoading ? "Redirecting" : `${action} with ${providerLabels[provider]}`}
+              {isLoading ? "Redirecting…" : `${action} with ${providerLabels[provider]}`}
             </Button>
           );
         })}
