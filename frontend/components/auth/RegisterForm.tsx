@@ -14,7 +14,6 @@ import {
   otpCodeFromDigits,
 } from "@/components/auth/EmailOtpCard";
 import {
-  AUTH_C,
   AUTH_ICONS,
   AuthIcon,
   AuthInput,
@@ -414,7 +413,7 @@ export function RegisterForm() {
             error={fieldErrors.email}
           />
           <label className="group flex flex-col gap-1.5" htmlFor="phone">
-            <span className="text-xs font-bold" style={{ color: AUTH_C.muted }}>
+            <span className="text-xs font-bold text-[var(--omnix-text-2)]">
               Phone number
             </span>
             <span className="relative flex rounded-xl border border-white/[0.08] bg-white/[0.04] transition-all duration-200 hover:border-white/[0.16] focus-within:border-cyan-300/40 focus-within:bg-white/[0.055] focus-within:ring-2 focus-within:ring-cyan-300/10">
@@ -453,7 +452,7 @@ export function RegisterForm() {
                 )}
               />
             </span>
-            <span className="text-xs leading-5" style={{ color: AUTH_C.faint }}>
+            <span className="text-xs leading-5 text-[var(--omnix-text-3)]">
               Used to complete your account profile.
             </span>
             {fieldErrors.phone ? (

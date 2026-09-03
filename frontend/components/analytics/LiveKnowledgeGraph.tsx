@@ -96,7 +96,7 @@ function GraphNodeCard({ title, value, detail, icon: Icon, tone, progress, empha
   return (
     <article
       className={cn(
-        "relative min-w-0 overflow-hidden rounded-xl border bg-[#07111d]/95 p-3 shadow-inner",
+        "relative min-w-0 overflow-hidden rounded-xl border bg-[var(--omnix-rgba-7-17-29-0-95)] p-3 shadow-inner",
         toneClass.border,
         emphasis ? "min-h-[9.75rem] sm:p-4" : "min-h-[7.25rem]",
       )}
@@ -154,7 +154,7 @@ export function LiveKnowledgeGraph({
 
   return (
     <section className="relative overflow-hidden rounded-[var(--omnix-radius)] border border-cyan-300/10 bg-black/20 p-3 shadow-[var(--omnix-glow-xs)] sm:p-4">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(0,255,255,0.075),rgba(155,92,255,0.045),transparent_68%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,var(--omnix-rgba-0-255-255-0-075),var(--omnix-rgba-155-92-255-0-045),transparent_68%)]" />
       <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
@@ -178,26 +178,26 @@ export function LiveKnowledgeGraph({
 
       <div className="relative z-10 mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(15rem,0.7fr)]">
         <div
-          className="relative overflow-hidden rounded-xl border border-white/[0.06] bg-[#020915]/85 p-3 sm:p-4 lg:p-5"
+          className="relative overflow-hidden rounded-xl border border-white/[0.06] bg-[var(--omnix-rgba-2-9-21-0-85)] p-3 sm:p-4 lg:p-5"
           data-omnix-live-knowledge-graph="true"
         >
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:42px_42px]" />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(var(--omnix-rgba-255-255-255-0-025)_1px,transparent_1px),linear-gradient(90deg,var(--omnix-rgba-255-255-255-0-025)_1px,transparent_1px)] bg-[size:42px_42px]" />
           <svg className="pointer-events-none absolute inset-0 hidden h-full w-full lg:block" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
             <defs>
               <marker id="omnix-graph-arrow" markerHeight="5" markerWidth="5" orient="auto" refX="4.2" refY="2.5">
-                <path d="M0,0 L5,2.5 L0,5 Z" fill="rgba(0,255,255,0.72)" />
+                <path d="M0,0 L5,2.5 L0,5 Z" fill="var(--omnix-rgba-0-255-255-0-72)" />
               </marker>
               <linearGradient id="omnix-graph-line" x1="0" x2="1" y1="0" y2="0">
-                <stop offset="0%" stopColor="rgba(0,232,122,0.55)" />
-                <stop offset="52%" stopColor="rgba(0,255,255,0.72)" />
-                <stop offset="100%" stopColor="rgba(155,92,255,0.58)" />
+                <stop offset="0%" stopColor="var(--omnix-rgba-0-232-122-0-55)" />
+                <stop offset="52%" stopColor="var(--omnix-rgba-0-255-255-0-72)" />
+                <stop offset="100%" stopColor="var(--omnix-rgba-155-92-255-0-58)" />
               </linearGradient>
             </defs>
             <path d="M29 50 C36 50 38 50 43 50" fill="none" markerEnd="url(#omnix-graph-arrow)" stroke="url(#omnix-graph-line)" strokeWidth="0.62" />
             <path d="M57 50 C64 50 66 50 72 50" fill="none" markerEnd="url(#omnix-graph-arrow)" stroke="url(#omnix-graph-line)" strokeWidth="0.62" />
-            <path d="M50 27 C50 34 50 37 50 41" fill="none" markerEnd="url(#omnix-graph-arrow)" stroke="rgba(155,92,255,0.58)" strokeWidth="0.45" />
-            <path d="M27 77 C34 70 40 63 44 57" fill="none" markerEnd="url(#omnix-graph-arrow)" stroke="rgba(51,102,255,0.54)" strokeWidth="0.45" />
-            <path d="M50 77 C50 69 50 64 50 58" fill="none" markerEnd="url(#omnix-graph-arrow)" stroke="rgba(255,184,0,0.58)" strokeWidth="0.45" />
+            <path d="M50 27 C50 34 50 37 50 41" fill="none" markerEnd="url(#omnix-graph-arrow)" stroke="var(--omnix-rgba-155-92-255-0-58)" strokeWidth="0.45" />
+            <path d="M27 77 C34 70 40 63 44 57" fill="none" markerEnd="url(#omnix-graph-arrow)" stroke="var(--omnix-rgba-51-102-255-0-54)" strokeWidth="0.45" />
+            <path d="M50 77 C50 69 50 64 50 58" fill="none" markerEnd="url(#omnix-graph-arrow)" stroke="var(--omnix-rgba-255-184-0-58)" strokeWidth="0.45" />
           </svg>
 
           <div className="relative z-10 grid gap-3 lg:grid-cols-3 lg:grid-rows-[minmax(6rem,auto)_minmax(9rem,auto)_minmax(6rem,auto)]">
