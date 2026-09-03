@@ -13,6 +13,7 @@ const sidebar = frontendSource("components/layout/Sidebar.tsx");
 const modal = frontendSource("components/ui/Modal.tsx");
 const styles = frontendSource("styles/globals.css");
 const markdown = frontendSource("components/chat/MarkdownRenderer.tsx");
+const header = frontendSource("components/layout/Header.tsx");
 
 test("viewport metadata opts into edge-to-edge safe areas and keyboard resizing", () => {
   expect(rootLayout).toContain('viewportFit: "cover"');
@@ -42,4 +43,11 @@ test("mobile dialogs keep a bounded body and safe-area-aware shell", () => {
 test("generated markdown tables scroll inside their own container", () => {
   expect(markdown).toContain("overflow-x-auto");
   expect(markdown).toContain('<table className="min-w-full');
+});
+
+test("mobile header defers secondary metadata until controls have room", () => {
+  expect(header).not.toContain("min-[390px]:block");
+  expect(header).toContain("hidden min-w-0 items-center gap-1 sm:flex");
+  expect(header).toContain("text-[var(--omnix-rgba-255-255-255-0-35)] sm:block");
+  expect(header).toContain("text-[var(--omnix-rgba-255-255-255-0-22)] sm:block");
 });
