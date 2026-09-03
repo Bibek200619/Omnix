@@ -31,7 +31,7 @@ test("shared announcements are atomic and errors use assertive semantics", () =>
 test("realtime and notification state changes have bounded live owners", () => {
   expect(header).toContain('<LiveRegion message={`Realtime ${realtimeStatusLabel}.`} />');
   expect(header).toContain('<Alert announce={false} variant="warning"');
-  expect(notifications).toContain('Loading notifications…');
+  expect(notifications).toContain('Loading workspace events…');
   expect(notifications).toContain('role="status" aria-live="polite" aria-atomic="true"');
   expect(invites).toContain('title: action === "accept" ? "Invitation accepted" : "Invitation declined"');
   expect(invites).toContain('message={`New workspace invitation from ${inviteSender(invite)} to join ${inviteWorkspaceName(invite)}.`}');
