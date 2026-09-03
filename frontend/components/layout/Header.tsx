@@ -191,15 +191,15 @@ export const Header = memo(function Header({ sidebarCollapsed = false, onMenuCli
                 </Button>
               </Tooltip>
             ) : null}
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 overflow-hidden">
                 {isSubspace && parentWorkspace ? (
-                  <>
+                  <span className="hidden min-w-0 items-center gap-1 sm:flex">
                     <span className="truncate text-xs font-medium text-[var(--omnix-rgba-255-255-255-0-35)]">
                       {parentWorkspace.name}
                     </span>
                     <ChevronRight className="h-3 w-3 shrink-0 text-white/10" />
-                  </>
+                  </span>
                 ) : null}
                 <span className="omnix-display truncate text-sm font-bold tracking-[0.01em] text-[var(--omnix-rgba-255-255-255-0-92)]">
                   {activeWorkspace?.name || active.title}
@@ -213,7 +213,7 @@ export const Header = memo(function Header({ sidebarCollapsed = false, onMenuCli
               {workspaceBreadcrumb.length > 0 ? (
                 <nav
                   aria-label="Workspace breadcrumb"
-                  className="mt-px hidden min-w-0 text-[10px] tracking-[0.03em] text-[var(--omnix-rgba-255-255-255-0-35)] min-[390px]:block"
+                  className="mt-px hidden min-w-0 text-[10px] tracking-[0.03em] text-[var(--omnix-rgba-255-255-255-0-35)] sm:block"
                 >
                   <ol className="flex min-w-0 items-center gap-1 overflow-hidden">
                     {workspaceBreadcrumb.map((workspace) => (
@@ -228,7 +228,7 @@ export const Header = memo(function Header({ sidebarCollapsed = false, onMenuCli
                   </ol>
                 </nav>
               ) : (
-                <p className="mt-px hidden truncate text-[10px] tracking-[0.03em] text-[var(--omnix-rgba-255-255-255-0-22)] min-[390px]:block">
+                <p className="mt-px hidden truncate text-[10px] tracking-[0.03em] text-[var(--omnix-rgba-255-255-255-0-22)] sm:block">
                   {active.subtitle}
                 </p>
               )}
