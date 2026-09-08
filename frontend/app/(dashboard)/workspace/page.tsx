@@ -304,7 +304,7 @@ function WorkspacePageContent() {
           <aside className="omnix-glass-band p-4">
             <div className="relative z-10 mb-3 flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">Organization Tree</p>
+                <p className="text-xs font-semibold text-[var(--omnix-text-3)]">Organization Tree</p>
                 <p className="mt-1 text-xs text-[var(--omnix-text-2)]">Root workspace with inherited collaboration layers.</p>
               </div>
               {loading ? <Loader2 className="h-4 w-4 animate-spin text-[var(--omnix-text-3)]" /> : null}
