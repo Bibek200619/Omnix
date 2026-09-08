@@ -26,6 +26,7 @@ _PARTIAL_INDEXING_ERROR = (
     "Text extraction succeeded, but vector indexing is temporarily unavailable. "
     "The source is only partially searchable and will be retried."
 )
+_PROCESSING_STATE_ERROR = "Unable to save file processing state. Please retry."
 
 
 def _unsearchable_processing_status(diagnostics: ExtractionDiagnostics) -> str:
@@ -88,11 +89,15 @@ async def _update_file_processing_state(
     }
     filters = _file_scope_filters(file_id, user_id, workspace_id)
     try:
-        return await update_one_trusted("files", filters, payload) or {**file_row, **payload}
+        updated = await update_one_trusted("files", filters, payload)
     except Exception:
-        logger.warning("Unable to persist file processing columns; retrying processing state as metadata only.")
-        await update_one_trusted("files", filters, {"metadata": metadata})
-        return {**file_row, "metadata": metadata}
+        # A metadata-only fallback would leave the canonical processing state stale.
+        # Suppress database exception details before the job handler logs the failure.
+        raise RuntimeError(_PROCESSING_STATE_ERROR) from None
+    if not updated:
+        # The scoped file may have disappeared; never fabricate persistence success.
+        raise RuntimeError(_PROCESSING_STATE_ERROR)
+    return updated
 
 
 async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
