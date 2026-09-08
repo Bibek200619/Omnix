@@ -11,11 +11,16 @@ import {
   useState,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "./api";
+import { apiQueryOptions } from "./query";
 import { useAuth } from "./auth-context";
 import { logger } from "./logger";
-import { useWorkspace } from "./workspace-context";
 import { realtimeRegistry } from "./realtime-registry";
+import { useWorkspaceIntelligence } from "./workspace-intelligence-context";
+import { useWorkspaceMembership } from "./workspace-membership-context";
+import { useWorkspaceTree } from "./workspace-tree-context";
+import { visibleRefreshRegistry } from "./visible-refresh-registry";
 import type {
   TypingSignal,
   WorkspaceActivityEvent,
@@ -33,8 +38,9 @@ type CollaborationContextType = {
   realtimeStatus: RealtimeStatus;
   loadingPresence: boolean;
   loadingActivity: boolean;
+  activityError: string | null;
   refreshPresence: () => Promise<WorkspacePresenceSnapshot | null>;
-  refreshActivity: () => Promise<WorkspaceActivityEvent[]>;
+  refreshActivity: () => Promise<WorkspaceActivityEvent[] | null>;
   refreshLiveStatuses: () => Promise<Record<string, WorkspaceLiveStatus>>;
   retryRealtimeConnection: () => Promise<void>;
   leaveWorkspace: (workspaceId?: string | null) => Promise<void>;
@@ -48,6 +54,7 @@ const HEARTBEAT_INTERVAL_MS = 60_000; // Calmer heartbeat
 const STATUS_INTERVAL_MS = 90_000;    // Less frequent status polling
 const TYPING_THROTTLE_MS = 3_000;
 const TYPING_TIMEOUT_MS = 8_000;
+const EMPTY_ACTIVITY: WorkspaceActivityEvent[] = [];
 
 function currentViewFromPath(pathname: string | null) {
   if (!pathname) return "workspace";
@@ -76,27 +83,36 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
   const pathname = usePathname();
   const router = useRouter();
   const { session } = useAuth();
-  const {
-    activeWorkspace,
-    activeWorkspaceId,
-    refreshActiveWorkspaceData,
-    refreshWorkspaceIntelligence,
-    refreshWorkspaces,
-    setActiveWorkspace,
-  } = useWorkspace();
+  const { activeWorkspace, activeWorkspaceId, refreshWorkspaces, setActiveWorkspace } =
+    useWorkspaceTree();
+  const { refreshActiveWorkspaceData } = useWorkspaceMembership();
+  const { refreshWorkspaceIntelligence } = useWorkspaceIntelligence();
   const [presence, setPresence] = useState<WorkspacePresenceSnapshot | null>(null);
-  const [activity, setActivity] = useState<WorkspaceActivityEvent[]>([]);
   const [liveStatuses, setLiveStatuses] = useState<Record<string, WorkspaceLiveStatus>>({});
   const [typingUsers, setTypingUsers] = useState<Record<string, TypingSignal>>({});
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
   const [loadingPresence] = useState(false);
-  const [loadingActivity, setLoadingActivity] = useState(false);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   
   const typingSentAtRef = useRef(0);
   const lastPresenceWorkspaceIdRef = useRef<string | null>(null);
   const activeWorkspaceIdRef = useRef<string | null>(activeWorkspaceId);
   const userId = session?.user.id ?? null;
+  const activityEnabled = Boolean(userId && activeWorkspaceId);
+  const activityQuery = useQuery({
+    ...apiQueryOptions<WorkspaceActivityEvent[]>(
+      `/workspaces/${activeWorkspaceId}/activity?limit=12`,
+      { key: ["workspace-activity", userId, activeWorkspaceId] },
+    ),
+    enabled: activityEnabled,
+    gcTime: 0,
+  });
+  const activity = activityEnabled ? activityQuery.data ?? EMPTY_ACTIVITY : EMPTY_ACTIVITY;
+  const loadingActivity = activityEnabled && activityQuery.isFetching;
+  const activityError = activityEnabled && activityQuery.error
+    ? "Unable to load workspace activity. Check your connection and retry."
+    : null;
+  const { refetch: refetchActivity } = activityQuery;
   const userEmail = session?.user.email ?? null;
   const userFullName =
     typeof session?.user.user_metadata?.full_name === "string"
@@ -150,26 +166,10 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
   }, [activeWorkspace?.name, activeWorkspaceId, pathname, userId]);
 
   const refreshActivity = useCallback(async () => {
-    if (!userId || !activeWorkspaceId) {
-      setActivity([]);
-      return [];
-    }
-
-    setLoadingActivity(true);
-    try {
-      const rows = await apiClient.get<WorkspaceActivityEvent[]>(
-        `/workspaces/${activeWorkspaceId}/activity?limit=12`,
-      );
-      setActivity(rows);
-      return rows;
-    } catch (err) {
-      console.warn("Unable to refresh workspace activity", err);
-      setActivity([]);
-      return [];
-    } finally {
-      setLoadingActivity(false);
-    }
-  }, [activeWorkspaceId, userId]);
+    if (!activityEnabled) return null;
+    const result = await refetchActivity({ cancelRefetch: false });
+    return result.error ? null : result.data ?? null;
+  }, [activityEnabled, refetchActivity]);
 
   const refreshLiveStatuses = useCallback(async () => {
     if (!userId) {
@@ -218,7 +218,6 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
      if (workspaceId === currentWorkspaceId) {
         if (type === "membership_removed" || type === "workspace_deleted") {
            setPresence(null);
-           setActivity([]);
            setTypingUsers({});
            setActiveWorkspace(null);
            router.replace("/dashboard");
@@ -229,7 +228,6 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
      } else if (activeInheritsRevokedWorkspace) {
        if (type === "membership_removed" || type === "workspace_deleted") {
          setPresence(null);
-         setActivity([]);
          setTypingUsers({});
          setActiveWorkspace(null);
          router.replace("/dashboard");
@@ -422,9 +420,8 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
 
   useEffect(() => {
     void heartbeatPresence();
-    void refreshActivity();
     void refreshLiveStatuses();
-  }, [refreshActivity, refreshLiveStatuses, heartbeatPresence]);
+  }, [refreshLiveStatuses, heartbeatPresence]);
 
   useEffect(() => {
     return () => {
@@ -438,35 +435,27 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
   useEffect(() => {
     if (!userId) return;
 
-    const heartbeatId = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
+    const unsubscribeHeartbeat = visibleRefreshRegistry.subscribe({
+      key: "collaboration-heartbeat",
+      intervalMs: HEARTBEAT_INTERVAL_MS,
+      callback: (reason) => {
         void heartbeatPresence();
-      }
-    }, HEARTBEAT_INTERVAL_MS);
-    
-    const statusId = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void refreshLiveStatuses();
-      }
-    }, STATUS_INTERVAL_MS);
-
-    const refreshVisibleWorkspaceState = () => {
-      if (document.visibilityState !== "visible") {
-        return;
-      }
-      void heartbeatPresence();
-      void refreshActivity();
-      void refreshLiveStatuses();
-    };
-
-    window.addEventListener("focus", refreshVisibleWorkspaceState);
-    document.addEventListener("visibilitychange", refreshVisibleWorkspaceState);
+        if (reason !== "interval") {
+          void refreshActivity();
+          void refreshLiveStatuses();
+        }
+      },
+    });
+    const unsubscribeStatuses = visibleRefreshRegistry.subscribe({
+      key: "collaboration-status",
+      intervalMs: STATUS_INTERVAL_MS,
+      callback: () => void refreshLiveStatuses(),
+      reactivate: false,
+    });
 
     return () => {
-      window.clearInterval(heartbeatId);
-      window.clearInterval(statusId);
-      window.removeEventListener("focus", refreshVisibleWorkspaceState);
-      document.removeEventListener("visibilitychange", refreshVisibleWorkspaceState);
+      unsubscribeHeartbeat();
+      unsubscribeStatuses();
     };
   }, [refreshActivity, refreshLiveStatuses, heartbeatPresence, userId]);
 
@@ -507,6 +496,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       realtimeStatus,
       loadingPresence,
       loadingActivity,
+      activityError,
       refreshPresence: heartbeatPresence,
       refreshActivity,
       refreshLiveStatuses,
@@ -518,6 +508,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     }),
     [
       activity,
+      activityError,
       liveStatuses,
       typingUsers,
       realtimeStatus,

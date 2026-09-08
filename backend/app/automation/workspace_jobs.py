@@ -32,7 +32,15 @@ async def run_automation_job(automation: dict[str, Any]) -> dict[str, Any]:
             "title": f"Automation: {automation.get('name') or job_type}",
             "type": "automation_insight",
             "content": combined,
-            "metadata": {"automation_id": automation.get("id"), "job_type": job_type},
+            "metadata": {
+                "automation_id": automation.get("id"),
+                "job_type": job_type,
+                "citations": {"summary": summary.get("citations", []), "topics": topics.get("citations", [])},
+                "citation_validation": {
+                    "summary": summary.get("citation_validation"),
+                    "topics": topics.get("citation_validation"),
+                },
+            },
         }
         try:
             art = await insert_one_trusted("artifacts", payload)

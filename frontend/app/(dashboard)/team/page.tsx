@@ -25,14 +25,15 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
+import { Modal } from "@/components/ui/Modal";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
-import { Portal } from "@/components/ui/Portal";
 import { PageTitle } from "@/components/ui/Typography";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModal";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceMembership } from "@/lib/workspace-membership-context";
+import { useWorkspaceTree } from "@/lib/workspace-tree-context";
 import { cn } from "@/lib/utils";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { WorkspaceMember, WorkspaceRole } from "@/lib/workspace-types";
@@ -223,18 +224,17 @@ export default function TeamPage() {
 }
 
 function TeamPageContent() {
+  const { activeWorkspace, refreshWorkspaces } = useWorkspaceTree();
   const {
-    activeWorkspace,
     activeMembers,
     activeInvites,
     membersError,
     membersLoading,
     refreshActiveWorkspaceData,
-    refreshWorkspaces,
     inviteToActiveWorkspace,
     removeWorkspaceMember,
     updateWorkspaceMemberRole,
-  } = useWorkspace();
+  } = useWorkspaceMembership();
   const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
@@ -640,11 +640,44 @@ function TeamPageContent() {
         onSubmit={handleInvite}
       />
 
-      {roleMember ? (
-        <Portal>
-          <div className="omnix-modal-backdrop fixed inset-0 z-[120] flex items-end justify-center px-3 py-3 sm:items-center sm:px-4">
-            <div className="omnix-modal-card max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto p-5 sm:p-6">
-              <div className="relative z-10 flex items-start gap-3">
+      <Modal
+        isOpen={Boolean(roleMember)}
+        onClose={() => {
+          setRoleMember(null);
+          setSelectedRole(null);
+        }}
+        title="Update member role"
+        description={roleMember ? `Choose a workspace role for ${memberName(roleMember)}.` : undefined}
+        closeDisabled={Boolean(busyAction)}
+        className="max-w-lg"
+        footer={roleMember ? (
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={Boolean(busyAction)}
+              onClick={() => {
+                setRoleMember(null);
+                setSelectedRole(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="omnix-primary-action"
+              disabled={!selectedRole || selectedRole === roleMember.role}
+              isLoading={busyAction === `role:${roleMember.user_id}`}
+              onClick={handleUpdateRole}
+            >
+              Update Role
+            </Button>
+          </>
+        ) : undefined}
+      >
+        {roleMember ? (
+          <>
+            <Modal.Header className="gap-3">
                 <ProfileAvatar
                   name={memberName(roleMember)}
                   email={roleMember.email}
@@ -656,9 +689,9 @@ function TeamPageContent() {
                   <h3 className="text-base font-semibold text-white">Update Role</h3>
                   <p className="mt-1 truncate text-sm text-[var(--omnix-text-2)]">{memberName(roleMember)}</p>
                 </div>
-              </div>
+            </Modal.Header>
 
-              <div className="relative z-10 mt-5 space-y-2">
+            <Modal.Body className="space-y-2">
                 {roleOptions.map((option) => {
                   const Icon = option.icon;
                   const active = selectedRole === option.value;
@@ -684,41 +717,46 @@ function TeamPageContent() {
                     </button>
                   );
                 })}
-              </div>
+            </Modal.Body>
+          </>
+        ) : null}
+      </Modal>
 
-              <div className="relative z-10 mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={Boolean(busyAction)}
-                  onClick={() => {
-                    setRoleMember(null);
-                    setSelectedRole(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  className="omnix-primary-action"
-                  disabled={!selectedRole || selectedRole === roleMember.role}
-                  isLoading={busyAction === `role:${roleMember.user_id}`}
-                  onClick={handleUpdateRole}
-                >
-                  Update Role
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      ) : null}
-
-      {removeMember ? (
-        <Portal>
-          <div className="omnix-modal-backdrop fixed inset-0 z-[120] flex items-end justify-center px-3 py-3 sm:items-center sm:px-4">
-            <div className="omnix-modal-card max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto p-5 sm:p-6">
-              <div className="relative z-10">
+      <Modal
+        isOpen={Boolean(removeMember)}
+        onClose={() => setRemoveMember(null)}
+        title="Remove workspace member"
+        description={removeMember ? `Remove ${memberName(removeMember)} and revoke their workspace access.` : undefined}
+        role="alertdialog"
+        closeDisabled={Boolean(busyAction)}
+        className="max-w-md"
+        footer={removeMember ? (
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={Boolean(busyAction)}
+              onClick={() => setRemoveMember(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              isLoading={busyAction === `remove:${removeMember.user_id}`}
+              onClick={handleRemoveMember}
+            >
+              Remove
+            </Button>
+          </>
+        ) : undefined}
+      >
+        {removeMember ? (
+          <>
+            <Modal.Header>
                 <h3 className="text-base font-semibold text-white">Remove Member</h3>
+            </Modal.Header>
+            <Modal.Body>
                 <p className="mt-3 text-sm leading-6 text-[var(--omnix-text-2)]">
                   Remove this member from the workspace?
                 </p>
@@ -733,30 +771,10 @@ function TeamPageContent() {
                     </li>
                   ))}
                 </ul>
-              </div>
-
-              <div className="relative z-10 mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={Boolean(busyAction)}
-                  onClick={() => setRemoveMember(null)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="danger"
-                  isLoading={busyAction === `remove:${removeMember.user_id}`}
-                  onClick={handleRemoveMember}
-                >
-                  Remove
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      ) : null}
+            </Modal.Body>
+          </>
+        ) : null}
+      </Modal>
     </section>
   );
 }

@@ -9,6 +9,8 @@ import { apiClient } from "@/lib/api";
 import { useConversationHistory } from "@/lib/conversation-history-context";
 import type { ApiMessage } from "@/components/chat/types";
 import { logClientError } from "@/lib/errors";
+import { useToast } from "@/lib/toast-context";
+import { showUndoToast } from "@/lib/undo-toast";
 import { cn } from "@/lib/utils";
 
 type BusyAction = "rename" | "clear" | "delete" | "export" | null;
@@ -21,12 +23,14 @@ export function ActionsMenu({ className }: { className?: string }) {
   const menuContentRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
   const params = useSearchParams();
+  const { showToast } = useToast();
   const {
     activeConversationId,
     archiveConversation,
     conversations,
     refreshConversations,
     renameConversation,
+    restoreConversation,
   } = useConversationHistory();
   const conversationId = params.get("conversation") || activeConversationId;
   const activeConversation = conversations.find((item) => item.id === conversationId);
@@ -108,8 +112,18 @@ export function ActionsMenu({ className }: { className?: string }) {
     if (!confirmed) return;
 
     await runAction("delete", async () => {
-      await archiveConversation(conversationId);
+      const archived = await archiveConversation(conversationId);
       router.push("/chat");
+      if (archived) {
+        showUndoToast(showToast, {
+          title: "Conversation deleted",
+          message: archived.title || "Omnix conversation",
+          onUndo: async () => {
+            await restoreConversation(archived);
+            await refreshConversations({ force: true, silent: true });
+          },
+        });
+      }
     });
   }
 

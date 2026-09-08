@@ -9,6 +9,7 @@ import type {
   WorkspaceRole,
   WorkspaceSubspaceCreatePayload,
 } from "./workspace-types";
+import type { WorkspaceSelectionGuard } from "./workspace-active-selection";
 
 export type RefreshOptions = {
   force?: boolean;
@@ -24,6 +25,7 @@ export type WorkspaceTreeContextValue = {
   activeRootWorkspace: Workspace | null;
   subspaceLoadingByParentId: Record<string, boolean>;
   subspaceErrorByParentId: Record<string, string | null>;
+  captureActiveWorkspaceSelection: () => WorkspaceSelectionGuard;
   setActiveWorkspace: (id: string | null) => void;
   refreshWorkspaces: (options?: RefreshOptions) => Promise<void>;
   refreshWorkspaceTree: (workspaceId: string, options?: RefreshOptions) => Promise<Workspace | null>;
@@ -60,8 +62,3 @@ export type WorkspaceIntelligenceContextValue = {
   refreshWorkspaceIntelligence: (options?: RefreshOptions) => Promise<WorkspaceIntelligenceProfile | null>;
   updateWorkspaceIntelligence: (payload: WorkspaceIntelligenceUpdatePayload) => Promise<WorkspaceIntelligenceProfile>;
 };
-
-export type WorkspaceContextType =
-  WorkspaceTreeContextValue &
-  WorkspaceMembershipContextValue &
-  WorkspaceIntelligenceContextValue;

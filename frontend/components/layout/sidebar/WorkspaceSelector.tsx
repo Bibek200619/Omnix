@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
@@ -9,7 +8,8 @@ import { WorkspaceInviteModal } from "@/components/workspace/WorkspaceInviteModa
 import { logClientError } from "@/lib/errors";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { useWorkspaceCollaboration } from "@/lib/workspace-collaboration-context";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceMembership } from "@/lib/workspace-membership-context";
+import { useWorkspaceTree } from "@/lib/workspace-tree-context";
 import { cn } from "@/lib/utils";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { Workspace, WorkspaceRole } from "@/lib/workspace-types";
@@ -27,16 +27,17 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
     loading,
     error: workspaceError,
     activeWorkspace,
+    activeWorkspaceId,
     activeRootWorkspace,
-    pendingInvites,
+    captureActiveWorkspaceSelection,
     setActiveWorkspace,
     refreshWorkspaces,
     createWorkspace,
     createSubspace,
     renameWorkspace,
     deleteWorkspace,
-    inviteToActiveWorkspace,
-  } = useWorkspace();
+  } = useWorkspaceTree();
+  const { pendingInvites, inviteToActiveWorkspace } = useWorkspaceMembership();
   const { presence, statusForWorkspace, realtimeStatus } = useWorkspaceCollaboration();
   const [open, setOpen] = useState(false);
   const selectorRef = useRef<HTMLDivElement | null>(null);
@@ -106,6 +107,23 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
     });
   }, [activeRootWorkspace?.id, activeRootWorkspace?.workspace_type]);
 
+  useEffect(() => {
+    setCreatingWorkspace(false);
+    setCreatingSubspace(false);
+    setInviting(false);
+    setRenaming(false);
+    setDeleting(false);
+    setCreateError(null);
+    setCreateSubspaceError(null);
+    setInviteError(null);
+    setRenameError(null);
+    setDeleteError(null);
+    setShowCreateSubspaceModal(false);
+    setInviteOpen(false);
+    setRenameOpen(false);
+    setDeleteOpen(false);
+  }, [activeWorkspaceId]);
+
   function finishWorkspaceAction() {
     setOpen(false);
     onWorkspaceSelect?.();
@@ -127,85 +145,100 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
 
   async function handleCreateWorkspace() {
     if (!newWorkspaceName.trim() || creatingWorkspace) return;
+    const owner = captureActiveWorkspaceSelection();
     try {
       setCreatingWorkspace(true);
       setCreateError(null);
       const created = await createWorkspace({ name: newWorkspaceName.trim(), workspace_type: "super_workspace" });
+      if (!owner.isCurrent()) return;
       setActiveWorkspace(created.id);
       setNewWorkspaceName("");
       setShowCreateForm(false);
       finishWorkspaceAction();
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to create workspace", err, { endpoint: "/workspaces" });
       setCreateError("Unable to create workspace. Check your connection and try again.");
     } finally {
-      setCreatingWorkspace(false);
+      if (owner.isCurrent()) setCreatingWorkspace(false);
     }
   }
 
   async function handleCreateSubspace() {
     if (!activeSuperWorkspace || !newSubspaceName.trim() || creatingSubspace) return;
+    const owner = captureActiveWorkspaceSelection();
     try {
       setCreatingSubspace(true);
       setCreateSubspaceError(null);
       const created = await createSubspace(activeSuperWorkspace.id, { name: newSubspaceName.trim() });
+      if (!owner.isCurrent()) return;
       setExpandedWorkspaceIds((current) => new Set(current).add(activeSuperWorkspace.id));
       setActiveWorkspace(created.id);
       setNewSubspaceName("");
       setShowCreateSubspaceModal(false);
       finishWorkspaceAction();
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to create subspace", err);
       setCreateSubspaceError("Unable to create subspace. Check your connection and try again.");
     } finally {
-      setCreatingSubspace(false);
+      if (owner.isCurrent()) setCreatingSubspace(false);
     }
   }
 
   async function handleInvite(target: string, role: WorkspaceRole) {
+    const owner = captureActiveWorkspaceSelection();
     try {
       setInviting(true);
       setInviteError(null);
       await inviteToActiveWorkspace(target, role);
+      if (!owner.isCurrent()) return;
       setInviteOpen(false);
       finishWorkspaceAction();
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to invite teammate", err);
       setInviteError("Unable to invite teammate. Check the email address and try again.");
     } finally {
-      setInviting(false);
+      if (owner.isCurrent()) setInviting(false);
     }
   }
 
   async function handleRenameWorkspace() {
     if (!active || !renameDraft.trim() || renaming) return;
+    const owner = captureActiveWorkspaceSelection();
     try {
       setRenaming(true);
       setRenameError(null);
       await renameWorkspace(active.id, { name: renameDraft.trim() });
+      if (!owner.isCurrent()) return;
       setRenameOpen(false);
       finishWorkspaceAction();
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to rename workspace", err, { endpoint: `/workspaces/${active.id}` });
       setRenameError("Unable to rename workspace. Your session may have expired; refresh and try again.");
     } finally {
-      setRenaming(false);
+      if (owner.isCurrent()) setRenaming(false);
     }
   }
 
   async function handleDeleteWorkspace() {
     if (!active || deleting || deleteConfirmText !== active.name) return;
+    const owner = captureActiveWorkspaceSelection();
     try {
       setDeleting(true);
       setDeleteError(null);
       await deleteWorkspace(active.id);
+      if (!owner.isCurrent()) return;
       setDeleteOpen(false);
       finishWorkspaceAction();
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to delete workspace", err, { endpoint: `/workspaces/${active.id}` });
       setDeleteError("Unable to delete workspace. Your session may have expired; refresh and try again.");
     } finally {
-      setDeleting(false);
+      if (owner.isCurrent()) setDeleting(false);
     }
   }
 
@@ -260,39 +293,37 @@ export function WorkspaceSelector({ onWorkspaceSelect }: WorkspaceSelectorProps)
         </div>
       </button>
 
-      <AnimatePresence>
-        {open ? (
-          <FloatingMenuLayer anchorRef={selectorRef} contentRef={selectorMenuRef} placement="bottom-start" width="anchor" minWidth={248} offset={6} zIndex={145}>
-            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: "easeOut" }} className="omnix-floating-card w-full overflow-hidden">
-              <div className="omnix-scrollbar overflow-y-auto py-1" style={{ maxHeight: "min(22rem, var(--omnix-floating-max-h))" }}>
-                <WorkspaceListState
-                  loading={loading}
-                  error={workspaceError}
-                  workspaces={workspaces}
-                  expandedWorkspaceIds={expandedWorkspaceIds}
-                  onRetry={() => void refreshWorkspaces({ force: true })}
-                  onToggleExpanded={toggleExpanded}
-                  onSelectWorkspace={selectWorkspace}
-                />
-              </div>
-              <WorkspaceManagementActions
-                canManageActive={canManageActive} canCreateSubspace={canCreateSubspace}
-                showManageActions={showManageActions} showCreateForm={showCreateForm}
-                createError={createError} creatingWorkspace={creatingWorkspace} newWorkspaceName={newWorkspaceName}
-                onNewWorkspaceNameChange={(value) => { setNewWorkspaceName(value); setCreateError(null); }}
-                onCreateWorkspace={handleCreateWorkspace}
-                onCancelCreate={() => { setShowCreateForm(false); setNewWorkspaceName(""); setCreateError(null); }}
-                onOpenCreate={() => setShowCreateForm(true)}
-                onOpenSubspace={() => { setCreateSubspaceError(null); setShowCreateSubspaceModal(true); }}
-                onOpenRename={() => { if (!active) return; setRenameDraft(active.name); setRenameError(null); setRenameOpen(true); }}
-                onOpenDelete={() => { setDeleteConfirmText(""); setDeleteError(null); setDeleteOpen(true); }}
-                onOpenInvite={() => { setInviteError(null); setInviteOpen(true); }}
-                onShowManageActionsChange={setShowManageActions}
+      {open ? (
+        <FloatingMenuLayer anchorRef={selectorRef} contentRef={selectorMenuRef} placement="bottom-start" width="anchor" minWidth={248} offset={6} zIndex={145}>
+          <div className="omnix-floating-card omnix-shell-popover-enter w-full overflow-hidden">
+            <div className="omnix-scrollbar overflow-y-auto py-1" style={{ maxHeight: "min(22rem, var(--omnix-floating-max-h))" }}>
+              <WorkspaceListState
+                loading={loading}
+                error={workspaceError}
+                workspaces={workspaces}
+                expandedWorkspaceIds={expandedWorkspaceIds}
+                onRetry={() => void refreshWorkspaces({ force: true })}
+                onToggleExpanded={toggleExpanded}
+                onSelectWorkspace={selectWorkspace}
               />
-            </motion.div>
-          </FloatingMenuLayer>
-        ) : null}
-      </AnimatePresence>
+            </div>
+            <WorkspaceManagementActions
+              canManageActive={canManageActive} canCreateSubspace={canCreateSubspace}
+              showManageActions={showManageActions} showCreateForm={showCreateForm}
+              createError={createError} creatingWorkspace={creatingWorkspace} newWorkspaceName={newWorkspaceName}
+              onNewWorkspaceNameChange={(value) => { setNewWorkspaceName(value); setCreateError(null); }}
+              onCreateWorkspace={handleCreateWorkspace}
+              onCancelCreate={() => { setShowCreateForm(false); setNewWorkspaceName(""); setCreateError(null); }}
+              onOpenCreate={() => setShowCreateForm(true)}
+              onOpenSubspace={() => { setCreateSubspaceError(null); setShowCreateSubspaceModal(true); }}
+              onOpenRename={() => { if (!active) return; setRenameDraft(active.name); setRenameError(null); setRenameOpen(true); }}
+              onOpenDelete={() => { setDeleteConfirmText(""); setDeleteError(null); setDeleteOpen(true); }}
+              onOpenInvite={() => { setInviteError(null); setInviteOpen(true); }}
+              onShowManageActionsChange={setShowManageActions}
+            />
+          </div>
+        </FloatingMenuLayer>
+      ) : null}
 
       {active ? (
         <>

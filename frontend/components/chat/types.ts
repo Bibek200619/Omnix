@@ -1,5 +1,19 @@
 import type { WorkspaceRole } from "@/lib/workspace-types";
 
+export type RetrievalState = {
+  outcome: "not_requested" | "sources_found" | "no_relevant_sources" | "partial" | "failed" | "source_unavailable";
+  source_count: number;
+  failed_channels?: string[];
+  reason?: string;
+};
+
+export type CitationValidation = {
+  status: "pending" | "supported" | "incomplete" | "unsupported" | "not_applicable";
+  source_count: number;
+  cited_source_count: number;
+  invalid_citation_count: number;
+};
+
 export type Message = {
   id: string;
   role: "user" | "assistant";
@@ -23,6 +37,8 @@ export type Message = {
   sourceMode?: SearchMode;
   webSearchUsed?: boolean;
   citations?: string[];
+  citationValidation?: CitationValidation;
+  retrieval?: RetrievalState;
   // optional sources attached to assistant responses
   sources?: Array<{
     id?: string;
@@ -62,7 +78,7 @@ export type MessageAttachment = {
   text_page_count?: number | null;
   extraction_status?: "processing" | "searchable" | "ocr_required" | "extraction_failed" | null;
   extraction_failure_reason?: string | null;
-  processing_status?: "uploaded" | "queued" | "processing" | "extracted" | "chunked" | "embedded" | "failed" | null;
+  processing_status?: "uploaded" | "queued" | "extracting" | "chunking" | "embedding" | "ocr_required" | "ocr_running" | "searchable" | "partially_searchable" | "failed" | "processing" | "extracted" | "chunked" | "embedded" | null;
   processing_error?: string | null;
   processing_job_id?: string | null;
   ocr_used?: boolean | null;
@@ -103,6 +119,7 @@ export type ChatApiResponse = {
   assistant_message_id: string;
   response: string;
   sources?: Array<Record<string, unknown>>;
+  retrieval?: RetrievalState;
   conversation?: ConversationSummary | null;
   user_message?: ApiMessage | null;
   assistant_message?: ApiMessage | null;

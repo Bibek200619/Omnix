@@ -7,9 +7,7 @@ import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
-  BadgeCheck,
   Database,
-  Download,
   ExternalLink,
   FileText,
   FileUp,
@@ -19,17 +17,16 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Trash2,
   Unplug,
-  X,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { ConnectorSetupModal } from "@/components/files/ConnectorSetupModal";
+import { DocumentDecisionSuggestionsModal } from "@/components/files/DocumentDecisionSuggestionsModal";
+import { FileSourceCard } from "@/components/files/FileSourceCard";
+import { loadFilesWithSearchTarget, useFileSearchFocus, fileSearchFocusId } from "@/components/files/useFileSearchFocus";
 import { SourceHealthConsole } from "@/components/files/SourceHealthConsole";
 import { CreateDecisionModal } from "@/components/decisions/CreateDecisionModal";
-import { DocumentPortal } from "@/components/files/DocumentPortal";
-import { DecisionCandidatePanel } from "@/components/decisions/DecisionCandidatePanel";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -39,18 +36,18 @@ import { WorkspaceMemberStack } from "@/components/workspace/WorkspaceMemberStac
 import { workspaceRoleLabel } from "@/lib/workspace-roles";
 import { cn } from "@/lib/utils";
 import type { MessageAttachment } from "@/components/chat/types";
-import type { DecisionCandidate, DecisionCandidateList, WorkspaceDecisionStatus } from "@/lib/workspace-types";
+import type {
+  DecisionCandidate,
+  DecisionCandidateList,
+  DecisionCandidateSourceCoverage,
+  WorkspaceDecisionStatus,
+} from "@/lib/workspace-types";
 import {
   connectorAccent,
   connectorIcon,
   connectorSummary,
   emptyForm,
-  fileIngestionStatus,
-  fileStatusDetail,
-  fileStatusLabel,
-  fileStatusStyle,
   formatDate,
-  formatFileSize,
   formFromConnector,
   newestConnector,
   sourceTypes,
@@ -66,6 +63,11 @@ import {
 } from "@/components/files/filesPageModel";
 
 const UploadDropzone = dynamic(() => import("@/components/upload/UploadDropzone").then((m) => m.UploadDropzone), { ssr: false });
+
+function mergeDecisionCandidates(current: DecisionCandidate[], incoming: DecisionCandidate[]) {
+  const knownIds = new Set(current.map((candidate) => candidate.id));
+  return [...current, ...incoming.filter((candidate) => !knownIds.has(candidate.id))];
+}
 
 export default function FilesPage() {
   return (
@@ -97,12 +99,15 @@ function FilesPageContent() {
   const [authConnectorId, setAuthConnectorId] = useState<string | null>(null);
   const [candidateFile, setCandidateFile] = useState<FileData | null>(null);
   const [decisionCandidates, setDecisionCandidates] = useState<DecisionCandidate[]>([]);
+  const [decisionCandidateCoverage, setDecisionCandidateCoverage] = useState<DecisionCandidateSourceCoverage | null>(null);
   const [decisionCandidatesLoading, setDecisionCandidatesLoading] = useState(false);
   const [decisionCandidatesError, setDecisionCandidatesError] = useState<string | null>(null);
-  const [decisionCandidateDraft, setDecisionCandidateDraft] = useState<{ title: string; reason: string; description: string; status: WorkspaceDecisionStatus; source_type: DecisionCandidate["source_type"]; source_id: string } | null>(null);
+  const nextDecisionSourceOffset = decisionCandidateCoverage?.next_source_offset;
+  const [decisionCandidateDraft, setDecisionCandidateDraft] = useState<{ title: string; reason: string; description: string; status: WorkspaceDecisionStatus; source_type: DecisionCandidate["source_type"]; source_id: string; candidate_id: string; source_evidence: DecisionCandidate["supporting_evidence"] } | null>(null);
   const fileResultsRef = useRef<HTMLDivElement | null>(null);
   const [gridColumnCount, setGridColumnCount] = useState(1);
   const workspaceMembers = activeMembers.length > 0 ? activeMembers : activeWorkspace?.members_preview ?? [];
+  const { focusedFileId, focusedSourceId } = useFileSearchFocus({ files, connectors, activeSection, searchQuery, setActiveSection, setActiveType, setSearchQuery });
 
   const filteredFiles = useMemo(() => files.filter((file) => {
     const name = file.file_name ?? file.filename ?? "";
@@ -160,7 +165,7 @@ function FilesPageContent() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiClient.get<FileData[]>("/files");
+      const data = await loadFilesWithSearchTarget(focusedFileId);
       setFiles(data);
     } catch (err) {
       logClientError("Failed to load files", err, { endpoint: "/files" });
@@ -168,7 +173,7 @@ function FilesPageContent() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [focusedFileId]);
 
   const loadConnectors = useCallback(async () => {
     if (!activeWorkspaceId) {
@@ -247,21 +252,25 @@ function FilesPageContent() {
     }
   }
 
-  async function scanDocumentDecisionCandidates(file: FileData) {
+  async function scanDocumentDecisionCandidates(file: FileData, sourceOffset = 0, append = false) {
     if (!activeWorkspaceId) {
       setError("Select a workspace before scanning document decisions.");
       return;
     }
     setCandidateFile(file);
-    setDecisionCandidates([]);
+    if (!append) {
+      setDecisionCandidates([]);
+      setDecisionCandidateCoverage(null);
+    }
     setDecisionCandidatesLoading(true);
     setDecisionCandidatesError(null);
     try {
       const result = await apiClient.post<DecisionCandidateList>(
-        `/workspaces/${activeWorkspaceId}/decisions/candidates/document/${file.id}`,
+        `/workspaces/${activeWorkspaceId}/decisions/candidates/document/${file.id}?source_offset=${sourceOffset}`,
         {},
       );
-      setDecisionCandidates(result.candidates);
+      setDecisionCandidates((current) => (append ? mergeDecisionCandidates(current, result.candidates) : result.candidates));
+      setDecisionCandidateCoverage(result.source_coverage);
     } catch (err) {
       logClientError("Failed to extract document decision candidates", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/document/${file.id}` });
       setDecisionCandidatesError("Unable to scan this document for decision candidates. Please try again in a moment.");
@@ -270,24 +279,18 @@ function FilesPageContent() {
     }
   }
 
-  async function openCandidateDecision(candidate: DecisionCandidate) {
+  function openCandidateDecision(candidate: DecisionCandidate) {
     if (!activeWorkspaceId) return;
     setDecisionCandidateDraft({
       title: candidate.title,
       reason: candidate.reason,
-      description: `Supporting evidence:\n${candidate.supporting_evidence.join("\n")}`,
-      status: "proposed", source_type: candidate.source_type, source_id: candidate.source_id,
+      description: `Supporting evidence:\n${candidate.supporting_evidence.map((evidence) => evidence.quote).join("\n")}`,
+      status: "proposed",
+      source_type: candidate.source_type,
+      source_id: candidate.source_id,
+      candidate_id: candidate.id,
+      source_evidence: candidate.supporting_evidence,
     });
-    try {
-      await apiClient.post(`/workspaces/${activeWorkspaceId}/decisions/candidates/metrics`, {
-        action: "accept",
-        candidate_id: candidate.id,
-        source_type: candidate.source_type,
-        source_id: candidate.source_id,
-      });
-    } catch (err) {
-      logClientError("Failed to log document decision candidate acceptance", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions/candidates/metrics` });
-    }
   }
 
   async function dismissDecisionCandidate(candidate: DecisionCandidate) {
@@ -451,30 +454,15 @@ function FilesPageContent() {
   }
 
   function renderFileCard(f: FileData) {
-    const ingestionStatus = fileIngestionStatus(f);
     return (
-      <div key={f.id} className={view === "grid" ? "omnix-source-card flex min-h-[174px] flex-col justify-between gap-3 p-[18px]" : "omnix-source-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"}>
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_0_14px_var(--omnix-rgba-0-255-255-0-12)]">
-            <FileText className="h-[19px] w-[19px]" />
-          </span>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="omnix-display max-w-full truncate text-[13px] font-bold text-white">{f.file_name ?? f.filename}</p>
-              <span className={cn("rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-wider", fileStatusStyle[ingestionStatus])}>
-                {fileStatusLabel[ingestionStatus]}
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-white/35">{f.file_type ?? f.content_type ?? "Document"} - {formatFileSize(f.size_bytes)}</p>
-            <p className="mt-2 max-w-3xl text-[11px] leading-5 text-white/50">{fileStatusDetail(f)}</p>
-          </div>
-        </div>
-        <div className={view === "grid" ? "grid grid-cols-2 gap-2 border-t border-white/5 pt-3 sm:flex sm:items-center" : "grid grid-cols-2 gap-2 sm:flex sm:items-center"}>
-          <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<BadgeCheck className="h-3.5 w-3.5" />} onClick={() => void scanDocumentDecisionCandidates(f)}>Decisions</Button>
-          <Button type="button" size="sm" variant="ghost" className="min-h-11" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => handleDownload(f.id, f.file_name ?? f.filename ?? "download")}>Download</Button>
-          <Button type="button" size="sm" variant="ghost" className="min-h-11 text-rose-200 hover:bg-rose-400/10 hover:text-rose-100" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => handleDelete(f.id)}>Delete</Button>
-        </div>
-      </div>
+      <FileSourceCard
+        key={f.id}
+        file={f}
+        view={view} focused={focusedFileId === f.id}
+        onScanDecisions={(file) => void scanDocumentDecisionCandidates(file)}
+        onDownload={(id, filename) => void handleDownload(id, filename)}
+        onDelete={(id) => void handleDelete(id)}
+      />
     );
   }
 
@@ -668,7 +656,7 @@ function FilesPageContent() {
                   connector.status === "needs_authentication" &&
                   valueFromConfig(connector.config, "provider") === "google_drive";
                 return (
-                  <div key={connector.id} className="omnix-source-card flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div key={connector.id} id={fileSearchFocusId("source", connector.id)} data-search-focused={focusedSourceId === connector.id ? "true" : undefined} aria-current={focusedSourceId === connector.id || undefined} tabIndex={-1} className={cn("omnix-source-card flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between", focusedSourceId === connector.id && "border-amber-300/55 bg-amber-300/[0.07] shadow-[var(--omnix-glow-sm)] focus:outline-none focus:ring-2 focus:ring-amber-300/65")}>
                     <div className="flex min-w-0 gap-3">
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border" style={{ background: accent.iconSurface, borderColor: accent.iconBorder, color: accent.color }}>
                         <Icon className="h-[18px] w-[18px]" />
@@ -831,42 +819,25 @@ function FilesPageContent() {
       </div>
 
       {candidateFile ? (
-        <DocumentPortal>
-          <div className="fixed inset-0 z-[155] flex items-end justify-center bg-black/70 px-3 py-4 backdrop-blur-md sm:items-center">
-            <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-white/10 bg-[linear-gradient(180deg,var(--omnix-rgba-12-18-28-0-98),var(--omnix-rgba-3-6-12-0-98))] p-4 shadow-2xl sm:rounded-2xl sm:p-5">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">Document suggestions</p>
-                  <h3 className="mt-1 truncate text-base font-semibold text-white">{candidateFile.file_name ?? candidateFile.filename ?? "Document"}</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCandidateFile(null);
-                    setDecisionCandidates([]);
-                    setDecisionCandidatesError(null);
-                  }}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white"
-                  aria-label="Close document decision suggestions"
-                  title="Close"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <DecisionCandidatePanel
-                collapsed={false}
-                candidates={decisionCandidates}
-                loading={decisionCandidatesLoading}
-                error={decisionCandidatesError}
-                emptyText="No evidence-backed document decisions found."
-                onToggle={() => undefined}
-                onRefresh={() => void scanDocumentDecisionCandidates(candidateFile)}
-                onCreate={(candidate) => void openCandidateDecision(candidate)}
-                onDismiss={(candidate) => void dismissDecisionCandidate(candidate)}
-              />
-            </div>
-          </div>
-        </DocumentPortal>
+        <DocumentDecisionSuggestionsModal
+          file={candidateFile}
+          candidates={decisionCandidates}
+          coverage={decisionCandidateCoverage}
+          error={decisionCandidatesError}
+          loading={decisionCandidatesLoading}
+          onClose={() => {
+            setCandidateFile(null);
+            setDecisionCandidates([]);
+            setDecisionCandidateCoverage(null);
+            setDecisionCandidatesError(null);
+          }}
+          onRefresh={() => void scanDocumentDecisionCandidates(candidateFile)}
+          onScanMore={typeof nextDecisionSourceOffset !== "number"
+            ? undefined
+            : () => void scanDocumentDecisionCandidates(candidateFile, nextDecisionSourceOffset, true)}
+          onCreate={(candidate) => void openCandidateDecision(candidate)}
+          onDismiss={(candidate) => void dismissDecisionCandidate(candidate)}
+        />
       ) : null}
 
       {activeWorkspaceId && decisionCandidateDraft ? (
@@ -878,6 +849,7 @@ function FilesPageContent() {
             setDecisionCandidateDraft(null);
             setCandidateFile(null);
             setDecisionCandidates([]);
+            setDecisionCandidateCoverage(null);
           }}
         />
       ) : null}

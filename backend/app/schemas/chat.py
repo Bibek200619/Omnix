@@ -14,6 +14,8 @@ FileProcessingStatus = Literal[
     "uploaded",
     "queued",
     "extracting",
+    "chunking",
+    "embedding",
     "ocr_required",
     "ocr_running",
     "searchable",
@@ -98,6 +100,7 @@ class ChatResponse(BaseModel):
     assistant_message_id: str
     response: str
     sources: list[dict[str, Any]] = Field(default_factory=list)
+    retrieval: dict[str, Any] | None = None
     conversation: ConversationHistoryRead | None = None
     user_message: MessageRead | None = None
     assistant_message: MessageRead | None = None
@@ -135,6 +138,12 @@ class FileCreate(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
+class FileRetentionUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    retention_expires_at: datetime | None
+
+
 class FileRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -159,7 +168,27 @@ class FileRead(BaseModel):
     processing_job_id: str | None = None
     ocr_used: bool = False
     ocr_character_count: int = 0
+    retention_expires_at: datetime | None = None
+    lifecycle_status: Literal["active", "retention_pending"] = "active"
     created_at: datetime | None = None
+
+
+class FileVersionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    file_id: str
+    version_number: int
+    file_name: str | None = None
+    file_type: str | None = None
+    size_bytes: int | None = None
+    content_hash: str | None = None
+    storage_backend: Literal["local", "supabase"]
+    lifecycle_status: Literal["active", "pending_delete", "deleted", "missing", "retained"]
+    cleanup_reason: str | None = None
+    created_at: datetime | None = None
+    cleanup_requested_at: datetime | None = None
+    cleaned_at: datetime | None = None
 
 
 class WorkspaceCreate(BaseModel):

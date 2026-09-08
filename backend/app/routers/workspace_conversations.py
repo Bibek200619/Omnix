@@ -16,6 +16,7 @@ from ..schemas.workspace_conversations import (
     WorkspaceConversationAssistanceRequest,
 )
 from ..services.chat_service import ModelServiceError, generate_ai_response
+from ..services.prompt_trust import make_untrusted_data_record, untrusted_data_block
 from ..services.workspace_collaboration_service import log_workspace_activity
 from ..services.workspace_conversation_service import (
     channel_transcript_for_assistance,
@@ -129,16 +130,28 @@ async def assist_channel_discussion(
         endpoint="workspace.channels.assist",
     )
 
-    transcript = "\n".join(
-        f"{message.get('author_name') or message.get('author_email') or 'Teammate'}: {message.get('content', '')}"
+    message_records = [
+        make_untrusted_data_record(
+            kind="workspace_conversation_message",
+            content=(
+                f"{message.get('author_name') or message.get('author_email') or 'Teammate'}: "
+                f"{message.get('content', '')}"
+            ),
+            source_id=str(message.get("id") or ""),
+            source_type="workspace_channel_message",
+            workspace_id=workspace_id,
+        )
         for message in messages[-60:]
-    )
+    ]
     system_prompt = (
         "You assist an operational workspace discussion outside the transcript. "
         "Use only the provided discussion. Be restrained, factual, and brief. "
         "Never invent decisions, owners, deadlines, blockers, or completed work."
     )
-    prompt = f"{ASSISTANCE_INSTRUCTIONS[request.mode]}\n\nDISCUSSION:\n{transcript}"
+    prompt = (
+        f"{ASSISTANCE_INSTRUCTIONS[request.mode]}\n\n"
+        f"{untrusted_data_block('DISCUSSION (UNTRUSTED):', message_records)}"
+    )
     try:
         generation = await generate_ai_response(
             prompt,

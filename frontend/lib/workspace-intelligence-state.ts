@@ -129,15 +129,21 @@ export function useWorkspaceIntelligenceState({
     if (!activeWorkspaceId) {
       throw new Error("Select a workspace first.");
     }
-    const profile = await updateWorkspaceIntelligenceProfile(activeWorkspaceId, payload);
+    const requestWorkspaceId = activeWorkspaceId;
+    const generation = requestGenerationRef.current;
+    const profile = await updateWorkspaceIntelligenceProfile(requestWorkspaceId, payload);
+    if (
+      activeWorkspaceIdRef.current !== requestWorkspaceId ||
+      requestGenerationRef.current !== generation
+    ) return profile;
     setActiveWorkspaceIntelligence(profile);
     setWorkspaces((current) =>
-      patchWorkspaceInTree(current, activeWorkspaceId, (workspace) =>
+      patchWorkspaceInTree(current, requestWorkspaceId, (workspace) =>
         applyWorkspaceIntelligenceProfile(workspace, profile),
       ),
     );
     return profile;
-  }, [activeWorkspaceId, setWorkspaces]);
+  }, [activeWorkspaceId, activeWorkspaceIdRef, requestGenerationRef, setWorkspaces]);
 
   return {
     activeWorkspaceIntelligence,

@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { FilePlus, X, FileText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { LiveRegion } from "@/components/ui/LiveRegion";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -27,12 +28,42 @@ type UploadItem = {
   preview?: string;
 };
 
+const activeProcessingStatuses = new Set<UploadItem["processingStatus"]>([
+  "extracting",
+  "chunking",
+  "embedding",
+  "ocr_required",
+  "ocr_running",
+  "processing",
+]);
+
 function uploadProcessingStatus(file: MessageAttachment): MessageAttachment["processing_status"] {
   const metadataStatus = file.metadata?.processing_status;
   if (typeof metadataStatus === "string") {
     return metadataStatus as MessageAttachment["processing_status"];
   }
   return file.processing_status;
+}
+
+function uploadResultLabel(processingStatus: UploadItem["processingStatus"]) {
+  if (processingStatus === "failed") return "Processing issue";
+  if (processingStatus === "queued") return "Queued";
+  if (activeProcessingStatuses.has(processingStatus)) {
+    return "Processing";
+  }
+  return "Uploaded";
+}
+
+export function uploadAnnouncement(item: Pick<UploadItem, "file" | "status" | "processingStatus">) {
+  if (item.status === "idle") return `${item.file.name} is ready to upload.`;
+  if (item.status === "uploading") return `${item.file.name} upload started.`;
+  if (item.status === "error") return `${item.file.name} upload failed.`;
+  if (item.processingStatus === "failed") return `${item.file.name} uploaded, but processing failed.`;
+  if (item.processingStatus === "queued") return `${item.file.name} uploaded and queued for processing.`;
+  if (activeProcessingStatuses.has(item.processingStatus)) {
+    return `${item.file.name} uploaded and is processing.`;
+  }
+  return `${item.file.name} uploaded successfully.`;
 }
 
 export function UploadDropzone({ conversationId, compact = false, onUploadSuccess, onUploadComplete }: UploadDropzoneProps = {}) {
@@ -262,6 +293,10 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
                 compact ? "p-3" : "p-4",
               )}
             >
+              <LiveRegion
+                message={uploadAnnouncement(it)}
+                politeness={it.status === "error" || it.processingStatus === "failed" ? "assertive" : "polite"}
+              />
               <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
                 <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--omnix-border)] transition-colors", it.status === "done" && it.processingStatus !== "failed" ? "bg-emerald-500/10 text-emerald-400" : it.status === "error" || it.processingStatus === "failed" ? "bg-rose-500/10 text-rose-400" : "bg-cyan-300/10 text-cyan-100")}>
                   <FileText className="h-5 w-5" />
@@ -271,7 +306,15 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
                   <div className="mt-1.5 flex flex-wrap items-center gap-3">
                     <p className="text-xs text-slate-500">{Math.round(it.file.size / 1024)} KB</p>
                     {it.status === "uploading" && (
-                      <div className="flex-1 h-1.5 max-w-[120px] overflow-hidden rounded-full bg-[var(--omnix-surface-hover)]">
+                      <div
+                        role="progressbar"
+                        aria-label={`Uploading ${it.file.name}`}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={it.progress}
+                        aria-valuetext={`${it.progress}% uploaded`}
+                        className="flex-1 h-1.5 max-w-[120px] overflow-hidden rounded-full bg-[var(--omnix-surface-hover)]"
+                      >
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: it.progress + "%" }}
@@ -288,7 +331,7 @@ export function UploadDropzone({ conversationId, compact = false, onUploadSucces
                 {it.status === "uploading" ? (
                   <span className="text-xs font-medium text-cyan-400 w-12 text-right">{it.progress}%</span>
                 ) : it.status === "done" ? (
-                  <motion.span initial={reduceMotion ? false : { scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.18 }} className={cn("text-xs font-medium", it.processingStatus === "failed" ? "text-rose-400" : "text-emerald-400")}>{it.processingStatus === "failed" ? "Processing issue" : it.processingStatus === "queued" ? "Queued" : "Uploaded"}</motion.span>
+                  <motion.span initial={reduceMotion ? false : { scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.18 }} className={cn("text-xs font-medium", it.processingStatus === "failed" ? "text-rose-400" : "text-emerald-400")}>{uploadResultLabel(it.processingStatus)}</motion.span>
                 ) : it.status === "error" ? (
                   <span className="text-xs font-medium text-rose-400">Failed</span>
                 ) : (

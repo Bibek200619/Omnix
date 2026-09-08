@@ -79,7 +79,25 @@ export function DecisionContextPanel({ decision, onUpdate }: DecisionContextPane
         detail: decision.initiative.status,
       }]
     : [];
-  const traceabilityEvidence = decision.source_message_id
+  const verifiedEvidence = decision.source_evidence ?? [];
+  const traceabilityEvidence = verifiedEvidence.length > 0
+    ? verifiedEvidence.map((evidence) => {
+        const isConversation = evidence.kind === "conversation_message";
+        const chunkLabel = evidence.chunk_index === null || evidence.chunk_index === undefined
+          ? "Document chunk"
+          : `Document chunk ${evidence.chunk_index + 1}`;
+        return {
+          kind: isConversation ? "conversation" as const : "file" as const,
+          label: isConversation
+            ? `Verified message ${evidence.message_id ?? "source"}`
+            : evidence.page ? `${chunkLabel} · page ${evidence.page}` : chunkLabel,
+          href: isConversation
+            ? (evidence.channel_id ? `/conversations?channel=${evidence.channel_id}` : "/conversations")
+            : (evidence.file_id ? `/files?id=${evidence.file_id}` : undefined),
+          detail: `“${evidence.quote}”`,
+        };
+      })
+    : decision.source_message_id
     ? [{
         kind: "conversation" as const,
         label: "Source conversation",

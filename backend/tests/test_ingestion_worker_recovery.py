@@ -252,7 +252,12 @@ class TestQueueRecovery:
         fake_svc = MagicMock()
         fake_svc.select_all_trusted = AsyncMock(
             return_value=[
-                {"id": "job-missing", "status": "queued", "created_at": (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()}
+                {
+                    "id": "job-missing",
+                    "status": "queued",
+                    "created_at": (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat(),
+                    "payload": {"_queue": "test:jobs"},
+                }
             ]
         )
 
@@ -273,7 +278,9 @@ class TestQueueRecovery:
 
         fake_redis = self.FakeRedisList()
         fake_svc = MagicMock()
-        fake_svc.select_all_trusted = AsyncMock(return_value=[{"id": "job-once", "status": "queued"}])
+        fake_svc.select_all_trusted = AsyncMock(
+            return_value=[{"id": "job-once", "status": "queued", "payload": {"_queue": "test:jobs"}}]
+        )
 
         with (
             patch("app.jobs.queue.get_redis", return_value=fake_redis),
@@ -294,7 +301,9 @@ class TestQueueRecovery:
 
         fake_redis = self.FakeRedisList()
         fake_svc = MagicMock()
-        fake_svc.select_all_trusted = AsyncMock(return_value=[{"id": "job-dry-run", "status": "queued"}])
+        fake_svc.select_all_trusted = AsyncMock(
+            return_value=[{"id": "job-dry-run", "status": "queued", "payload": {"_queue": "test:jobs"}}]
+        )
 
         with (
             patch("app.jobs.queue.get_redis", return_value=fake_redis),

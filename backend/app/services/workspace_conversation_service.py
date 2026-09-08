@@ -13,17 +13,13 @@ from .supabase_service import (
     select_all_trusted,
     select_one_trusted,
 )
+from .workspace_access_service import require_workspace_access
+from .workspace_common import normalize_operational_label, utc_now_iso
+from .workspace_membership_service import get_profiles, list_workspace_members
 from .workspace_mention_service import (
     mention_metadata_for_sources,
     prepare_mentions_for_workspace,
     sync_mentions_for_source,
-)
-from .workspace_service import (
-    get_profiles,
-    list_workspace_members,
-    normalize_operational_label,
-    require_workspace_access,
-    utc_now_iso,
 )
 
 logger = logging.getLogger(__name__)
@@ -352,6 +348,8 @@ async def list_messages(
                 MESSAGE_COLUMNS,
                 filters={"channel_id": channel_id, "workspace_id": workspace_id, "parent_message_id": thread_root_id},
                 order_by="created_at",
+                secondary_order_by="id",
+                desc=False,
                 limit=query_limit,
                 offset=offset,
             )
@@ -368,6 +366,7 @@ async def list_messages(
                 MESSAGE_COLUMNS,
                 filters={"channel_id": channel_id, "workspace_id": workspace_id, "parent_message_id": {"is": None}},
                 order_by="created_at",
+                secondary_order_by="id",
                 desc=True,
                 limit=query_limit,
                 offset=offset,
@@ -470,14 +469,18 @@ async def channel_transcript_for_assistance(
     channel_id: str,
     user_id: str,
     thread_root_id: str | None,
+    limit: int = 60,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
+    query_limit = min(max(limit, 1), MESSAGE_LIST_LIMIT)
+    query_offset = max(offset, 0)
     if thread_root_id:
         return await list_messages(
             workspace_id=workspace_id,
             channel_id=channel_id,
             user_id=user_id,
-            limit=60,
-            offset=0,
+            limit=query_limit,
+            offset=query_offset,
             thread_root_id=thread_root_id,
         )
     _, access = await _require_channel_access(workspace_id=workspace_id, channel_id=channel_id, user_id=user_id)
@@ -487,8 +490,10 @@ async def channel_transcript_for_assistance(
             MESSAGE_COLUMNS,
             filters={"workspace_id": workspace_id, "channel_id": channel_id},
             order_by="created_at",
+            secondary_order_by="id",
             desc=True,
-            limit=60,
+            limit=query_limit,
+            offset=query_offset,
         )
     except SupabaseServiceError as exc:
         raise _database_error() from exc

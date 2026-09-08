@@ -40,8 +40,16 @@ def test_traceability_links_reuse_existing_provenance_fields() -> None:
     assert "decision.linked_tasks.map" in decision_panel
     assert "decision.initiative" in decision_panel
     assert "source_type: initialValues?.source_type" in decision_modal
-    assert "source_type: source.candidate.source_type" in decision_from_message_modal
+    assert '"/candidates/accept"' in decision_modal
+    assert "source_evidence: initialValues?.source_evidence" in decision_modal
+    assert "source_type: requestSource.candidate.source_type" in decision_from_message_modal
+    assert "source_evidence: requestSource.candidate.supporting_evidence" in decision_from_message_modal
+    assert "/decisions/candidates/accept" in decision_from_message_modal
     assert "source_type: candidate.source_type" in files_page
+    assert "source_evidence: candidate.supporting_evidence" in files_page
+    assert "candidate_id: candidate.id" in files_page
+    assert "decision.source_evidence" in decision_panel
+    assert "DecisionEvidence" in workspace_types
     assert "selected.linked_resources.map" in initiative_panel
     assert "selected.linked_channels.map" in initiative_panel
     assert "selected.linked_tasks.map" in initiative_panel

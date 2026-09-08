@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import type {
-  WorkspaceContextType,
   WorkspaceIntelligenceContextValue,
   WorkspaceMembershipContextValue,
   WorkspaceTreeContextValue,
@@ -23,6 +22,7 @@ export function useWorkspaceContextValues(params: WorkspaceContextValuesParams) 
     activeRootWorkspace,
     subspaceLoadingByParentId,
     subspaceErrorByParentId,
+    captureActiveWorkspaceSelection,
     setActiveWorkspace,
     refreshWorkspaces,
     refreshWorkspaceTree,
@@ -64,6 +64,7 @@ export function useWorkspaceContextValues(params: WorkspaceContextValuesParams) 
       activeRootWorkspace,
       subspaceLoadingByParentId,
       subspaceErrorByParentId,
+      captureActiveWorkspaceSelection,
       setActiveWorkspace,
       refreshWorkspaces,
       refreshWorkspaceTree,
@@ -82,6 +83,7 @@ export function useWorkspaceContextValues(params: WorkspaceContextValuesParams) 
       activeRootWorkspace,
       subspaceLoadingByParentId,
       subspaceErrorByParentId,
+      captureActiveWorkspaceSelection,
       setActiveWorkspace,
       refreshWorkspaces,
       refreshWorkspaceTree,
@@ -149,19 +151,9 @@ export function useWorkspaceContextValues(params: WorkspaceContextValuesParams) 
     ],
   );
 
-  const value = useMemo<WorkspaceContextType>(
-    () => ({
-      ...treeValue,
-      ...membershipValue,
-      ...intelligenceValue,
-    }),
-    [treeValue, membershipValue, intelligenceValue],
-  );
-
   return {
     treeValue,
     membershipValue,
     intelligenceValue,
-    value,
   };
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { AlertTriangle, Check, Edit3, Plus, Settings, Trash2, UserPlus, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -63,7 +62,14 @@ export function SidebarModals({
   return (
     <>
       {activeSuperWorkspace ? (
-        <Modal isOpen={createOpen} onClose={onCloseCreate} title="Create team subspace" className="max-w-md p-5">
+        <Modal
+          isOpen={createOpen}
+          onClose={onCloseCreate}
+          title="Create team subspace"
+          description={`Add a team space under ${activeSuperWorkspace.name}.`}
+          closeDisabled={creatingSubspace}
+          className="max-w-md p-5"
+        >
           <WorkspaceModalHeader
             title="Create team subspace"
             description={<>Add a team space under <span className="font-medium text-slate-200">{activeSuperWorkspace.name}</span>.</>}
@@ -102,7 +108,14 @@ export function SidebarModals({
         </Modal>
       ) : null}
 
-      <Modal isOpen={renameOpen} onClose={onCloseRename} title="Rename workspace" className="max-w-md p-5">
+      <Modal
+        isOpen={renameOpen}
+        onClose={onCloseRename}
+        title="Rename workspace"
+        description="Update the visible name for this workspace."
+        closeDisabled={renaming}
+        className="max-w-md p-5"
+      >
         <WorkspaceModalHeader
           title="Rename workspace"
           description="Update the visible name for this workspace."
@@ -139,7 +152,15 @@ export function SidebarModals({
         </form>
       </Modal>
 
-      <Modal isOpen={deleteOpen} onClose={onCloseDelete} title="Delete workspace" className="max-w-md border-rose-400/25 p-5 shadow-[0_24px_80px_var(--omnix-rgba-0-0-0-0-5),0_0_24px_var(--omnix-rgba-244-63-94-0-14)]">
+      <Modal
+        isOpen={deleteOpen}
+        onClose={onCloseDelete}
+        title="Delete workspace"
+        description={`Permanently remove ${active.name} from the workspace list and active session.`}
+        role="alertdialog"
+        closeDisabled={deleting}
+        className="max-w-md border-rose-400/25 p-5 shadow-[0_24px_80px_var(--omnix-rgba-0-0-0-0-5),0_0_24px_var(--omnix-rgba-244-63-94-0-14)]"
+      >
         <WorkspaceModalHeader
           title="Delete workspace"
           description={<>This removes <span className="font-medium text-slate-200">{active.name}</span> from the workspace list and clears it from the active session.</>}
@@ -220,7 +241,7 @@ export function WorkspaceManagementActions({
   return (
     <div className="border-t border-white/5 bg-black/10 p-2">
       {showManageActions ? (
-        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ height: "auto", opacity: 1 }} className="space-y-2 pb-2">
+        <div className="omnix-shell-expand-enter space-y-2 pb-2">
           {createError ? (
             <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[10px] text-rose-200">{createError}</div>
           ) : null}
@@ -273,7 +294,7 @@ export function WorkspaceManagementActions({
           <button type="button" onClick={() => onShowManageActionsChange(false)} className="min-h-11 w-full rounded-md px-3 text-[8px] font-bold uppercase tracking-[0.2em] text-white/10 transition-colors hover:bg-white/5 hover:text-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
             Close Settings
           </button>
-        </motion.div>
+        </div>
       ) : (
         <button type="button" onClick={() => onShowManageActionsChange(true)} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-3 text-[9px] font-bold uppercase tracking-[0.2em] text-white/20 transition hover:bg-white/5 hover:text-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
           <Settings className="h-3 w-3" /> Workspace Management

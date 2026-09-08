@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import { createOptimisticUserMessage, mergeStreamInitMessages } from "@/components/chat/chatStreamMessages";
 import { readChatStream, type StreamEvent } from "@/components/chat/chatStreamProtocol";
 import type { Message, MessageAttachment, SearchMode } from "@/components/chat/types";
+import { normalizeCitationValidation, normalizeRetrievalState } from "@/components/chat/chatMessageUtils";
 import { type ChatRef, type RefreshConversations, type SenderLookup } from "@/components/chat/useChatMessages";
 import { apiClient } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
@@ -67,32 +68,16 @@ export function useChatStream({
   userId,
 }: UseChatStreamParams) {
   const [responding, setResponding] = useState(false);
-  const [streamingContent, setStreamingContent] = useState("");
+  const [streamAnnouncement, setStreamAnnouncement] = useState("");
   const activeStreamAbortRef = useRef<AbortController | null>(null);
-  const streamAnnouncerClearTimerRef = useRef<number | null>(null);
-
-  const clearStreamAnnouncerTimer = useCallback(() => {
-    if (streamAnnouncerClearTimerRef.current !== null) {
-      window.clearTimeout(streamAnnouncerClearTimerRef.current);
-      streamAnnouncerClearTimerRef.current = null;
-    }
-  }, []);
-
-  const scheduleStreamAnnouncerClear = useCallback(() => {
-    clearStreamAnnouncerTimer();
-    streamAnnouncerClearTimerRef.current = window.setTimeout(() => {
-      setStreamingContent("");
-      streamAnnouncerClearTimerRef.current = null;
-    }, 2000);
-  }, [clearStreamAnnouncerTimer]);
+  const streamCancelledRef = useRef(false);
 
   useEffect(() => void (respondingRef.current = responding), [responding, respondingRef]);
   useEffect(() => {
     return () => {
-      clearStreamAnnouncerTimer();
       activeStreamAbortRef.current?.abort();
     };
-  }, [clearStreamAnnouncerTimer]);
+  }, []);
 
   const sendMessage = useCallback(async (content: string, retryMessageId?: string, attachmentsOverride?: MessageAttachment[]) => {
     if (respondingRef.current) return;
@@ -122,14 +107,15 @@ export function useChatStream({
 
     respondingRef.current = true;
     setResponding(true);
+    setStreamAnnouncement("Omnix is responding.");
     setError(null);
     let assistantId: string | null = null;
     let persistedUserMessageId: string | null = null;
     let streamConversationId: string | null = currentConversation;
     const streamAbortController = new AbortController();
     activeStreamAbortRef.current = streamAbortController;
-    clearStreamAnnouncerTimer();
-    setStreamingContent("");
+    streamCancelledRef.current = false;
+    let streamReportedError = false;
     let pendingTokenText = "";
     let tokenFlushFrame: number | null = null;
 
@@ -171,6 +157,8 @@ export function useChatStream({
       if (!reader) throw new Error("Streaming not supported by this browser.");
 
       const handleStreamEvent = (obj: StreamEvent) => {
+        const retrieval = normalizeRetrievalState(obj.retrieval);
+        const citationValidation = normalizeCitationValidation(obj.citation_validation);
         if (obj.type === "init") {
           if (obj.conversation_id) {
             streamConversationId = obj.conversation_id;
@@ -182,26 +170,33 @@ export function useChatStream({
           persistedUserMessageId = obj.user_message_id ?? null;
           assistantId = obj.assistant_message_id ?? crypto.randomUUID();
           setMessages((current) =>
-            mergeStreamInitMessages(current, messageId, persistedUserMessageId, assistantId as string, obj.sources),
+            mergeStreamInitMessages(current, messageId, persistedUserMessageId, assistantId as string, obj.sources, retrieval),
           );
           return;
         }
-        if (obj.type === "status") return;
+        if (obj.type === "status") {
+          if (!assistantId || !retrieval) return;
+          setMessages((current) => current.map((message) => (message.id === assistantId ? { ...message, retrieval } : message)));
+          return;
+        }
         if (obj.type === "sources") {
           if (!assistantId) return;
-          setMessages((current) => current.map((message) => (message.id === assistantId ? { ...message, sources: obj.sources ?? [] } : message)));
+          setMessages((current) => current.map((message) => (
+            message.id === assistantId ? { ...message, sources: obj.sources ?? [], retrieval: retrieval ?? message.retrieval } : message
+          )));
           return;
         }
         if (obj.type === "token") {
           if (!assistantId) return;
           const txt = obj.text ?? "";
           if (!txt) return;
-          setStreamingContent((current) => current + txt);
           pendingTokenText += txt;
           scheduleTokenFlush();
           return;
         }
         if (obj.type === "error") {
+          streamReportedError = true;
+          setStreamAnnouncement("Omnix could not complete the response.");
           flushPendingTokens();
           logClientError("[chat] stream returned an error event", new Error(String(obj.detail ?? "Stream error")), { responsePayload: obj });
           const detail = "AI response is unavailable.";
@@ -215,11 +210,25 @@ export function useChatStream({
         if (obj.type === "done") {
           flushPendingTokens();
           streamConversationId = obj.conversation_id ?? streamConversationId;
+          const citations = Array.isArray(obj.citations)
+            ? obj.citations.filter((citation): citation is string => typeof citation === "string" && /^[SW]\d{1,4}$/.test(citation))
+            : undefined;
           if (assistantId) {
-            setMessages((current) => current.map((message) => (message.id === assistantId ? { ...message, status: "sent", isStreaming: false } : message)));
+            setMessages((current) => current.map((message) => (
+              message.id === assistantId
+                ? {
+                    ...message,
+                    content: typeof obj.content === "string" ? obj.content : message.content,
+                    citations: citations ?? message.citations,
+                    citationValidation: citationValidation ?? message.citationValidation,
+                    status: "sent",
+                    isStreaming: false,
+                  }
+                : message
+            )));
           }
           if (!conversationId && obj.conversation_id) router.replace(`/chat?conversation=${obj.conversation_id}`, { scroll: false });
-          scheduleStreamAnnouncerClear();
+          if (!streamReportedError) setStreamAnnouncement("Response complete.");
         }
       };
 
@@ -230,6 +239,25 @@ export function useChatStream({
     } catch (err) {
       if (mountedRef.current) flushPendingTokens();
       if (streamAbortController.signal.aborted && !mountedRef.current) return;
+      if (streamAbortController.signal.aborted && streamCancelledRef.current) {
+        setStreamAnnouncement("Response stopped.");
+        const targetConversationId = streamConversationId || currentConversationRef.current;
+        const recovered = targetConversationId
+          ? await reconcileConversationMessages(targetConversationId, { allowInactiveConversation: true, force: true, silent: true })
+          : false;
+        if (!recovered) {
+          setMessages((current) =>
+            current.map((item) =>
+              item.id === (persistedUserMessageId ?? messageId)
+                ? { ...item, status: "failed", error: "Stopped" }
+                : item,
+            ),
+          );
+        }
+        await refreshConversations({ force: true, silent: true });
+        return;
+      }
+      setStreamAnnouncement("Omnix could not complete the response.");
       logClientError("Failed to send message", err, { endpoint: "/chat/stream" });
       const targetConversationId = streamConversationId || currentConversationRef.current;
       const recovered = targetConversationId
@@ -247,11 +275,11 @@ export function useChatStream({
       respondingRef.current = false;
       if (mountedRef.current) setResponding(false);
       if (activeStreamAbortRef.current === streamAbortController) activeStreamAbortRef.current = null;
+      streamCancelledRef.current = false;
     }
   }, [
     activeWorkspaceId,
     activeWorkspaceRole,
-    clearStreamAnnouncerTimer,
     conversationId,
     currentConversation,
     currentConversationRef,
@@ -261,7 +289,6 @@ export function useChatStream({
     refreshConversations,
     respondingRef,
     router,
-    scheduleStreamAnnouncerClear,
     searchMode,
     senderLookup,
     setActiveConversation,
@@ -287,8 +314,10 @@ export function useChatStream({
   }, [messagesRef, sendMessage]);
 
   const cancelStream = useCallback(() => {
+    streamCancelledRef.current = true;
+    setStreamAnnouncement("Response stopped.");
     activeStreamAbortRef.current?.abort();
   }, []);
 
-  return { responding, streamingContent, sendMessage, handleRetry, handleRegenerate, cancelStream };
+  return { responding, streamAnnouncement, sendMessage, handleRetry, handleRegenerate, cancelStream };
 }

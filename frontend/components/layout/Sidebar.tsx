@@ -59,7 +59,7 @@ export const Sidebar = memo(function Sidebar({ isOpen, collapsed, onClose, onTog
         <div className="pointer-events-none absolute inset-0 opacity-[0.025] [animation:auth-grid_22s_linear_infinite] [background-image:linear-gradient(var(--omnix-rgba-0-255-255-0-55)_1px,transparent_1px),linear-gradient(90deg,var(--omnix-rgba-0-255-255-0-55)_1px,transparent_1px)] [background-size:64px_64px]" />
         <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-[linear-gradient(180deg,transparent,var(--omnix-rgba-0-255-255-0-15),var(--omnix-rgba-0-255-255-0-08),transparent)]" />
 
-        <div className="relative flex h-auto items-start justify-between border-b border-[var(--omnix-border)] px-[18px] pb-3.5 pt-[18px]">
+        <div className="relative flex h-auto items-start justify-between border-b border-[var(--omnix-border)] px-[18px] pb-3.5 pt-[max(18px,env(safe-area-inset-top))]">
           <div className="flex w-full flex-col gap-3">
             <div className="flex items-center justify-between">
               <Link href="/dashboard" onClick={onClose} className="group/logo flex items-center gap-2.5">

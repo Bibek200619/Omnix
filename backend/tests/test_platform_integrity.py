@@ -144,7 +144,8 @@ async def test_file_upload_ingestion_rag_chat_and_decision_extraction(monkeypatc
                     content=(
                         '{"candidates":[{"title":"Adopt vector search-backed RAG",'
                         '"reason":"The memo explicitly records this as the platform decision.",'
-                        '"confidence":"high","supporting_evidence":["Decision: Adopt vector search-backed RAG for uploaded architecture notes."]}]}'
+                        '"confidence":"high","evidence":[{"source_ref":"d1",'
+                        '"quote":"Decision: Adopt vector search-backed RAG for uploaded architecture notes."}]}]}'
                     ),
                     model="phi3:mini",
                     provider="ollama",
@@ -204,6 +205,7 @@ async def test_file_upload_ingestion_rag_chat_and_decision_extraction(monkeypatc
             "file_id": "file-platform",
             "user_id": user_id,
             "workspace_id": workspace_id,
+            "_queue": "omnix:jobs",
         }
     ]
 

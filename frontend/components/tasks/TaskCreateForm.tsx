@@ -82,6 +82,7 @@ export function TaskCreateForm({
       <Input
         ref={titleInputRef}
         value={title}
+        disabled={creating}
         onChange={(event) => onTitleChange(event.target.value)}
         placeholder="Operational next step"
         className="h-10 text-sm sm:col-span-2"
@@ -89,6 +90,7 @@ export function TaskCreateForm({
       <div className="sm:col-span-2">
         <MentionTextarea
           value={description}
+          disabled={creating}
           onChange={onDescriptionChange}
           members={members}
           mentions={descriptionMentions}
@@ -99,6 +101,7 @@ export function TaskCreateForm({
       </div>
       <select
         value={status}
+        disabled={creating}
         onChange={(event) => onStatusChange(event.target.value as WorkspaceTaskStatus)}
         className="omnix-input h-10 rounded-lg px-2 text-sm focus-visible:ring-2 focus-visible:ring-cyan-300/70"
       >
@@ -110,6 +113,7 @@ export function TaskCreateForm({
       </select>
       <select
         value={ownerId}
+        disabled={creating}
         onChange={(event) => onOwnerChange(event.target.value)}
         className="omnix-input h-10 rounded-lg px-2 text-sm focus-visible:ring-2 focus-visible:ring-cyan-300/70"
       >
@@ -123,17 +127,20 @@ export function TaskCreateForm({
       <input
         type="date"
         value={dueDate}
+        disabled={creating}
         onChange={(event) => onDueDateChange(event.target.value)}
         className="omnix-input h-10 rounded-lg px-2 text-sm"
       />
       <Input
         value={initialBlocker}
+        disabled={creating}
         onChange={(event) => onInitialBlockerChange(event.target.value)}
         placeholder="Recorded blocker, optional"
         className="h-10 text-sm"
       />
       <select
         value={initiativeId}
+        disabled={creating}
         onChange={(event) => onInitiativeChange(event.target.value)}
         className="omnix-input h-10 rounded-lg px-2 text-sm focus-visible:ring-2 focus-visible:ring-cyan-300/70 sm:col-span-2"
       >
@@ -145,10 +152,10 @@ export function TaskCreateForm({
         ))}
       </select>
       <div className="flex justify-end gap-2 sm:col-span-2">
-        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+        <Button type="button" size="sm" variant="ghost" disabled={creating} onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" size="sm" isLoading={creating} disabled={!title.trim()}>
+        <Button type="submit" size="sm" isLoading={creating} disabled={creating || !title.trim()}>
           Create record
         </Button>
       </div>

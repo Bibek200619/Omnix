@@ -99,7 +99,7 @@ async def test_ingest_file_updates_processing_statuses(monkeypatch: pytest.Monke
 
     assert result["status"] == "completed"
     assert result["processing_status"] == "searchable"
-    assert statuses == ["extracting", "searchable", "searchable"]
+    assert statuses == ["extracting", "chunking", "embedding", "searchable"]
     assert file_row["processing_status"] == "searchable"
     assert file_row["metadata"]["text_chunk_count"] == 1
     assert file_row["metadata"]["embedded_chunk_count"] == 1
@@ -241,6 +241,10 @@ async def test_ingest_file_exposes_ocr_running_before_success(monkeypatch: pytes
                 extraction_status="searchable",
                 ocr_used=True,
                 ocr_character_count=42,
+                page_count=30,
+                ocr_pages_processed=25,
+                ocr_pages_omitted=5,
+                ocr_coverage_complete=False,
             ),
         )
 
@@ -271,7 +275,28 @@ async def test_ingest_file_exposes_ocr_running_before_success(monkeypatch: pytes
 
     assert result["status"] == "completed"
     assert result["processing_status"] == "searchable"
-    assert statuses == ["extracting", "ocr_running", "searchable", "searchable"]
+    assert statuses == ["extracting", "ocr_running", "chunking", "embedding", "searchable"]
+    assert file_row["metadata"] == {
+        "extracted_text_preview": "OCR extracted contract terms and obligations.",
+        "page_count": 30,
+        "extractor_used": "pypdf+tesseract",
+        "extracted_character_count": 0,
+        "image_page_count": 0,
+        "text_page_count": 0,
+        "extraction_status": "searchable",
+        "extraction_failure_reason": None,
+        "ocr_used": True,
+        "ocr_character_count": 42,
+        "ocr_pages_processed": 25,
+        "ocr_pages_omitted": 5,
+        "ocr_coverage_complete": False,
+        "processing_status": "searchable",
+        "text_chunk_count": 1,
+        "text_chunks_truncated": False,
+        "vector_index_status": "ready",
+        "embedded_chunk_count": 1,
+        "embedded_chunk_ids": ["embedded-chunk-1"],
+    }
 
 
 @pytest.mark.asyncio

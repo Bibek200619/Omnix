@@ -9,6 +9,7 @@ import {
   reconcileMessageLists,
 } from "@/components/chat/useChatMessages";
 import { logClientError } from "@/lib/errors";
+import { visibleRefreshRegistry } from "@/lib/visible-refresh-registry";
 
 const MESSAGE_VALIDATION_INTERVAL_MS = 45_000;
 const MESSAGE_FOCUS_STALE_MS = 12_000;
@@ -108,22 +109,14 @@ export function useChatSync({
       }
     };
 
-    const syncOnFocus = () => syncActiveConversation({ forceMessages: false, forceWorkspace: false });
-    const syncOnVisibility = () => {
-      if (document.visibilityState === "visible") {
-        syncActiveConversation({ forceMessages: true, forceWorkspace: true });
-      }
-    };
-
-    const intervalId = window.setInterval(syncActiveConversation, MESSAGE_VALIDATION_INTERVAL_MS);
-    window.addEventListener("focus", syncOnFocus);
-    document.addEventListener("visibilitychange", syncOnVisibility);
-
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", syncOnFocus);
-      document.removeEventListener("visibilitychange", syncOnVisibility);
-    };
+    return visibleRefreshRegistry.subscribe({
+      key: "chat-sync",
+      intervalMs: MESSAGE_VALIDATION_INTERVAL_MS,
+      callback: (reason) => syncActiveConversation({
+        forceMessages: reason === "visible",
+        forceWorkspace: reason === "visible",
+      }),
+    });
   }, [
     authenticatedUserId,
     currentConversationRef,

@@ -23,9 +23,10 @@ class Citation:
     file_name: str = "Unknown File"
     metadata: Dict[str, Any] = field(default_factory=dict)
     score: float = 0.0
+    label: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        payload = {
             "source_id": self.source_id,
             "source_type": self.source_type.value,
             "content": self.content[:200] + "..." if len(self.content) > 200 else self.content,
@@ -33,6 +34,9 @@ class Citation:
             "file_name": self.file_name,
             "score": self.score,
         }
+        if self.label:
+            payload["label"] = self.label
+        return payload
 
 
 @dataclass

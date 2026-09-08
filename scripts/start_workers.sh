@@ -5,7 +5,7 @@ echo "Starting/Scaling Omnix Workers..."
 
 WORKERS=${1:-1}
 
-# Scale workers using docker-compose
-docker-compose -f docker-compose.prod.yml up --scale worker=$WORKERS -d worker
+# Scale ordinary ingestion capacity and ensure one bounded OCR worker is running.
+docker-compose -f docker-compose.prod.yml up --scale ingestion-worker=$WORKERS --scale ocr-worker=1 -d ingestion-worker ocr-worker
 
-echo "Workers scaled to $WORKERS. Check status with ./scripts/runtime_status.py"
+echo "Ingestion workers scaled to $WORKERS; OCR worker pinned to 1. Check status with ./scripts/runtime_status.py"

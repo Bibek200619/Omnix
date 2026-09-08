@@ -311,7 +311,18 @@ Useful checks:
 ```bash
 npm --prefix frontend run lint
 npm --prefix frontend run build
+npm --prefix frontend run test:e2e
 ```
+
+The deterministic Playwright suite uses mocked API responses for repeatable UI, race, mobile, and accessibility coverage. A separate live lane verifies the deployed frontend, persisted Supabase session, API proxy, authenticated backend, and workspace database reads without intercepting requests:
+
+```bash
+OMNIX_E2E_BASE_URL=https://your-deployment.example \
+OMNIX_E2E_STORAGE_STATE=/absolute/path/to/playwright-storage-state.json \
+npm --prefix frontend run test:e2e:live
+```
+
+`OMNIX_E2E_STORAGE_STATE` must be a Playwright storage-state file captured for the deployment origin and contain the `omnix.supabase.auth` local-storage session for a least-privilege test user with an existing workspace. Keep that file outside the repository and secret storage; traces, screenshots, and videos are retained only on failure under `frontend/test-results-live/`. The live test does not invoke product write controls, although loading the authenticated app can emit its normal presence heartbeat. Missing or invalid live configuration fails the command instead of skipping the check.
 
 Backend verification depends on the local Python environment and configured services. At minimum, start the API and check:
 
