@@ -18,7 +18,7 @@ class VisibleRefreshRegistry {
   private entries = new Map<string, VisibleRefreshEntry>();
   private timerId: number | null = null;
   private listening = false;
-  private lastReactivateAt = 0;
+  private lastReactivateAt = -Infinity;
 
   private invoke(entry: VisibleRefreshEntry, reason: VisibleRefreshReason) {
     try {
@@ -49,8 +49,6 @@ class VisibleRefreshRegistry {
     if (document.visibilityState !== "visible") return;
 
     const now = Date.now();
-    if (now - this.lastReactivateAt < 100) return;
-    this.lastReactivateAt = now;
     for (const entry of this.entries.values()) {
       if (entry.nextRunAt <= now) {
         entry.nextRunAt = now + entry.intervalMs;
@@ -64,6 +62,11 @@ class VisibleRefreshRegistry {
     if (document.visibilityState !== "visible") return;
 
     const now = Date.now();
+    if (now - this.lastReactivateAt < 100) {
+      this.schedule();
+      return;
+    }
+    this.lastReactivateAt = now;
     for (const entry of this.entries.values()) {
       entry.nextRunAt = now + entry.intervalMs;
       if (entry.reactivate) this.invoke(entry, reason);
@@ -93,23 +96,25 @@ class VisibleRefreshRegistry {
     window.removeEventListener("focus", this.handleFocus);
     document.removeEventListener("visibilitychange", this.handleVisibility);
     this.listening = false;
-    this.lastReactivateAt = 0;
+    this.lastReactivateAt = -Infinity;
     this.clearTimer();
   }
 
   subscribe({ key, intervalMs, callback, reactivate = true }: VisibleRefreshOptions) {
     if (typeof window === "undefined" || intervalMs <= 0) return () => undefined;
 
-    this.entries.set(key, {
+    const entry = {
       callback,
       intervalMs,
       nextRunAt: Date.now() + intervalMs,
       reactivate,
-    });
+    };
+    this.entries.set(key, entry);
     this.attach();
     this.schedule();
 
     return () => {
+      if (this.entries.get(key) !== entry) return;
       this.entries.delete(key);
       if (this.entries.size === 0) this.detach();
       else this.schedule();
