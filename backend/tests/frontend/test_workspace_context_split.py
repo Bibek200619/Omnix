@@ -15,6 +15,8 @@ def read_frontend(relative_path: str) -> str:
 def test_workspace_provider_exposes_split_contexts() -> None:
     source = WORKSPACE_CONTEXT.read_text(encoding="utf-8")
     context_values = read_frontend("lib/workspace-context-values.ts")
+    context_exports = read_frontend("lib/workspace-context.tsx")
+    context_types = read_frontend("lib/workspace-context-types.ts")
 
     assert "useWorkspaceContextValues" in source
     assert "useMemo<WorkspaceTreeContextValue>" in context_values
@@ -23,10 +25,12 @@ def test_workspace_provider_exposes_split_contexts() -> None:
     assert "<WorkspaceTreeContext.Provider value={treeValue}>" in source
     assert "<WorkspaceMembershipContext.Provider value={membershipValue}>" in source
     assert "<WorkspaceIntelligenceContext.Provider value={intelligenceValue}>" in source
-    assert "...treeValue" in context_values
-    assert "...membershipValue" in context_values
-    assert "...intelligenceValue" in context_values
-    assert "export function useWorkspace()" in source
+    assert "const WorkspaceContext =" not in source
+    assert "<WorkspaceContext.Provider" not in source
+    assert "export function useWorkspace()" not in source
+    assert "WorkspaceProvider, useWorkspace" not in context_exports
+    assert "export { useWorkspace }" not in context_exports
+    assert "WorkspaceContextType" not in context_types
 
 
 def test_workspace_context_modules_have_guarded_hooks() -> None:
@@ -132,14 +136,21 @@ def test_workspace_switch_clears_scoped_api_and_query_state() -> None:
     provider = WORKSPACE_CONTEXT.read_text(encoding="utf-8")
     active_selection = read_frontend("lib/workspace-active-selection.ts")
     api = read_frontend("lib/api.ts")
+    query = read_frontend("lib/query.ts")
+    query_provider = read_frontend("lib/query-provider.tsx")
 
     assert 'import { invalidateQueries } from "./query";' in active_selection
     assert "replaceActiveWorkspace(null, { forceInvalidate: true });" in provider
     assert "invalidateQueries();" in active_selection
+    assert "client.clear();" in query
+    assert "QueryClientProvider" in query_provider
     assert "export function getApiWorkspaceId()" in api
     assert "const apiWorkspaceChangeListeners = new Set<() => void>();" in api
     assert "subscribeApiWorkspaceChange(() =>" in api
     assert "this.inFlightGets.clear();" in api
+    assert "const requestWorkspaceId = _activeWorkspaceId;" in api
+    assert "this.applyWorkspaceHeader(headers, requestWorkspaceId);" in api
+    assert "if (this.inFlightGets.get(key) === request)" in api
 
 
 def test_upload_uses_api_workspace_state_instead_of_legacy_storage() -> None:
@@ -160,7 +171,6 @@ def test_app_shell_delegates_dashboard_provider_stack() -> None:
     assert "WorkspaceProvider" not in app_shell
     assert "WorkspaceCollaborationProvider" not in app_shell
     assert "WorkspaceNotificationsProvider" not in app_shell
-    assert "WorkspaceContinuityProvider" not in app_shell
     assert "ConversationHistoryProvider" not in app_shell
     assert "dynamic(" not in app_shell
 
@@ -168,7 +178,6 @@ def test_app_shell_delegates_dashboard_provider_stack() -> None:
         "<WorkspaceProvider>",
         "<WorkspaceCollaborationProvider>",
         "<WorkspaceNotificationsProvider>",
-        "<WorkspaceContinuityProvider>",
         "<ProfileProvider>",
         "<ConversationHistoryProvider>",
         "<WorkspaceOnboardingGate>",
@@ -178,13 +187,28 @@ def test_app_shell_delegates_dashboard_provider_stack() -> None:
     assert "ssr: false" in providers
 
 
-def test_app_shell_mobile_layout_does_not_lock_document_scroll() -> None:
+def test_workspace_continuity_is_scoped_to_its_only_consumer() -> None:
+    providers = read_frontend("components/layout/DashboardProviders.tsx")
+    workspace_page = read_frontend("app/(dashboard)/workspace/page.tsx")
+    continuity = read_frontend("lib/workspace-continuity-context.tsx")
+
+    assert "WorkspaceContinuityProvider" not in providers
+    assert "WorkspaceContinuityProvider, useWorkspaceContinuity" in workspace_page
+    assert "<WorkspaceContinuityProvider>" in workspace_page
+    assert "</WorkspaceContinuityProvider>" in workspace_page
+    assert "useWorkspaceContinuity()" in workspace_page
+    assert "useWorkspaceTree" in continuity
+    assert "/initiatives" in continuity
+    assert "/timeline" in continuity
+    assert "/continuity/unresolved" in continuity
+
+
+def test_app_shell_mobile_layout_uses_dynamic_viewport_and_scoped_scroll() -> None:
     app_shell = read_frontend("components/layout/AppShell.tsx")
 
-    assert "h-[100dvh] overflow-hidden" not in app_shell
-    assert "min-h-[100svh]" in app_shell
-    assert "overflow-x-hidden text-white lg:h-screen" in app_shell
-    assert "lg:overflow-hidden" in app_shell
+    assert app_shell.count("h-[100dvh] min-h-0") == 2
+    assert "min-h-[100svh]" not in app_shell
+    assert "overflow-hidden text-white lg:h-screen" in app_shell
     assert "overflow-x-hidden overflow-y-auto overscroll-y-contain" in app_shell
     assert "pb-[calc(4.25rem_+_env(safe-area-inset-bottom))]" in app_shell
 
@@ -205,3 +229,42 @@ def test_low_scope_consumers_use_targeted_workspace_hooks() -> None:
 
         assert hook_name in source
         assert "useWorkspace()" not in source
+
+
+def test_broad_workspace_consumers_use_explicit_domain_hooks() -> None:
+    consumers = {
+        "app/(dashboard)/dashboard/page.tsx": ("useWorkspaceTree", "useWorkspaceIntelligence"),
+        "app/(dashboard)/team/page.tsx": ("useWorkspaceTree", "useWorkspaceMembership"),
+        "app/(dashboard)/workspace/page.tsx": (
+            "useWorkspaceTree",
+            "useWorkspaceMembership",
+            "useWorkspaceIntelligence",
+        ),
+        "components/chat/ChatInterface.tsx": (
+            "useWorkspaceTree",
+            "useWorkspaceMembership",
+            "useWorkspaceIntelligence",
+        ),
+        "components/layout/sidebar/WorkspaceSelector.tsx": ("useWorkspaceTree", "useWorkspaceMembership"),
+        "components/settings/WorkspaceSettingsPanel.tsx": (
+            "useWorkspaceTree",
+            "useWorkspaceMembership",
+            "useWorkspaceIntelligence",
+        ),
+        "components/workspace/PendingWorkspaceInvites.tsx": ("useWorkspaceMembership",),
+        "components/workspace/WorkspaceAccessPanel.tsx": ("useWorkspaceTree", "useWorkspaceMembership"),
+        "components/workspace/WorkspaceOnboardingGate.tsx": ("useWorkspaceTree", "useWorkspaceMembership"),
+        "lib/workspace-collaboration-context.tsx": (
+            "useWorkspaceTree",
+            "useWorkspaceMembership",
+            "useWorkspaceIntelligence",
+        ),
+    }
+
+    for relative_path, hook_names in consumers.items():
+        source = read_frontend(relative_path)
+
+        assert "useWorkspace()" not in source
+        assert "workspace-context\"" not in source
+        for hook_name in hook_names:
+            assert hook_name in source

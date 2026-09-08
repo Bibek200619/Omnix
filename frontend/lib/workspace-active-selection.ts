@@ -10,6 +10,23 @@ type ReplaceOptions = {
   forceInvalidate?: boolean;
 };
 
+export type WorkspaceSelectionSnapshot = Readonly<{
+  generation: number;
+  workspaceId: string | null;
+}>;
+
+export type WorkspaceSelectionGuard = WorkspaceSelectionSnapshot & Readonly<{
+  isCurrent: () => boolean;
+}>;
+
+export function workspaceSelectionIsCurrent(
+  snapshot: WorkspaceSelectionSnapshot,
+  workspaceId: string | null,
+  generation: number,
+) {
+  return snapshot.workspaceId === workspaceId && snapshot.generation === generation;
+}
+
 function normalizeWorkspaceId(id: string | null): string | null {
   const normalized = id?.trim();
   return normalized || null;
@@ -44,9 +61,25 @@ export function useActiveWorkspaceSelection(userId: string | null) {
     }
   }, [replaceActiveWorkspace, userId]);
 
+  const captureActiveWorkspaceSelection = useCallback((): WorkspaceSelectionGuard => {
+    const snapshot = {
+      workspaceId: activeWorkspaceIdRef.current,
+      generation: requestGenerationRef.current,
+    };
+    return {
+      ...snapshot,
+      isCurrent: () => workspaceSelectionIsCurrent(
+        snapshot,
+        activeWorkspaceIdRef.current,
+        requestGenerationRef.current,
+      ),
+    };
+  }, []);
+
   return {
     activeWorkspaceId,
     activeWorkspaceIdRef,
+    captureActiveWorkspaceSelection,
     requestGenerationRef,
     replaceActiveWorkspace,
     setActiveWorkspace,

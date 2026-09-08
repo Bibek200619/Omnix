@@ -7,19 +7,29 @@ from typing import Any
 
 from ..observability.safe_logging import safe_text_preview
 from .document_context_service import build_uploaded_document_context, find_unavailable_uploaded_documents
+from .prompt_trust import untrusted_user_request_block
 from .query_classifier import SearchDecision, SearchMode, classify_search_need
-from .supabase_service import select_all, select_all_trusted
+from .retrieval_state import (
+    WEB_NO_RESULTS_ANSWER,
+    apply_channel_failure,
+    hybrid_retrieval_state,
+    prompt_with_retrieval_coverage_guard,
+    retrieval_unavailable_answer,
+    set_retrieval_outcome,
+    should_bypass_model_for_retrieval,
+)
+from .message_retrieval_support import (
+    compact_intelligence_debug,
+    has_retrievable_documents,
+    is_lightweight_conversation,
+    load_workspace_intelligence_for_chat,
+    merge_sources,
+)
 from .web_search import WebSearchResponse, get_web_search_service
-from .workspace_intelligence_service import build_workspace_intelligence_profile
 
 logger = logging.getLogger(__name__)
-
 DOCUMENT_INTENT_RE = re.compile(
     r"\b(file|document|doc|pdf|docx|upload|attached|attachment|summari[sz]e|analy[sz]e|resume|contract|report|context|source)\b",
-    re.IGNORECASE,
-)
-LIGHTWEIGHT_CONVERSATION_RE = re.compile(
-    r"^(hi|hello|hey|thanks|thank you|ok|okay|yes|no|cool|great|nice|got it|sounds good|help)\b[!.?\s]*$",
     re.IGNORECASE,
 )
 
@@ -27,10 +37,14 @@ BuildWebSupplementsFn = Callable[..., Awaitable[tuple[list[Any], list[dict[str, 
 UploadedContextFn = Callable[..., Awaitable[Any]]
 UnavailableDocumentsFn = Callable[..., Awaitable[list[dict[str, Any]]]]
 HasRetrievableDocumentsFn = Callable[..., Awaitable[bool]]
-WorkspaceIntelligenceFn = Callable[[str, str], Awaitable[dict[str, Any] | None]]
-
-
-def retrieval_debug_from_context(strategy: str, built_context: Any) -> dict[str, Any]:
+def retrieval_debug_from_context(
+    strategy: str,
+    built_context: Any,
+    *,
+    outcome: str = "sources_found",
+    reason: str | None = None,
+    failed_channels: list[str] | None = None,
+) -> dict[str, Any]:
     chunks = built_context.chunks if getattr(built_context, "chunks", None) else []
     sources = built_context.sources if getattr(built_context, "sources", None) else []
     first_chunk: dict[str, Any] = chunks[0] if chunks else {}
@@ -42,23 +56,33 @@ def retrieval_debug_from_context(strategy: str, built_context: Any) -> dict[str,
         or ""
     )
 
-    return {
+    debug = {
         "strategy": strategy,
         "retrieved_chunks_count": len(chunks) or len(sources),
         "first_chunk_preview": safe_text_preview(preview, max_chars=240),
         "diagnostics": getattr(built_context, "diagnostics", {}),
     }
+    return set_retrieval_outcome(
+        debug,
+        outcome=outcome,
+        reason=reason,
+        failed_channels=failed_channels,
+    )
 
 
-def empty_retrieval_debug(strategy: str = "none") -> dict[str, Any]:
-    return {
+def empty_retrieval_debug(
+    strategy: str = "none",
+    *,
+    outcome: str = "not_requested",
+    reason: str | None = None,
+    failed_channels: list[str] | None = None,
+) -> dict[str, Any]:
+    return set_retrieval_outcome({
         "strategy": strategy,
         "retrieved_chunks_count": 0,
         "first_chunk_preview": "",
         "diagnostics": {},
-    }
-
-
+    }, outcome=outcome, reason=reason, failed_channels=failed_channels)
 def document_unavailable_answer(files: list[dict[str, Any]]) -> str:
     first = files[0] if files else {}
     name = str(first.get("file_name") or "this file")
@@ -83,13 +107,6 @@ def should_skip_retrieval_for_prompt(message_text: str) -> bool:
         return False
 
     return len(normalized) <= 120
-
-
-def is_lightweight_conversation(message_text: str) -> bool:
-    normalized = " ".join((message_text or "").strip().split())
-    if not normalized:
-        return True
-    return bool(LIGHTWEIGHT_CONVERSATION_RE.match(normalized))
 
 
 async def build_web_supplements(
@@ -152,22 +169,6 @@ async def build_web_supplements(
     return supplements, sources, decision, diagnostics
 
 
-def merge_sources(*source_groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    merged: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for group in source_groups:
-        for source in group:
-            if not isinstance(source, dict):
-                continue
-            key = str(source.get("url") or source.get("id") or source.get("label") or "")
-            if key and key in seen:
-                continue
-            if key:
-                seen.add(key)
-            merged.append(source)
-    return merged
-
-
 def web_only_context(
     message_text: str,
     *,
@@ -209,7 +210,7 @@ async def retrieve_prompt_context(
     has_retrievable_documents_fn: HasRetrievableDocumentsFn | None = None,
     document_unavailable_answer_fn: Callable[[list[dict[str, Any]]], str] = document_unavailable_answer,
 ) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
-    prompt_message = message_text
+    prompt_message = untrusted_user_request_block(message_text)
     scope_workspace_ids = (
         [
             str(item)
@@ -219,10 +220,38 @@ async def retrieve_prompt_context(
         or None
     )
     has_new_attachments = any(str(item).strip() for item in attachment_ids or [])
-    web_supplements, web_sources, search_decision, web_diagnostics = await build_web_supplements_fn(
-        message_text,
-        workspace_id=workspace_id,
-        search_mode=search_mode,
+
+    try:
+        web_supplements, web_sources, search_decision, web_diagnostics = await build_web_supplements_fn(
+            message_text,
+            workspace_id=workspace_id,
+            search_mode=search_mode,
+        )
+    except Exception:
+        logger.exception("Web retrieval setup failed for conversation %s.", conversation_id)
+        debug = empty_retrieval_debug(
+            "retrieval_failed",
+            outcome="failed",
+            reason="provider_unavailable",
+            failed_channels=["web"],
+        )
+        return retrieval_unavailable_answer(), [], debug
+
+    def with_common_diagnostics(debug: dict[str, Any]) -> dict[str, Any]:
+        diagnostics = debug.get("diagnostics")
+        if not isinstance(diagnostics, dict):
+            diagnostics = {}
+            debug["diagnostics"] = diagnostics
+        diagnostics["web_search"] = web_diagnostics
+        if intelligence_profile:
+            debug["workspace_intelligence"] = compact_intelligence_debug(intelligence_profile)
+        return debug
+
+    web_search = web_diagnostics.get("search") if isinstance(web_diagnostics, dict) else None
+    web_failed = bool(
+        search_decision.needs_web
+        and isinstance(web_search, dict)
+        and web_search.get("ok") is False
     )
     if search_mode == "web":
         if web_supplements:
@@ -231,13 +260,21 @@ async def retrieve_prompt_context(
                 workspace_id=workspace_id,
                 web_supplements=web_supplements,
             )
-            debug["diagnostics"]["web_search"] = web_diagnostics
-            return prompt, merge_sources(sources, web_sources), debug
-        debug = empty_retrieval_debug("web_unavailable")
-        debug["diagnostics"]["web_search"] = web_diagnostics
-        if intelligence_profile:
-            debug["workspace_intelligence"] = compact_intelligence_debug(intelligence_profile)
-        return prompt_message, [], debug
+            return prompt, merge_sources(sources, web_sources), with_common_diagnostics(debug)
+        if web_failed:
+            debug = empty_retrieval_debug(
+                "web_unavailable",
+                outcome="failed",
+                reason="provider_unavailable",
+                failed_channels=["web"],
+            )
+            return retrieval_unavailable_answer(), [], with_common_diagnostics(debug)
+        debug = empty_retrieval_debug(
+            "web_no_relevant_sources",
+            outcome="no_relevant_sources",
+            reason="no_matches",
+        )
+        return WEB_NO_RESULTS_ANSWER, [], with_common_diagnostics(debug)
 
     skip_lightweight_prompt = (
         not has_new_attachments
@@ -246,11 +283,22 @@ async def retrieve_prompt_context(
     )
     if skip_lightweight_prompt and workspace_id and not is_lightweight_conversation(message_text):
         has_documents = has_retrievable_documents_fn or has_retrievable_documents
-        if await has_documents(
-            user_id=user_id,
-            workspace_id=workspace_id,
-            scope_workspace_ids=scope_workspace_ids,
-        ):
+        try:
+            documents_exist = await has_documents(
+                user_id=user_id,
+                workspace_id=workspace_id,
+                scope_workspace_ids=scope_workspace_ids,
+            )
+        except Exception:
+            logger.exception("Document availability check failed for conversation %s.", conversation_id)
+            debug = empty_retrieval_debug(
+                "retrieval_failed",
+                outcome="failed",
+                reason="availability_unavailable",
+                failed_channels=["availability"],
+            )
+            return retrieval_unavailable_answer(), [], with_common_diagnostics(debug)
+        if documents_exist:
             skip_lightweight_prompt = False
 
     if skip_lightweight_prompt:
@@ -259,12 +307,9 @@ async def retrieve_prompt_context(
             conversation_id,
             workspace_id,
         )
-        debug = empty_retrieval_debug("lightweight_prompt")
-        debug["diagnostics"]["web_search"] = web_diagnostics
-        if intelligence_profile:
-            debug["workspace_intelligence"] = compact_intelligence_debug(intelligence_profile)
-        return prompt_message, [], debug
+        return prompt_message, [], with_common_diagnostics(empty_retrieval_debug("lightweight_prompt"))
 
+    uploaded_context_failed = False
     try:
         uploaded_context = await build_uploaded_document_context_fn(
             message_text,
@@ -275,37 +320,75 @@ async def retrieve_prompt_context(
             supplemental_contexts=web_supplements,
         )
         if uploaded_context and uploaded_context.sources:
+            if not isinstance(uploaded_context.diagnostics, dict):
+                uploaded_context.diagnostics = {}
             uploaded_context.diagnostics["web_search"] = web_diagnostics
             uploaded_context.diagnostics["workspace_intelligence"] = compact_intelligence_debug(intelligence_profile)
+            debug = retrieval_debug_from_context("uploaded_document", uploaded_context)
+            if web_failed:
+                debug = apply_channel_failure(debug, channel="web", reason="provider_unavailable")
             return (
-                uploaded_context.prompt,
+                prompt_with_retrieval_coverage_guard(uploaded_context.prompt, str(debug.get("outcome") or "")),
                 merge_sources(uploaded_context.sources, web_sources),
-                retrieval_debug_from_context("uploaded_document", uploaded_context),
+                with_common_diagnostics(debug),
             )
-    except Exception as exc:
-        logger.exception("Uploaded document context retrieval failed for conversation %s: %s", conversation_id, exc)
+    except Exception:
+        logger.exception("Uploaded document context retrieval failed for conversation %s.", conversation_id)
+        uploaded_context_failed = True
 
     if DOCUMENT_INTENT_RE.search(message_text):
-        unavailable_files = await find_unavailable_uploaded_documents_fn(
+        try:
+            unavailable_files = await find_unavailable_uploaded_documents_fn(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                workspace_id=workspace_id,
+                scope_workspace_ids=scope_workspace_ids,
+            )
+        except Exception:
+            logger.exception("Uploaded-document availability lookup failed for conversation %s.", conversation_id)
+            debug = empty_retrieval_debug(
+                "retrieval_failed",
+                outcome="failed",
+                reason="availability_unavailable",
+                failed_channels=["uploaded_document"],
+            )
+            return retrieval_unavailable_answer(), [], with_common_diagnostics(debug)
+        if unavailable_files:
+            debug = empty_retrieval_debug(
+                "document_unavailable",
+                outcome="source_unavailable",
+                reason="source_processing",
+            )
+            debug["diagnostics"]["unavailable_documents"] = unavailable_files
+            return document_unavailable_answer_fn(unavailable_files), [], with_common_diagnostics(debug)
+
+    has_documents = has_retrievable_documents_fn or has_retrievable_documents
+    try:
+        documents_exist = await has_documents(
             user_id=user_id,
-            conversation_id=conversation_id,
             workspace_id=workspace_id,
             scope_workspace_ids=scope_workspace_ids,
         )
-        if unavailable_files:
-            debug = empty_retrieval_debug("document_unavailable")
-            debug["diagnostics"]["web_search"] = web_diagnostics
-            debug["diagnostics"]["unavailable_documents"] = unavailable_files
-            if intelligence_profile:
-                debug["workspace_intelligence"] = compact_intelligence_debug(intelligence_profile)
-            return document_unavailable_answer_fn(unavailable_files), [], debug
+    except Exception:
+        logger.exception("Document availability check failed before hybrid retrieval for conversation %s.", conversation_id)
+        debug = empty_retrieval_debug(
+            "retrieval_failed",
+            outcome="failed",
+            reason="availability_unavailable",
+            failed_channels=["availability"],
+        )
+        if web_supplements:
+            prompt, sources, web_debug = web_only_context(
+                message_text,
+                workspace_id=workspace_id,
+                web_supplements=web_supplements,
+            )
+            return prompt_with_retrieval_coverage_guard(prompt, "partial"), merge_sources(sources, web_sources), with_common_diagnostics(
+                apply_channel_failure(web_debug, channel="availability", reason="availability_unavailable")
+            )
+        return retrieval_unavailable_answer(), [], with_common_diagnostics(debug)
 
-    has_documents = has_retrievable_documents_fn or has_retrievable_documents
-    if not await has_documents(
-        user_id=user_id,
-        workspace_id=workspace_id,
-        scope_workspace_ids=scope_workspace_ids,
-    ):
+    if not documents_exist:
         logger.info(
             "Skipping hybrid retrieval because no document chunks exist for conversation %s workspace_id=%s.",
             conversation_id,
@@ -317,13 +400,19 @@ async def retrieve_prompt_context(
                 workspace_id=workspace_id,
                 web_supplements=web_supplements,
             )
-            debug["diagnostics"]["web_search"] = web_diagnostics
-            return prompt, merge_sources(sources, web_sources), debug
-        debug = empty_retrieval_debug("no_documents")
-        debug["diagnostics"]["web_search"] = web_diagnostics
-        if intelligence_profile:
-            debug["workspace_intelligence"] = compact_intelligence_debug(intelligence_profile)
-        return prompt_message, [], debug
+            if uploaded_context_failed:
+                debug = apply_channel_failure(debug, channel="uploaded_document")
+            return prompt_with_retrieval_coverage_guard(prompt, str(debug.get("outcome") or "")), merge_sources(sources, web_sources), with_common_diagnostics(debug)
+        debug = empty_retrieval_debug(
+            "no_documents",
+            outcome="no_relevant_sources",
+            reason="no_documents",
+        )
+        if uploaded_context_failed:
+            debug = apply_channel_failure(debug, channel="uploaded_document")
+        if debug.get("outcome") == "failed":
+            return retrieval_unavailable_answer(), [], with_common_diagnostics(debug)
+        return prompt_message, [], with_common_diagnostics(debug)
 
     try:
         from ..rag.startup import get_vector_store
@@ -336,6 +425,7 @@ async def retrieve_prompt_context(
             user_id=user_id,
             workspace_id=workspace_id,
         )
+        outcome, reason, failed_channels = hybrid_retrieval_state(response)
         if web_supplements:
             context_builder = ContextBuilder(
                 max_chunks=min(engine.context_builder.max_chunks + len(web_supplements), 10),
@@ -357,19 +447,36 @@ async def retrieve_prompt_context(
             response.results,
             workspace_id=workspace_id,
             supplemental_contexts=web_supplements,
+            retrieval_outcome=outcome,
         )
         response.diagnostics["context"] = built_context.diagnostics
         built_context.diagnostics["web_search"] = web_diagnostics
         built_context.diagnostics["workspace_intelligence"] = compact_intelligence_debug(intelligence_profile)
 
+        debug = retrieval_debug_from_context(
+            "hybrid",
+            built_context,
+            outcome=outcome,
+            reason=reason,
+            failed_channels=failed_channels,
+        )
+        if web_failed:
+            debug = apply_channel_failure(debug, channel="web", reason="provider_unavailable")
+        if uploaded_context_failed:
+            debug = apply_channel_failure(debug, channel="uploaded_document")
         if built_context.sources:
-            return (
-                built_context.prompt,
-                merge_sources(built_context.sources, web_sources),
-                retrieval_debug_from_context("hybrid", built_context),
-            )
-    except Exception as exc:
-        logger.exception("Hybrid retrieval failed for conversation %s: %s", conversation_id, exc)
+            return prompt_with_retrieval_coverage_guard(built_context.prompt, str(debug.get("outcome") or "")), merge_sources(built_context.sources, web_sources), with_common_diagnostics(debug)
+        if debug.get("outcome") == "failed":
+            return retrieval_unavailable_answer(), [], with_common_diagnostics(debug)
+        debug = set_retrieval_outcome(
+            debug,
+            outcome="no_relevant_sources",
+            reason="no_matches",
+            failed_channels=debug.get("failed_channels"),
+        )
+        return prompt_message, [], with_common_diagnostics(debug)
+    except Exception:
+        logger.exception("Hybrid retrieval failed for conversation %s.", conversation_id)
 
     if web_supplements:
         prompt, sources, debug = web_only_context(
@@ -377,77 +484,17 @@ async def retrieve_prompt_context(
             workspace_id=workspace_id,
             web_supplements=web_supplements,
         )
-        debug["diagnostics"]["web_search"] = web_diagnostics
-        return prompt, merge_sources(sources, web_sources), debug
+        debug = apply_channel_failure(debug, channel="hybrid")
+        if uploaded_context_failed:
+            debug = apply_channel_failure(debug, channel="uploaded_document")
+        return prompt_with_retrieval_coverage_guard(prompt, str(debug.get("outcome") or "")), merge_sources(sources, web_sources), with_common_diagnostics(debug)
 
-    debug = empty_retrieval_debug()
-    debug["diagnostics"]["web_search"] = web_diagnostics
-    if intelligence_profile:
-        debug["workspace_intelligence"] = compact_intelligence_debug(intelligence_profile)
-    return prompt_message, [], debug
-
-
-def compact_intelligence_debug(profile: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not profile:
-        return None
-    return {
-        "workspace_id": profile.get("workspace_id"),
-        "workspace_name": profile.get("workspace_name"),
-        "workspace_focus": profile.get("workspace_focus") or profile.get("ai_specialization"),
-        "ai_specialization": profile.get("ai_specialization"),
-        "retrieval_scope": profile.get("retrieval_scope"),
-        "source_count": profile.get("source_count"),
-        "active_domains": profile.get("active_domains", [])[:8],
-        "scope_workspace_ids": profile.get("scope_workspace_ids", [])[:20],
-    }
-
-
-async def load_workspace_intelligence_for_chat(
-    workspace_id: str | None,
-    user_id: str,
-    *,
-    build_workspace_intelligence_profile_fn: WorkspaceIntelligenceFn = build_workspace_intelligence_profile,
-) -> dict[str, Any] | None:
-    if not workspace_id:
-        return None
-    try:
-        return await build_workspace_intelligence_profile_fn(workspace_id, user_id)
-    except Exception:
-        logger.exception("Failed to load workspace intelligence profile for chat; continuing with generic AI context.")
-        return None
-
-
-async def has_retrievable_documents(
-    *,
-    user_id: str,
-    workspace_id: str | None,
-    scope_workspace_ids: list[str] | None = None,
-    select_all_fn: Callable[..., Awaitable[list[dict[str, Any]]]] = select_all,
-    select_all_trusted_fn: Callable[..., Awaitable[list[dict[str, Any]]]] = select_all_trusted,
-) -> bool:
-    try:
-        workspace_ids = [
-            str(item)
-            for item in (scope_workspace_ids or ([workspace_id] if workspace_id else []))
-            if str(item or "").strip()
-        ]
-        if workspace_ids:
-            rows = await select_all_trusted_fn(
-                "documents",
-                "id,workspace_id",
-                filters={"workspace_id": workspace_ids},
-                limit=1,
-            )
-            scope_set = set(workspace_ids)
-            return any(str(row.get("workspace_id") or "") in scope_set for row in rows)
-
-        rows = await select_all_fn(
-            "documents",
-            "id,workspace_id",
-            filters={"user_id": user_id},
-            limit=1,
-        )
-        return any(not row.get("workspace_id") for row in rows)
-    except Exception:
-        logger.exception("Unable to check document availability; allowing hybrid retrieval fallback.")
-        return True
+    debug = empty_retrieval_debug(
+        "retrieval_failed",
+        outcome="failed",
+        reason="hybrid_unavailable",
+        failed_channels=["hybrid"],
+    )
+    if uploaded_context_failed:
+        debug = apply_channel_failure(debug, channel="uploaded_document")
+    return retrieval_unavailable_answer(), [], with_common_diagnostics(debug)

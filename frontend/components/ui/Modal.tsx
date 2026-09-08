@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
-import type { HTMLAttributes, MouseEvent, ReactNode } from "react";
+import { useEffect, useId } from "react";
+import type {
+  HTMLAttributes,
+  KeyboardEvent,
+  MouseEvent,
+  ReactNode,
+  RefObject,
+} from "react";
 import { Portal } from "@/components/ui/Portal";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { cn } from "@/lib/utils";
@@ -9,26 +15,35 @@ import { cn } from "@/lib/utils";
 type ModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  title: ReactNode;
+  title: string;
+  description?: string;
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
   backdropClassName?: string;
   footerClassName?: string;
+  initialFocusRef?: RefObject<HTMLElement | null>;
+  closeDisabled?: boolean;
+  role?: "dialog" | "alertdialog";
 };
 
 function ModalRoot({
   isOpen,
   onClose,
   title,
+  description,
   children,
   footer,
   className,
   backdropClassName,
   footerClassName,
+  initialFocusRef,
+  closeDisabled = false,
+  role = "dialog",
 }: ModalProps) {
-  const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
-  const label = typeof title === "string" ? title : undefined;
+  const modalRef = useFocusTrap<HTMLDivElement>(isOpen, initialFocusRef, { isolateBackground: true });
+  const titleId = useId();
+  const descriptionId = useId();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -50,25 +65,19 @@ function ModalRoot({
     };
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
   if (!isOpen) return null;
 
   function handleBackdropMouseDown(event: MouseEvent<HTMLDivElement>) {
-    if (event.target === event.currentTarget) {
+    if (!closeDisabled && event.target === event.currentTarget) {
       onClose();
     }
+  }
+
+  function handleDialogKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.defaultPrevented || event.key !== "Escape" || closeDisabled) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onClose();
   }
 
   return (
@@ -76,14 +85,19 @@ function ModalRoot({
       <div
         className={cn("omnix-modal-backdrop fixed inset-0 z-[150] flex items-center justify-center p-4 backdrop-blur-md", backdropClassName)}
         onMouseDown={handleBackdropMouseDown}
+        onKeyDown={handleDialogKeyDown}
       >
         <div
           ref={modalRef}
-          role="dialog"
+          role={role}
           aria-modal="true"
-          aria-label={label}
-          className={cn("omnix-modal-card relative flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden", className)}
+          aria-labelledby={titleId}
+          aria-describedby={description ? descriptionId : undefined}
+          tabIndex={-1}
+          className={cn("omnix-modal-card relative flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden overscroll-contain", className)}
         >
+          <span id={titleId} className="sr-only">{title}</span>
+          {description ? <span id={descriptionId} className="sr-only">{description}</span> : null}
           {children}
           {footer ? <ModalFooter className={footerClassName}>{footer}</ModalFooter> : null}
         </div>
@@ -105,7 +119,7 @@ function ModalHeader({ className, children, ...props }: HTMLAttributes<HTMLDivEl
 
 function ModalBody({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("omnix-scrollbar relative z-10 min-h-0 flex-1 overflow-y-auto p-4 sm:p-6", className)} {...props}>
+    <div className={cn("omnix-scrollbar relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6", className)} {...props}>
       {children}
     </div>
   );

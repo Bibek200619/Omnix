@@ -3,20 +3,26 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
 import { Portal } from "@/components/ui/Portal";
 
-type ToastVariant = "info" | "success" | "warning" | "error";
+export type ToastVariant = "info" | "success" | "warning" | "error";
 
-type ToastInput = {
+export type ToastInput = {
   title?: string;
   message: string;
   variant?: ToastVariant;
   durationMs?: number;
+  action?: {
+    label: string;
+    onClick: () => void | Promise<void>;
+  };
 };
 
 type ToastRecord = Required<Pick<ToastInput, "message" | "variant" | "durationMs">> & {
   id: string;
   title?: string;
+  action?: ToastInput["action"];
 };
 
 type ToastContextValue = {
@@ -56,6 +62,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           message: nextToast.message,
           variant: nextToast.variant ?? "success",
           durationMs,
+          action: nextToast.action,
         },
       ]);
       if (durationMs > 0) {
@@ -77,6 +84,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ showToast, dismissToast }), [dismissToast, showToast]);
 
+  const runToastAction = useCallback((toast: ToastRecord) => {
+    const action = toast.action;
+    if (!action) return;
+    void Promise.resolve(action.onClick()).finally(() => dismissToast(toast.id));
+  }, [dismissToast]);
+
   return (
     <ToastContext.Provider value={value}>
       {children}
@@ -84,7 +97,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         <div className="pointer-events-none fixed right-4 top-4 z-[220] flex w-[min(24rem,calc(100vw_-_2rem))] flex-col gap-3">
           {toasts.map((toast) => (
             <Alert key={toast.id} variant={toast.variant} title={toast.title} className="pointer-events-auto relative pr-11 shadow-[var(--omnix-glow-sm)] backdrop-blur-xl">
-              {toast.message}
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="min-w-0 flex-1 break-words">{toast.message}</span>
+                {toast.action ? (
+                  <Button type="button" size="sm" variant="secondary" className="min-h-9" onClick={() => runToastAction(toast)}>
+                    {toast.action.label}
+                  </Button>
+                ) : null}
+              </div>
               <button
                 type="button"
                 onClick={() => dismissToast(toast.id)}

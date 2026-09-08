@@ -4,7 +4,9 @@ from collections.abc import Awaitable, Callable
 import logging
 from typing import Any
 
+from .citation_validation_service import pending_citation_validation, validate_generated_citations
 from .query_classifier import SearchMode
+from .retrieval_state import public_retrieval_payload
 from .supabase_service import SupabaseServiceError, update_one, update_one_trusted
 
 logger = logging.getLogger(__name__)
@@ -115,26 +117,36 @@ def assistant_message_payload(
     sources: list[dict[str, Any]],
     search_mode: SearchMode,
     retrieval_debug: dict[str, Any] | None,
+    content: str | None = None,
 ) -> dict[str, Any]:
     compact_sources = compact_sources_for_payload(sources)
     mode = mode_from_retrieval_debug(search_mode, retrieval_debug, compact_sources)
     web_search_used = any(source.get("type") == "web" or source.get("url") for source in compact_sources)
-    citations = [
-        str(source["label"])
-        for source in compact_sources
-        if isinstance(source.get("label"), str) and source.get("label")
-    ]
-    return {
+    citation_validation = (
+        validate_generated_citations(content, compact_sources)
+        if content is not None
+        else pending_citation_validation(compact_sources)
+    )
+    payload: dict[str, Any] = {
         "mode": mode,
         "web_search_used": web_search_used,
         "sources": compact_sources,
-        "citations": citations,
+        "citations": list(citation_validation.citations),
+        "citation_validation": citation_validation.public_payload,
     }
+    retrieval = public_retrieval_payload(retrieval_debug, compact_sources)
+    if retrieval:
+        payload["retrieval"] = retrieval
+    return payload
 
 
 def has_persistable_payload(payload: dict[str, Any]) -> bool:
     sources = payload.get("sources")
-    return bool(payload.get("web_search_used") or (isinstance(sources, list) and sources))
+    return bool(
+        payload.get("web_search_used")
+        or (isinstance(sources, list) and sources)
+        or isinstance(payload.get("retrieval"), dict)
+    )
 
 
 async def persist_assistant_payload(
@@ -156,12 +168,13 @@ async def persist_assistant_payload(
         return None
 
     logger.info(
-        "Persisting assistant payload: stage=%s assistant_message_id=%s mode=%s web_search_used=%s source_count=%d",
+        "Persisting assistant payload: stage=%s assistant_message_id=%s mode=%s web_search_used=%s source_count=%d retrieval_outcome=%s",
         stage,
         assistant_message_id,
         message_payload.get("mode"),
         message_payload.get("web_search_used"),
         len(message_payload.get("sources") or []),
+        (message_payload.get("retrieval") or {}).get("outcome") if isinstance(message_payload.get("retrieval"), dict) else None,
     )
 
     try:
@@ -201,10 +214,13 @@ async def update_assistant_message(
 ) -> dict[str, Any] | None:
     payload: dict[str, Any] = {"content": content, "status": status_value}
     if sources is not None:
+        content = validate_generated_citations(content, sources).content
+        payload["content"] = content
         message_payload = assistant_message_payload(
             sources=sources,
             search_mode=search_mode,
             retrieval_debug=retrieval_debug,
+            content=content,
         )
         if has_persistable_payload(message_payload):
             payload["payload"] = message_payload
@@ -226,7 +242,16 @@ async def update_assistant_message(
                 {
                     "content": content,
                     "status": status_value,
-                    "metadata": {"sources": payload["payload"]["sources"]},
+                    "metadata": {
+                        "sources": payload["payload"]["sources"],
+                        "citations": payload["payload"]["citations"],
+                        "citation_validation": payload["payload"]["citation_validation"],
+                        **(
+                            {"retrieval": payload["payload"]["retrieval"]}
+                            if isinstance(payload["payload"].get("retrieval"), dict)
+                            else {}
+                        ),
+                    },
                 },
             )
         except SupabaseServiceError:

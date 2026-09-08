@@ -60,6 +60,8 @@ export function WorkspaceDestructiveConfirmationModal({
       isOpen={Boolean(confirmation)}
       onClose={onCancel}
       title={confirmation?.title || "Confirm destructive action"}
+      description={confirmation?.description}
+      role="alertdialog"
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onCancel}>

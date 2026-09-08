@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from ..core.security import get_current_user
 from .ai_rate_limits import enforce_expensive_ai_rate_limit
@@ -10,6 +10,7 @@ from ..services.workspace_service import require_workspace_access
 from ..schemas.workspace_decisions import (
     DecisionCandidateListRead,
     DecisionCandidateMetricCreate,
+    WorkspaceDecisionCandidateCreate,
     WorkspaceDecisionCreate,
     WorkspaceDecisionFromMessageCreate,
     WorkspaceDecisionLinkInitiative,
@@ -19,6 +20,7 @@ from ..schemas.workspace_decisions import (
 )
 from ..services.workspace_decision_service import (
     create_decision,
+    create_decision_from_candidate,
     create_decision_from_message,
     get_decision,
     link_initiative_to_decision,
@@ -26,6 +28,7 @@ from ..services.workspace_decision_service import (
     list_decisions,
     unlink_task_from_decision,
     update_decision_status,
+    validate_candidate_metric_source,
 )
 from ..services.decision_candidate_service import (
     conversation_decision_candidates,
@@ -65,6 +68,21 @@ async def post_workspace_decision(
     )
 
 
+@router.post("/candidates/accept", response_model=WorkspaceDecisionRead, status_code=status.HTTP_201_CREATED)
+async def post_workspace_decision_candidate(
+    workspace_id: str,
+    payload: WorkspaceDecisionCandidateCreate,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = _user_id(current_user)
+    await require_workspace_access(workspace_id, user_id)
+    return await create_decision_from_candidate(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        payload=payload.model_dump(),
+    )
+
+
 @router.post(
     "/from-message/{channel_id}/{message_id}",
     response_model=WorkspaceDecisionRead,
@@ -91,6 +109,7 @@ async def post_workspace_decision_from_message(
 async def post_conversation_decision_candidates(
     workspace_id: str,
     channel_id: str,
+    source_offset: int = Query(0, ge=0),
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     user_id = _user_id(current_user)
@@ -104,6 +123,7 @@ async def post_conversation_decision_candidates(
         workspace_id=workspace_id,
         channel_id=channel_id,
         user_id=user_id,
+        source_offset=source_offset,
     )
 
 
@@ -111,6 +131,7 @@ async def post_conversation_decision_candidates(
 async def post_document_decision_candidates(
     workspace_id: str,
     file_id: str,
+    source_offset: int = Query(0, ge=0),
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     user_id = _user_id(current_user)
@@ -124,6 +145,7 @@ async def post_document_decision_candidates(
         workspace_id=workspace_id,
         file_id=file_id,
         user_id=user_id,
+        source_offset=source_offset,
     )
 
 
@@ -133,10 +155,17 @@ async def post_decision_candidate_metric(
     payload: DecisionCandidateMetricCreate,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> None:
-    await require_workspace_access(workspace_id, _user_id(current_user))
+    user_id = _user_id(current_user)
+    await require_workspace_access(workspace_id, user_id)
+    await validate_candidate_metric_source(
+        workspace_id=workspace_id,
+        user_id=user_id,
+        source_type=payload.source_type,
+        source_id=payload.source_id,
+    )
     await log_candidate_metrics(
         workspace_id=workspace_id,
-        user_id=_user_id(current_user),
+        user_id=user_id,
         source_type=payload.source_type,
         source_id=payload.source_id,
         action=payload.action,

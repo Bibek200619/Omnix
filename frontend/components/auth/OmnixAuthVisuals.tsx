@@ -68,7 +68,7 @@ export function AuthBrand({ compact = false }: { compact?: boolean }) {
   return (
     <Link href="/" className="flex items-center gap-3" aria-label="Omnix home">
       <AuthOmnixMark size={compact ? 32 : 34} />
-      <span className="text-xl font-semibold tracking-[-0.045em]" style={{ color: AUTH_C.white }}>
+      <span className="text-xl font-semibold tracking-[-0.045em] text-white">
         Omnix
       </span>
     </Link>
@@ -133,7 +133,7 @@ export const AuthInput = forwardRef<HTMLInputElement, AuthInputProps>(
 
     return (
       <label className="group flex flex-col gap-1.5" htmlFor={inputId}>
-        <span className="text-xs font-bold" style={{ color: AUTH_C.muted }}>
+        <span className="text-xs font-bold text-[var(--omnix-text-2)]">
           {label}
         </span>
         <span className="relative block">
@@ -154,7 +154,7 @@ export const AuthInput = forwardRef<HTMLInputElement, AuthInputProps>(
             {...props}
           />
         </span>
-        {hint ? <span className="text-xs leading-5" style={{ color: AUTH_C.faint }}>{hint}</span> : null}
+        {hint ? <span className="text-xs leading-5 text-[var(--omnix-text-3)]">{hint}</span> : null}
         {error ? (
           <span id={errorId} className="text-xs leading-5 text-rose-200">
             {error}

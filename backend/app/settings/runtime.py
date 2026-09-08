@@ -5,5 +5,6 @@ class RuntimeSettings(BaseAppSettings):
     WORKER_COUNT: int = 4
     REDIS_URL: str = "redis://localhost:6379/0"
     STREAMING_TIMEOUT: float = 30.0
+    OMNIX_API_LOG_DRAIN_TIMEOUT_SECONDS: float = 10.0
     CORS_ALLOWED_ORIGINS: str = ""
     CORS_ALLOWED_ORIGIN_REGEX: str | None = None

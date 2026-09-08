@@ -119,7 +119,12 @@ async def run_preflight() -> int:
 
     # Sample DB embedding dimension check
     try:
-        rows = await select_all_trusted("documents", "id,embedding", limit=10)
+        rows = await select_all_trusted(
+            "documents",
+            "id,embedding",
+            limit=10,
+            unscoped_reason="startup_embedding_contract_sample",
+        )
         checked = 0
         if rows:
             for row in rows:

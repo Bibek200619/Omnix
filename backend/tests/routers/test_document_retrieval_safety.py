@@ -5,6 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 from backend.app.routers import messages
+from backend.app.retrieval.context_builder import ContextBuilder
+from backend.app.services.prompt_trust import BEGIN_UNTRUSTED_SOURCE_DATA
 from backend.app.services.query_classifier import SearchDecision
 
 
@@ -133,6 +135,125 @@ async def test_short_greeting_still_skips_retrieval() -> None:
         has_retrievable_documents_fn=fail_has_documents,
     )
 
-    assert prompt == "thanks"
+    assert "CURRENT USER REQUEST (UNTRUSTED):" in prompt
+    assert BEGIN_UNTRUSTED_SOURCE_DATA in prompt
+    assert '"kind": "user_message"' in prompt
+    assert "thanks" in prompt
     assert sources == []
     assert debug["strategy"] == "lightweight_prompt"
+
+
+@pytest.mark.asyncio
+async def test_hybrid_failure_returns_explicit_non_source_backed_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FailingHybridSearch:
+        def __init__(self, *_args, **_kwargs) -> None:
+            self.context_builder = ContextBuilder()
+
+        async def search(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                results=[],
+                diagnostics={
+                    "retrieval": {
+                        "outcome": "failed",
+                        "reason": "channel_timeout",
+                        "failed_channels": ["semantic", "keyword"],
+                    }
+                },
+            )
+
+    async def fake_web(*args, **kwargs):
+        return [], [], SearchDecision("workspace", "workspace", False, 0.0, ["workspace_only"]), {}
+
+    async def no_uploaded_context(*args, **kwargs):
+        return None
+
+    async def no_unavailable_documents(*args, **kwargs):
+        return []
+
+    async def has_documents(*args, **kwargs):
+        return True
+
+    from backend.app.rag import startup
+    from backend.app.retrieval import hybrid_search
+
+    monkeypatch.setattr(startup, "get_vector_store", lambda: object())
+    monkeypatch.setattr(hybrid_search, "HybridSearchEngine", FailingHybridSearch)
+
+    prompt, sources, debug = await messages.message_retrieval_service.retrieve_prompt_context(
+        "Summarize the workspace documents",
+        "user-1",
+        "conversation-1",
+        "workspace-1",
+        [],
+        "workspace",
+        {"scope_workspace_ids": ["workspace-1"]},
+        build_web_supplements_fn=fake_web,
+        build_uploaded_document_context_fn=no_uploaded_context,
+        find_unavailable_uploaded_documents_fn=no_unavailable_documents,
+        has_retrievable_documents_fn=has_documents,
+    )
+
+    assert prompt == messages.message_retrieval_service.retrieval_unavailable_answer()
+    assert sources == []
+    assert debug["strategy"] == "hybrid"
+    assert debug["outcome"] == "failed"
+    assert debug["reason"] == "channel_timeout"
+    assert debug["failed_channels"] == ["semantic", "keyword"]
+
+
+@pytest.mark.asyncio
+async def test_hybrid_empty_context_is_not_reported_as_retrieval_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    class EmptyHybridSearch:
+        def __init__(self, *_args, **_kwargs) -> None:
+            self.context_builder = ContextBuilder()
+
+        async def search(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                results=[],
+                diagnostics={
+                    "retrieval": {
+                        "outcome": "no_relevant_sources",
+                        "reason": "no_matches",
+                        "failed_channels": [],
+                    }
+                },
+            )
+
+    async def fake_web(*args, **kwargs):
+        return [], [], SearchDecision("workspace", "workspace", False, 0.0, ["workspace_only"]), {}
+
+    async def no_uploaded_context(*args, **kwargs):
+        return None
+
+    async def no_unavailable_documents(*args, **kwargs):
+        return []
+
+    async def has_documents(*args, **kwargs):
+        return True
+
+    from backend.app.rag import startup
+    from backend.app.retrieval import hybrid_search
+
+    monkeypatch.setattr(startup, "get_vector_store", lambda: object())
+    monkeypatch.setattr(hybrid_search, "HybridSearchEngine", EmptyHybridSearch)
+
+    prompt, sources, debug = await messages.message_retrieval_service.retrieve_prompt_context(
+        "Summarize the workspace documents",
+        "user-1",
+        "conversation-1",
+        "workspace-1",
+        [],
+        "workspace",
+        {"scope_workspace_ids": ["workspace-1"]},
+        build_web_supplements_fn=fake_web,
+        build_uploaded_document_context_fn=no_uploaded_context,
+        find_unavailable_uploaded_documents_fn=no_unavailable_documents,
+        has_retrievable_documents_fn=has_documents,
+    )
+
+    assert "CURRENT USER REQUEST (UNTRUSTED):" in prompt
+    assert sources == []
+    assert debug["strategy"] == "hybrid"
+    assert debug["outcome"] == "no_relevant_sources"
+    assert debug["reason"] == "no_matches"
+    assert debug["failed_channels"] == []

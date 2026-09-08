@@ -47,6 +47,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "rgb(6 16 32)",
   colorScheme: "dark",
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

@@ -14,14 +14,16 @@ from .supabase_service import (
     select_one_trusted,
     update_one_trusted,
 )
+from .workspace_access_service import require_workspace_access
 from .workspace_collaboration_service import log_workspace_activity
+from .workspace_common import utc_now_iso
 from .workspace_conversation_service import MESSAGE_COLUMNS, _require_channel_access
+from .workspace_membership_service import get_profiles, list_workspace_members
 from .workspace_mention_service import (
     mention_metadata_for_sources,
     prepare_mentions_for_workspace,
     sync_mentions_for_source,
 )
-from .workspace_service import get_profiles, list_workspace_members, require_workspace_access, utc_now_iso
 
 TASK_COLUMNS = (
     "id,workspace_id,title,description,status,owner_user_id,created_by,due_date,blockers,"

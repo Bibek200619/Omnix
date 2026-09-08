@@ -27,6 +27,10 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, ErrorBoun
     });
   }
 
+  private reset = () => {
+    this.setState({ hasError: false });
+  };
+
   private refreshPage = () => {
     window.location.reload();
   };
@@ -41,14 +45,23 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, ErrorBoun
           <section className="max-w-md text-center">
             <p className="omnix-display text-3xl font-bold tracking-[0.18em] text-cyan-100">OMNIX</p>
             <h1 className="mt-6 text-2xl font-semibold">Something went wrong.</h1>
-            <p className="mt-3 text-sm leading-6 text-[var(--omnix-text-2)]">Something went wrong. Please refresh.</p>
-            <button
-              type="button"
-              className="omnix-primary-action mt-6 min-h-11 rounded-xl px-5 py-2.5 text-sm font-semibold"
-              onClick={this.refreshPage}
-            >
-              Refresh
-            </button>
+            <p className="mt-3 text-sm leading-6 text-[var(--omnix-text-2)]">Try recovering first. Drafts in active composers are restored when this view remounts.</p>
+            <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <button
+                type="button"
+                className="omnix-primary-action min-h-11 rounded-xl px-5 py-2.5 text-sm font-semibold"
+                onClick={this.reset}
+              >
+                Try again
+              </button>
+              <button
+                type="button"
+                className="min-h-11 rounded-xl border border-[var(--omnix-border)] px-5 py-2.5 text-sm font-semibold text-[var(--omnix-text-2)] transition hover:border-cyan-300/35 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                onClick={this.refreshPage}
+              >
+                Reload page
+              </button>
+            </div>
           </section>
         </main>
       );
@@ -88,7 +101,7 @@ export class SurfaceErrorBoundary extends Component<SurfaceErrorBoundaryProps, E
         <div className="p-3 sm:p-5">
           <OmnixErrorState
             title={`${this.props.surfaceName} needs attention`}
-            message="This workspace surface could not render. Try again or refresh the page."
+            message="This workspace surface could not render. Try again; active composer drafts are restored when it remounts."
             retryLabel="Try again"
             onRetry={this.reset}
           />

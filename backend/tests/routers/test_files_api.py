@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import FastAPI
+import pytest
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from app.routers import files
 from app.services.file_storage import sanitize_filename
+from app.services.workspace_common import WorkspaceAccess
 
 
 def _files_client(current_user: dict[str, Any] | None = None) -> TestClient:
@@ -109,6 +111,189 @@ def test_download_allows_managed_upload_path(monkeypatch, tmp_path) -> None:
 
     assert response.status_code == 200
     assert response.content == b"safe notes"
+
+
+def test_workspace_file_hydrates_storage_path_only_after_authorization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[tuple[str, object]] = []
+    hydrated = {
+        "id": "file-1",
+        "user_id": "owner-1",
+        "workspace_id": "workspace-1",
+        "file_name": "private.pdf",
+        "file_type": "application/pdf",
+        "storage_path": "supabase://omnix-test/uploads/owner-1/private.pdf",
+    }
+
+    async def fake_select(
+        table: str,
+        columns: str,
+        filters: dict[str, Any],
+    ) -> dict[str, Any]:
+        assert table == "files"
+        events.append(("select", (columns, filters)))
+        if columns == files.FILE_LOCATOR_COLUMNS:
+            return {
+                "id": "file-1",
+                "user_id": "owner-1",
+                "workspace_id": "workspace-1",
+            }
+        assert columns == files.FILE_COLUMNS
+        return hydrated
+
+    async def fake_access(workspace_id: str, user_id: str) -> WorkspaceAccess:
+        events.append(("authorize", (workspace_id, user_id)))
+        return WorkspaceAccess(
+            workspace={
+                "id": workspace_id,
+                "user_id": "owner-1",
+                "workspace_type": "workspace",
+            },
+            role="member",
+        )
+
+    async def fake_read(storage_path: str) -> bytes:
+        events.append(("read", storage_path))
+        return b"%PDF-1.4"
+
+    monkeypatch.setattr(files, "select_one_trusted", fake_select)
+    monkeypatch.setattr(files, "require_workspace_access", fake_access)
+    monkeypatch.setattr(files, "read_bytes_from_storage", fake_read)
+    client = _files_client({"sub": "member-1", "role": "authenticated"})
+
+    response = client.get("/files/file-1/download")
+
+    assert response.status_code == 200
+    assert events == [
+        (
+            "select",
+            (files.FILE_LOCATOR_COLUMNS, {"id": "file-1"}),
+        ),
+        ("authorize", ("workspace-1", "member-1")),
+        (
+            "select",
+            (
+                files.FILE_COLUMNS,
+                {"id": "file-1", "workspace_id": "workspace-1"},
+            ),
+        ),
+        (
+            "read",
+            "supabase://omnix-test/uploads/owner-1/private.pdf",
+        ),
+    ]
+
+
+def test_denied_workspace_file_does_not_hydrate_storage_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    selections: list[tuple[str, dict[str, Any]]] = []
+
+    async def fake_select(
+        table: str,
+        columns: str,
+        filters: dict[str, Any],
+    ) -> dict[str, Any]:
+        assert table == "files"
+        selections.append((columns, filters))
+        if columns != files.FILE_LOCATOR_COLUMNS:
+            raise AssertionError("File storage metadata must follow authorization.")
+        return {
+            "id": "file-1",
+            "user_id": "owner-1",
+            "workspace_id": "workspace-1",
+        }
+
+    async def deny_access(workspace_id: str, user_id: str) -> WorkspaceAccess:
+        raise HTTPException(status_code=403, detail="Workspace access denied.")
+
+    async def fail_read(storage_path: str) -> bytes:
+        raise AssertionError("Storage must not be read without workspace access.")
+
+    monkeypatch.setattr(files, "select_one_trusted", fake_select)
+    monkeypatch.setattr(files, "require_workspace_access", deny_access)
+    monkeypatch.setattr(files, "read_bytes_from_storage", fail_read)
+    client = _files_client({"sub": "outsider-1", "role": "authenticated"})
+
+    response = client.get("/files/file-1/download")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "File not found."}
+    assert selections == [
+        (files.FILE_LOCATOR_COLUMNS, {"id": "file-1"}),
+    ]
+
+
+def test_personal_file_list_excludes_workspace_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def no_workspace(*args: Any, **kwargs: Any) -> None:
+        return None
+
+    async def fake_select_all(
+        table: str,
+        columns: str,
+        filters: dict[str, Any],
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]:
+        captured.update(
+            {
+                "table": table,
+                "columns": columns,
+                "filters": filters,
+                "kwargs": kwargs,
+            }
+        )
+        return []
+
+    monkeypatch.setattr(files, "_resolve_effective_workspace_id", no_workspace)
+    monkeypatch.setattr(files, "select_all", fake_select_all)
+    client = _files_client({"sub": "user-1", "role": "authenticated"})
+
+    response = client.get("/files")
+
+    assert response.status_code == 200
+    assert captured["table"] == "files"
+    assert captured["filters"] == {
+        "user_id": "user-1",
+        "workspace_id": {"is": None},
+    }
+
+
+def test_get_file_returns_authorized_metadata_without_storage_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_require_file_access(
+        file_id: str,
+        user_id: str,
+    ) -> tuple[dict[str, Any], WorkspaceAccess]:
+        assert (file_id, user_id) == ("file-1", "member-1")
+        return (
+            {
+                "id": file_id,
+                "user_id": "owner-1",
+                "workspace_id": "workspace-1",
+                "file_name": "launch-plan.pdf",
+                "file_type": "application/pdf",
+                "storage_path": "supabase://private-bucket/workspace-1/launch-plan.pdf",
+            },
+            WorkspaceAccess(
+                workspace={"id": "workspace-1", "user_id": "owner-1"},
+                role="member",
+            ),
+        )
+
+    monkeypatch.setattr(files, "_require_file_access", fake_require_file_access)
+    client = _files_client({"sub": "member-1", "role": "authenticated"})
+
+    response = client.get("/files/file-1")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == "file-1"
+    assert response.json()["storage_path"] is None
 
 
 def test_sanitize_filename_uses_allowlisted_storage_name() -> None:

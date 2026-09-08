@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { KeyboardShortcutsModal } from "@/components/layout/KeyboardShortcutsModal";
@@ -55,10 +56,12 @@ function writeSidebarCollapsedPreference(collapsed: boolean) {
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const showDashboardAmbient = pathname === "/dashboard";
 
   useEffect(() => {
     setIsSidebarCollapsed(readSidebarCollapsedPreference());
@@ -87,20 +90,29 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <DashboardProviders>
-      <div className="omnix-app-bg omnix-auth-shell relative min-h-[100svh] overflow-x-hidden text-white lg:h-screen lg:min-h-0 lg:overflow-hidden">
+      <div
+        className={cn(
+          "omnix-app-bg omnix-auth-shell relative h-[100dvh] min-h-0 overflow-hidden text-white lg:h-screen",
+          showDashboardAmbient && "omnix-dashboard-ambient",
+        )}
+      >
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[9999] focus:rounded-lg focus:bg-[var(--omnix-cyan)] focus:px-4 focus:py-2 focus:font-bold focus:text-[var(--omnix-bg)] focus:shadow-[var(--omnix-glow-md)]"
         >
           Skip to main content
         </a>
-        <div className="omnix-ambient-layer" aria-hidden="true" />
-        <AmbientParticles count={30} />
-        <div className="omnix-shell-scanline" aria-hidden="true" />
-        <div
-          className="pointer-events-none fixed inset-x-0 top-0 z-[2] h-px bg-[linear-gradient(90deg,transparent_0%,var(--omnix-rgba-0-255-255-0-35)_30%,var(--omnix-rgba-0-255-255-0-6)_50%,var(--omnix-rgba-0-255-255-0-35)_70%,transparent_100%)]"
-          aria-hidden="true"
-        />
+        {showDashboardAmbient ? (
+          <>
+            <div className="omnix-ambient-layer" aria-hidden="true" />
+            <AmbientParticles count={30} />
+            <div className="omnix-shell-scanline" aria-hidden="true" />
+            <div
+              className="pointer-events-none fixed inset-x-0 top-0 z-[2] h-px bg-[linear-gradient(90deg,transparent_0%,var(--omnix-rgba-0-255-255-0-35)_30%,var(--omnix-rgba-0-255-255-0-6)_50%,var(--omnix-rgba-0-255-255-0-35)_70%,transparent_100%)]"
+              aria-hidden="true"
+            />
+          </>
+        ) : null}
         <Sidebar
           isOpen={isSidebarOpen}
           collapsed={isSidebarCollapsed}
@@ -109,7 +121,7 @@ export function AppShell({ children }: AppShellProps) {
         />
         <div
           className={cn(
-            "relative z-[1] flex min-h-[100svh] flex-col transition-[padding] duration-200 ease-out lg:h-full lg:min-h-0",
+            "relative z-[1] flex h-[100dvh] min-h-0 flex-col transition-[padding] duration-200 ease-out lg:h-full",
             isSidebarCollapsed ? "lg:pl-0" : "lg:pl-[var(--omnix-sidebar-w)]",
           )}
         >
@@ -124,7 +136,7 @@ export function AppShell({ children }: AppShellProps) {
           >
             <PageTransition className="flex min-h-0 flex-1 flex-col">{children}</PageTransition>
           </main>
-          <MobileDock onMoreClick={() => setIsSidebarOpen(true)} />
+          <MobileDock />
           <KeyboardShortcutsModal
             isOpen={isShortcutsOpen}
             onClose={() => setIsShortcutsOpen(false)}

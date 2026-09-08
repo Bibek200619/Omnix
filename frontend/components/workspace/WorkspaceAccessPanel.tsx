@@ -19,10 +19,11 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { ClientTime } from "@/components/ui/ClientTime";
 import { FloatingMenuLayer } from "@/components/ui/FloatingMenuLayer";
-import { Portal } from "@/components/ui/Portal";
+import { Modal } from "@/components/ui/Modal";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { logClientError } from "@/lib/errors";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceMembership } from "@/lib/workspace-membership-context";
+import { useWorkspaceTree } from "@/lib/workspace-tree-context";
 import {
   getWorkspaceInviteId,
   type WorkspaceMember,
@@ -202,8 +203,8 @@ function MemberActionsMenu({
 }
 
 export function WorkspaceAccessPanel() {
+  const { activeWorkspace } = useWorkspaceTree();
   const {
-    activeWorkspace,
     activeMembers,
     activeInvites,
     membersLoading,
@@ -213,7 +214,7 @@ export function WorkspaceAccessPanel() {
     revokeInvite,
     updateWorkspaceMemberRole,
     assignWorkspaceMember,
-  } = useWorkspace();
+  } = useWorkspaceMembership();
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
@@ -572,9 +573,22 @@ export function WorkspaceAccessPanel() {
       ) : null}
 
       {confirmAction ? (
-        <Portal>
-          <div className="omnix-modal-backdrop fixed inset-0 z-[120] flex items-center justify-center px-4">
-            <div className="omnix-modal-card w-full max-w-md p-5">
+        <Modal
+          isOpen
+          onClose={() => setConfirmAction(null)}
+          title={confirmAction.type === "remove"
+            ? (isSuper ? "Remove from organization?" : "Remove from workspace?")
+            : "Change workspace role?"}
+          description={confirmAction.type === "remove"
+            ? (isSuper
+                ? `${workspaceMemberName(confirmAction.member)} will lose all access to the organization, its subspaces, and all collaborative memory.`
+                : `${workspaceMemberName(confirmAction.member)} will lose access to this specific workspace scope.`)
+            : `${workspaceMemberName(confirmAction.member)} will become ${workspaceRoleLabel(confirmAction.role).toLowerCase()}.`}
+          role="alertdialog"
+          closeDisabled={Boolean(busyKey)}
+          backdropClassName="z-[120] px-4"
+          className="max-w-md p-5"
+        >
               <div className="relative z-10 flex items-start gap-3">
                 <ProfileAvatar
                   name={workspaceMemberName(confirmAction.member)}
@@ -614,9 +628,7 @@ export function WorkspaceAccessPanel() {
                     : "Update role"}
                 </Button>
               </div>
-            </div>
-          </div>
-        </Portal>
+        </Modal>
       ) : null}
     </section>
   );

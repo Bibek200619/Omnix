@@ -1,9 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { BadgeCheck, ChevronDown, ChevronRight, Loader2, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-import type { DecisionCandidate } from "@/lib/workspace-types";
+import type {
+  DecisionCandidate,
+  DecisionCandidateSourceCoverage,
+  DecisionCandidateSourceType,
+  DecisionEvidence,
+} from "@/lib/workspace-types";
 
 type DecisionCandidatePanelProps = {
   title?: string;
@@ -12,8 +18,11 @@ type DecisionCandidatePanelProps = {
   loading?: boolean;
   error?: string | null;
   emptyText?: string;
+  sourceCoverage?: DecisionCandidateSourceCoverage | null;
+  sourceType?: DecisionCandidateSourceType;
   onToggle: () => void;
   onRefresh: () => void;
+  onScanMore?: () => void;
   onCreate: (candidate: DecisionCandidate) => void;
   onDismiss: (candidate: DecisionCandidate) => void;
 };
@@ -24,6 +33,50 @@ const confidenceStyle: Record<DecisionCandidate["confidence"], string> = {
   low: "border-amber-300/25 bg-amber-300/10 text-amber-100",
 };
 
+function evidenceLabel(evidence: DecisionEvidence) {
+  if (evidence.kind === "conversation_message") {
+    return `Verified message ${evidence.message_id ?? "source"}`;
+  }
+  const chunk = evidence.chunk_index === null || evidence.chunk_index === undefined
+    ? "Document chunk"
+    : `Document chunk ${evidence.chunk_index + 1}`;
+  return evidence.page ? `${chunk} · page ${evidence.page}` : chunk;
+}
+
+function evidenceHref(evidence: DecisionEvidence) {
+  if (evidence.kind === "conversation_message" && evidence.channel_id) {
+    return `/conversations?channel=${evidence.channel_id}`;
+  }
+  if (evidence.kind === "document_chunk" && evidence.file_id) {
+    return `/files?id=${evidence.file_id}`;
+  }
+  return undefined;
+}
+
+function coverageCopy(coverage: DecisionCandidateSourceCoverage, sourceType: DecisionCandidateSourceType) {
+  const recordLabel = sourceType === "conversation" ? "message" : "document chunk";
+  const plural = coverage.selected_record_count === 1 ? recordLabel : `${recordLabel}s`;
+  const messages = [`Reviewed ${coverage.selected_record_count} ${plural} in this scan.`];
+
+  if (coverage.context_limited) {
+    messages.push(
+      `${coverage.prompt_record_count} of those ${plural} fit the analysis context.`,
+    );
+  }
+  if (coverage.has_additional_records) {
+    messages.push(
+      sourceType === "conversation"
+        ? "Earlier messages are available; suggestions cover this source window only."
+        : "Later document chunks are available; suggestions cover this source window only.",
+    );
+  }
+  return messages.join(" ");
+}
+
+function scanMoreLabel(sourceType: DecisionCandidateSourceType) {
+  return sourceType === "conversation" ? "Scan Earlier Messages" : "Scan Next Document Section";
+}
+
 export function DecisionCandidatePanel({
   title = "Potential Decisions",
   candidates,
@@ -31,8 +84,11 @@ export function DecisionCandidatePanel({
   loading = false,
   error = null,
   emptyText = "No evidence-backed decision candidates found.",
+  sourceCoverage = null,
+  sourceType,
   onToggle,
   onRefresh,
+  onScanMore,
   onCreate,
   onDismiss,
 }: DecisionCandidatePanelProps) {
@@ -70,6 +126,28 @@ export function DecisionCandidatePanel({
               Scan
             </Button>
           </div>
+          {sourceCoverage && sourceType ? (
+            <div
+              data-testid="decision-source-coverage"
+              role="status"
+              aria-live="polite"
+              className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.05] px-3 py-2 text-[11px] leading-5 text-cyan-50/80"
+            >
+              <p className="min-w-0 flex-1">{coverageCopy(sourceCoverage, sourceType)}</p>
+              {sourceCoverage.has_additional_records && onScanMore ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="min-h-11"
+                  onClick={onScanMore}
+                  isLoading={loading}
+                >
+                  {scanMoreLabel(sourceType)}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           {loading ? (
             <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/10 px-3 py-3 text-xs text-cyan-100/70">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -97,11 +175,21 @@ export function DecisionCandidatePanel({
                     </span>
                   </div>
                   <div className="mt-3 space-y-1.5">
-                    {candidate.supporting_evidence.map((evidence, index) => (
-                      <p key={`${candidate.id}-${index}`} className="rounded-md border border-white/7 bg-white/[0.025] px-2 py-1.5 text-[11px] leading-5 text-white/55">
-                        {evidence}
-                      </p>
-                    ))}
+                    {candidate.supporting_evidence.map((evidence, index) => {
+                      const href = evidenceHref(evidence);
+                      return (
+                        <div key={`${candidate.id}-${index}`} className="rounded-md border border-white/7 bg-white/[0.025] px-2 py-1.5 text-[11px] leading-5 text-white/55">
+                          <p>“{evidence.quote}”</p>
+                          {href ? (
+                            <Link href={href} className="mt-1 inline-flex text-[10px] font-semibold text-cyan-200/70 hover:text-cyan-100">
+                              {evidenceLabel(evidence)}
+                            </Link>
+                          ) : (
+                            <span className="mt-1 inline-flex text-[10px] font-semibold text-cyan-200/55">{evidenceLabel(evidence)}</span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                   <div className="mt-3 flex flex-wrap justify-end gap-2">
                     <Button

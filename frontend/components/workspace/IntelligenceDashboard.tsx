@@ -53,7 +53,7 @@ function MiniBarChart({
   const chartLabel = `${label} trend: ${data.map((val, i) => `${labels[i]} ${numberFormatter.format(val)}`).join(", ")}`;
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-      <div className="flex min-w-0 items-center justify-between gap-2 text-[9px] uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">
+      <div className="flex min-w-0 items-center justify-between gap-2 text-xs text-[var(--omnix-text-3)]">
         <span className="truncate">{label}</span>
         <span className="shrink-0" style={{ color }}>{numberFormatter.format(total(data))}</span>
       </div>
@@ -168,7 +168,7 @@ export function IntelligenceDashboard() {
       <section className="min-w-0 rounded-xl border border-white/5 bg-black/20 p-3 shadow-inner sm:p-4">
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/60">
+            <div className="flex items-center gap-2 text-xs font-semibold text-cyan-200/60">
               <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
               7-Day Workspace Trend
             </div>
@@ -181,7 +181,7 @@ export function IntelligenceDashboard() {
               { label: "Tokens", value: totals?.latestTokens ?? 0, color: "var(--omnix-purple)" },
             ].map((item) => (
               <div key={item.label} className="min-w-0 rounded-lg border border-white/5 bg-white/[0.035] px-2.5 py-2 text-right">
-                <div className="truncate text-[9px] uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">{item.label}</div>
+                <div className="text-xs text-[var(--omnix-text-3)]">{item.label}</div>
                 <div className="mt-1 truncate text-sm font-bold tabular-nums text-white" style={{ color: item.color }}>{numberFormatter.format(item.value)}</div>
               </div>
             ))}

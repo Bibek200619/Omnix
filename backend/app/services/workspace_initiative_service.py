@@ -15,9 +15,11 @@ from .supabase_service import (
     select_one_trusted,
     update_one_trusted,
 )
+from .workspace_access_service import require_workspace_access
 from .workspace_collaboration_service import log_workspace_activity
+from .workspace_common import utc_now_iso
 from .workspace_conversation_service import _require_channel_access, channel_transcript_for_assistance, list_channels
-from .workspace_service import get_profiles, list_workspace_members, require_workspace_access, utc_now_iso
+from .workspace_membership_service import get_profiles, list_workspace_members
 from .workspace_task_service import list_tasks, update_task
 
 INITIATIVE_COLUMNS = (

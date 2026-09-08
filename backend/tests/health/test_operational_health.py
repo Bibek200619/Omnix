@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 from typing import Any
 
@@ -42,9 +43,9 @@ def _api_logging_health() -> dict[str, Any]:
         "enqueued_total": 4,
         "written_total": 4,
         "failed_total": 0,
-        "dropped_total": 0,
+        "backpressured_total": 0,
         "last_failure_at": None,
-        "last_drop_at": None,
+        "last_backpressure_at": None,
     }
 
 
@@ -79,6 +80,7 @@ def test_operational_health_contains_required_components() -> None:
         "queue_recovery",
         "dead_letters",
     }.issubset(result["components"])
+    assert result["components"]["api_logging"]["backpressured_total"] == 0
 
 
 def test_operational_health_distinguishes_warning_and_degraded_states() -> None:
@@ -141,6 +143,82 @@ async def test_operational_health_route_returns_structured_result(monkeypatch: p
     monkeypatch.setattr(router, "run_operational_checks", fake_operational_checks)
 
     assert await router.operational_health(current_user={"sub": "admin-1"}) == expected
+
+
+@pytest.mark.asyncio
+async def test_production_local_storage_without_shared_contract_fails_health(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv("OMNIX_FILE_STORAGE_BACKEND", "local")
+    monkeypatch.setenv("OMNIX_UPLOAD_DIR", str(tmp_path))
+    monkeypatch.delenv("OMNIX_FILE_STORAGE_SHARED", raising=False)
+    monkeypatch.setattr(checks, "get_settings", lambda: SimpleNamespace(ENV="production"))
+
+    result = await checks.check_file_storage()
+
+    assert result["status"] == "failed"
+    assert result["shared"] is False
+    assert result["reason"] == "local_storage_not_shared"
+
+
+@pytest.mark.asyncio
+async def test_production_explicit_shared_local_storage_is_healthy(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv("OMNIX_FILE_STORAGE_BACKEND", "local")
+    monkeypatch.setenv("OMNIX_UPLOAD_DIR", str(tmp_path))
+    monkeypatch.setenv("OMNIX_FILE_STORAGE_SHARED", "true")
+    monkeypatch.setattr(checks, "get_settings", lambda: SimpleNamespace(ENV="production"))
+
+    result = await checks.check_file_storage()
+
+    assert result["status"] == "healthy"
+    assert result["shared"] is True
+
+
+@pytest.mark.asyncio
+async def test_run_all_checks_includes_file_storage(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def healthy_check() -> dict[str, Any]:
+        return {"status": "healthy"}
+
+    async def healthy_worker(*, include_stuck_jobs: bool) -> dict[str, Any]:
+        assert include_stuck_jobs is False
+        return {"status": "healthy"}
+
+    storage_result = {"status": "failed", "reason": "local_storage_not_shared"}
+
+    async def failed_storage() -> dict[str, Any]:
+        return storage_result
+
+    monkeypatch.setattr(checks, "check_supabase", healthy_check)
+    monkeypatch.setattr(checks, "check_workspace_schema_health", healthy_check)
+    monkeypatch.setattr(checks, "check_vector_store", healthy_check)
+    monkeypatch.setattr(checks, "check_redis", healthy_check)
+    monkeypatch.setattr(checks, "check_chat_providers", healthy_check)
+    monkeypatch.setattr(checks, "check_ingestion_worker", healthy_worker)
+    monkeypatch.setattr(checks, "check_file_storage", failed_storage)
+
+    result = await checks.run_all_checks(include_internal=False)
+
+    assert result["file_storage"] == storage_result
+
+
+@pytest.mark.asyncio
+async def test_readiness_includes_and_rejects_failed_file_storage(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.health import router
+
+    async def failed_storage_checks(*, include_internal: bool) -> dict[str, Any]:
+        assert include_internal is False
+        return {"file_storage": {"status": "failed", "reason": "local_storage_not_shared"}}
+
+    monkeypatch.setattr(router, "run_all_checks", failed_storage_checks)
+
+    response = await router.readiness_check()
+
+    assert response.status_code == 503
+    assert json.loads(response.body) == {"status": "not_ready"}
 
 
 @pytest.mark.asyncio
@@ -228,7 +306,4 @@ async def test_readiness_allows_explicit_warning_state(monkeypatch: pytest.Monke
 
     monkeypatch.setattr(router, "run_all_checks", warning_checks)
 
-    assert await router.readiness_check() == {
-        "status": "ready",
-        "checks": {"chat_provider": {"status": "warning"}},
-    }
+    assert await router.readiness_check() == {"status": "ready"}

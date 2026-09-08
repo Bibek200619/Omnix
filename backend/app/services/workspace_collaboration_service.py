@@ -6,6 +6,8 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from fastapi import HTTPException
+
 from ..services.supabase_service import (
     SupabaseServiceError,
     check_infrastructure_pressure,
@@ -13,15 +15,15 @@ from ..services.supabase_service import (
     select_all_trusted,
     upsert_one,
 )
-from .workspace_service import (
-    get_profiles,
-    list_user_workspaces,
+from .workspace_access_service import require_workspace_access
+from .workspace_cognition import normalize_workspace_focus
+from .workspace_common import (
     normalize_ai_specialization,
-    normalize_workspace_focus,
     normalize_workspace_record,
-    require_workspace_access,
     utc_now_iso,
 )
+from .workspace_membership_service import get_profiles
+from .workspace_service import list_user_workspaces
 from ..bootstrap.redis import get_redis
 import json
 
@@ -387,8 +389,11 @@ async def list_workspace_activity(
             limit=limit,
         )
     except SupabaseServiceError:
-        logger.exception("Failed to load workspace activity | workspace_id=%s", workspace_id)
-        return []
+        logger.warning("Failed to load workspace activity | workspace_id=%s", workspace_id)
+        raise HTTPException(
+            status_code=503,
+            detail="Workspace activity is temporarily unavailable. Please retry.",
+        ) from None
 
     profiles = await get_profiles([str(row.get("actor_user_id") or "") for row in rows])
     activity: list[dict[str, Any]] = []

@@ -204,12 +204,21 @@ async def import_file(workspace_id: str, file_id: str, current_user: dict[str, A
     try:
         file_row = await insert_one("files", payload)
     except SupabaseServiceError:
+        from ..services.file_storage import discard_uncommitted_storage_object
+
+        await discard_uncommitted_storage_object(storage_path)
         logger.exception("Failed to persist file metadata")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to register file")
 
     try:
         job_id = await job_queue.enqueue_job(
-            {"type": "ingest_file", "file_id": str(file_row.get("id")), "user_id": user_id, "workspace_id": workspace_id}
+            {
+                "type": "ingest_file",
+                "file_id": str(file_row.get("id")),
+                "user_id": user_id,
+                "workspace_id": workspace_id,
+                "_queue": job_queue.ingestion_queue_for_file(filename, file_meta.get("mimeType")),
+            }
         )
         file_row = await _update_import_processing_state(
             file_row,

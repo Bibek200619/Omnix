@@ -22,7 +22,8 @@ import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
 import { markOnboardingCompleted, readOnboardingCompleted } from "@/lib/onboarding";
 import { useFocusTrap } from "@/lib/use-focus-trap";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceMembership } from "@/lib/workspace-membership-context";
+import { useWorkspaceTree } from "@/lib/workspace-tree-context";
 import type { Workspace, WorkspaceFocus, WorkspaceInvite } from "@/lib/workspace-types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -103,14 +104,13 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
     error,
     activeWorkspace,
     activeWorkspaceId,
-    pendingInvites,
-    acceptInvite,
-    declineInvite,
+    captureActiveWorkspaceSelection,
     createWorkspace,
     refreshWorkspaces,
-    refreshActiveWorkspaceData,
     setActiveWorkspace,
-  } = useWorkspace();
+  } = useWorkspaceTree();
+  const { pendingInvites, acceptInvite, declineInvite, refreshActiveWorkspaceData } =
+    useWorkspaceMembership();
   const { user, signOut } = useAuth();
 
   const [onboardingComplete, setOnboardingComplete] = useState(false);
@@ -150,6 +150,12 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
     setOnboardingWorkspaceId(null);
     setStep("account");
   }, [user?.id]);
+
+  useEffect(() => {
+    setCreating(false);
+    setAcceptingId(null);
+    setCreateError(null);
+  }, [activeWorkspaceId]);
 
   useEffect(() => {
     if (loading) {
@@ -201,6 +207,7 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
       setCreateError("Workspace name is required.");
       return;
     }
+    let owner = captureActiveWorkspaceSelection();
 
     try {
       setCreating(true);
@@ -210,28 +217,36 @@ export function WorkspaceOnboardingGate({ children }: WorkspaceOnboardingGatePro
         description: workspaceDescription.trim() || undefined,
         workspace_focus: workspaceFocus,
       });
+      if (!owner.isCurrent()) return;
       setWorkspace(workspace);
+      owner = captureActiveWorkspaceSelection();
       await refreshWorkspaces({ force: true, silent: true });
+      if (!owner.isCurrent()) return;
       goTo("team", { allowPendingWorkspace: true });
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to create onboarding workspace", err, { endpoint: "/workspaces" });
       setCreateError("Unable to create workspace. Check your connection and try again.");
     } finally {
-      setCreating(false);
+      if (owner.isCurrent()) setCreating(false);
     }
   }
 
   async function handleAccept(inviteId: string) {
+    let owner = captureActiveWorkspaceSelection();
     try {
       setAcceptingId(inviteId);
       const workspace = await acceptInvite(inviteId);
+      if (!owner.isCurrent()) return;
       setWorkspace(workspace);
+      owner = captureActiveWorkspaceSelection();
       goTo("team", { allowPendingWorkspace: true });
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to accept onboarding invite", err, { endpoint: `/workspace-invites/${inviteId}/accept` });
       setCreateError("Unable to accept invite. Your session may have expired; refresh and try again.");
     } finally {
-      setAcceptingId(null);
+      if (owner.isCurrent()) setAcceptingId(null);
     }
   }
 

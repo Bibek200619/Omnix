@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import ast
+import inspect
+
 import pytest
 from fastapi import HTTPException
 
@@ -7,7 +10,7 @@ from app.schemas.connectors import ConnectorCreate
 from app.services.document_context_service import StoredDocumentChunks
 from app.services import workspace_connector_service as connectors
 from app.services.supabase_service import SupabaseServiceError
-from app.services.workspace_service import WorkspaceAccess
+from app.services.workspace_common import WorkspaceAccess
 
 
 def _access(workspace_id: str = "workspace-1") -> WorkspaceAccess:
@@ -22,6 +25,27 @@ def _access(workspace_id: str = "workspace-1") -> WorkspaceAccess:
         },
         role="member",
     )
+
+
+def test_connector_row_mutations_require_authorized_workspace_scope() -> None:
+    tree = ast.parse(inspect.getsource(connectors))
+    connector_mutations: list[ast.Call] = []
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+            continue
+        if node.func.id not in {"update_one_trusted", "delete_many_trusted"} or len(node.args) < 2:
+            continue
+        table = node.args[0]
+        if not isinstance(table, ast.Constant) or table.value != "workspace_connectors":
+            continue
+        connector_mutations.append(node)
+        filters = node.args[1]
+        assert isinstance(filters, ast.Call)
+        assert isinstance(filters.func, ast.Name)
+        assert filters.func.id == "_connector_scope_filters"
+
+    assert len(connector_mutations) == 8
 
 
 @pytest.mark.asyncio
@@ -48,7 +72,7 @@ async def test_repository_connector_persists_real_setup_job(monkeypatch: pytest.
 
     async def fake_update_one_trusted(table: str, filters: dict[str, object], payload: dict[str, object]):
         assert table == "workspace_connectors"
-        assert filters == {"id": "connector-1"}
+        assert filters == {"id": "connector-1", "workspace_id": "workspace-1"}
         updated.update(payload)
         return {"id": "connector-1", **inserted, **payload}
 
@@ -110,6 +134,7 @@ async def test_knowledge_link_success_creates_retrievable_file(monkeypatch: pyte
 
     async def fake_update_one_trusted(table: str, filters: dict[str, object], payload: dict[str, object]):
         assert table == "workspace_connectors"
+        assert filters == {"id": "connector-1", "workspace_id": "workspace-1"}
         connector_update.update(payload)
         return {
             "id": "connector-1",
@@ -173,6 +198,149 @@ async def test_database_connector_requires_connection_scope(monkeypatch: pytest.
         )
 
     assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_get_connector_hydrates_only_after_workspace_capability(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[tuple[str, object]] = []
+    full_connector = {
+        "id": "connector-1",
+        "workspace_id": "workspace-1",
+        "user_id": "user-1",
+        "connector_type": "file_repository",
+        "display_name": "Runbooks",
+        "status": "connected",
+        "config": {"access_token": "secret"},
+    }
+
+    async def fake_select_one(
+        table: str,
+        columns: str,
+        filters: dict[str, object],
+    ) -> dict[str, object] | None:
+        assert table == "workspace_connectors"
+        events.append(("select", (columns, filters)))
+        if columns == connectors.CONNECTOR_LOCATOR_COLUMNS:
+            return {"id": "connector-1", "workspace_id": "workspace-1"}
+        assert columns == connectors.CONNECTOR_COLUMNS
+        return full_connector
+
+    async def fake_sources_access(workspace_id: str, user_id: str) -> WorkspaceAccess:
+        events.append(("authorize", (workspace_id, user_id)))
+        return _access(workspace_id)
+
+    monkeypatch.setattr(connectors, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(connectors, "_require_sources_access", fake_sources_access)
+
+    connector, access = await connectors.get_workspace_connector("connector-1", "user-1")
+
+    assert connector is full_connector
+    assert access.workspace_id == "workspace-1"
+    assert events == [
+        (
+            "select",
+            (connectors.CONNECTOR_LOCATOR_COLUMNS, {"id": "connector-1"}),
+        ),
+        ("authorize", ("workspace-1", "user-1")),
+        (
+            "select",
+            (
+                connectors.CONNECTOR_COLUMNS,
+                {"id": "connector-1", "workspace_id": "workspace-1"},
+            ),
+        ),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_connector_does_not_hydrate_config_when_access_is_denied(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    selections: list[tuple[str, dict[str, object]]] = []
+
+    async def fake_select_one(
+        table: str,
+        columns: str,
+        filters: dict[str, object],
+    ) -> dict[str, object] | None:
+        assert table == "workspace_connectors"
+        selections.append((columns, filters))
+        if columns != connectors.CONNECTOR_LOCATOR_COLUMNS:
+            raise AssertionError("Full connector hydration must follow authorization.")
+        return {"id": "connector-1", "workspace_id": "workspace-1"}
+
+    async def fake_sources_access(workspace_id: str, user_id: str) -> WorkspaceAccess:
+        raise HTTPException(status_code=403, detail="Workspace access denied.")
+
+    monkeypatch.setattr(connectors, "select_one_trusted", fake_select_one)
+    monkeypatch.setattr(connectors, "_require_sources_access", fake_sources_access)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await connectors.get_workspace_connector("connector-1", "attacker-1")
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "Connector not found."
+    assert selections == [
+        (connectors.CONNECTOR_LOCATOR_COLUMNS, {"id": "connector-1"}),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_retry_connector_scopes_every_update_to_authorized_workspace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connector = {
+        "id": "connector-1",
+        "workspace_id": "workspace-1",
+        "user_id": "user-1",
+        "connector_type": "file_repository",
+        "display_name": "Runbooks",
+        "status": "request_submitted",
+        "config": {"repository": "https://github.com/acme/runbooks", "auth_mode": "none"},
+    }
+    update_filters: list[dict[str, object]] = []
+
+    async def fake_get_connector(connector_id: str, user_id: str):
+        assert connector_id == "connector-1"
+        assert user_id == "user-1"
+        return connector, _access("workspace-1")
+
+    async def fake_update_one_trusted(
+        table: str,
+        filters: dict[str, object],
+        payload: dict[str, object],
+    ) -> dict[str, object]:
+        assert table == "workspace_connectors"
+        update_filters.append(filters)
+        return {**connector, **payload}
+
+    async def fake_insert_setup_job(
+        row: dict[str, object],
+        user_id: str,
+        access: WorkspaceAccess,
+    ) -> dict[str, object]:
+        assert row["id"] == "connector-1"
+        assert user_id == "user-1"
+        assert access.workspace_id == "workspace-1"
+        return {"id": "job-1"}
+
+    async def fake_serialize(row: dict[str, object]) -> dict[str, object]:
+        return row
+
+    monkeypatch.setattr(connectors, "get_workspace_connector", fake_get_connector)
+    monkeypatch.setattr(connectors, "update_one_trusted", fake_update_one_trusted)
+    monkeypatch.setattr(connectors, "_insert_setup_job", fake_insert_setup_job)
+    monkeypatch.setattr(connectors, "_serialize_connector", fake_serialize)
+
+    result = await connectors.retry_workspace_connector("connector-1", "user-1")
+
+    assert result["job_id"] == "job-1"
+    assert update_filters == [
+        {"id": "connector-1", "workspace_id": "workspace-1"},
+        {"id": "connector-1", "workspace_id": "workspace-1"},
+    ]
 
 
 def test_private_knowledge_urls_are_not_fetchable() -> None:
@@ -468,7 +636,8 @@ async def test_connector_source_file_cleanup_is_scoped_to_connector_workspace(
             "id": "connector-1",
             "workspace_id": "workspace-1",
             "source_file_id": "file-from-other-workspace",
-        }
+        },
+        _access("workspace-1"),
     )
 
     assert deleted == [

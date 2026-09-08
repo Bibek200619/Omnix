@@ -43,6 +43,7 @@ class AutomationScheduler:
             automations = await select_all_trusted(
                 "automations",
                 "id,workspace_id,name,job_type,schedule,interval_seconds,enabled,user_id",
+                unscoped_reason="automation_scheduler_startup",
             )
         except Exception as exc:
             logger.warning(

@@ -9,7 +9,9 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Toggle } from "@/components/ui/Toggle";
 import { logClientError } from "@/lib/errors";
-import { useWorkspace } from "@/lib/workspace-context";
+import { useWorkspaceIntelligence } from "@/lib/workspace-intelligence-context";
+import { useWorkspaceMembership } from "@/lib/workspace-membership-context";
+import { useWorkspaceTree } from "@/lib/workspace-tree-context";
 import { flattenWorkspaces } from "@/lib/workspace-utils";
 import { isWorkspaceFounderRole, workspaceRoleBadgeClass, workspaceRoleLabel } from "@/lib/workspace-roles";
 import type { Workspace } from "@/lib/workspace-types";
@@ -42,16 +44,16 @@ export function WorkspaceSettingsPanel() {
   const {
     activeWorkspace,
     activeRootWorkspace,
-    activeMembers,
-    activeInvites,
-    activeWorkspaceIntelligence,
+    captureActiveWorkspaceSelection,
     createSubspace,
     deleteWorkspace,
     renameWorkspace,
     setActiveWorkspace,
-    updateWorkspaceIntelligence,
     workspaces,
-  } = useWorkspace();
+  } = useWorkspaceTree();
+  const { activeMembers, activeInvites } = useWorkspaceMembership();
+  const { activeWorkspaceIntelligence, updateWorkspaceIntelligence } =
+    useWorkspaceIntelligence();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
@@ -93,8 +95,16 @@ export function WorkspaceSettingsPanel() {
     setIntelligenceSaved(false);
   }, [activeWorkspace]);
 
+  useEffect(() => {
+    setSaving(false);
+    setCreatingSubspace(false);
+    setDeleting(false);
+    setSavingIntelligence(false);
+  }, [activeWorkspace?.id]);
+
   async function saveWorkspace() {
     if (!activeWorkspace) return;
+    const owner = captureActiveWorkspaceSelection();
     const nextName = name.trim();
     if (!nextName) {
       setError("Workspace name cannot be empty.");
@@ -106,20 +116,23 @@ export function WorkspaceSettingsPanel() {
       setError(null);
       await renameWorkspace(activeWorkspace.id, {
         name: nextName,
-        description: description.trim() || null,
+        description: description.trim(),
       });
+      if (!owner.isCurrent()) return;
       setSaved(true);
-      window.setTimeout(() => setSaved(false), 2200);
+      window.setTimeout(() => { if (owner.isCurrent()) setSaved(false); }, 2200);
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to update workspace", err, { endpoint: `/workspaces/${activeWorkspace.id}` });
       setError("Unable to update workspace. Your session may have expired; refresh and try again.");
     } finally {
-      setSaving(false);
+      if (owner.isCurrent()) setSaving(false);
     }
   }
 
   async function handleCreateSubspace() {
     if (!activeWorkspace) return;
+    const owner = captureActiveWorkspaceSelection();
     const nextName = subspaceName.trim();
     if (!nextName) {
       setSubspaceError("Subworkspace name is required.");
@@ -133,33 +146,38 @@ export function WorkspaceSettingsPanel() {
         name: nextName,
         description: subspaceDescription.trim() || undefined,
       });
+      if (!owner.isCurrent()) return;
       setSubspaceName("");
       setSubspaceDescription("");
       setActiveWorkspace(created.id);
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to create subworkspace", err);
       setSubspaceError("Unable to create subworkspace. Check your connection and try again.");
     } finally {
-      setCreatingSubspace(false);
+      if (owner.isCurrent()) setCreatingSubspace(false);
     }
   }
 
   async function handleDeleteWorkspace() {
     if (!activeWorkspace || !canEdit) return;
+    const owner = captureActiveWorkspaceSelection();
     try {
       setDeleting(true);
       setDeleteError(null);
       await deleteWorkspace(activeWorkspace.id);
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to delete workspace", err, { endpoint: `/workspaces/${activeWorkspace.id}` });
       setDeleteError("Unable to delete workspace. Your session may have expired; refresh and try again.");
     } finally {
-      setDeleting(false);
+      if (owner.isCurrent()) setDeleting(false);
     }
   }
 
   async function saveIntelligence() {
     if (!activeWorkspace) return;
+    const owner = captureActiveWorkspaceSelection();
     try {
       setSavingIntelligence(true);
       setIntelligenceError(null);
@@ -175,13 +193,15 @@ export function WorkspaceSettingsPanel() {
           source_permissions: activeWorkspace.is_global ? "organization" : "workspace_only",
         },
       });
+      if (!owner.isCurrent()) return;
       setIntelligenceSaved(true);
-      window.setTimeout(() => setIntelligenceSaved(false), 2200);
+      window.setTimeout(() => { if (owner.isCurrent()) setIntelligenceSaved(false); }, 2200);
     } catch (err) {
+      if (!owner.isCurrent()) return;
       logClientError("Failed to update intelligence profile", err, { endpoint: `/workspaces/${activeWorkspace.id}/intelligence` });
       setIntelligenceError("Unable to update intelligence profile. Please try again in a moment.");
     } finally {
-      setSavingIntelligence(false);
+      if (owner.isCurrent()) setSavingIntelligence(false);
     }
   }
 

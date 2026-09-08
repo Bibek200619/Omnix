@@ -75,4 +75,4 @@ class PgVectorStore(VectorStore):
                 "pgvector search failed. Ensure search_documents_vector accepts %d-dimensional local embeddings.",
                 EMBEDDING_DIMENSION,
             )
-            return []
+            raise

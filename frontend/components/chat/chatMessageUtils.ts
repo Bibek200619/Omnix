@@ -1,4 +1,4 @@
-import type { ApiMessage, Message, SearchMode } from "@/components/chat/types";
+import type { ApiMessage, CitationValidation, Message, RetrievalState, SearchMode } from "@/components/chat/types";
 import { initialsFromText } from "@/lib/workspace-roles";
 import type { WorkspaceMember } from "@/lib/workspace-types";
 
@@ -56,6 +56,79 @@ function citationsFromPayload(payload?: Record<string, unknown> | null) {
   return citations.filter((item): item is string => typeof item === "string" && Boolean(item));
 }
 
+const citationValidationStatuses: CitationValidation["status"][] = [
+  "pending",
+  "supported",
+  "incomplete",
+  "unsupported",
+  "not_applicable",
+];
+
+export function normalizeCitationValidation(value: unknown): CitationValidation | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+
+  const validation = value as Record<string, unknown>;
+  const sourceCount = validation.source_count;
+  const citedSourceCount = validation.cited_source_count;
+  const invalidCitationCount = validation.invalid_citation_count;
+  if (
+    typeof validation.status !== "string" ||
+    !citationValidationStatuses.includes(validation.status as CitationValidation["status"]) ||
+    typeof sourceCount !== "number" || !Number.isSafeInteger(sourceCount) || sourceCount < 0 ||
+    typeof citedSourceCount !== "number" || !Number.isSafeInteger(citedSourceCount) || citedSourceCount < 0 ||
+    typeof invalidCitationCount !== "number" || !Number.isSafeInteger(invalidCitationCount) || invalidCitationCount < 0 ||
+    citedSourceCount > sourceCount
+  ) {
+    return undefined;
+  }
+
+  return {
+    status: validation.status as CitationValidation["status"],
+    source_count: sourceCount,
+    cited_source_count: citedSourceCount,
+    invalid_citation_count: invalidCitationCount,
+  };
+}
+
+const retrievalOutcomes: RetrievalState["outcome"][] = [
+  "not_requested",
+  "sources_found",
+  "no_relevant_sources",
+  "partial",
+  "failed",
+  "source_unavailable",
+];
+
+function isRetrievalOutcome(value: unknown): value is RetrievalState["outcome"] {
+  return typeof value === "string" && retrievalOutcomes.includes(value as RetrievalState["outcome"]);
+}
+
+export function normalizeRetrievalState(value: unknown): RetrievalState | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+
+  const retrieval = value as Record<string, unknown>;
+  const sourceCount = retrieval.source_count;
+  if (!isRetrievalOutcome(retrieval.outcome) || typeof sourceCount !== "number" || !Number.isSafeInteger(sourceCount) || sourceCount < 0) {
+    return undefined;
+  }
+
+  const failedChannels = Array.isArray(retrieval.failed_channels)
+    ? retrieval.failed_channels
+        .filter((channel): channel is string => typeof channel === "string" && /^[a-z0-9_-]{1,64}$/i.test(channel))
+        .slice(0, 8)
+    : undefined;
+  const reason = typeof retrieval.reason === "string" && /^[a-z0-9_-]{1,64}$/i.test(retrieval.reason)
+    ? retrieval.reason
+    : undefined;
+
+  return {
+    outcome: retrieval.outcome,
+    source_count: sourceCount,
+    ...(failedChannels?.length ? { failed_channels: failedChannels } : {}),
+    ...(reason ? { reason } : {}),
+  };
+}
+
 export function normalizeMessage(message: ApiMessage, index: number, senderLookup: SenderLookup): Message {
   const failed = message.status === "failed";
   const pending = message.status === "pending";
@@ -66,6 +139,7 @@ export function normalizeMessage(message: ApiMessage, index: number, senderLooku
   const senderName = role === "assistant" ? "Omnix" : isOwn ? "You" : member?.full_name || member?.email || "Teammate";
   const payloadSources = sourcesFromPayload(message.payload);
   const metadataSources = sourcesFromPayload(message.metadata);
+  const persistedPayload = message.payload ?? message.metadata;
 
   return {
     id: message.id ?? `message-${index}`,
@@ -85,8 +159,10 @@ export function normalizeMessage(message: ApiMessage, index: number, senderLooku
     error: failed ? "Not completed" : undefined,
     isStreaming: pending && role === "assistant",
     sources: role === "assistant" ? (message.sources?.length ? message.sources : payloadSources.length ? payloadSources : metadataSources) : undefined,
-    sourceMode: sourceModeFromPayload(message.payload),
-    webSearchUsed: webSearchUsedFromPayload(message.payload),
-    citations: citationsFromPayload(message.payload),
+    sourceMode: sourceModeFromPayload(persistedPayload),
+    webSearchUsed: webSearchUsedFromPayload(persistedPayload),
+    citations: citationsFromPayload(persistedPayload),
+    citationValidation: role === "assistant" ? normalizeCitationValidation(persistedPayload?.citation_validation) : undefined,
+    retrieval: role === "assistant" ? normalizeRetrievalState(persistedPayload?.retrieval) : undefined,
   };
 }

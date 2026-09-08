@@ -6,6 +6,7 @@ import pytest
 
 from app.rag.vector_store_base import VectorStore
 from app.retrieval import semantic_search
+from app.retrieval.outcomes import RetrievalChannelError
 
 
 class _Store(VectorStore):
@@ -87,3 +88,22 @@ async def test_fetch_files_uses_in_workspace_filter_for_multiple_scopes(monkeypa
         },
     }
 
+
+@pytest.mark.asyncio
+async def test_vector_store_failure_is_exposed_to_hybrid_channel(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FailingStore(_Store):
+        def search(self, *args: Any, **kwargs: Any) -> list[tuple[str, float]]:
+            raise RuntimeError("vector index unavailable")
+
+    async def fake_embedding(_query: str) -> list[float]:
+        return [0.1]
+
+    monkeypatch.setattr(semantic_search, "get_embedding", fake_embedding)
+    monkeypatch.setattr(semantic_search, "validate_embedding_dimension", lambda *args, **kwargs: None)
+    search = semantic_search.SemanticSearch(FailingStore())
+
+    with pytest.raises(RetrievalChannelError) as exc_info:
+        await search.search("find notes", user_id="user-1", workspace_id="workspace-1")
+
+    assert exc_info.value.component == "semantic"
+    assert exc_info.value.code == "vector_store_unavailable"

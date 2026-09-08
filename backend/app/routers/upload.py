@@ -10,11 +10,16 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from ..jobs import queue as job_queue
 from ..core.security import get_current_user
 from ..services.document_intelligence_service import (
+    EXTRACTION_COLUMN_NAMES,
     ExtractionDiagnostics,
     extraction_columns_payload,
 )
 from ..services.supabase_service import SupabaseServiceError, insert_one, update_one
-from ..services.file_storage import sanitize_filename, save_bytes_to_user_upload
+from ..services.file_storage import (
+    discard_uncommitted_storage_object,
+    sanitize_filename,
+    save_bytes_to_user_upload,
+)
 from ..services.workspace_service import active_workspace_id_from_request, require_workspace_access
 from ..services.workspace_collaboration_service import log_workspace_activity
 from .conversations import require_conversation_access
@@ -101,7 +106,7 @@ async def _insert_file_row(payload: dict[str, Any], user_id: str) -> dict[str, A
         return await insert_one("files", {"user_id": user_id, **payload})
     except SupabaseServiceError as exc:
         message = str(exc.__cause__ or exc).lower()
-        optional_columns = set(ExtractionDiagnostics().__dataclass_fields__) | PROCESSING_COLUMNS
+        optional_columns = set(EXTRACTION_COLUMN_NAMES) | PROCESSING_COLUMNS
         if not any(column in message for column in optional_columns):
             raise
         logger.warning("File status columns are unavailable; inserting file metadata without physical status columns.")
@@ -225,12 +230,19 @@ async def upload_file(
     try:
         file_row = await _insert_file_row(payload, user_id)
     except SupabaseServiceError as exc:
+        await discard_uncommitted_storage_object(storage_path)
         logger.exception("Failed to insert file metadata: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to register file")
 
     try:
         job_id = await job_queue.enqueue_job(
-            {"type": "ingest_file", "file_id": str(file_row.get("id")), "user_id": user_id, "workspace_id": workspace_id}
+            {
+                "type": "ingest_file",
+                "file_id": str(file_row.get("id")),
+                "user_id": user_id,
+                "workspace_id": workspace_id,
+                "_queue": job_queue.ingestion_queue_for_file(filename, file_type),
+            }
         )
         file_row = await _update_file_processing_state(
             file_row=file_row,

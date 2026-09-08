@@ -30,6 +30,11 @@ export function apiUrl(endpoint: string) {
 
 export type ApiStatus = "idle" | "loading" | "success" | "error";
 
+type ApiGetOptions = {
+  dedupe?: boolean;
+  signal?: AbortSignal;
+};
+
 let _activeWorkspaceId: string | null = null;
 const apiWorkspaceChangeListeners = new Set<() => void>();
 
@@ -168,9 +173,12 @@ class ApiClient {
     });
   }
 
-  private applyWorkspaceHeader(headers: Headers) {
-    if (_activeWorkspaceId) {
-      headers.set("X-Omnix-Workspace", _activeWorkspaceId);
+  private applyWorkspaceHeader(
+    headers: Headers,
+    requestWorkspaceId: string | null,
+  ) {
+    if (requestWorkspaceId) {
+      headers.set("X-Omnix-Workspace", requestWorkspaceId);
     }
   }
 
@@ -224,7 +232,11 @@ class ApiClient {
     return refreshedSession?.access_token ?? null;
   }
 
-  private buildHeaders(options: RequestInit, token: string | null): Headers {
+  private buildHeaders(
+    options: RequestInit,
+    token: string | null,
+    requestWorkspaceId: string | null,
+  ): Headers {
     const headers = new Headers(options.headers);
     const isFormData =
       typeof FormData !== "undefined" && options.body instanceof FormData;
@@ -237,7 +249,7 @@ class ApiClient {
       headers.set("Authorization", `Bearer ${token}`);
     }
 
-    this.applyWorkspaceHeader(headers);
+    this.applyWorkspaceHeader(headers, requestWorkspaceId);
 
     return headers;
   }
@@ -248,8 +260,9 @@ class ApiClient {
     options: RequestInit,
     token: string | null,
     fallbackMethod: string,
+    requestWorkspaceId: string | null,
   ): Promise<Response> {
-    const headers = this.buildHeaders(options, token);
+    const headers = this.buildHeaders(options, token, requestWorkspaceId);
 
     try {
       return await fetch(url, {
@@ -295,9 +308,17 @@ class ApiClient {
     url: string,
     options: RequestInit,
     fallbackMethod: string,
+    requestWorkspaceId: string | null,
   ): Promise<Response> {
     const token = await this.getAuthToken();
-    const response = await this.fetchOnce(normalizedEndpoint, url, options, token, fallbackMethod);
+    const response = await this.fetchOnce(
+      normalizedEndpoint,
+      url,
+      options,
+      token,
+      fallbackMethod,
+      requestWorkspaceId,
+    );
 
     if (response.status !== 401) {
       return response;
@@ -307,7 +328,14 @@ class ApiClient {
     const refreshedToken = await this.refreshAuthToken();
 
     if (refreshedToken) {
-      const retryResponse = await this.fetchOnce(normalizedEndpoint, url, options, refreshedToken, fallbackMethod);
+      const retryResponse = await this.fetchOnce(
+        normalizedEndpoint,
+        url,
+        options,
+        refreshedToken,
+        fallbackMethod,
+        requestWorkspaceId,
+      );
       if (retryResponse.status !== 401) {
         return retryResponse;
       }
@@ -336,10 +364,20 @@ class ApiClient {
     throw error;
   }
 
-  async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  private async requestForWorkspace(
+    endpoint: string,
+    options: RequestInit,
+    requestWorkspaceId: string | null,
+  ): Promise<Response> {
     const normalizedEndpoint = normalizeEndpoint(endpoint);
     const url = apiUrl(normalizedEndpoint);
-    const response = await this.fetchWithAuthRecovery(normalizedEndpoint, url, options, "GET");
+    const response = await this.fetchWithAuthRecovery(
+      normalizedEndpoint,
+      url,
+      options,
+      "GET",
+      requestWorkspaceId,
+    );
 
     if (!response.ok) {
       const errorData = await readErrorPayload(response);
@@ -360,14 +398,32 @@ class ApiClient {
     return response;
   }
 
+  async request(
+    endpoint: string,
+    options: RequestInit = {},
+  ): Promise<Response> {
+    return this.requestForWorkspace(
+      endpoint,
+      options,
+      _activeWorkspaceId,
+    );
+  }
+
   /**
    * Open a streaming POST request and return the raw Response so caller can
    * iterate over response.body as a stream. Does not attempt to parse JSON.
    */
   async stream(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    const requestWorkspaceId = _activeWorkspaceId;
     const normalizedEndpoint = normalizeEndpoint(endpoint);
     const url = apiUrl(normalizedEndpoint);
-    const response = await this.fetchWithAuthRecovery(normalizedEndpoint, url, options, "POST");
+    const response = await this.fetchWithAuthRecovery(
+      normalizedEndpoint,
+      url,
+      options,
+      "POST",
+      requestWorkspaceId,
+    );
 
     if (!response.ok && response.status !== 200) {
       // For streaming endpoints some servers may return 200 with streaming body.
@@ -405,20 +461,33 @@ class ApiClient {
     return response.json() as Promise<T>;
   }
 
-  async get<T>(endpoint: string): Promise<T> {
-    const key = `${_activeWorkspaceId ?? "none"}::${endpoint}`;
+  async get<T>(endpoint: string, options: ApiGetOptions = {}): Promise<T> {
+    const requestWorkspaceId = _activeWorkspaceId;
+    const execute = () =>
+      this.requestForWorkspace(
+        endpoint,
+        {
+          method: "GET",
+          signal: options.signal,
+        },
+        requestWorkspaceId,
+      ).then((response) => response.json() as Promise<T>);
+
+    if (options.dedupe === false || options.signal) {
+      return execute();
+    }
+
+    const key = `${requestWorkspaceId ?? "none"}::${endpoint}`;
     const inFlight = this.inFlightGets.get(key);
     if (inFlight) {
       return inFlight as Promise<T>;
     }
 
-    const request = this.request(endpoint, {
-      method: "GET",
-    })
-      .then((response) => response.json() as Promise<T>)
-      .finally(() => {
+    const request = execute().finally(() => {
+      if (this.inFlightGets.get(key) === request) {
         this.inFlightGets.delete(key);
-      });
+      }
+    });
 
     this.inFlightGets.set(key, request);
     return request;

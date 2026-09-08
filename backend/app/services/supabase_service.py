@@ -11,11 +11,7 @@ from typing import Any, NoReturn
 import httpx
 
 from ..db.supabase_client import get_async_supabase, get_supabase
-from .supabase_query_helpers import (
-    apply_filters as _apply_filters,
-    select_columns_after_missing_column as _select_columns_after_missing_column,
-    select_recovery_attempts as _select_recovery_attempts,
-)
+from .supabase_query_helpers import apply_filters as _apply_filters
 
 logger = logging.getLogger(__name__)
 INTERNAL_DB_ERROR = "Internal server error"
@@ -150,6 +146,19 @@ def execute_query_sync(query: Any, *, operation: str = "execute") -> Any:
 
 class SupabaseServiceError(RuntimeError):
     pass
+
+
+def _require_trusted_filters(
+    table: str,
+    filters: Mapping[str, Any] | None,
+    operation: str,
+    *,
+    unscoped_reason: str | None = None,
+) -> None:
+    if filters or (isinstance(unscoped_reason, str) and unscoped_reason.strip()):
+        return
+    logger.error("Rejected unscoped trusted %s on table '%s'.", operation, table)
+    raise SupabaseServiceError(INTERNAL_DB_ERROR)
 
 
 def _is_supabase_auth_error(exc: Exception) -> bool:
@@ -303,51 +312,8 @@ def _select_all_sync(
     if offset is not None:
         query = query.offset(offset)
 
-    try:
-        response = _execute_with_retry(query, operation=f"select {table}")
-        return list(getattr(response, "data", None) or [])
-    except Exception as exc:
-        msg = str(exc)
-        # Detect missing column errors and retry with that column removed from selection
-        if "does not exist" in msg and isinstance(columns, str):
-            import re
-
-            m = re.search(r"column\s+([^\s]+)\s+does not exist", msg)
-            if m:
-                missing = m.group(1)
-                # handle qualified name like table.column
-                missing_col = missing.split(".")[-1]
-                # Split columns by comma if present, otherwise treat as single entry
-                cols_raw = [c.strip() for c in columns.split(",")] if "," in columns else [columns.strip()]
-                cols = [c for c in cols_raw if c and c != missing_col and c != f"{table}.{missing_col}"]
-                if cols:
-                    new_columns = ",".join(cols)
-                    logger.warning("Retrying select on %s without missing column '%s'", table, missing_col)
-                    query = get_supabase().table(table).select(new_columns)
-                    query = _apply_filters(query, filters)
-                    if order_by:
-                        query = query.order(order_by, desc=desc)
-                    if limit is not None:
-                        query = query.limit(limit)
-                    if offset is not None:
-                        query = query.offset(offset)
-                    response = _execute_with_retry(query, operation=f"select {table} without missing column")
-                    return list(getattr(response, "data", None) or [])
-                else:
-                    # No usable columns left after removing missing column; try selecting all
-                    logger.warning("No columns left after removing missing column '%s' on %s; retrying select *", missing_col, table)
-                    query = get_supabase().table(table).select("*")
-                    query = _apply_filters(query, filters)
-                    if order_by:
-                        query = query.order(order_by, desc=desc)
-                    if limit is not None:
-                        query = query.limit(limit)
-                    if offset is not None:
-                        query = query.offset(offset)
-                    response = _execute_with_retry(query, operation=f"select {table} fallback all columns")
-                    return list(getattr(response, "data", None) or [])
-        # If we couldn't handle it, re-raise
-        raise
+    response = _execute_with_retry(query, operation=f"select {table}")
+    return list(getattr(response, "data", None) or [])
 
 
 def _select_all_trusted_sync(
@@ -359,6 +325,7 @@ def _select_all_trusted_sync(
     limit: int | None = None,
     offset: int | None = None,
 ) -> list[dict[str, Any]]:
+    _require_trusted_filters(table, filters, "read")
     query = get_supabase().table(table).select(columns)
     query = _apply_filters(query, filters)
 
@@ -369,46 +336,8 @@ def _select_all_trusted_sync(
     if offset is not None:
         query = query.offset(offset)
 
-    try:
-        response = _execute_with_retry(query, operation=f"trusted select {table}")
-        return list(getattr(response, "data", None) or [])
-    except Exception as exc:
-        msg = str(exc)
-        if "does not exist" in msg and isinstance(columns, str):
-            import re
-
-            m = re.search(r"column\s+([^\s]+)\s+does not exist", msg)
-            if m:
-                missing = m.group(1)
-                missing_col = missing.split(".")[-1]
-                cols_raw = [c.strip() for c in columns.split(",")] if "," in columns else [columns.strip()]
-                cols = [c for c in cols_raw if c and c != missing_col and c != f"{table}.{missing_col}"]
-                if cols:
-                    new_columns = ",".join(cols)
-                    logger.warning("Retrying trusted select on %s without missing column '%s'", table, missing_col)
-                    query = get_supabase().table(table).select(new_columns)
-                    query = _apply_filters(query, filters)
-                    if order_by:
-                        query = query.order(order_by, desc=desc)
-                    if limit is not None:
-                        query = query.limit(limit)
-                    if offset is not None:
-                        query = query.offset(offset)
-                    response = _execute_with_retry(query, operation=f"trusted select {table} without missing column")
-                    return list(getattr(response, "data", None) or [])
-                else:
-                    logger.warning("No columns left after removing missing column '%s' on %s; retrying select *", missing_col, table)
-                    query = get_supabase().table(table).select("*")
-                    query = _apply_filters(query, filters)
-                    if order_by:
-                        query = query.order(order_by, desc=desc)
-                    if limit is not None:
-                        query = query.limit(limit)
-                    if offset is not None:
-                        query = query.offset(offset)
-                    response = _execute_with_retry(query, operation=f"trusted select {table} fallback all columns")
-                    return list(getattr(response, "data", None) or [])
-        raise
+    response = _execute_with_retry(query, operation=f"trusted select {table}")
+    return list(getattr(response, "data", None) or [])
 
 
 def _select_one_sync(
@@ -424,43 +353,11 @@ def _select_one_sync(
 
     query = get_supabase().table(table).select(columns)
     query = _apply_filters(query, filters)
-    try:
-        response = _execute_with_retry(
-            query.limit(1).maybe_single(),
-            operation=f"select one {table}",
-        )
-        return getattr(response, "data", None)
-    except Exception as exc:
-        msg = str(exc)
-        if "does not exist" in msg and isinstance(columns, str):
-            import re
-
-            m = re.search(r"column\s+([^\s]+)\s+does not exist", msg)
-            if m:
-                missing = m.group(1)
-                missing_col = missing.split(".")[-1]
-                cols_raw = [c.strip() for c in columns.split(",")] if "," in columns else [columns.strip()]
-                cols = [c for c in cols_raw if c and c != missing_col and c != f"{table}.{missing_col}"]
-                if cols:
-                    new_columns = ",".join(cols)
-                    logger.warning("Retrying select on %s without missing column '%s'", table, missing_col)
-                    query = get_supabase().table(table).select(new_columns)
-                    query = _apply_filters(query, filters)
-                    response = _execute_with_retry(
-                        query.limit(1).maybe_single(),
-                        operation=f"select one {table} without missing column",
-                    )
-                    return getattr(response, "data", None)
-                else:
-                    logger.warning("No columns left after removing missing column '%s' on %s; retrying select *", missing_col, table)
-                    query = get_supabase().table(table).select("*")
-                    query = _apply_filters(query, filters)
-                    response = _execute_with_retry(
-                        query.limit(1).maybe_single(),
-                        operation=f"select one {table} fallback all columns",
-                    )
-                    return getattr(response, "data", None)
-        raise
+    response = _execute_with_retry(
+        query.limit(1).maybe_single(),
+        operation=f"select one {table}",
+    )
+    return getattr(response, "data", None)
 
 
 def _select_one_trusted_sync(
@@ -468,35 +365,14 @@ def _select_one_trusted_sync(
     columns: str,
     filters: Mapping[str, Any],
 ) -> dict[str, Any] | None:
+    _require_trusted_filters(table, filters, "single-row read")
     query = get_supabase().table(table).select(columns)
     query = _apply_filters(query, filters)
-    try:
-        response = _execute_with_retry(
-            query.limit(1).maybe_single(),
-            operation=f"trusted select one {table}",
-        )
-        return getattr(response, "data", None)
-    except Exception as exc:
-        msg = str(exc)
-        if "does not exist" in msg and isinstance(columns, str) and "," in columns:
-            import re
-
-            m = re.search(r"column\s+([^\s]+)\s+does not exist", msg)
-            if m:
-                missing = m.group(1)
-                missing_col = missing.split(".")[-1]
-                cols = [c.strip() for c in columns.split(",") if c.strip() and c.strip() != missing_col and c.strip() != f"{table}.{missing_col}"]
-                if cols:
-                    new_columns = ",".join(cols)
-                    logger.warning("Retrying trusted select on %s without missing column '%s'", table, missing_col)
-                    query = get_supabase().table(table).select(new_columns)
-                    query = _apply_filters(query, filters)
-                    response = _execute_with_retry(
-                        query.limit(1).maybe_single(),
-                        operation=f"trusted select one {table} without missing column",
-                    )
-                    return getattr(response, "data", None)
-        raise
+    response = _execute_with_retry(
+        query.limit(1).maybe_single(),
+        operation=f"trusted select one {table}",
+    )
+    return getattr(response, "data", None)
 
 
 def _update_one_sync(
@@ -528,6 +404,7 @@ def _update_one_trusted_sync(
     filters: Mapping[str, Any],
     payload: Mapping[str, Any],
 ) -> dict[str, Any] | None:
+    _require_trusted_filters(table, filters, "update")
     if not payload:
         logger.error("Trusted update for '%s' requires at least one field.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
@@ -545,6 +422,7 @@ def _delete_many_trusted_sync(
     table: str,
     filters: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
+    _require_trusted_filters(table, filters, "delete")
     query = get_supabase().table(table).delete()
     query = _apply_filters(query, filters)
     response = _execute_with_retry(query, operation=f"trusted delete {table}")
@@ -653,30 +531,7 @@ async def select_all(
 
     try:
         client = await _async_client()
-        selected_columns = columns
-        for _ in range(_select_recovery_attempts(columns)):
-            query = client.table(table).select(selected_columns)
-            query = _apply_filters(query, filters)
-
-            if order_by:
-                query = query.order(order_by, desc=desc)
-            if limit is not None:
-                query = query.limit(limit)
-            if offset is not None:
-                query = query.offset(offset)
-
-            try:
-                response = await _execute_with_retry_async(query, operation=f"select {table}")
-                return list(getattr(response, "data", None) or [])
-            except Exception as exc:
-                msg = str(exc)
-                recovery = _select_columns_after_missing_column(table, selected_columns, msg)
-                if recovery is None:
-                    raise
-                missing_col, selected_columns = recovery
-                logger.warning("Retrying select on %s without missing column '%s'", table, missing_col)
-
-        query = client.table(table).select(selected_columns)
+        query = client.table(table).select(columns)
         query = _apply_filters(query, filters)
         if order_by:
             query = query.order(order_by, desc=desc)
@@ -700,52 +555,29 @@ async def select_all_trusted(
     desc: bool = False,
     limit: int | None = None,
     offset: int | None = None,
+    secondary_order_by: str | None = None,
+    unscoped_reason: str | None = None,
 ) -> list[dict[str, Any]]:
+    _require_trusted_filters(
+        table,
+        filters,
+        "read",
+        unscoped_reason=unscoped_reason,
+    )
     try:
         client = await _async_client()
-        selected_columns = columns
-        for _ in range(_select_recovery_attempts(columns)):
-            query = client.table(table).select(selected_columns)
-            query = _apply_filters(query, filters)
-
-            if order_by:
-                query = query.order(order_by, desc=desc)
-            if limit is not None:
-                query = query.limit(limit)
-            if offset is not None:
-                query = query.offset(offset)
-
-            try:
-                response = await _execute_with_retry_async(query, operation=f"trusted select {table}")
-                return list(getattr(response, "data", None) or [])
-            except Exception as exc:
-                msg = str(exc)
-                recovery = _select_columns_after_missing_column(table, selected_columns, msg)
-                if recovery is None:
-                    if "does not exist" in msg or "schema cache" in msg.lower():
-                        logger.warning("Trusted query on '%s' failed due to missing column: %s. Returning empty list.", table, msg)
-                        return []
-                    raise
-                missing_col, selected_columns = recovery
-                logger.warning("Retrying trusted select on %s without missing column '%s'", table, missing_col)
-
-        try:
-            query = client.table(table).select(selected_columns)
-            query = _apply_filters(query, filters)
-            if order_by:
-                query = query.order(order_by, desc=desc)
-            if limit is not None:
-                query = query.limit(limit)
-            if offset is not None:
-                query = query.offset(offset)
-            response = await _execute_with_retry_async(query, operation=f"trusted select {table}")
-            return list(getattr(response, "data", None) or [])
-        except Exception as exc:
-            msg = str(exc)
-            if "does not exist" in msg or "schema cache" in msg.lower():
-                logger.warning("Trusted query on '%s' failed due to missing column: %s. Returning empty list.", table, msg)
-                return []
-            raise
+        query = client.table(table).select(columns)
+        query = _apply_filters(query, filters)
+        if order_by:
+            query = query.order(order_by, desc=desc)
+        if secondary_order_by:
+            query = query.order(secondary_order_by, desc=desc)
+        if limit is not None:
+            query = query.limit(limit)
+        if offset is not None:
+            query = query.offset(offset)
+        response = await _execute_with_retry_async(query, operation=f"trusted select {table}")
+        return list(getattr(response, "data", None) or [])
     except Exception as exc:
         _raise_supabase_error("Trusted query", table, exc)
 
@@ -763,25 +595,7 @@ async def select_one(
 
     try:
         client = await _async_client()
-        selected_columns = columns
-        for _ in range(_select_recovery_attempts(columns)):
-            query = client.table(table).select(selected_columns)
-            query = _apply_filters(query, filters)
-            try:
-                response = await _execute_with_retry_async(
-                    query.limit(1).maybe_single(),
-                    operation=f"select one {table}",
-                )
-                return getattr(response, "data", None)
-            except Exception as exc:
-                msg = str(exc)
-                recovery = _select_columns_after_missing_column(table, selected_columns, msg)
-                if recovery is None:
-                    raise
-                missing_col, selected_columns = recovery
-                logger.warning("Retrying select one on %s without missing column '%s'", table, missing_col)
-
-        query = client.table(table).select(selected_columns)
+        query = client.table(table).select(columns)
         query = _apply_filters(query, filters)
         response = await _execute_with_retry_async(
             query.limit(1).maybe_single(),
@@ -799,43 +613,16 @@ async def select_one_trusted(
     columns: str,
     filters: Mapping[str, Any],
 ) -> dict[str, Any] | None:
+    _require_trusted_filters(table, filters, "single-row read")
     try:
         client = await _async_client()
-        selected_columns = columns
-        for _ in range(_select_recovery_attempts(columns)):
-            query = client.table(table).select(selected_columns)
-            query = _apply_filters(query, filters)
-            try:
-                response = await _execute_with_retry_async(
-                    query.limit(1).maybe_single(),
-                    operation=f"trusted select one {table}",
-                )
-                return getattr(response, "data", None)
-            except Exception as exc:
-                msg = str(exc)
-                recovery = _select_columns_after_missing_column(table, selected_columns, msg)
-                if recovery is None:
-                    if "does not exist" in msg or "schema cache" in msg.lower():
-                        logger.warning("Trusted query on '%s' failed due to missing column: %s. Returning None.", table, msg)
-                        return None
-                    raise
-                missing_col, selected_columns = recovery
-                logger.warning("Retrying trusted select one on %s without missing column '%s'", table, missing_col)
-
-        try:
-            query = client.table(table).select(selected_columns)
-            query = _apply_filters(query, filters)
-            response = await _execute_with_retry_async(
-                query.limit(1).maybe_single(),
-                operation=f"trusted select one {table}",
-            )
-            return getattr(response, "data", None)
-        except Exception as exc:
-            msg = str(exc)
-            if "does not exist" in msg or "schema cache" in msg.lower():
-                logger.warning("Trusted query on '%s' failed due to missing column: %s. Returning None.", table, msg)
-                return None
-            raise
+        query = client.table(table).select(columns)
+        query = _apply_filters(query, filters)
+        response = await _execute_with_retry_async(
+            query.limit(1).maybe_single(),
+            operation=f"trusted select one {table}",
+        )
+        return getattr(response, "data", None)
     except Exception as exc:
         _raise_supabase_error("Trusted query", table, exc)
 
@@ -873,6 +660,7 @@ async def update_one_trusted(
     filters: Mapping[str, Any],
     payload: Mapping[str, Any],
 ) -> dict[str, Any] | None:
+    _require_trusted_filters(table, filters, "update")
     if not payload:
         logger.error("Trusted update for '%s' requires at least one field.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
@@ -895,6 +683,7 @@ async def update_many_trusted(
     filters: Mapping[str, Any],
     payload: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
+    _require_trusted_filters(table, filters, "batch update")
     if not payload:
         logger.error("Trusted batch update for '%s' requires at least one field.", table)
         raise SupabaseServiceError(INTERNAL_DB_ERROR)
@@ -939,6 +728,7 @@ async def delete_one_trusted(
     table: str,
     filters: Mapping[str, Any],
 ) -> dict[str, Any] | None:
+    _require_trusted_filters(table, filters, "single-row delete")
     try:
         client = await _async_client()
         query = client.table(table).delete()
@@ -954,6 +744,7 @@ async def delete_many_trusted(
     table: str,
     filters: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
+    _require_trusted_filters(table, filters, "delete")
     try:
         client = await _async_client()
         query = client.table(table).delete()

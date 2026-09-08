@@ -9,13 +9,13 @@ from typing import Any
 from fastapi import HTTPException
 
 from ..services.supabase_service import SupabaseServiceError, select_all_trusted
+from .workspace_access_service import require_workspace_access
 from .workspace_cognition import build_workspace_focus_prompt, normalize_workspace_focus
-from .workspace_service import (
-    list_workspace_members,
+from .workspace_common import (
     normalize_intelligence_preferences,
     normalize_workspace_record,
-    require_workspace_access,
 )
+from .workspace_membership_service import list_workspace_members
 
 FILE_COLUMNS = "id,file_name,file_type,workspace_id,metadata,created_at"
 CONVERSATION_COLUMNS = "id,title,workspace_id,last_message_at,updated_at,created_at"

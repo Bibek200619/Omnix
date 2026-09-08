@@ -101,7 +101,9 @@ def test_public_ai_generation_clamps_temperature_and_tokens(monkeypatch: pytest.
     )
 
     assert response.status_code == 200
-    assert captured["prompt"] == "Write a summary"
+    assert "CURRENT USER REQUEST (UNTRUSTED):" in captured["prompt"]
+    assert '"kind": "user_message"' in captured["prompt"]
+    assert "Write a summary" in captured["prompt"]
     assert captured["system_prompt"] is None
     assert captured["temperature"] == 0.5
     assert captured["max_tokens"] == 256

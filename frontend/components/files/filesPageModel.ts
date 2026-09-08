@@ -1,8 +1,23 @@
 import type { LucideIcon } from "lucide-react";
 import { Database, FileUp, GitBranch, HardDrive, Link2, Server } from "lucide-react";
 
-export type FileProcessingStatus = "uploaded" | "queued" | "processing" | "extracted" | "chunked" | "embedded" | "failed";
-export type FileIngestionStatus = FileProcessingStatus | "searchable" | "ocr_required" | "ocr_complete" | "extraction_failed";
+export type FileProcessingStatus =
+  | "uploaded"
+  | "queued"
+  | "extracting"
+  | "chunking"
+  | "embedding"
+  | "ocr_required"
+  | "ocr_running"
+  | "searchable"
+  | "partially_searchable"
+  | "failed"
+  // Legacy values remain supported while older rows are migrated.
+  | "processing"
+  | "extracted"
+  | "chunked"
+  | "embedded";
+export type FileIngestionStatus = FileProcessingStatus | "ocr_complete" | "extraction_failed";
 
 export interface FileData {
   id: string;
@@ -25,6 +40,9 @@ export interface FileData {
   processing_job_id?: string | null;
   ocr_used?: boolean | null;
   ocr_character_count?: number | null;
+  ocr_pages_processed?: number | null;
+  ocr_pages_omitted?: number | null;
+  ocr_coverage_complete?: boolean | null;
 }
 
 export type ConnectorType = "knowledge_link" | "file_repository" | "company_drive" | "external_database";
@@ -207,12 +225,17 @@ export const fileStatusStyle: Record<FileIngestionStatus, string> = {
   uploaded: "border-white/10 bg-white/[0.04] text-white/55",
   queued: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
   searchable: "border-emerald-300/25 bg-emerald-300/10 text-emerald-200",
+  partially_searchable: "border-amber-300/25 bg-amber-300/10 text-amber-100",
   processing: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
+  extracting: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100",
   extracted: "border-sky-300/25 bg-sky-300/10 text-sky-100",
+  chunking: "border-teal-300/25 bg-teal-300/10 text-teal-100",
   chunked: "border-teal-300/25 bg-teal-300/10 text-teal-100",
+  embedding: "border-sky-300/25 bg-sky-300/10 text-sky-100",
   embedded: "border-emerald-300/25 bg-emerald-300/10 text-emerald-200",
   failed: "border-rose-300/30 bg-rose-300/10 text-rose-100",
   ocr_required: "border-amber-300/25 bg-amber-300/10 text-amber-100",
+  ocr_running: "border-amber-300/25 bg-amber-300/10 text-amber-100",
   ocr_complete: "border-emerald-300/25 bg-emerald-300/10 text-emerald-200",
   extraction_failed: "border-rose-300/30 bg-rose-300/10 text-rose-100",
 };
@@ -221,12 +244,17 @@ export const fileStatusLabel: Record<FileIngestionStatus, string> = {
   uploaded: "Uploaded",
   queued: "Queued",
   searchable: "Searchable",
+  partially_searchable: "Partially Searchable",
   processing: "Processing",
+  extracting: "Extracting",
   extracted: "Extracted",
+  chunking: "Chunking",
   chunked: "Chunked",
+  embedding: "Embedding",
   embedded: "Embedded",
   failed: "Failed",
   ocr_required: "OCR Required",
+  ocr_running: "Running OCR",
   ocr_complete: "OCR Complete",
   extraction_failed: "Extraction Failed",
 };
@@ -269,17 +297,13 @@ export function booleanDiagnostic(file: FileData, key: keyof FileData) {
   return typeof fromMetadata === "boolean" ? fromMetadata : false;
 }
 
+function isFileIngestionStatus(value: string): value is FileIngestionStatus {
+  return Object.prototype.hasOwnProperty.call(fileStatusStyle, value);
+}
+
 export function fileIngestionStatus(file: FileData): FileIngestionStatus {
   const processingStatus = stringDiagnostic(file, "processing_status");
-  if (
-    processingStatus === "uploaded" ||
-    processingStatus === "queued" ||
-    processingStatus === "processing" ||
-    processingStatus === "extracted" ||
-    processingStatus === "chunked" ||
-    processingStatus === "embedded" ||
-    processingStatus === "failed"
-  ) {
+  if (processingStatus && isFileIngestionStatus(processingStatus)) {
     return processingStatus;
   }
 
@@ -301,15 +325,35 @@ export function fileStatusDetail(file: FileData) {
   const extractedChars = numberDiagnostic(file, "extracted_character_count") ?? 0;
   const ocrChars = numberDiagnostic(file, "ocr_character_count") ?? 0;
   const pages = numberDiagnostic(file, "page_count");
+  const ocrPagesProcessed = numberDiagnostic(file, "ocr_pages_processed");
+  const ocrPagesOmitted = numberDiagnostic(file, "ocr_pages_omitted");
+  const omittedOcrPages = ocrPagesOmitted ?? 0;
+  const ocrCoverageComplete = booleanDiagnostic(file, "ocr_coverage_complete");
+  const ocrUsed = booleanDiagnostic(file, "ocr_used");
   if (status === "uploaded") return "The file is stored and waiting to be queued for processing.";
   if (status === "queued") return "Processing is queued. Omnix will extract, chunk, and embed this source in the background.";
-  if (status === "processing") return "Text extraction is still running.";
-  if (status === "extracted") return `Extracted ${extractedChars.toLocaleString()} characters; chunking is next.`;
-  if (status === "chunked") return `Text chunks are ready${extractedChars ? ` from ${extractedChars.toLocaleString()} characters` : ""}; embeddings are still finishing.`;
+  if (status === "processing" || status === "extracting") return "Text extraction is still running.";
+  if (status === "extracted" || status === "chunking") return `Extracted ${extractedChars.toLocaleString()} characters; chunking is next.`;
+  if (status === "chunked" || status === "embedding") return `Text chunks are ready${extractedChars ? ` from ${extractedChars.toLocaleString()} characters` : ""}; embeddings are still finishing.`;
   if (status === "embedded") return `Fully indexed for retrieval${extractedChars ? ` from ${extractedChars.toLocaleString()} characters` : ""}${pages ? ` across ${pages} pages` : ""}.`;
   if (status === "failed") return "File processing failed.";
+  if (status === "partially_searchable") return "Text chunks are available, but vector indexing is incomplete. Omnix will retry processing this source.";
   if (status === "ocr_required") return "This PDF contains no readable text layer. OCR is required before it becomes searchable.";
+  if (status === "ocr_running") return "OCR is running before this source can be indexed.";
   if (status === "extraction_failed") return "Text extraction failed for this document.";
+  if ((status === "searchable" || status === "ocr_complete") && ocrUsed && ocrChars > 0) {
+    if (ocrPagesProcessed === undefined) {
+      return `OCR extracted ${ocrChars.toLocaleString()} characters. Page coverage was not recorded for this older import.`;
+    }
+    if (omittedOcrPages > 0) {
+      const pageCoverage = pages ? `the first ${ocrPagesProcessed.toLocaleString()} of ${pages.toLocaleString()}` : ocrPagesProcessed.toLocaleString();
+      return `OCR indexed ${pageCoverage} pages and extracted ${ocrChars.toLocaleString()} characters. ${omittedOcrPages.toLocaleString()} pages were not processed because of the OCR limit.`;
+    }
+    if (ocrCoverageComplete) {
+      return `OCR extracted ${ocrChars.toLocaleString()} characters from all ${pages?.toLocaleString() ?? ocrPagesProcessed.toLocaleString()} pages.`;
+    }
+    return `OCR extracted ${ocrChars.toLocaleString()} characters from ${ocrPagesProcessed.toLocaleString()} OCR-processed pages.`;
+  }
   if (status === "ocr_complete") return `OCR extracted ${ocrChars.toLocaleString()} characters${pages ? ` across ${pages} pages` : ""}.`;
   return `Extracted ${extractedChars.toLocaleString()} characters${pages ? ` across ${pages} pages` : ""}.`;
 }

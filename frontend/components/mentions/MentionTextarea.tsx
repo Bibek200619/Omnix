@@ -110,7 +110,7 @@ export function MentionTextarea({
   const [activeIndex, setActiveIndex] = useState(0);
 
   const candidates = useMemo(() => filterMembers(members, trigger?.query || ""), [members, trigger?.query]);
-  const pickerOpen = Boolean(trigger && candidates.length);
+  const pickerOpen = Boolean(!disabled && trigger && candidates.length);
 
   function updateTrigger(nextValue: string, caret: number) {
     const nextTrigger = activeMentionTrigger(nextValue, caret);
@@ -194,12 +194,13 @@ export function MentionTextarea({
                 <button
                   type="button"
                   key={member.user_id}
+                  disabled={disabled}
                   onMouseDown={(event) => {
                     event.preventDefault();
                     selectMember(member);
                   }}
                   className={cn(
-                    "flex min-h-12 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition",
+                    "flex min-h-12 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-50",
                     isActive ? "bg-cyan-300/[0.12] text-white" : "text-[var(--omnix-text-2)] hover:bg-white/[0.04] hover:text-white",
                   )}
                 >

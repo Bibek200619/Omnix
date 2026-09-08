@@ -67,7 +67,7 @@ async def test_update_assistant_message_persists_payload(monkeypatch: pytest.Mon
     updated = await messages._update_assistant_message(
         assistant_message_id="assistant-1",
         user_id="user-1",
-        content="Answer with sources.",
+        content="Answer with [W1].",
         status_value="completed",
         sources=[
             {
@@ -91,7 +91,7 @@ async def test_update_assistant_message_persists_payload(monkeypatch: pytest.Mon
     )
 
     assert updated is not None
-    assert captured_payload["content"] == "Answer with sources."
+    assert captured_payload["content"] == "Answer with [W1]."
     assert captured_payload["status"] == "completed"
     assert "metadata" not in captured_payload
     assert captured_payload["payload"] == {
@@ -108,6 +108,12 @@ async def test_update_assistant_message_persists_payload(monkeypatch: pytest.Mon
             }
         ],
         "citations": ["W1"],
+        "citation_validation": {
+            "status": "supported",
+            "source_count": 1,
+            "cited_source_count": 1,
+            "invalid_citation_count": 0,
+        },
     }
 
 
@@ -156,7 +162,97 @@ async def test_persist_assistant_payload_updates_payload_immediately(monkeypatch
                         "excerpt": "Current information.",
                     }
                 ],
-                "citations": ["W1"],
+                "citations": [],
+                "citation_validation": {
+                    "status": "pending",
+                    "source_count": 1,
+                    "cited_source_count": 0,
+                    "invalid_citation_count": 0,
+                },
             }
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_legacy_metadata_keeps_validated_citation_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    updates: list[dict[str, object]] = []
+
+    async def fake_update_one(table: str, filters: dict[str, object], payload: dict[str, object]):
+        assert table == "messages"
+        assert filters == {"id": "assistant-1", "user_id": "user-1"}
+        updates.append(payload)
+        if len(updates) == 1:
+            raise messages.SupabaseServiceError("payload column unavailable")
+        return {"id": "assistant-1", **payload}
+
+    monkeypatch.setattr(messages, "update_one", fake_update_one)
+
+    updated = await messages._update_assistant_message(
+        assistant_message_id="assistant-1",
+        user_id="user-1",
+        content="Answer with [S1].",
+        status_value="completed",
+        sources=[{"label": "S1", "title": "Release plan"}],
+        search_mode="workspace",
+    )
+
+    assert updated is not None
+    assert updates[1]["metadata"] == {
+        "sources": [{"label": "S1", "title": "Release plan"}],
+        "citations": ["S1"],
+        "citation_validation": {
+            "status": "supported",
+            "source_count": 1,
+            "cited_source_count": 1,
+            "invalid_citation_count": 0,
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_zero_source_retrieval_failure_persists_safe_outcome(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured_payload: dict[str, object] = {}
+
+    async def fake_update_one(table: str, filters: dict[str, object], payload: dict[str, object]):
+        assert table == "messages"
+        assert filters == {"id": "assistant-1", "user_id": "user-1"}
+        captured_payload.update(payload)
+        return {"id": "assistant-1", **payload}
+
+    monkeypatch.setattr(messages, "update_one", fake_update_one)
+
+    updated = await messages._update_assistant_message(
+        assistant_message_id="assistant-1",
+        user_id="user-1",
+        content="Source retrieval is temporarily unavailable.",
+        status_value="completed",
+        sources=[],
+        search_mode="workspace",
+        retrieval_debug={
+            "outcome": "failed",
+            "reason": "channel_timeout",
+            "failed_channels": ["semantic", "keyword", "not-public"],
+            "diagnostics": {"provider_error": "internal endpoint https://secret.invalid"},
+        },
+    )
+
+    assert updated is not None
+    assert captured_payload["payload"] == {
+        "mode": "workspace",
+        "web_search_used": False,
+        "sources": [],
+        "citations": [],
+        "citation_validation": {
+            "status": "not_applicable",
+            "source_count": 0,
+            "cited_source_count": 0,
+            "invalid_citation_count": 0,
+        },
+        "retrieval": {
+            "outcome": "failed",
+            "source_count": 0,
+            "reason": "channel_timeout",
+            "failed_channels": ["semantic", "keyword"],
+        },
+    }

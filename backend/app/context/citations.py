@@ -4,6 +4,7 @@ import logging
 from typing import List, Dict
 
 from .schemas import Citation
+from ..services.prompt_trust import make_untrusted_data_record, untrusted_data_block
 
 logger = logging.getLogger(__name__)
 
@@ -29,18 +30,30 @@ class CitationManager:
                 
         return list(seen.values())
 
-    def format_citations_block(self, citations: List[Citation]) -> str:
+    def format_citations_block(self, citations: List[Citation], *, section_title: str = "CONTEXT SOURCES:") -> str:
         """Format citations into a standard string block for prompts."""
         if not citations:
             return ""
 
-        formatted = []
+        records = []
         for idx, citation in enumerate(citations, 1):
+            label = citation.label or f"S{idx}"
             if citation.file_name and citation.file_name != "Unknown File":
-                header = f"[{idx}] Source: {citation.file_name}"
+                title = citation.file_name
             else:
-                header = f"[{idx}] Source: {citation.source_type.value}"
+                title = citation.source_type.value
                 
-            formatted.append(f"{header}\n{citation.content.strip()}\n")
+            records.append(
+                make_untrusted_data_record(
+                    kind=f"{citation.source_type.value}_source",
+                    content=citation.content.strip(),
+                    label=f"[{label}]",
+                    source_id=citation.source_id,
+                    source_type=citation.source_type.value,
+                    title=title,
+                    file_id=citation.file_id,
+                    score=citation.score,
+                )
+            )
             
-        return "\n".join(formatted)
+        return untrusted_data_block(section_title, records)

@@ -79,6 +79,36 @@ def test_decisions_non_member_returns_404(method: str, path: str, monkeypatch: p
     assert response.status_code == 404
 
 
+def test_candidate_accept_non_member_returns_404(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def deny_access(workspace_id: str, user_id: str) -> WorkspaceAccess:
+        raise HTTPException(status_code=404, detail="Workspace not found.")
+
+    monkeypatch.setattr(workspace_decisions, "require_workspace_access", deny_access)
+    client = _decisions_client({"sub": "outsider", "role": "authenticated"})
+    response = client.post(
+        "/workspaces/ws-1/decisions/candidates/accept",
+        json={
+            "candidate_id": "candidate-1",
+            "title": "Use source-backed decision",
+            "status": "proposed",
+            "source_type": "conversation",
+            "source_id": "channel-1",
+            "source_evidence": [
+                {
+                    "kind": "conversation_message",
+                    "channel_id": "channel-1",
+                    "message_id": "message-1",
+                    "char_start": 0,
+                    "char_end": 11,
+                    "quote": "Source quote",
+                    "source_content_hash": "a" * 64,
+                }
+            ],
+        },
+    )
+    assert response.status_code == 404
+
+
 # ---- workspace_mentions: non-member ----
 
 

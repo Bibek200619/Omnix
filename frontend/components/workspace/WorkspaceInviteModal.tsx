@@ -59,6 +59,8 @@ export function WorkspaceInviteModal({
       isOpen={open}
       onClose={onClose}
       title="Invite teammate"
+      description={`Invite a collaborator to ${workspaceName} and choose their workspace scope.`}
+      closeDisabled={loading}
       className="max-w-md p-4 sm:p-5"
       footerClassName="mt-5 border-t-0 p-0 pt-2"
       footer={(
@@ -88,6 +90,7 @@ export function WorkspaceInviteModal({
           aria-label="Close invite modal"
           title="Close invite modal"
           onClick={onClose}
+          disabled={loading}
         >
           <X className="h-4 w-4" />
         </button>

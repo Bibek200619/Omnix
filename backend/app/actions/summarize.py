@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 from ..services.chat_service import call_llm
+from ..services.citation_validation_service import finalize_generated_context_result
 
 
 async def run(context_engine, user_id: str, workspace_id: str | None = None) -> dict[str, Any]:
@@ -13,9 +14,9 @@ async def run(context_engine, user_id: str, workspace_id: str | None = None) -> 
 
     citations = assembled.get("sources", [])
 
-    return {
+    return finalize_generated_context_result({
         "action": "summarize",
         "markdown": assistant_text,
         "citations": citations,
         "artifacts": [],
-    }
+    })

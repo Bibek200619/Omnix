@@ -54,17 +54,19 @@ def test_mobile_task_create_form_does_not_use_raw_autofocus() -> None:
     assert "focus({ preventScroll: true })" in source
 
 
-def test_major_framer_motion_surfaces_respect_reduced_motion() -> None:
+def test_major_motion_surfaces_respect_reduced_motion() -> None:
     upload = read_frontend("components/upload/UploadDropzone.tsx")
     page_transition = read_frontend("components/layout/PageTransition.tsx")
     button = read_frontend("components/ui/Button.tsx")
     toggle = read_frontend("components/ui/Toggle.tsx")
+    globals_css = read_frontend("styles/globals.css")
 
     assert "useReducedMotion" in upload
     assert "reduceMotion ? 1" in upload
     assert "initial={reduceMotion ? false" in upload
     assert "duration: reduceMotion ? 0" in upload
-    assert "useReducedMotion" in page_transition
-    assert "initial={reduceMotion ? false" in page_transition
+    assert "framer-motion" not in page_transition
+    assert '"omnix-shell-page-enter min-h-0"' in page_transition
+    assert ".omnix-shell-page-enter," in globals_css
     assert "motion-reduce:active:scale-100" in button
     assert "motion-reduce:hover:translate-y-0" in toggle

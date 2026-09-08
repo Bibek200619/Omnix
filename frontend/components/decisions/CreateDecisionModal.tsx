@@ -11,6 +11,7 @@ import { useWorkspaceMembership } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
 import type { 
   WorkspaceDecision, 
+  DecisionEvidence,
   WorkspaceDecisionSourceType,
   WorkspaceDecisionStatus, 
   WorkspaceInitiative, 
@@ -29,6 +30,8 @@ interface CreateDecisionModalProps {
     status?: WorkspaceDecisionStatus;
     source_type?: WorkspaceDecisionSourceType;
     source_id?: string;
+    candidate_id?: string;
+    source_evidence?: DecisionEvidence[];
   };
 }
 
@@ -86,9 +89,10 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
 
     setCreating(true);
     try {
+      const isCandidateAcceptance = Boolean(initialValues?.candidate_id && initialValues.source_evidence?.length);
       // 1. Create decision
       const decision = await apiClient.post<WorkspaceDecision>(
-        `/workspaces/${workspaceId}/decisions`,
+        `/workspaces/${workspaceId}/decisions${isCandidateAcceptance ? "/candidates/accept" : ""}`,
         {
           title: title.trim(),
           decision_reason: reason.trim(),
@@ -96,6 +100,12 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
           status,
           source_type: initialValues?.source_type ?? null,
           source_id: initialValues?.source_id ?? null,
+          ...(isCandidateAcceptance
+            ? {
+                candidate_id: initialValues?.candidate_id,
+                source_evidence: initialValues?.source_evidence,
+              }
+            : {}),
           mentions: mentionPayload(mentions, `${reason}\n${description}`),
         }
       );
@@ -154,6 +164,8 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
       isOpen
       onClose={onClose}
       title="Record New Decision"
+      description="Capture an organizational choice, its rationale, status, and linked work."
+      closeDisabled={creating}
       backdropClassName="z-[100] px-4 py-6"
       className="omnix-mobile-sheet omnix-panel-strong max-h-[calc(100dvh_-_2rem)] max-w-xl rounded-2xl border-cyan-400/20 shadow-2xl"
       footerClassName="border-white/5 bg-black/20 p-4 sm:px-6 sm:py-4"
@@ -164,6 +176,7 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
             variant="ghost"
             size="sm"
             onClick={onClose}
+            disabled={creating}
             className="text-[var(--omnix-text-3)] hover:text-white"
           >
             Cancel
@@ -193,6 +206,7 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
             <button 
               type="button" 
               onClick={onClose} 
+              disabled={creating}
               aria-label="Close decision modal"
               title="Close decision modal"
               className="rounded-lg p-2 text-white/40 transition hover:bg-white/5 hover:text-white"
@@ -208,8 +222,10 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
               <div className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-[1fr_12rem]">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--omnix-text-3)]">Title *</label>
+                    <span id={`${formId}-title-label`} className="text-[10px] font-bold uppercase tracking-wider text-[var(--omnix-text-3)]">Title *</span>
                     <Input 
+                      id={`${formId}-title`}
+                      aria-labelledby={`${formId}-title-label`}
                       value={title} 
                       onChange={(e) => setTitle(e.target.value)} 
                       placeholder="e.g., Use Supabase Realtime for Collaboration"
@@ -219,8 +235,9 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--omnix-text-3)]">Status</label>
+                    <label htmlFor={`${formId}-status`} className="text-[10px] font-bold uppercase tracking-wider text-[var(--omnix-text-3)]">Status</label>
                     <select
+                      id={`${formId}-status`}
                       value={status}
                       onChange={(e) => setStatus(e.target.value as WorkspaceDecisionStatus)}
                       className="omnix-input h-11 w-full rounded-lg bg-white/5 border-white/10 px-3 text-sm focus:border-cyan-400/40 outline-none"
@@ -233,8 +250,9 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--omnix-text-3)]">Reason *</label>
+                  <label htmlFor={`${formId}-reason`} className="text-[10px] font-bold uppercase tracking-wider text-[var(--omnix-text-3)]">Reason *</label>
                   <MentionTextarea
+                    id={`${formId}-reason`}
                     value={reason}
                     onChange={setReason}
                     members={activeMembers}
@@ -247,8 +265,9 @@ export function CreateDecisionModal({ workspaceId, onClose, onSuccess, initialVa
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--omnix-text-3)]">Description</label>
+                  <label htmlFor={`${formId}-description`} className="text-[10px] font-bold uppercase tracking-wider text-[var(--omnix-text-3)]">Description</label>
                   <MentionTextarea
+                    id={`${formId}-description`}
                     value={description}
                     onChange={setDescription}
                     members={activeMembers}
