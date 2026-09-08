@@ -71,13 +71,14 @@ function NotificationCenterSurfaceContent() {
     markMentionRead,
     markAllMentionsRead,
   } = useWorkspaceNotifications();
-  const { activity, loadingActivity, refreshActivity } = useWorkspaceCollaboration();
+  const { activity, loadingActivity, activityError, refreshActivity } = useWorkspaceCollaboration();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
   const [filter, setFilter] = useState<NotificationFeedFilter>("all");
   const notificationListRef = useRef<HTMLDivElement | null>(null);
   const feed = useMemo(() => buildNotificationFeed(mentions, activity, filter), [activity, filter, mentions]);
   const isLoading = loading || loadingActivity;
+  const selectedSourceFailed = (filter !== "activity" && Boolean(error)) || (filter !== "mentions" && Boolean(activityError));
 
   const notificationVirtualizer = useVirtualizer({
     count: feed.length,
@@ -141,7 +142,9 @@ function NotificationCenterSurfaceContent() {
           </p>
           <h1 className="omnix-display text-xl font-semibold text-white">Notifications</h1>
           <p role="status" aria-live="polite" aria-atomic="true" className="mt-1 text-sm text-[var(--omnix-text-2)]">
-            {isLoading && feed.length === 0
+            {selectedSourceFailed
+              ? "Some workspace events could not be loaded. Retry to update your inbox."
+              : isLoading && feed.length === 0
               ? "Loading workspace events…"
               : unreadCount > 0
               ? `${unreadCount} unread mention${unreadCount === 1 ? "" : "s"} in ${activeWorkspace?.name || "this workspace"}.`
@@ -205,6 +208,17 @@ function NotificationCenterSurfaceContent() {
         />
       ) : null}
 
+      {activityError ? (
+        <OmnixErrorState
+          compact
+          className="mb-4"
+          title="Workspace activity is unavailable"
+          message={activityError}
+          onRetry={() => void refreshActivity()}
+          isRetrying={loadingActivity}
+        />
+      ) : null}
+
       {isLoading && feed.length === 0 ? (
         <div className="min-h-[18rem]">
           <div className="grid gap-2" aria-hidden="true">
@@ -230,7 +244,7 @@ function NotificationCenterSurfaceContent() {
         </div>
       ) : null}
 
-      {!isLoading && feed.length === 0 ? (
+      {!isLoading && !selectedSourceFailed && feed.length === 0 ? (
         <EmptyState
           icon={filter === "activity" ? Activity : AtSign}
           title={filter === "all" ? "You're all caught up" : `No ${filter} yet`}

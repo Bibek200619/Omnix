@@ -6,6 +6,8 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from fastapi import HTTPException
+
 from ..services.supabase_service import (
     SupabaseServiceError,
     check_infrastructure_pressure,
@@ -387,8 +389,11 @@ async def list_workspace_activity(
             limit=limit,
         )
     except SupabaseServiceError:
-        logger.exception("Failed to load workspace activity | workspace_id=%s", workspace_id)
-        return []
+        logger.warning("Failed to load workspace activity | workspace_id=%s", workspace_id)
+        raise HTTPException(
+            status_code=503,
+            detail="Workspace activity is temporarily unavailable. Please retry.",
+        ) from None
 
     profiles = await get_profiles([str(row.get("actor_user_id") or "") for row in rows])
     activity: list[dict[str, Any]] = []

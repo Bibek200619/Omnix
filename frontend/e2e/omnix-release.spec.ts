@@ -2973,6 +2973,79 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page).toHaveURL(/\/decisions$/);
   });
 
+  test("notification activity failure is explicit and retry recovers", async ({ page }) => {
+    let failActivity = true;
+    await page.route("**/api/workspaces/*/activity?*", async (route) => {
+      if (failActivity) {
+        await route.fulfill({ status: 503, contentType: "application/json", body: '{"detail":"Unavailable"}' });
+      } else {
+        await fulfillJson(route, []);
+      }
+    });
+    await page.goto("/notifications");
+    await expect(page.getByText("Workspace activity is unavailable", { exact: true })).toBeVisible();
+    await expect(page.getByText("You're all caught up", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("No unread mentions right now.", { exact: true })).toHaveCount(0);
+    failActivity = false;
+    await page.getByRole("button", { name: "Retry", exact: true }).click();
+    await expect(page.getByText("Workspace activity is unavailable", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("You're all caught up", { exact: true })).toBeVisible();
+  });
+
+  test("notification activity retains current rows on refresh failure", async ({ page }) => {
+    let failActivity = false;
+    await page.route("**/api/workspaces/*/activity?*", async (route) => {
+      if (failActivity) {
+        await route.fulfill({ status: 503, contentType: "application/json", body: '{"detail":"Unavailable"}' });
+      } else {
+        await fulfillJson(route, [{
+          id: "retained-activity", workspace_id: "workspace-1", event_type: "task.created",
+          summary: "Current workspace task created", created_at: "2026-06-20T00:05:00Z", metadata: {},
+        }]);
+      }
+    });
+    await page.goto("/notifications");
+    await expect(page.getByText("Current workspace task created")).toBeVisible();
+    failActivity = true;
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await expect(page.getByText("Workspace activity is unavailable", { exact: true })).toBeVisible();
+    await expect(page.getByText("Current workspace task created")).toBeVisible();
+  });
+
+  test("notification activity cannot cross a workspace switch", async ({ page, isMobile }) => {
+    let releaseOldWorkspace!: () => void;
+    const gate = new Promise<void>((resolve) => { releaseOldWorkspace = resolve; });
+    let oldRequestStarted = false;
+    await page.route("**/api/workspaces/*/activity?*", async (route) => {
+      const oldWorkspace = route.request().url().includes("/workspace-1/");
+      if (oldWorkspace) {
+        oldRequestStarted = true;
+        await gate;
+      }
+      await fulfillJson(route, [{
+        id: oldWorkspace ? "old-event" : "new-event",
+        workspace_id: oldWorkspace ? "workspace-1" : "workspace-2",
+        event_type: "task.created",
+        summary: oldWorkspace ? "Old workspace private activity" : "Platform task created",
+        created_at: "2026-06-20T00:05:00Z", metadata: {},
+      }]).catch(() => undefined);
+    });
+    try {
+      await page.goto("/notifications");
+      await expect.poll(() => oldRequestStarted).toBe(true);
+      if (isMobile) await page.getByRole("button", { name: "Open navigation" }).click();
+      await page.getByRole("button", { name: /Switch workspace\. Current workspace: Acme Operations/ }).click();
+      await page.getByRole("button", { name: "Switch to Platform Lab" }).click();
+      await expect(page.getByText("Platform task created")).toBeVisible();
+      releaseOldWorkspace();
+      await page.getByRole("button", { name: "Refresh", exact: true }).click();
+      await expect(page.getByText("Platform task created")).toBeVisible();
+      await expect(page.getByText("Old workspace private activity")).toHaveCount(0);
+    } finally {
+      releaseOldWorkspace();
+    }
+  });
+
   test("keyboard cancellation announces a stopped response", async ({ page, isMobile }) => {
     let releaseStream!: () => void;
     const streamGate = new Promise<void>((resolve) => {
