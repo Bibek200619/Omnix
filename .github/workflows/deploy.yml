@@ -19,6 +19,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
 
           script: |
+            set -e
+
             cd ~/Omnix
 
             git fetch origin
@@ -30,15 +32,25 @@ jobs:
 
             pip install -r requirements.txt --quiet
 
+            # Install the dedicated PDF/OCR consumer, including on existing hosts.
+            sudo install -m 0644 ../scripts/omnix-ocr-worker.service /etc/systemd/system/omnix-ocr-worker.service
+            sudo systemctl daemon-reload
+            sudo systemctl enable omnix-ocr-worker
+
             # Restart API process
             sudo systemctl restart omnix
 
             # Restart ingestion worker (consumes ingest_file jobs from Redis)
             sudo systemctl restart omnix-ingestion-worker
 
+            # PDF jobs use a separate queue and require their own worker.
+            sudo systemctl restart omnix-ocr-worker
+
             # Restart automation scheduler (periodic workspace automations)
             sudo systemctl restart omnix-automation-scheduler
 
             sleep 5
+
+            sudo systemctl is-active --quiet omnix-ocr-worker
 
             echo "Deployment completed successfully"
