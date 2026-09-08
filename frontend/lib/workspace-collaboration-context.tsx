@@ -11,7 +11,9 @@ import {
   useState,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "./api";
+import { apiQueryOptions } from "./query";
 import { useAuth } from "./auth-context";
 import { logger } from "./logger";
 import { realtimeRegistry } from "./realtime-registry";
@@ -36,8 +38,9 @@ type CollaborationContextType = {
   realtimeStatus: RealtimeStatus;
   loadingPresence: boolean;
   loadingActivity: boolean;
+  activityError: string | null;
   refreshPresence: () => Promise<WorkspacePresenceSnapshot | null>;
-  refreshActivity: () => Promise<WorkspaceActivityEvent[]>;
+  refreshActivity: () => Promise<WorkspaceActivityEvent[] | null>;
   refreshLiveStatuses: () => Promise<Record<string, WorkspaceLiveStatus>>;
   retryRealtimeConnection: () => Promise<void>;
   leaveWorkspace: (workspaceId?: string | null) => Promise<void>;
@@ -51,6 +54,7 @@ const HEARTBEAT_INTERVAL_MS = 60_000; // Calmer heartbeat
 const STATUS_INTERVAL_MS = 90_000;    // Less frequent status polling
 const TYPING_THROTTLE_MS = 3_000;
 const TYPING_TIMEOUT_MS = 8_000;
+const EMPTY_ACTIVITY: WorkspaceActivityEvent[] = [];
 
 function currentViewFromPath(pathname: string | null) {
   if (!pathname) return "workspace";
@@ -84,18 +88,31 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
   const { refreshActiveWorkspaceData } = useWorkspaceMembership();
   const { refreshWorkspaceIntelligence } = useWorkspaceIntelligence();
   const [presence, setPresence] = useState<WorkspacePresenceSnapshot | null>(null);
-  const [activity, setActivity] = useState<WorkspaceActivityEvent[]>([]);
   const [liveStatuses, setLiveStatuses] = useState<Record<string, WorkspaceLiveStatus>>({});
   const [typingUsers, setTypingUsers] = useState<Record<string, TypingSignal>>({});
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
   const [loadingPresence] = useState(false);
-  const [loadingActivity, setLoadingActivity] = useState(false);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   
   const typingSentAtRef = useRef(0);
   const lastPresenceWorkspaceIdRef = useRef<string | null>(null);
   const activeWorkspaceIdRef = useRef<string | null>(activeWorkspaceId);
   const userId = session?.user.id ?? null;
+  const activityEnabled = Boolean(userId && activeWorkspaceId);
+  const activityQuery = useQuery({
+    ...apiQueryOptions<WorkspaceActivityEvent[]>(
+      `/workspaces/${activeWorkspaceId}/activity?limit=12`,
+      { key: ["workspace-activity", userId, activeWorkspaceId] },
+    ),
+    enabled: activityEnabled,
+    gcTime: 0,
+  });
+  const activity = activityEnabled ? activityQuery.data ?? EMPTY_ACTIVITY : EMPTY_ACTIVITY;
+  const loadingActivity = activityEnabled && activityQuery.isFetching;
+  const activityError = activityEnabled && activityQuery.error
+    ? "Unable to load workspace activity. Check your connection and retry."
+    : null;
+  const { refetch: refetchActivity } = activityQuery;
   const userEmail = session?.user.email ?? null;
   const userFullName =
     typeof session?.user.user_metadata?.full_name === "string"
@@ -149,26 +166,10 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
   }, [activeWorkspace?.name, activeWorkspaceId, pathname, userId]);
 
   const refreshActivity = useCallback(async () => {
-    if (!userId || !activeWorkspaceId) {
-      setActivity([]);
-      return [];
-    }
-
-    setLoadingActivity(true);
-    try {
-      const rows = await apiClient.get<WorkspaceActivityEvent[]>(
-        `/workspaces/${activeWorkspaceId}/activity?limit=12`,
-      );
-      setActivity(rows);
-      return rows;
-    } catch (err) {
-      console.warn("Unable to refresh workspace activity", err);
-      setActivity([]);
-      return [];
-    } finally {
-      setLoadingActivity(false);
-    }
-  }, [activeWorkspaceId, userId]);
+    if (!activityEnabled) return null;
+    const result = await refetchActivity({ cancelRefetch: false });
+    return result.error ? null : result.data ?? null;
+  }, [activityEnabled, refetchActivity]);
 
   const refreshLiveStatuses = useCallback(async () => {
     if (!userId) {
@@ -217,7 +218,6 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
      if (workspaceId === currentWorkspaceId) {
         if (type === "membership_removed" || type === "workspace_deleted") {
            setPresence(null);
-           setActivity([]);
            setTypingUsers({});
            setActiveWorkspace(null);
            router.replace("/dashboard");
@@ -228,7 +228,6 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
      } else if (activeInheritsRevokedWorkspace) {
        if (type === "membership_removed" || type === "workspace_deleted") {
          setPresence(null);
-         setActivity([]);
          setTypingUsers({});
          setActiveWorkspace(null);
          router.replace("/dashboard");
@@ -421,9 +420,8 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
 
   useEffect(() => {
     void heartbeatPresence();
-    void refreshActivity();
     void refreshLiveStatuses();
-  }, [refreshActivity, refreshLiveStatuses, heartbeatPresence]);
+  }, [refreshLiveStatuses, heartbeatPresence]);
 
   useEffect(() => {
     return () => {
@@ -498,6 +496,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
       realtimeStatus,
       loadingPresence,
       loadingActivity,
+      activityError,
       refreshPresence: heartbeatPresence,
       refreshActivity,
       refreshLiveStatuses,
@@ -509,6 +508,7 @@ export function WorkspaceCollaborationProvider({ children }: { children: ReactNo
     }),
     [
       activity,
+      activityError,
       liveStatuses,
       typingUsers,
       realtimeStatus,
