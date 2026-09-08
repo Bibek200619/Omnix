@@ -104,7 +104,7 @@ function GraphNodeCard({ title, value, detail, icon: Icon, tone, progress, empha
       <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br to-transparent opacity-80", toneClass.glow)} />
       <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">{title}</p>
+          <p className="break-words text-xs font-semibold text-[var(--omnix-text-3)]">{title}</p>
           <div className={cn("mt-2 truncate font-black tabular-nums text-white", emphasis ? "text-3xl" : "text-2xl")}>{value}</div>
         </div>
         <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", toneClass.icon)}>
@@ -123,7 +123,7 @@ function GraphNodeCard({ title, value, detail, icon: Icon, tone, progress, empha
 
 function FlowChip({ children, tone }: { children: string; tone: NodeTone }) {
   return (
-    <span className={cn("rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]", toneClasses[tone].border, toneClasses[tone].text)}>
+    <span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", toneClasses[tone].border, toneClasses[tone].text)}>
       {children}
     </span>
   );
@@ -167,7 +167,7 @@ export function LiveKnowledgeGraph({
         </div>
         <div
           className={cn(
-            "flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em]",
+            "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold",
             runtimeHealthy ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100" : "border-amber-300/20 bg-amber-300/10 text-amber-100",
           )}
         >
@@ -275,7 +275,7 @@ export function LiveKnowledgeGraph({
 
         <aside className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
           <div className="rounded-xl border border-white/[0.06] bg-white/[0.035] p-3">
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--omnix-text-3)]">
               <GitBranch className="h-3.5 w-3.5 text-cyan-200" aria-hidden="true" />
               Primary Flow
             </div>
@@ -283,7 +283,7 @@ export function LiveKnowledgeGraph({
             <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">The center node is the active workspace memory used by chat.</p>
           </div>
           <div className="rounded-xl border border-white/[0.06] bg-white/[0.035] p-3">
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--omnix-text-3)]">
               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-200" aria-hidden="true" />
               Readiness
             </div>
@@ -291,7 +291,7 @@ export function LiveKnowledgeGraph({
             <p className="mt-1 text-xs leading-5 text-[var(--omnix-text-3)]">{contextItems} scoped item{contextItems === 1 ? "" : "s"} feeding the graph.</p>
           </div>
           <div className="rounded-xl border border-white/[0.06] bg-white/[0.035] p-3">
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--omnix-text-3)]">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--omnix-text-3)]">
               <Activity className="h-3.5 w-3.5 text-amber-200" aria-hidden="true" />
               Live Signal
             </div>

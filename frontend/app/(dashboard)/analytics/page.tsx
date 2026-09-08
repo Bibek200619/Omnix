@@ -133,7 +133,7 @@ function AnalysisSignalCard({
       />
       <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--omnix-text-3)]">{label}</p>
+          <p className="break-words text-xs font-semibold text-[var(--omnix-text-3)]">{label}</p>
           <div className="mt-2 truncate text-xl font-bold text-white tabular-nums">{value}</div>
         </div>
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border" style={{ borderColor: accent, color: accent, background: "rgba(255,255,255,0.035)" }}>
@@ -310,7 +310,7 @@ function AnalyticsPageContent() {
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.045),transparent)]" />
           <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/18 bg-cyan-300/8 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">
+              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/18 bg-cyan-300/8 px-3 py-1 text-xs font-semibold text-cyan-100">
                 <Sparkles className="h-3.5 w-3.5" />
                 Analysis Studio
               </p>
@@ -374,7 +374,7 @@ function AnalyticsPageContent() {
                   <Skeleton className="h-6 w-24 rounded-full" />
                 ) : (
                   <span className={cn(
-                    "flex h-6 items-center rounded-full px-2.5 text-[10px] font-bold uppercase tracking-wider",
+                    "flex min-h-6 items-center rounded-full px-2.5 text-xs font-semibold",
                     runtimeInfo?.status === "healthy" ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"
                   )}>
                     {runtimeInfo?.status || "Unavailable"}
@@ -384,18 +384,18 @@ function AnalyticsPageContent() {
               
               <div className="grid grid-cols-2 gap-2 sm:gap-4">
                 <div className="rounded-lg border border-white/5 bg-black/40 p-3 sm:p-4">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--omnix-text-3)]">Environment</p>
+                  <p className="text-xs font-semibold text-[var(--omnix-text-3)]">Environment</p>
                   {loadingRuntime ? <Skeleton className="mt-2 h-4 w-24 rounded-full" /> : <p className="mt-1.5 text-sm font-semibold text-white capitalize">{runtimeInfo?.environment || "Not reported"}</p>}
                 </div>
                 <div className="rounded-lg border border-white/5 bg-black/40 p-3 sm:p-4">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--omnix-text-3)]">Version</p>
+                  <p className="text-xs font-semibold text-[var(--omnix-text-3)]">Version</p>
                   {loadingRuntime ? <Skeleton className="mt-2 h-4 w-20 rounded-full" /> : <p className="mt-1.5 text-sm font-semibold text-white">{runtimeInfo?.version || "Not reported"}</p>}
                 </div>
               </div>
 
               <div className="rounded-lg border border-white/5 bg-black/40 p-3 sm:p-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--omnix-text-3)]">Telemetry Source</p>
+                  <p className="text-xs font-semibold text-[var(--omnix-text-3)]">Telemetry Source</p>
                   <Globe className="h-3.5 w-3.5 text-white/20" />
                 </div>
                 <p className="mt-1.5 text-sm font-semibold text-white">{runtimeInfo ? "Runtime API" : "Not reported"}</p>
@@ -438,7 +438,7 @@ function AnalyticsPageContent() {
         <section className="omnix-cinematic-card overflow-hidden p-3 sm:p-6">
           <div className="pointer-events-none absolute right-[-6rem] top-[-6rem] h-72 w-72 rounded-full bg-cyan-400/5 blur-[88px]" />
           <div className="relative z-10">
-            <div className="mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/50 sm:mb-6">
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-cyan-200/50 sm:mb-6">
               <Sparkles className="h-3.5 w-3.5" />
               Custom Intelligence Dashboards
             </div>

@@ -338,6 +338,9 @@ async function mockApi(page: Page) {
     if (presenceMatch) return fulfillJson(route, presenceSnapshot(presenceMatch[1]));
     const activityMatch = path.match(/^\/workspaces\/([^/]+)\/activity$/);
     if (activityMatch) return fulfillJson(route, workspaceActivity);
+    if (/^\/workspaces\/[^/]+\/telemetry$/.test(path)) {
+      return fulfillJson(route, { dates: ["2026-06-20"], conversations: [0], sources: [files.length], tokens: [0] });
+    }
     const membersMatch = path.match(/^\/workspaces\/([^/]+)\/members$/);
     if (membersMatch) return fulfillJson(route, members);
     const timelineMatch = path.match(/^\/workspaces\/([^/]+)\/timeline$/);
@@ -1000,6 +1003,30 @@ test.describe("authenticated Omnix shell", () => {
     await expect(page.getByText("No command or workspace match.")).toBeVisible();
     await expect(page.locator("#omnix-command-palette-status")).toContainText("No command or workspace results");
   });
+
+  for (const width of [375, 1366]) {
+    for (const [route, labels] of [
+      ["/dashboard", ["Knowledge Readiness", "Workspace Roots", "Role"]],
+      ["/analytics", ["Runtime Confidence", "Environment", "Telemetry Source", "Primary Flow", "7-Day Workspace Trend", "Chats"]],
+    ] as const) {
+      test(`dashboard labels remain readable on ${route} at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto(route);
+        for (const label of labels) {
+          const element = page.getByText(label, { exact: true });
+          await expect(element).toBeVisible();
+          const metrics = await element.evaluate((node) => ({
+            fontSize: Number.parseFloat(getComputedStyle(node).fontSize),
+            transform: getComputedStyle(node).textTransform,
+            fits: node.scrollWidth <= node.clientWidth + 1,
+          }));
+          expect(metrics.fontSize, `${label} at ${width}px`).toBeGreaterThanOrEqual(12);
+          expect(metrics.transform).toBe("none");
+          expect(metrics.fits).toBe(true);
+        }
+      });
+    }
+  }
 
   test("switches workspace from the sidebar", async ({ page, isMobile }) => {
     await page.goto("/dashboard");
