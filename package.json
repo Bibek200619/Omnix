@@ -1,0 +1,18 @@
+{
+  "name": "omnix",
+  "private": true,
+  "scripts": {
+    "frontend": "npm --prefix frontend run dev",
+    "backend": "cd backend && uvicorn app.main:app --reload",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.4",
+    "supabase": "^2.107.0"
+  },
+  "dependencies": {
+    "framer-motion": "^12.38.0",
+    "react-markdown": "^10.1.0",
+    "react-syntax-highlighter": "^16.1.1"
+  }
+}

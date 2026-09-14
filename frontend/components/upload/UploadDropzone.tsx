@@ -1,0 +1,351 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+import { FilePlus, X, FileText } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { LiveRegion } from "@/components/ui/LiveRegion";
+import { cn } from "@/lib/utils";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { supabase } from "@/lib/supabase";
+import { apiUrl, getApiWorkspaceId } from "@/lib/api";
+import { logger } from "@/lib/logger";
+import type { MessageAttachment } from "@/components/chat/types";
+
+
+type UploadDropzoneProps = {
+  conversationId?: string;
+  compact?: boolean;
+  onUploadSuccess?: (file: MessageAttachment) => void;
+  onUploadComplete?: (result: { hasSuccess: boolean }) => void;
+};
+
+type UploadItem = {
+  id: string;
+  file: File;
+  progress: number;
+  status: "idle" | "uploading" | "done" | "error";
+  processingStatus?: MessageAttachment["processing_status"];
+  preview?: string;
+};
+
+const activeProcessingStatuses = new Set<UploadItem["processingStatus"]>([
+  "extracting",
+  "chunking",
+  "embedding",
+  "ocr_required",
+  "ocr_running",
+  "processing",
+]);
+
+function uploadProcessingStatus(file: MessageAttachment): MessageAttachment["processing_status"] {
+  const metadataStatus = file.metadata?.processing_status;
+  if (typeof metadataStatus === "string") {
+    return metadataStatus as MessageAttachment["processing_status"];
+  }
+  return file.processing_status;
+}
+
+function uploadResultLabel(processingStatus: UploadItem["processingStatus"]) {
+  if (processingStatus === "failed") return "Processing issue";
+  if (processingStatus === "queued") return "Queued";
+  if (activeProcessingStatuses.has(processingStatus)) {
+    return "Processing";
+  }
+  return "Uploaded";
+}
+
+export function uploadAnnouncement(item: Pick<UploadItem, "file" | "status" | "processingStatus">) {
+  if (item.status === "idle") return `${item.file.name} is ready to upload.`;
+  if (item.status === "uploading") return `${item.file.name} upload started.`;
+  if (item.status === "error") return `${item.file.name} upload failed.`;
+  if (item.processingStatus === "failed") return `${item.file.name} uploaded, but processing failed.`;
+  if (item.processingStatus === "queued") return `${item.file.name} uploaded and queued for processing.`;
+  if (activeProcessingStatuses.has(item.processingStatus)) {
+    return `${item.file.name} uploaded and is processing.`;
+  }
+  return `${item.file.name} uploaded successfully.`;
+}
+
+export function UploadDropzone({ conversationId, compact = false, onUploadSuccess, onUploadComplete }: UploadDropzoneProps = {}) {
+  const [items, setItems] = useState<UploadItem[]>([]);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const reduceMotion = useReducedMotion();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const activeUploadsRef = useRef(0);
+  const batchHadSuccessRef = useRef(false);
+  const springTransition = reduceMotion ? { duration: 0 } : { type: "spring" as const, stiffness: 300, damping: 20 };
+  const itemTransition = reduceMotion ? { duration: 0 } : { type: "spring" as const, stiffness: 400, damping: 25 };
+
+  const markUploadSettled = useCallback((success: boolean) => {
+    if (success) {
+      batchHadSuccessRef.current = true;
+    }
+    activeUploadsRef.current = Math.max(0, activeUploadsRef.current - 1);
+    if (activeUploadsRef.current === 0) {
+      onUploadComplete?.({ hasSuccess: batchHadSuccessRef.current });
+      batchHadSuccessRef.current = false;
+    }
+  }, [onUploadComplete]);
+
+  const upload = useCallback(async (item: UploadItem) => {
+    logger.debug("[upload] starting upload", { fileName: item.file.name, conversationId });
+    setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "uploading" } : it));
+
+    const fd = new FormData();
+    fd.append("file", item.file);
+    if (conversationId) {
+      fd.append("conversation_id", conversationId);
+    }
+
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", apiUrl("/upload"));
+
+    xhr.upload.onprogress = (ev) => {
+      if (!ev.lengthComputable) return;
+      const pct = Math.round((ev.loaded / ev.total) * 100);
+      setItems((s) => s.map((it) => it.id === item.id ? { ...it, progress: pct } : it));
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        let processingStatus: MessageAttachment["processing_status"] = null;
+        try {
+          const uploaded = JSON.parse(xhr.responseText) as MessageAttachment;
+          processingStatus = uploadProcessingStatus(uploaded);
+          if (uploaded?.id) {
+            logger.debug("[upload] upload success", { fileId: uploaded.id, conversationId });
+            onUploadSuccess?.(uploaded);
+          }
+        } catch (err) {
+          console.error("Unable to parse upload response", err);
+        }
+        setItems((s) => s.map((it) => it.id === item.id ? { ...it, progress: 100, status: "done", processingStatus } : it));
+      } else {
+        logger.debug("[upload] upload failed", { fileName: item.file.name, status: xhr.status });
+        setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "error" } : it));
+      }
+      markUploadSettled(xhr.status >= 200 && xhr.status < 300);
+    };
+
+    xhr.onerror = () => {
+      logger.debug("[upload] upload network error", { fileName: item.file.name });
+      setItems((s) => s.map((it) => it.id === item.id ? { ...it, status: "error" } : it));
+      markUploadSettled(false);
+    };
+
+    try {
+      if (supabase) {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error("Unable to read Supabase session", error);
+        }
+        const token = data?.session?.access_token ?? null;
+        if (token) {
+          xhr.setRequestHeader("Authorization", "Bearer " + token);
+        }
+      }
+
+      const activeWorkspace = getApiWorkspaceId();
+      if (activeWorkspace) {
+        xhr.setRequestHeader("X-Omnix-Workspace", activeWorkspace);
+      }
+    } catch (err) {
+      console.error("Failed to attach auth token to upload request", err);
+    }
+
+    xhr.send(fd);
+  }, [conversationId, markUploadSettled, onUploadSuccess]);
+
+  const onFiles = useCallback((files: FileList | null) => {
+    if (!files) return;
+    const arr = Array.from(files).map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+      progress: 0,
+      status: "idle" as const,
+      preview: file.type === "application/pdf" || file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+    }));
+    setItems((s) => [...arr, ...s]);
+    if (activeUploadsRef.current === 0) {
+      batchHadSuccessRef.current = false;
+    }
+    activeUploadsRef.current += arr.length;
+    arr.forEach((it) => {
+      void upload(it);
+    });
+  }, [upload]);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragActive) {
+      setIsDragActive(true);
+    }
+  }, [isDragActive]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+    onFiles(e.dataTransfer.files);
+  }, [onFiles]);
+
+  const handleChoose = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onFiles(e.target.files);
+    e.currentTarget.value = "";
+  }, [onFiles]);
+
+  const triggerFilePicker = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  return (
+    <div className="w-full">
+      <motion.div
+        onDrop={handleDrop}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        animate={{
+          borderColor: isDragActive ? "var(--omnix-rgba-0-255-255-0-5)" : "var(--omnix-rgba-0-255-255-0-12)",
+          backgroundColor: isDragActive ? "var(--omnix-rgba-0-255-255-0-06)" : "var(--omnix-rgba-0-255-255-0-035)",
+          scale: reduceMotion ? 1 : isDragActive ? 1.01 : 1,
+        }}
+        transition={springTransition}
+        className={cn(
+          "relative overflow-hidden rounded-xl border border-dashed text-center transition-shadow hover:border-[var(--omnix-border-active)] hover:shadow-[var(--omnix-glow-xs)]",
+          compact ? "p-4" : "p-5 sm:p-8",
+        )}
+      >
+        <div className="relative z-10 mx-auto max-w-lg">
+          <div className={cn("flex items-center justify-center gap-4", compact ? "flex-row" : "flex-col sm:flex-row")}>
+            <motion.div 
+              animate={{ 
+                scale: reduceMotion ? 1 : isDragActive ? 1.1 : 1,
+                rotate: reduceMotion ? 0 : isDragActive ? 10 : 0,
+                color: isDragActive ? "var(--omnix-color-22d3ee)" : "var(--omnix-color-67e8f9)",
+                backgroundColor: isDragActive ? "var(--omnix-rgba-34-211-238-0-1)" : "var(--omnix-rgba-255-255-255-0-03)"
+              }}
+              transition={springTransition}
+              className={cn("flex shrink-0 items-center justify-center rounded-xl", compact ? "h-10 w-10" : "h-14 w-14")}
+            >
+              <FilePlus className={cn(compact ? "h-5 w-5" : "h-7 w-7")} />
+            </motion.div>
+            <div className={cn("min-w-0", compact ? "text-left" : "text-center sm:text-left")}>
+              <motion.p 
+                animate={{ color: isDragActive ? "var(--omnix-color-fff)" : "var(--omnix-color-f8fafc)" }}
+                className={cn("font-medium", compact ? "text-sm" : "text-base")}
+              >
+                {isDragActive ? "Drop files to upload" : "Upload documents"}
+              </motion.p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">
+                {compact ? "PDF, DOCX, TXT, or Markdown." : "PDF, DOCX, TXT, Markdown supported. Drop files here or click to choose."}
+              </p>
+            </div>
+          </div>
+
+          <motion.div 
+            animate={{ opacity: isDragActive ? 0 : 1, y: reduceMotion ? 0 : isDragActive ? 10 : 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.2 }}
+            className={cn("flex items-center justify-center", compact ? "mt-4" : "mt-6")}
+          >
+            <input ref={fileInputRef} type="file" multiple onChange={handleChoose} className="hidden" accept=".pdf,.docx,.txt,.md,text/*,application/pdf" />
+            <Button type="button" size={compact ? "sm" : "md"} onClick={triggerFilePicker} className="omnix-primary-action min-h-11 w-full shadow-[var(--omnix-glow-sm)] sm:w-auto">Choose files</Button>
+          </motion.div>
+        </div>
+        
+        <AnimatePresence>
+          {isDragActive && (
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-cyan-500/10 via-transparent to-purple-500/10"
+            />
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      <div className={cn("space-y-3", compact ? "mt-3" : "mt-6")}>
+        <AnimatePresence>
+          {items.map((it) => (
+            <motion.div 
+              key={it.id} 
+              initial={reduceMotion ? false : { opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+              transition={itemTransition}
+              className={cn(
+                "group flex flex-col gap-4 rounded-xl border border-[var(--omnix-border)] bg-[var(--omnix-surface)] transition-colors hover:border-[var(--omnix-border-active)] hover:bg-[var(--omnix-surface-hover)] hover:shadow-[var(--omnix-glow-xs)] sm:flex-row sm:items-center",
+                compact ? "p-3" : "p-4",
+              )}
+            >
+              <LiveRegion
+                message={uploadAnnouncement(it)}
+                politeness={it.status === "error" || it.processingStatus === "failed" ? "assertive" : "polite"}
+              />
+              <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+                <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--omnix-border)] transition-colors", it.status === "done" && it.processingStatus !== "failed" ? "bg-emerald-500/10 text-emerald-400" : it.status === "error" || it.processingStatus === "failed" ? "bg-rose-500/10 text-rose-400" : "bg-cyan-300/10 text-cyan-100")}>
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-200 group-hover:text-white transition-colors">{it.file.name}</p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-3">
+                    <p className="text-xs text-slate-500">{Math.round(it.file.size / 1024)} KB</p>
+                    {it.status === "uploading" && (
+                      <div
+                        role="progressbar"
+                        aria-label={`Uploading ${it.file.name}`}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={it.progress}
+                        aria-valuetext={`${it.progress}% uploaded`}
+                        className="flex-1 h-1.5 max-w-[120px] overflow-hidden rounded-full bg-[var(--omnix-surface-hover)]"
+                      >
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: it.progress + "%" }}
+                          transition={{ duration: reduceMotion ? 0 : undefined, ease: "linear" }}
+                          className="h-full rounded-full bg-cyan-400" 
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-2 flex shrink-0 items-center justify-end gap-3 sm:mt-0">
+                {it.status === "uploading" ? (
+                  <span className="text-xs font-medium text-cyan-400 w-12 text-right">{it.progress}%</span>
+                ) : it.status === "done" ? (
+                  <motion.span initial={reduceMotion ? false : { scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.18 }} className={cn("text-xs font-medium", it.processingStatus === "failed" ? "text-rose-400" : "text-emerald-400")}>{uploadResultLabel(it.processingStatus)}</motion.span>
+                ) : it.status === "error" ? (
+                  <span className="text-xs font-medium text-rose-400">Failed</span>
+                ) : (
+                  <Button type="button" size="sm" variant="ghost" className="min-h-11" onClick={() => upload(it)}>Upload</Button>
+                )}
+                
+                <button type="button" onClick={() => setItems((s) => s.filter((_i) => _i.id !== it.id))} className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-cyan-300/10 hover:text-slate-100" aria-label={`Remove ${it.file.name}`}>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - REDIS_URL=redis://redis:6379/0
+      - OMNIX_ROLE=api
+      - ENV=dev
+    depends_on:
+      - redis
+    volumes:
+      - ./backend:/app
+    networks:
+      - omnix-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - omnix-network
+
+  ingestion-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    command: ["python", "-m", "app.jobs.worker"]
+    environment:
+      - OMNIX_ROLE=ingestion_worker
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - backend
+    volumes:
+      - ./backend:/app
+    networks:
+      - omnix-network
+
+  # PDF ingestion is isolated so OCR cannot consume ordinary upload capacity.
+  ocr-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    command: ["python", "-m", "app.jobs.worker"]
+    environment:
+      - OMNIX_ROLE=ocr_worker
+      - OMNIX_WORKER_ID=ocr_worker_main
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - backend
+    volumes:
+      - ./backend:/app
+    networks:
+      - omnix-network
+
+  automation-scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    command: ["python", "-m", "app.automation.scheduler"]
+    environment:
+      - OMNIX_ROLE=automation_scheduler
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - backend
+    volumes:
+      - ./backend:/app
+    networks:
+      - omnix-network
+
+networks:
+  omnix-network:
+    driver: bridge
+
+volumes:
+  redis_data:

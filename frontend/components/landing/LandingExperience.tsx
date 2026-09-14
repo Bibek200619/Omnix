@@ -1,0 +1,973 @@
+"use client";
+
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useEffect, useState, type CSSProperties } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { AppScreenshots } from "@/components/landing/LandingAppScreenshots";
+import { useDecorativeMotionEnabled } from "@/lib/use-decorative-motion";
+
+import {
+  AnimatedGrid,
+  C,
+  CyanBtn,
+  DriftingOrb,
+  FEATURES_HREF,
+  GhostBtn,
+  GradText,
+  H2,
+  ICONS,
+  Icon,
+  Label,
+  OmnixMark,
+  ParticleField,
+  Sec,
+  SectionBg,
+  easeOutExpo,
+  fadeUp,
+  tint,
+} from "@/components/landing/LandingPrimitives";
+
+const LandingHeroScene = dynamic(
+  () => import("@/components/landing/LandingHeroScene").then((module) => module.LandingHeroScene),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute inset-x-[10%] top-[6%] h-[38rem] rounded-full bg-[radial-gradient(circle,rgba(0,255,255,0.16),transparent_64%)] opacity-55 blur-3xl" />
+        <div className="absolute inset-x-0 bottom-0 h-[58%] bg-[linear-gradient(180deg,rgba(6,16,32,0)_0%,rgba(6,16,32,0.46)_42%,rgba(6,16,32,0.9)_100%)]" />
+      </div>
+    ),
+  },
+);
+
+// ─── NAVBAR ───────────────────────────────────────────────────────────────────
+function Navbar() {
+  const [sc,setSc]=useState(false);
+  useEffect(()=>{
+    const h=()=>setSc(window.scrollY>50);
+    window.addEventListener("scroll",h,{passive:true});
+    return ()=>window.removeEventListener("scroll",h);
+  },[]);
+  return (
+    <motion.nav initial={{y:-24,opacity:0}} animate={{y:0,opacity:1}} transition={{duration:0.5}}
+      className="sticky top-0 z-50 flex items-center justify-between gap-2 px-4 py-3 transition-all duration-300 sm:px-8 sm:py-4"
+      style={{background:sc?"var(--omnix-rgba-10-25-47-0-92)":"transparent",backdropFilter:sc?"blur(24px)":"none",borderBottom:sc?`1px solid var(--omnix-rgba-0-255-255-0-08)`:"1px solid transparent"}}>
+      <div className="flex items-center gap-3">
+        <OmnixMark size={32}/>
+        <span className="text-2xl font-semibold tracking-[-0.045em]" style={{color:C.white}}>Omnix</span>
+      </div>
+      <div className="hidden md:flex items-center gap-8">
+        {[
+          { label:"Features", href:FEATURES_HREF },
+          { label:"How it works", href:"#how-it-works" },
+          { label:"Access", href:"#pricing" },
+          { label:"Docs", href:"#inside-app" },
+          { label:"About", href:"#security" },
+        ].map(item=>(
+          <a key={item.label} href={item.href} className="text-sm font-medium transition-colors duration-200"
+            style={{color:C.muted}}
+            onMouseEnter={e=>(e.currentTarget.style.color=C.white)}
+            onMouseLeave={e=>(e.currentTarget.style.color=C.muted)}>{item.label}</a>
+        ))}
+      </div>
+      <div className="flex items-center gap-3">
+        <Link href="/login" className="hidden rounded-lg px-4 py-2 text-sm font-medium transition-colors sm:inline-flex" style={{color:C.muted}}
+          onMouseEnter={e=>(e.currentTarget.style.color=C.white)}
+          onMouseLeave={e=>(e.currentTarget.style.color=C.muted)}>Sign in</Link>
+        <Link href="/register" className="rounded-xl px-3.5 py-2.5 text-xs font-black transition-all duration-200 sm:px-5 sm:text-sm"
+          style={{background:C.cyan,color:C.navyDark,boxShadow:`0 0 24px var(--omnix-rgba-0-255-255-0-35)`}}
+          onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.transform="translateY(-1px)";(e.currentTarget as HTMLElement).style.boxShadow=`0 0 40px var(--omnix-rgba-0-255-255-0-55)`;}}
+          onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.transform="translateY(0)";(e.currentTarget as HTMLElement).style.boxShadow=`0 0 24px var(--omnix-rgba-0-255-255-0-35)`;}}>
+          Get started →
+        </Link>
+      </div>
+    </motion.nav>
+  );
+}
+
+// ─── HERO ─────────────────────────────────────────────────────────────────────
+function FloatTag({ text, icon, style }:{ text:string; icon:string; style:CSSProperties }) {
+  const motionEnabled = useDecorativeMotionEnabled();
+
+  return (
+    <motion.div
+      animate={motionEnabled ? {y:[0,-8,0]} : undefined}
+      transition={{duration:3.8,repeat:Infinity,ease:"easeInOut"}}
+      className="absolute hidden lg:flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold backdrop-blur-sm pointer-events-none"
+      style={{background:"var(--omnix-rgba-10-25-47-0-88)",border:`1px solid var(--omnix-rgba-0-255-255-0-2)`,color:C.white,whiteSpace:"nowrap",...style}}>
+      <span style={{color:C.cyan}}>{icon}</span> {text}
+    </motion.div>
+  );
+}
+
+function HeroChat() {
+  const msgs = [
+    { role:"user",  text:"Which onboarding steps are blocking launch readiness?" },
+    { role:"ai",    text:"Three blockers found: invite setup, source coverage, and unresolved checklist owners.", sources:["launch-checklist.md","workspace-notes.md"] },
+    { role:"user",  text:"Summarise the remaining owner handoffs." },
+    { role:"ai",    text:null, loading:true },
+  ];
+  return (
+    <motion.div initial={{opacity:0,y:56,scale:0.96}} animate={{opacity:1,y:0,scale:1}}
+      transition={{duration:0.9,delay:0.5,ease:easeOutExpo}}
+      className="relative mx-auto mt-10 w-full sm:mt-14" style={{maxWidth:900}}>
+
+      <FloatTag text="Sources retrieved" icon="↗" style={{top:"12%",left:"-10%"}}/>
+      <FloatTag text="Workspace scoped" icon="✓" style={{top:"38%",right:"-10%"}}/>
+      <FloatTag text="Streaming reply" icon="→" style={{bottom:"28%",left:"-9%"}}/>
+      <FloatTag text="Grounded answer" icon="◆" style={{bottom:"12%",right:"-9%"}}/>
+
+      <div className="absolute inset-0 rounded-2xl" style={{boxShadow:`0 0 80px var(--omnix-rgba-0-255-255-0-1),0 50px 130px var(--omnix-rgba-0-0-0-0-8)`,borderRadius:20}}/>
+      <div className="relative rounded-2xl overflow-hidden"
+        style={{border:`1px solid var(--omnix-rgba-0-255-255-0-14)`,background:"var(--omnix-rgba-6-18-32-0-98)",backdropFilter:"blur(20px)"}}>
+        <div className="flex items-center gap-2 px-3 py-3 sm:px-5 sm:py-3.5"
+          style={{borderBottom:`1px solid var(--omnix-rgba-255-255-255-0-05)`,background:"var(--omnix-rgba-255-255-255-0-02)"}}>
+          <div className="flex gap-1.5">
+            {["var(--omnix-color-ff5f57)","var(--omnix-color-febc2e)","var(--omnix-color-28c840)"].map(c=><div key={c} className="w-3 h-3 rounded-full" style={{background:c}}/>)}
+          </div>
+          <div className="flex-1 text-center text-xs" style={{color:"var(--omnix-rgba-255-255-255-0-25)"}}>OMNIX - Demo Workspace</div>
+          <div className="hidden items-center gap-1.5 rounded-md px-2.5 py-1 text-xs sm:flex" style={{background:"var(--omnix-rgba-34-197-94-0-12)",color:"var(--omnix-color-4ade80)"}}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{background:"var(--omnix-color-22c55e)"}}/>Demo
+          </div>
+        </div>
+        <div className="flex" style={{height:400}}>
+          <div className="hidden w-52 flex-shrink-0 flex-col sm:flex" style={{borderRight:`1px solid var(--omnix-rgba-255-255-255-0-05)`,background:"var(--omnix-rgba-255-255-255-0-01)"}}>
+            <div className="p-4">
+              <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl mb-4"
+                style={{background:"var(--omnix-rgba-0-255-255-0-06)",border:`1px solid var(--omnix-rgba-0-255-255-0-14)`}}>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black"
+                  style={{background:C.cyan,color:C.navyDark}}>D</div>
+                <div>
+                  <div className="text-xs font-bold" style={{color:C.white}}>demo</div>
+                  <div className="text-xs" style={{color:C.faint}}>Example workspace</div>
+                </div>
+              </div>
+              {[
+                {icon:ICONS.chat,    label:"Chat",     active:true  },
+                {icon:ICONS.files,   label:"Files",    active:false },
+                {icon:ICONS.clock,   label:"History",  active:false },
+                {icon:ICONS.settings,label:"Settings", active:false },
+              ].map(nav=>(
+                <div key={nav.label} className="flex items-center gap-2.5 px-3 py-2 rounded-lg mb-0.5 cursor-pointer text-sm"
+                  style={{background:nav.active?"var(--omnix-rgba-0-255-255-0-08)":"transparent",color:nav.active?C.cyan:C.muted,fontWeight:nav.active?"600":"400"}}>
+                  <Icon d={nav.icon} size={15} stroke={nav.active?C.cyan:C.muted} sw={1.8}/>
+                  {nav.label}
+                </div>
+              ))}
+              <div className="text-xs font-black mt-5 mb-2 px-1" style={{color:C.faint,letterSpacing:"0.1em"}}>RECENT CHATS</div>
+              {["Launch checklist","Support handoff","API notes"].map((c,i)=>(
+                <div key={c} className="px-3 py-1.5 rounded-lg mb-0.5 text-xs"
+                  style={{color:i===0?C.white:C.faint,background:i===0?"var(--omnix-rgba-255-255-255-0-04)":"transparent"}}>{c}</div>
+              ))}
+            </div>
+          </div>
+          <div className="flex-1 flex flex-col">
+            <div className="flex items-center justify-between gap-2 px-3 py-3 sm:px-5" style={{borderBottom:`1px solid var(--omnix-rgba-255-255-255-0-04)`}}>
+              <div className="truncate text-sm font-bold" style={{color:C.white}}>Launch readiness blockers</div>
+              <div className="hidden gap-1.5 sm:flex">
+                {["Auto","Workspace","Web","Synthesis"].map((m,i)=>(
+                  <span key={m} className="px-2.5 py-1 rounded-lg text-xs font-semibold"
+                    style={{background:i===0?"var(--omnix-rgba-0-255-255-0-14)":C.card,color:i===0?C.cyan:C.faint,border:i===0?`1px solid var(--omnix-rgba-0-255-255-0-25)`:`1px solid ${C.border}`}}>
+                    {m}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1 space-y-4 overflow-hidden p-3 sm:p-5">
+              {msgs.map((msg,i)=>(
+                <motion.div key={i}
+                  initial={{opacity:0,x:msg.role==="user"?16:-16}}
+                  animate={{opacity:1,x:0}}
+                  transition={{delay:0.7+i*0.18,duration:0.3}}
+                  className={`flex ${msg.role==="user"?"justify-end":"justify-start"}`}>
+                  {msg.role==="ai"&&(
+                    <div className="max-w-sm rounded-2xl px-4 py-3 text-sm leading-relaxed"
+                      style={{background:"var(--omnix-rgba-255-255-255-0-03)",border:`1px solid var(--omnix-rgba-255-255-255-0-06)`,color:"var(--omnix-rgba-255-255-255-0-82)"}}>
+                      {msg.loading?(
+                        <div className="flex items-center gap-2" style={{color:C.cyan}}>
+                          <motion.div animate={{rotate:360}} transition={{duration:1,repeat:Infinity,ease:"linear"}}
+                            className="w-3 h-3 rounded-full border border-current border-t-transparent"/>
+                          <span className="text-xs">Retrieving workspace sources…</span>
+                        </div>
+                      ):(
+                        <div>
+                          <div className="flex items-center gap-1.5 text-xs mb-1.5" style={{color:C.cyan}}>
+                            <OmnixMark size={12}/><span className="font-bold">OMNIX AI</span>
+                          </div>
+                          <p>{msg.text}</p>
+                          {msg.sources&&(
+                            <div className="flex gap-1.5 mt-2 flex-wrap">
+                              {msg.sources.map(s=>(
+                                <span key={s} className="text-xs px-2 py-0.5 rounded-md flex items-center gap-1"
+                                  style={{background:"var(--omnix-rgba-0-255-255-0-07)",color:C.cyan,border:`1px solid var(--omnix-rgba-0-255-255-0-15)`}}>
+                                  <Icon d={ICONS.doc} size={10} stroke={C.cyan} sw={2}/>{s}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {msg.role==="user"&&(
+                    <div className="max-w-xs rounded-2xl px-4 py-3 text-sm leading-relaxed"
+                      style={{background:"var(--omnix-rgba-0-255-255-0-1)",border:`1px solid var(--omnix-rgba-0-255-255-0-2)`,color:"var(--omnix-rgba-255-255-255-0-9)"}}>
+                      {msg.text}
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+            <div className="px-3 py-3 sm:px-5 sm:py-4" style={{borderTop:`1px solid var(--omnix-rgba-255-255-255-0-05)`}}>
+              <div className="flex items-center gap-3 rounded-2xl px-3 py-3 sm:px-4"
+                style={{background:"var(--omnix-rgba-255-255-255-0-04)",border:`1px solid var(--omnix-rgba-255-255-255-0-08)`}}>
+                <span className="text-sm flex-1" style={{color:"var(--omnix-rgba-255-255-255-0-25)"}}>Ask OMNIX anything about your knowledge base…</span>
+                <button
+                  type="button"
+                  aria-label="Submit prompt"
+                  title="Submit prompt"
+                  className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{background:C.cyan,color:C.navyDark}}>
+                  <Icon d={ICONS.arrow} size={14} stroke={C.navyDark} sw={2.5}/>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function Hero() {
+  return (
+    <section className="relative overflow-hidden pb-16 pt-5 sm:pb-28 sm:pt-8">
+      <SectionBg>
+        <LandingHeroScene/>
+        <ParticleField count={34}/>
+        <AnimatedGrid opacity={0.045}/>
+        <div className="absolute inset-0"
+          style={{background:"linear-gradient(180deg,var(--omnix-rgba-10-25-47-0) 0%,var(--omnix-rgba-10-25-47-0) 60%,var(--omnix-rgba-6-16-32-1) 100%)"}}/>
+      </SectionBg>
+      <div className="relative z-10 flex flex-col items-center px-4 pt-10 text-center sm:px-6 sm:pt-14">
+        <motion.div initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{duration:0.45,delay:0.08}}>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black mb-8"
+            style={{background:"var(--omnix-rgba-0-255-255-0-07)",border:`1px solid var(--omnix-rgba-0-255-255-0-24)`,color:C.cyan,letterSpacing:"0.1em"}}>
+            <motion.span animate={{opacity:[1,0.4,1]}} transition={{duration:2,repeat:Infinity}} className="w-1.5 h-1.5 rounded-full" style={{background:C.cyan}}/>
+            AI WORKSPACE FOR KNOWLEDGE TEAMS
+          </div>
+        </motion.div>
+        <motion.h1 initial={{opacity:0,y:36}} animate={{opacity:1,y:0}}
+          transition={{duration:0.75,delay:0.2,ease:easeOutExpo}}
+          className="font-black leading-[1.05] tracking-tight"
+          style={{fontSize:"clamp(2.5rem,6.8vw,5.5rem)",color:C.white,maxWidth:900}}>
+          Turn private knowledge{" "}
+          <span style={{background:`linear-gradient(135deg,${C.cyan} 0%,var(--omnix-color-00aaff) 50%,${C.blue} 100%)`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
+            into precise AI
+          </span>{" "}answers
+        </motion.h1>
+        <motion.p initial={{opacity:0,y:22}} animate={{opacity:1,y:0}} transition={{duration:0.6,delay:0.36}}
+          className="mt-6 text-base leading-relaxed sm:mt-7 sm:text-lg" style={{color:C.muted,maxWidth:540,textShadow:"0 2px 24px rgba(0,0,0,0.85)"}}>
+          OMNIX gives operators, support teams, and builders a secure place to ask questions
+          against private knowledge — with searchable history, workspaces built for real operations,
+          and session-gated access.
+        </motion.p>
+        <motion.div initial={{opacity:0,y:22}} animate={{opacity:1,y:0}} transition={{duration:0.5,delay:0.5}}
+          className="mt-8 flex w-full max-w-sm flex-col items-center gap-3 sm:mt-10 sm:w-auto sm:max-w-none sm:flex-row sm:gap-4">
+          <CyanBtn large href="/register">Start working free <Icon d={ICONS.arrow} size={18} stroke={C.navyDark} sw={2.5}/></CyanBtn>
+          <GhostBtn large href="#inside-app"><Icon d={ICONS.play} size={18} stroke={C.muted} sw={1.8}/>View product tour</GhostBtn>
+        </motion.div>
+        <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.75}}
+          className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 rounded-full border px-4 py-2 backdrop-blur-md sm:px-5"
+          style={{ background:"rgba(6,18,32,0.62)", borderColor:"var(--omnix-rgba-0-255-255-0-12)", boxShadow:"0 18px 52px var(--omnix-rgba-0-0-0-0-24)" }}>
+          {["No credit card","Workspace-scoped","Session-gated"].map(t=>(
+            <span key={t} className="text-xs flex items-center gap-1.5" style={{color:"var(--omnix-rgba-255-255-255-0-6)"}}>
+              <Icon d={ICONS.check} size={11} stroke="var(--omnix-rgba-0-255-255-0-7)" sw={2.5}/>{t}
+            </span>
+          ))}
+        </motion.div>
+        <HeroSignalStrip/>
+        <HeroChat/>
+      </div>
+    </section>
+  );
+}
+
+function HeroSignalStrip() {
+  const reduceMotion = useReducedMotion();
+  const signals = [
+    { label: "Workspace", value: "Ready" },
+    { label: "Sources", value: "Scoped" },
+    { label: "Team", value: "Invited" },
+  ];
+
+  return (
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+      animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, delay: 0.62, ease: easeOutExpo }}
+      className="mt-7 grid w-full max-w-2xl grid-cols-3 overflow-hidden rounded-2xl border"
+      style={{ borderColor:"var(--omnix-rgba-0-255-255-0-18)", background:"rgba(6,18,32,0.72)", boxShadow:"0 18px 70px var(--omnix-rgba-0-0-0-0-24)", backdropFilter:"blur(18px)" }}
+    >
+      {signals.map((signal, index) => (
+        <div
+          key={signal.label}
+          className="min-w-0 px-3 py-3 text-center sm:px-5"
+          style={{ borderLeft:index === 0 ? "0" : "1px solid var(--omnix-rgba-255-255-255-0-06)" }}
+        >
+          <div className="truncate text-[10px] font-black uppercase" style={{ color:C.faint, letterSpacing:"0.12em" }}>{signal.label}</div>
+          <div className="mt-1 truncate text-sm font-black sm:text-base" style={{ color:C.white }}>{signal.value}</div>
+        </div>
+      ))}
+    </motion.div>
+  );
+}
+
+// ─── MARQUEE ──────────────────────────────────────────────────────────────────
+function Marquee() {
+  const motionEnabled = useDecorativeMotionEnabled();
+  const items = ["Workspace hierarchy","Document uploads","Searchable history","Source-grounded answers","Role-aware access","Streaming responses","Stream recovery","Workspace switching","Activity feed","Invite flow","Operational telemetry","Retrieval modes"];
+  const doubled = [...items,...items];
+  return (
+    <div className="py-10 overflow-hidden relative"
+      style={{borderTop:`1px solid var(--omnix-rgba-255-255-255-0-05)`,borderBottom:`1px solid var(--omnix-rgba-255-255-255-0-05)`}}>
+      <SectionBg>
+        <DriftingOrb x="50%" y="50%" size={500} color="var(--omnix-rgba-0-255-255-0-04)" dur={18}/>
+      </SectionBg>
+      <p className="text-center text-xs font-black tracking-widest mb-6 relative z-10"
+        style={{color:C.faint,letterSpacing:"0.12em"}}>CURRENT PRODUCT SURFACES</p>
+      <div className="relative z-10">
+        <div className="absolute left-0 top-0 bottom-0 w-32 z-10 pointer-events-none"
+          style={{background:`linear-gradient(90deg,var(--omnix-color-061020),transparent)`}}/>
+        <div className="absolute right-0 top-0 bottom-0 w-32 z-10 pointer-events-none"
+          style={{background:`linear-gradient(270deg,var(--omnix-color-061020),transparent)`}}/>
+        <motion.div className="flex gap-10 whitespace-nowrap"
+          animate={motionEnabled ? {x:[0,-2200]} : undefined}
+          transition={{duration:38,repeat:Infinity,ease:"linear"}}>
+          {doubled.map((name,i)=>(
+            <div key={i} className="flex items-center gap-3 px-5 py-2.5 rounded-xl flex-shrink-0"
+              style={{background:C.card,border:`1px solid ${C.border}`}}>
+              <div className="w-5 h-5 rounded flex items-center justify-center" style={{background:"var(--omnix-rgba-0-255-255-0-1)"}}>
+                <OmnixMark size={14}/>
+              </div>
+              <span className="text-sm font-semibold" style={{color:"var(--omnix-rgba-255-255-255-0-5)"}}>{name}</span>
+            </div>
+          ))}
+        </motion.div>
+      </div>
+    </div>
+  );
+}
+
+// ─── STATS ────────────────────────────────────────────────────────────────────
+function Stats() {
+  const stats=[
+    {value:"4",        label:"Retrieval modes",        icon:ICONS.search  },
+    {value:"Workspace",label:"Scoped knowledge",        icon:ICONS.workspace},
+    {value:"Files",    label:"Uploaded source context", icon:ICONS.files   },
+    {value:"History",  label:"Searchable conversations",icon:ICONS.clock   },
+    {value:"Roles",    label:"Workspace access",        icon:ICONS.team    },
+    {value:"Live data",label:"Analytics source",         icon:ICONS.chart   },
+  ];
+  return (
+    <Sec className="px-4 py-14 sm:px-6 sm:py-20">
+      <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5">
+        {stats.map(s=>(
+          <motion.div key={s.label} variants={fadeUp}
+            className="flex flex-col items-center text-center p-5 rounded-2xl transition-all duration-200"
+            style={{background:C.card,border:`1px solid ${C.border}`}}
+            onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor=C.borderC;(e.currentTarget as HTMLElement).style.background="var(--omnix-rgba-0-255-255-0-04)";}}
+            onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor=C.border;(e.currentTarget as HTMLElement).style.background=C.card;}}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3"
+              style={{background:"var(--omnix-rgba-0-255-255-0-08)",border:`1px solid var(--omnix-rgba-0-255-255-0-14)`}}>
+              <Icon d={s.icon} size={16} stroke={C.cyan} sw={1.8}/>
+            </div>
+            <div className="text-2xl font-black mb-1" style={{background:`linear-gradient(135deg,${C.white},${C.cyan})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
+              {s.value}
+            </div>
+            <div className="text-xs" style={{color:C.faint}}>{s.label}</div>
+          </motion.div>
+        ))}
+      </div>
+    </Sec>
+  );
+}
+
+// ─── FEATURES ─────────────────────────────────────────────────────────────────
+const FEATS=[
+  {icon:ICONS.chat,      title:"Precision AI Chat",         accent:C.cyan,    desc:"Ask complex questions across uploaded workspace knowledge. OMNIX retrieves relevant context and shows source grounding when sources are available."},
+  {icon:ICONS.files,     title:"Shared Knowledge Files",    accent:"var(--omnix-color-818cf8)", desc:"Upload PDFs, DOCX, Markdown, and text files. Workspace sources are indexed for retrieval after ingestion completes."},
+  {icon:ICONS.workspace, title:"Collaborative Workspaces",  accent:"var(--omnix-color-34d399)", desc:"Invite teammates into role-aware workspaces while preserving hierarchy, workspace switching, and onboarding gates."},
+  {icon:ICONS.clock,     title:"Searchable Chat History",   accent:"var(--omnix-color-fb923c)", desc:"Conversations persist to workspace history so teams can return to previous threads and recover context."},
+  {icon:ICONS.lock,      title:"Session-Gated Access",      accent:"var(--omnix-color-f472b6)", desc:"The app keeps private workspace surfaces behind authenticated sessions and backend workspace checks."},
+  {icon:ICONS.bolt,      title:"Streaming Recovery",        accent:C.cyan,    desc:"Long AI replies use streaming paths with recovery handling so interrupted responses can still resolve cleanly."},
+  {icon:ICONS.globe,     title:"Aligned Retrieval Modes",   accent:"var(--omnix-color-818cf8)", desc:"Use the same modes exposed in chat: Auto, Workspace, Web, and Synthesis."},
+  {icon:ICONS.chart,     title:"Workspace Reporting",       accent:"var(--omnix-color-34d399)", desc:"Analytics show counts and status loaded from real app data, including workspaces, members, files, conversations, and invites."},
+  {icon:ICONS.link,      title:"Source Operations",         accent:"var(--omnix-color-fb923c)", desc:"Manage uploaded sources and workspace context through the product surfaces already present in this build."},
+];
+
+function Features() {
+  const [hov,setHov]=useState<number|null>(null);
+  return (
+    <section id="features" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
+      <SectionBg>
+        <DriftingOrb x="14%" y="55%" size={600} color="var(--omnix-rgba-0-51-255-0-07)" dur={28} delay={-6}/>
+        <DriftingOrb x="88%" y="35%" size={480} color="var(--omnix-rgba-0-255-255-0-06)" dur={22} delay={-3}/>
+        <ParticleField count={20}/>
+      </SectionBg>
+      <Sec className="max-w-6xl mx-auto relative z-10">
+        <motion.div variants={fadeUp} className="text-center mb-16">
+          <Label>FEATURES</Label>
+          <H2>Everything your team needs</H2>
+          <motion.p variants={fadeUp} className="text-lg" style={{color:C.muted,maxWidth:480,margin:"0 auto"}}>
+            OMNIX is built for teams that need answers they can trust — fast, secure, and grounded in your actual knowledge base.
+          </motion.p>
+        </motion.div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {FEATS.map((f,i)=>(
+            <motion.div key={f.title} variants={fadeUp}
+              className="relative rounded-2xl p-6 cursor-pointer transition-all duration-300 group overflow-hidden"
+              style={{background:hov===i?tint(f.accent,4):C.card,border:`1px solid ${hov===i?tint(f.accent,16):C.border}`,transform:hov===i?"translateY(-4px)":"translateY(0)",boxShadow:hov===i?`0 24px 64px ${tint(f.accent,8)}`:"none"}}
+              onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)}>
+              <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                style={{background:`radial-gradient(circle at top right,${tint(f.accent,9)},transparent 70%)`}}/>
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5"
+                style={{background:tint(f.accent,7),border:`1px solid ${tint(f.accent,13)}`}}>
+                <Icon d={f.icon} size={22} stroke={f.accent} sw={1.7}/>
+              </div>
+              <h3 className="font-black text-base mb-2" style={{color:C.white}}>{f.title}</h3>
+              <p className="text-sm leading-relaxed" style={{color:C.faint}}>{f.desc}</p>
+              <div className="mt-4 flex items-center gap-1 text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                style={{color:f.accent}}>
+                Learn more <Icon d={ICONS.arrow} size={12} stroke={f.accent} sw={2.5}/>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </Sec>
+    </section>
+  );
+}
+
+// ─── HOW IT WORKS ─────────────────────────────────────────────────────────────
+function HowItWorks() {
+  const steps=[
+    {num:"01",title:"Create your workspace",    desc:"Sign up free, name your workspace, and invite your team when your workspace is ready. No credit card required.",  icon:ICONS.workspace},
+    {num:"02",title:"Upload your knowledge",    desc:"Drop in PDFs, Markdown, DOCX, and text files. OMNIX stores them as workspace sources and indexes them for retrieval.", icon:ICONS.upload},
+    {num:"03",title:"Ask precise questions",    desc:"Type any question in natural language. OMNIX retrieves matching context and returns source-grounded answers when evidence is available.", icon:ICONS.chat},
+    {num:"04",title:"Share across your team",   desc:"Teammates can ask their own questions, see shared history, and build on what others have already asked and learned.", icon:ICONS.team},
+  ];
+  return (
+    <section id="how-it-works" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
+      <SectionBg>
+        <DriftingOrb x="50%" y="30%" size={700} color="var(--omnix-rgba-0-51-255-0-07)" dur={26} delay={-7}/>
+        <DriftingOrb x="80%" y="70%" size={500} color="var(--omnix-rgba-0-255-255-0-06)" dur={20} delay={-3}/>
+        <AnimatedGrid opacity={0.03}/>
+      </SectionBg>
+      <Sec className="max-w-5xl mx-auto relative z-10">
+        <motion.div variants={fadeUp} className="mb-10 text-center sm:mb-16">
+          <Label>HOW IT WORKS</Label>
+          <H2>Set up the workspace, <GradText>then build context</GradText></H2>
+        </motion.div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {steps.map((s,i)=>(
+            <motion.div key={s.num} variants={fadeUp}
+              className="relative overflow-hidden rounded-2xl p-5 sm:p-7"
+              style={{background:C.card,border:`1px solid ${C.border}`}}>
+              <div className="absolute top-5 right-5 text-6xl font-black select-none"
+                style={{color:"var(--omnix-rgba-0-255-255-0-04)"}}>{s.num}</div>
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5"
+                style={{background:"var(--omnix-rgba-0-255-255-0-08)",border:`1px solid var(--omnix-rgba-0-255-255-0-18)`}}>
+                <Icon d={s.icon} size={22} stroke={C.cyan} sw={1.7}/>
+              </div>
+              <h3 className="font-black text-lg mb-2" style={{color:C.white}}>{s.title}</h3>
+              <p className="text-sm leading-relaxed" style={{color:C.faint}}>{s.desc}</p>
+              {i<steps.length-1&&(
+                <div className="hidden md:block absolute -right-3 top-1/2 -translate-y-1/2 z-10">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center"
+                    style={{background:C.navyDark,border:`1px solid ${C.border}`}}>
+                    <Icon d={ICONS.arrow} size={10} stroke={C.cyan} sw={2.5}/>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      </Sec>
+    </section>
+  );
+}
+
+// ─── RETRIEVAL MODES ──────────────────────────────────────────────────────────
+function RetrievalModes() {
+  const [active,setActive]=useState(0);
+  const modes=[
+    {name:"Auto",      color:C.cyan,    desc:"OMNIX routes the question through the best available retrieval path for the current request.",                           icon:ICONS.bolt   },
+    {name:"Workspace", color:"var(--omnix-color-818cf8)", desc:"Retrieval is limited to workspace documents and conversation context available to the current user.",               icon:ICONS.files  },
+    {name:"Web",       color:"var(--omnix-color-34d399)", desc:"OMNIX uses the configured web-search path for current public information when web mode is selected.",       icon:ICONS.globe  },
+    {name:"Synthesis", color:"var(--omnix-color-fb923c)", desc:"Synthesis maps to the app's hybrid mode: workspace context and web context can be combined in one response.",     icon:ICONS.link   },
+  ];
+  const m=modes[active];
+  return (
+    <section id="retrieval" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
+      <SectionBg>
+        <DriftingOrb x="25%" y="50%" size={600} color="var(--omnix-rgba-0-255-255-0-06)" dur={22} delay={-5}/>
+        <DriftingOrb x="80%" y="40%" size={500} color="var(--omnix-rgba-0-51-255-0-07)" dur={28} delay={-12}/>
+      </SectionBg>
+      <Sec className="max-w-5xl mx-auto relative z-10">
+        <motion.div variants={fadeUp} className="text-center mb-14">
+          <Label>RETRIEVAL MODES</Label>
+          <H2>Choose how <GradText>OMNIX thinks</GradText></H2>
+        </motion.div>
+        <motion.div variants={fadeUp} className="flex flex-col md:flex-row gap-6 items-start">
+          <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-visible">
+            {modes.map((md,i)=>(
+              <button key={md.name} onClick={()=>setActive(i)}
+                className="flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all duration-200"
+                style={{
+                  background:active===i?tint(md.color,8):C.card,
+                  border:`1px solid ${active===i?tint(md.color,21):C.border}`,
+                  color:active===i?md.color:C.faint,
+                  boxShadow:active===i?`0 0 24px ${tint(md.color,9)}`:"none",
+                }}>
+                <Icon d={md.icon} size={16} stroke={active===i?md.color:C.faint} sw={1.8}/>
+                {md.name}
+              </button>
+            ))}
+          </div>
+          <AnimatePresence mode="wait">
+            <motion.div key={active}
+              initial={{opacity:0,x:20}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-20}}
+              transition={{duration:0.28}}
+              className="flex-1 rounded-2xl p-5 sm:p-8"
+              style={{background:tint(m.color,3),border:`1px solid ${tint(m.color,16)}`,boxShadow:`0 0 40px ${tint(m.color,6)}`}}>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center"
+                  style={{background:tint(m.color,8),border:`1px solid ${tint(m.color,16)}`}}>
+                  <Icon d={m.icon} size={22} stroke={m.color} sw={1.7}/>
+                </div>
+                <div>
+                  <div className="font-black text-xl" style={{color:C.white}}>{m.name} mode</div>
+                  <div className="text-xs font-bold" style={{color:m.color}}>Active retrieval strategy</div>
+                </div>
+              </div>
+              <p className="text-base leading-relaxed mb-6" style={{color:C.muted}}>{m.desc}</p>
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
+                style={{background:"var(--omnix-rgba-255-255-255-0-03)",border:`1px solid var(--omnix-rgba-255-255-255-0-06)`}}>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background:m.color}}/>
+                <span className="text-sm font-semibold" style={{color:m.color}}>{m.name}</span>
+                <span className="text-sm" style={{color:C.faint}}>— currently active for this workspace</span>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </motion.div>
+      </Sec>
+    </section>
+  );
+}
+
+// ─── SECURITY ─────────────────────────────────────────────────────────────────
+function Security() {
+  const badges=[
+    {label:"Auth sessions",        color:C.cyan   },
+    {label:"Workspace roles",      color:"var(--omnix-color-818cf8)"},
+    {label:"Scoped sources",       color:"var(--omnix-color-34d399)"},
+    {label:"Backend checks",       color:"var(--omnix-color-fb923c)"},
+    {label:"Activity events",      color:"var(--omnix-color-f472b6)"},
+    {label:"Recovery paths",       color:C.cyan   },
+  ];
+  return (
+    <section id="security" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
+      <SectionBg>
+        <DriftingOrb x="88%" y="30%" size={600} color="var(--omnix-rgba-0-255-255-0-07)" dur={24} delay={-5}/>
+        <DriftingOrb x="10%" y="70%" size={480} color="var(--omnix-rgba-0-51-255-0-06)" dur={20} delay={-9}/>
+        <ParticleField/>
+      </SectionBg>
+      <Sec className="max-w-5xl mx-auto relative z-10">
+        <div className="grid grid-cols-1 items-center gap-10 md:grid-cols-2 md:gap-16">
+          <motion.div variants={fadeUp} className="flex flex-wrap gap-3">
+            {badges.map(b=>(
+              <motion.div key={b.label} variants={fadeUp}
+                className="flex items-center gap-2.5 px-5 py-3 rounded-2xl text-sm font-bold"
+                style={{background:tint(b.color,5),border:`1px solid ${tint(b.color,16)}`,color:b.color}}>
+                <Icon d={ICONS.shield} size={15} stroke={b.color} sw={1.8}/>
+                {b.label}
+              </motion.div>
+            ))}
+            <motion.div variants={fadeUp} className="w-full p-5 rounded-2xl mt-2"
+              style={{background:"var(--omnix-rgba-255-255-255-0-02)",border:`1px solid var(--omnix-rgba-255-255-255-0-06)`}}>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-2 h-2 rounded-full" style={{background:"var(--omnix-color-22c55e)"}}/>
+                <span className="text-xs font-black" style={{color:"var(--omnix-rgba-255-255-255-0-35)",letterSpacing:"0.1em"}}>IMPLEMENTED SAFEGUARDS</span>
+              </div>
+              {["Authenticated routes","Workspace-scoped access","Source visibility checks","Session persistence"].map(item=>(
+                <div key={item} className="flex items-center justify-between py-1.5">
+                  <span className="text-sm" style={{color:C.muted}}>{item}</span>
+                  <div className="flex items-center gap-1.5 text-xs" style={{color:"var(--omnix-color-4ade80)"}}>
+                    <Icon d={ICONS.check} size={11} stroke="var(--omnix-color-4ade80)" sw={2.5}/>Live
+                  </div>
+                </div>
+              ))}
+            </motion.div>
+          </motion.div>
+          <motion.div variants={fadeUp}>
+            <Label>ENTERPRISE SECURITY</Label>
+            <H2>Your knowledge stays <GradText>yours — always</GradText></H2>
+            <motion.p variants={fadeUp} className="text-base leading-relaxed mb-6" style={{color:C.muted}}>
+              OMNIX keeps workspace surfaces behind authenticated sessions and scopes knowledge access through workspace membership. Certification and compliance claims are not shown until they are independently verified.
+            </motion.p>
+            {[
+              "Identity-first: every page gated behind active session",
+              "Workspace membership checks before sensitive data access",
+              "Granular role-based access per workspace",
+              "Activity events for supported workspace actions",
+              "Stream and session recovery paths preserved",
+            ].map(item=>(
+              <motion.div key={item} variants={fadeUp} className="flex items-start gap-3 mb-3">
+                <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                  style={{background:"var(--omnix-rgba-0-255-255-0-12)",border:`1px solid var(--omnix-rgba-0-255-255-0-25)`}}>
+                  <Icon d={ICONS.check} size={9} stroke={C.cyan} sw={2.5}/>
+                </div>
+                <span className="text-sm leading-relaxed" style={{color:C.muted}}>{item}</span>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </Sec>
+    </section>
+  );
+}
+
+// ─── PRICING ──────────────────────────────────────────────────────────────────
+function Pricing() {
+  const plans=[
+    {name:"Current build",      price:"Open",     sub:"Use the workspace flow available in this repo",        accent:C.cyan,    popular:true,  href:"/register",
+     features:["Auth-gated workspace access","Document uploads and retrieval","Searchable chat history","Auto, Workspace, Web, and Synthesis modes","Operational analytics from loaded app data"],
+     cta:"Start working free"},
+    {name:"Shared workspace",   price:"Included", sub:"For teams using workspace membership",                 accent:"var(--omnix-color-34d399)", popular:false, href:"/register",
+     features:["Workspace invitations","Role-aware access controls","Shared files and conversations","Presence and activity surfaces backed by workspace state","Onboarding gate preserved"],
+     cta:"Create workspace"},
+    {name:"Enterprise controls",price:"Planned",  sub:"Not claimed as live in this build",                    accent:"var(--omnix-color-818cf8)",popular:false, href:"#security",
+     features:["Certification-backed compliance is not claimed","Paid billing and trials are not shown","Public API and webhooks are not claimed","Enterprise SLA claims stay out until verified"],
+     cta:"Review security posture"},
+  ];
+  return (
+    <section id="pricing" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
+      <SectionBg>
+        <DriftingOrb x="50%" y="40%" size={800} color="var(--omnix-rgba-0-255-255-0-07)" dur={30} delay={-10}/>
+        <DriftingOrb x="15%" y="60%" size={500} color="var(--omnix-rgba-0-51-255-0-06)" dur={22} delay={-6}/>
+        <DriftingOrb x="88%" y="35%" size={450} color="var(--omnix-rgba-0-51-255-0-05)" dur={18} delay={-1}/>
+        <ParticleField/>
+      </SectionBg>
+      <Sec className="max-w-6xl mx-auto relative z-10">
+        <motion.div variants={fadeUp} className="text-center mb-14">
+          <Label>ACCESS</Label>
+          <H2>Access without inflated claims</H2>
+          <motion.p variants={fadeUp} className="text-lg" style={{color:C.muted}}>This build does not present paid billing, trials, SLAs, or certification-backed enterprise tiers.</motion.p>
+        </motion.div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {plans.map(p=>(
+            <motion.div key={p.name} variants={fadeUp}
+              className="relative rounded-2xl p-7 flex flex-col"
+              style={{background:p.popular?`linear-gradient(145deg,var(--omnix-rgba-0-255-255-0-07),var(--omnix-rgba-0-51-255-0-07))`:C.card,border:p.popular?`1px solid var(--omnix-rgba-0-255-255-0-28)`:`1px solid ${C.border}`,boxShadow:p.popular?`0 0 60px var(--omnix-rgba-0-255-255-0-1),0 40px 80px var(--omnix-rgba-0-0-0-0-3)`:"none"}}>
+              {p.popular&&(
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-5 py-1 rounded-full text-xs font-black"
+                  style={{background:C.cyan,color:C.navyDark}}>CURRENT</div>
+              )}
+              <div className="mb-6">
+                <div className="font-black text-lg mb-1" style={{color:p.popular?C.cyan:C.white}}>{p.name}</div>
+                <div className="text-xs mb-4" style={{color:C.faint}}>{p.sub}</div>
+                <div className="flex items-end gap-1">
+                  <span className="text-5xl font-black" style={{color:C.white}}>{p.price}</span>
+                  {p.price!=="Free"&&p.price!=="Custom"&&<span className="text-sm mb-2" style={{color:C.faint}}>/mo</span>}
+                </div>
+              </div>
+              <ul className="space-y-3 mb-8 flex-1">
+                {p.features.map(f=>(
+                  <li key={f} className="flex items-start gap-2.5 text-sm">
+                    <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                      style={{background:tint(p.accent,9),border:`1px solid ${tint(p.accent,19)}`}}>
+                      <Icon d={ICONS.check} size={8} stroke={p.accent} sw={2.5}/>
+                    </div>
+                    <span style={{color:C.muted}}>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link href={p.href}
+                className="block w-full py-3.5 rounded-xl text-center font-black text-sm transition-all duration-200"
+                  style={{background:p.popular?C.cyan:"transparent",border:p.popular?"none":`1px solid ${tint(p.accent,31)}`,color:p.popular?C.navyDark:p.accent}}
+                  onMouseEnter={e=>{if(p.popular){(e.currentTarget as HTMLElement).style.boxShadow=`0 0 40px var(--omnix-rgba-0-255-255-0-5)`;}else{(e.currentTarget as HTMLElement).style.background=tint(p.accent,8);}}}
+                  onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.boxShadow="none";if(!p.popular)(e.currentTarget as HTMLElement).style.background="transparent";}}>
+                  {p.cta}
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+      </Sec>
+    </section>
+  );
+}
+
+// ─── TRUST LEDGER ─────────────────────────────────────────────────────────────
+function TrustLedger() {
+  const items=[
+    {title:"Customer proof", status:"Removed", desc:"No named customer logos, quotes, star reviews, or adoption metrics are shown without source evidence.", color:C.cyan, icon:ICONS.shield},
+    {title:"AI modes", status:"Aligned", desc:"Landing labels match the chat composer: Auto, Workspace, Web, and Synthesis.", color:"var(--omnix-color-818cf8)", icon:ICONS.search},
+    {title:"Analytics", status:"Scoped", desc:"Reporting is described as real app data from workspaces, members, files, conversations, and invites.", color:"var(--omnix-color-34d399)", icon:ICONS.chart},
+    {title:"Security claims", status:"Conservative", desc:"Certification, compliance, SLA, and exact encryption claims are removed until independently verified.", color:"var(--omnix-color-fb923c)", icon:ICONS.lock},
+    {title:"Demo behavior", status:"Fixed", desc:"The hero demo action now opens the product tour instead of advertising a missing video.", color:"var(--omnix-color-f472b6)", icon:ICONS.play},
+    {title:"Roadmap items", status:"Labeled", desc:"Enterprise controls are presented as planned, not as shipped capabilities.", color:C.cyan, icon:ICONS.tag},
+  ];
+  return (
+    <section id="trust-ledger" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
+      <SectionBg>
+        <DriftingOrb x="28%" y="50%" size={600} color="var(--omnix-rgba-0-51-255-0-06)" dur={28} delay={-8}/>
+        <DriftingOrb x="76%" y="50%" size={500} color="var(--omnix-rgba-0-255-255-0-05)" dur={22} delay={-3}/>
+        <AnimatedGrid opacity={0.025}/>
+      </SectionBg>
+      <Sec className="max-w-6xl mx-auto relative z-10">
+        <motion.div variants={fadeUp} className="text-center mb-16">
+          <Label>TRUST LEDGER</Label>
+          <H2>Claims kept <GradText>grounded</GradText></H2>
+        </motion.div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {items.map(item=>(
+            <motion.div key={item.title} variants={fadeUp}
+              className="p-6 rounded-2xl flex flex-col gap-5 transition-all duration-300"
+              style={{background:C.card,border:`1px solid ${C.border}`}}
+              onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor=tint(item.color,16);(e.currentTarget as HTMLElement).style.transform="translateY(-3px)";}}
+              onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor=C.border;(e.currentTarget as HTMLElement).style.transform="translateY(0)";}}>
+              <div className="flex items-center justify-between gap-4">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{background:tint(item.color,8),border:`1px solid ${tint(item.color,16)}`}}>
+                  <Icon d={item.icon} size={18} stroke={item.color} sw={1.8}/>
+                </div>
+                <div className="rounded-full px-3 py-1 text-xs font-black"
+                  style={{background:tint(item.color,7),border:`1px solid ${tint(item.color,16)}`,color:item.color}}>
+                  {item.status}
+                </div>
+              </div>
+              <div>
+                <h3 className="font-black text-base mb-2" style={{color:C.white}}>{item.title}</h3>
+                <p className="text-sm leading-relaxed" style={{color:"var(--omnix-rgba-255-255-255-0-56)"}}>{item.desc}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </Sec>
+    </section>
+  );
+}
+
+// ─── FAQ ──────────────────────────────────────────────────────────────────────
+const FAQS=[
+  {q:"How does OMNIX retrieve context from my documents?",     a:"OMNIX indexes uploaded files for semantic retrieval. When you ask a question, it retrieves relevant chunks from accessible workspace sources and uses them as context for source-grounded answers."},
+  {q:"Is my data private and secure?",                         a:"The current product keeps workspace surfaces behind authenticated sessions and scopes document access to workspace membership. This page does not claim SOC 2, GDPR certification, SLA coverage, or exact encryption guarantees."},
+  {q:"What file types can I upload?",                          a:"OMNIX supports PDF, DOCX, TXT, and Markdown uploads in the current product flow. Files become useful to AI retrieval after ingestion and indexing complete."},
+  {q:"How many team members can I have?",                      a:"Membership is workspace and invite based in this build. Billing limits, paid tiers, and enterprise seat commitments are not presented as shipped capabilities."},
+  {q:"What retrieval modes does OMNIX support?",               a:"The chat composer exposes Auto, Workspace, Web, and Synthesis. Synthesis maps to the backend hybrid path that can combine workspace and web context."},
+  {q:"Can I use OMNIX via API?",                               a:"The app uses backend APIs internally. Public API access, webhooks, and third-party marketplace integrations are not advertised as shipped capabilities on this landing page."},
+];
+
+function FAQ() {
+  const [open,setOpen]=useState<number|null>(null);
+  return (
+    <section className="relative overflow-hidden px-4 py-16 sm:px-6 sm:py-28">
+      <SectionBg>
+        <DriftingOrb x="80%" y="50%" size={500} color="var(--omnix-rgba-0-255-255-0-06)" dur={20} delay={-4}/>
+        <DriftingOrb x="20%" y="40%" size={400} color="var(--omnix-rgba-0-51-255-0-05)" dur={26} delay={-11}/>
+      </SectionBg>
+      <Sec className="max-w-3xl mx-auto relative z-10">
+        <motion.div variants={fadeUp} className="text-center mb-14">
+          <Label>FAQ</Label>
+          <H2>Frequently asked <GradText>questions</GradText></H2>
+        </motion.div>
+        <div className="space-y-3">
+          {FAQS.map((faq,i)=>(
+            <motion.div key={i} variants={fadeUp}
+              className="rounded-2xl overflow-hidden transition-all duration-200"
+              style={{background:open===i?"var(--omnix-rgba-0-255-255-0-05)":C.card,border:open===i?`1px solid var(--omnix-rgba-0-255-255-0-22)`:`1px solid ${C.border}`}}>
+              <button className="w-full flex items-center justify-between px-6 py-5 text-left"
+                onClick={()=>setOpen(open===i?null:i)}>
+                <span className="font-bold text-sm pr-4" style={{color:C.white}}>{faq.q}</span>
+                <motion.div animate={{rotate:open===i?45:0}} transition={{duration:0.22}}
+                  className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
+                  style={{background:open===i?"var(--omnix-rgba-0-255-255-0-15)":"var(--omnix-rgba-255-255-255-0-06)",border:`1px solid ${open===i?"var(--omnix-rgba-0-255-255-0-25)":C.border}`}}>
+                  <Icon d={ICONS.plus} size={11} stroke={open===i?C.cyan:C.muted} sw={2.5}/>
+                </motion.div>
+              </button>
+              <AnimatePresence>
+                {open===i&&(
+                  <motion.div initial={{height:0,opacity:0}} animate={{height:"auto",opacity:1}} exit={{height:0,opacity:0}}
+                    transition={{duration:0.25}} style={{overflow:"hidden"}}>
+                    <p className="px-6 pb-5 text-sm leading-relaxed" style={{color:C.faint}}>{faq.a}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          ))}
+        </div>
+      </Sec>
+    </section>
+  );
+}
+
+// ─── CTA ──────────────────────────────────────────────────────────────────────
+function CTA() {
+  return (
+    <section id="get-started" className="relative overflow-hidden px-4 py-16 scroll-mt-24 sm:px-6 sm:py-28">
+      <SectionBg>
+        <DriftingOrb x="50%" y="50%" size={1000} color="var(--omnix-rgba-0-255-255-0-09)" dur={35} delay={-15}/>
+        <DriftingOrb x="20%" y="75%" size={500} color="var(--omnix-rgba-0-51-255-0-07)" dur={22} delay={-8}/>
+        <DriftingOrb x="82%" y="25%" size={450} color="var(--omnix-rgba-0-255-255-0-06)" dur={28} delay={-3}/>
+        <ParticleField/>
+      </SectionBg>
+      <Sec className="max-w-5xl mx-auto relative z-10">
+        <motion.div variants={fadeUp} className="rounded-3xl p-px"
+          style={{background:`linear-gradient(135deg,var(--omnix-rgba-0-255-255-0-35),var(--omnix-rgba-0-51-255-0-2),transparent 70%)`}}>
+          <div className="relative overflow-hidden rounded-3xl px-5 py-14 text-center sm:px-12 sm:py-24"
+            style={{background:`linear-gradient(145deg,var(--omnix-rgba-6-20-38-0-99),var(--omnix-rgba-5-14-26-0-99))`}}>
+            <SectionBg>
+              <AnimatedGrid opacity={0.03}/>
+              <div className="absolute inset-0"
+                style={{background:`radial-gradient(ellipse at 50% 0%,var(--omnix-rgba-0-255-255-0-09) 0%,transparent 65%)`}}/>
+            </SectionBg>
+            <div className="relative z-10">
+              <motion.div variants={fadeUp} className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black mb-8"
+                style={{background:"var(--omnix-rgba-0-255-255-0-07)",border:`1px solid var(--omnix-rgba-0-255-255-0-22)`,color:C.cyan,letterSpacing:"0.1em"}}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{background:C.cyan}}/>
+                START WITH OMNIX
+              </motion.div>
+              <motion.h2 variants={fadeUp} className="mb-6 text-3xl font-black leading-tight tracking-tight sm:text-6xl" style={{color:C.white}}>
+                Bring a secure AI workspace<br className="hidden sm:block"/><GradText> to your team today.</GradText>
+              </motion.h2>
+              <motion.p variants={fadeUp} className="mb-8 text-base sm:mb-12 sm:text-xl" style={{color:C.muted,maxWidth:500,marginInline:"auto"}}>
+                Sign in to continue an existing workspace, or create a new account and get started in minutes — no credit card required.
+              </motion.p>
+              <motion.div variants={fadeUp} className="mx-auto flex max-w-sm flex-col items-center justify-center gap-3 sm:max-w-none sm:flex-row sm:flex-wrap sm:gap-4">
+                <CyanBtn large href="/register">Start working free <Icon d={ICONS.arrow} size={18} stroke={C.navyDark} sw={2.5}/></CyanBtn>
+                <GhostBtn large href="/login">Sign in to workspace</GhostBtn>
+              </motion.div>
+              <motion.div variants={fadeUp} className="flex items-center justify-center gap-8 mt-10 flex-wrap">
+                {["No credit card","Workspace-scoped","Session-gated","No certification claims"].map(t=>(
+                  <span key={t} className="text-xs flex items-center gap-1.5" style={{color:"var(--omnix-rgba-255-255-255-0-3)"}}>
+                    <Icon d={ICONS.check} size={11} stroke="var(--omnix-rgba-0-255-255-0-45)" sw={2.5}/>{t}
+                  </span>
+                ))}
+              </motion.div>
+            </div>
+          </div>
+        </motion.div>
+      </Sec>
+    </section>
+  );
+}
+
+// ─── FOOTER ───────────────────────────────────────────────────────────────────
+function Footer() {
+  const cols=[
+    {title:"Product", links:[
+      {label:"Features", href:FEATURES_HREF},
+      {label:"Product tour", href:"#inside-app"},
+      {label:"How it works", href:"#how-it-works"},
+      {label:"Retrieval modes", href:"#retrieval"},
+    ]},
+    {title:"Trust", links:[
+      {label:"Security posture", href:"#security"},
+      {label:"Access scope", href:"#pricing"},
+      {label:"Trust ledger", href:"#trust-ledger"},
+    ]},
+    {title:"Start", links:[
+      {label:"Create account", href:"/register"},
+      {label:"Sign in", href:"/login"},
+    ]},
+  ];
+  return (
+    <footer className="relative px-4 pb-8 pt-14 sm:px-8 sm:pb-10 sm:pt-20" style={{borderTop:`1px solid var(--omnix-rgba-255-255-255-0-05)`}}>
+      <SectionBg>
+        <DriftingOrb x="50%" y="50%" size={600} color="var(--omnix-rgba-0-255-255-0-04)" dur={32} delay={-6}/>
+      </SectionBg>
+      <div className="max-w-6xl mx-auto relative z-10">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-14 mb-14"
+          style={{borderBottom:`1px solid var(--omnix-rgba-255-255-255-0-06)`}}>
+          <div>
+            <h3 className="font-black text-xl mb-1" style={{color:C.white}}>Explore the current build</h3>
+            <p className="text-sm" style={{color:C.faint}}>Review shipped surfaces and trust notes before creating a workspace.</p>
+          </div>
+          <div className="flex w-full flex-col gap-3 min-[380px]:flex-row md:w-auto">
+            <a href="#inside-app" className="rounded-xl px-5 py-3 text-center text-sm font-black"
+              style={{background:C.cyan,color:C.navyDark}}>
+              Product tour
+            </a>
+            <a href="#trust-ledger" className="rounded-xl px-5 py-3 text-center text-sm font-black"
+              style={{background:C.card,border:`1px solid ${C.border}`,color:C.muted}}>
+              Trust notes
+            </a>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-14">
+          <div className="col-span-2 md:col-span-1">
+            <div className="flex items-center gap-3 mb-4">
+              <OmnixMark size={30}/>
+              <span className="text-xl font-semibold tracking-[-0.045em]" style={{color:C.white}}>Omnix</span>
+            </div>
+            <p className="text-sm leading-relaxed mb-6" style={{color:C.faint}}>
+              AI workspace for knowledge teams. Precise answers, secure by design.
+            </p>
+          </div>
+          {cols.map(col=>(
+            <div key={col.title}>
+              <div className="text-xs font-black tracking-widest mb-5"
+                style={{color:C.faint,letterSpacing:"0.1em"}}>{col.title.toUpperCase()}</div>
+              <ul className="space-y-2.5">
+                {col.links.map(link=>(
+                  <li key={link.label}>
+                    <a href={link.href} className="text-sm transition-colors duration-200" style={{color:"var(--omnix-rgba-255-255-255-0-38)"}}
+                      onMouseEnter={e=>(e.currentTarget.style.color=C.white)}
+                      onMouseLeave={e=>(e.currentTarget.style.color="var(--omnix-rgba-255-255-255-0-38)")}>
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8"
+          style={{borderTop:`1px solid var(--omnix-rgba-255-255-255-0-05)`}}>
+          <div className="flex items-center gap-6">
+            <p className="text-xs" style={{color:"var(--omnix-rgba-255-255-255-0-2)"}}>© 2026 OMNIX. All rights reserved.</p>
+            <div className="flex items-center gap-1.5 text-xs" style={{color:"var(--omnix-rgba-255-255-255-0-2)"}}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{background:"var(--omnix-color-22c55e)"}}/>Claims scoped to current build
+            </div>
+          </div>
+          <p className="text-xs" style={{color:"var(--omnix-rgba-255-255-255-0-14)"}}>Built for teams that need answers they can trust.</p>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+// ─── ROOT ─────────────────────────────────────────────────────────────────────
+export function LandingExperience() {
+  return (
+    <div className="min-h-screen"
+      style={{background:C.navyDark,fontFamily:"'Inter','DM Sans',system-ui,sans-serif",WebkitFontSmoothing:"antialiased"}}>
+      <Navbar/>
+      <Hero/>
+      <Marquee/>
+      <Stats/>
+      <Features/>
+      <AppScreenshots/>
+      <HowItWorks/>
+      <RetrievalModes/>
+      <Security/>
+      <Pricing/>
+      <TrustLedger/>
+      <FAQ/>
+      <CTA/>
+      <Footer/>
+    </div>
+  );
+}

@@ -1,0 +1,20 @@
+[Unit]
+Description=Omnix Automation Scheduler
+After=network.target
+Requires=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Omnix/backend
+Environment=OMNIX_ROLE=automation_scheduler
+EnvironmentFile=/home/ubuntu/Omnix/.env.production
+ExecStart=/home/ubuntu/Omnix/backend/venv/bin/python -m app.automation.scheduler
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=omnix-automation-scheduler
+
+[Install]
+WantedBy=multi-user.target

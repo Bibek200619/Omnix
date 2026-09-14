@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Your Omnix verification code</title>
+  </head>
+  <body style="margin:0;background:#061020;color:#e4eef9;font-family:Inter,Arial,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+      Your Omnix OTP is {{ .Token }}. Enter this 6-digit code to continue.
+    </div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#061020;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;border:1px solid rgba(0,255,255,0.2);border-radius:24px;background:#07131f;box-shadow:0 24px 80px rgba(0,0,0,0.35);overflow:hidden;">
+            <tr>
+              <td style="padding:0;">
+                <div style="height:6px;background:linear-gradient(90deg,#00ffff,#3366ff,#00e87a);"></div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:34px 32px 30px;">
+                <p style="margin:0 0 10px;color:#00ffff;font-size:12px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;">Omnix secure login</p>
+                <h1 style="margin:0 0 12px;color:#ffffff;font-size:30px;line-height:1.18;font-weight:800;">Your verification code</h1>
+                <p style="margin:0 0 26px;color:rgba(255,255,255,0.68);font-size:15px;line-height:1.65;">Use this one-time password to finish signing in or verifying your new Omnix account.</p>
+
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 24px;border:1px solid rgba(0,255,255,0.26);border-radius:18px;background:rgba(0,255,255,0.08);">
+                  <tr>
+                    <td align="center" style="padding:24px 14px;">
+                      <div style="margin:0 0 8px;color:rgba(255,255,255,0.46);font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;">One-time code</div>
+                      <div style="color:#ffffff;font-size:40px;line-height:1;font-weight:900;letter-spacing:0.32em;text-indent:0.32em;">{{ .Token }}</div>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 20px;color:rgba(255,255,255,0.62);font-size:14px;line-height:1.65;">This code expires soon. Do not share it with anyone from Omnix or any other service.</p>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-radius:14px;background:rgba(255,255,255,0.045);">
+                  <tr>
+                    <td style="padding:14px 16px;color:rgba(255,255,255,0.48);font-size:13px;line-height:1.55;">
+                      If you did not request this code, ignore this email. Your account is not changed unless the code is entered.
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

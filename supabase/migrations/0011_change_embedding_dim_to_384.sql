@@ -1,0 +1,6 @@
+-- Migration: local embedding dimension transition marker.
+--
+-- The original version of this file was a manual template that added an
+-- embedding_new column. The executable migration lives in
+-- 0012_local_embeddings_contract.sql so fresh installs and existing installs
+-- follow the same safe, idempotent path.
