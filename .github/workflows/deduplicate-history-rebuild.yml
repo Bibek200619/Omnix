@@ -1,0 +1,176 @@
+name: Rebuild deduplicated history
+
+on:
+  push:
+    branches:
+      - automation/deduplicate-history-rebuild-2026-09-15
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out archived history
+        uses: actions/checkout@v4
+        with:
+          ref: archive/main-before-history-cleanup-2026-09-15
+          fetch-depth: 0
+
+      - name: Rebuild history while preserving original metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin archive/main-before-history-cleanup-2026-09-15
+          python3 <<'PY'
+          import collections
+          import os
+          import subprocess
+          import sys
+
+          SOURCE = "origin/archive/main-before-history-cleanup-2026-09-15"
+          TARGET = "history/clean-deduplicated-2026-09-15"
+          WEEK = 7 * 24 * 60 * 60
+
+          def out(args, input_bytes=None, env=None):
+              return subprocess.check_output(args, input=input_bytes, env=env)
+
+          commits = out(["git", "rev-list", "--reverse", "--topo-order", SOURCE]).decode().splitlines()
+          if not commits:
+              raise SystemExit("No commits found in archived history")
+
+          meta = {}
+          semantic_groups = collections.defaultdict(list)
+          exact_groups = collections.defaultdict(list)
+
+          for index, sha in enumerate(commits):
+              raw = out([
+                  "git", "show", "-s",
+                  "--format=%H%x00%P%x00%T%x00%an%x00%ae%x00%at%x00%aI%x00%cn%x00%ce%x00%ct%x00%cI%x00%B",
+                  sha,
+              ]).decode("utf-8", "surrogateescape").rstrip("\n")
+              parts = raw.split("\x00", 11)
+              if len(parts) != 12:
+                  raise RuntimeError(f"Could not parse metadata for {sha}")
+              _, parents_s, tree, an, ae, at, aI, cn, ce, ct, cI, message = parts
+              parents = parents_s.split() if parents_s else []
+              at_i, ct_i = int(at), int(ct)
+              message_key = message.strip()
+              info = {
+                  "sha": sha,
+                  "index": index,
+                  "parents": parents,
+                  "tree": tree,
+                  "an": an,
+                  "ae": ae,
+                  "at": at_i,
+                  "aI": aI,
+                  "cn": cn,
+                  "ce": ce,
+                  "ct": ct_i,
+                  "cI": cI,
+                  "message": message,
+                  "message_key": message_key,
+              }
+              meta[sha] = info
+
+              exact_key = (message_key, at_i, ct_i, len(parents))
+              exact_groups[exact_key].append(sha)
+
+              if len(parents) == 1 and message_key:
+                  patch_text = out(["git", "show", "--pretty=format:", "--binary", sha])
+                  proc = subprocess.run(["git", "patch-id", "--stable"], input=patch_text, stdout=subprocess.PIPE, check=True)
+                  patch_line = proc.stdout.decode().strip()
+                  patch_id = patch_line.split()[0] if patch_line else ""
+                  if patch_id:
+                      semantic_groups[(message_key, patch_id)].append(sha)
+
+          skip = {}
+
+          # Exact duplicate metadata is the strongest signal. This removes the
+          # parallel copies that have the same message and original timestamps.
+          for key, group in exact_groups.items():
+              if len(group) < 2:
+                  continue
+              ordered = sorted(group, key=lambda s: (meta[s]["at"], meta[s]["ct"], meta[s]["index"]))
+              keeper = ordered[0]
+              for sha in ordered[1:]:
+                  skip[sha] = f"exact duplicate of {keeper}"
+
+          # For identical patches with the same message that were recommitted
+          # much later, keep the earliest/original occurrence. The 7-day guard
+          # avoids collapsing legitimate quick reapplications of a similar fix.
+          for key, group in semantic_groups.items():
+              candidates = [s for s in group if s not in skip]
+              if len(candidates) < 2:
+                  continue
+              ordered = sorted(candidates, key=lambda s: (meta[s]["at"], meta[s]["ct"], meta[s]["index"]))
+              keeper = ordered[0]
+              for sha in ordered[1:]:
+                  a_gap = abs(meta[sha]["at"] - meta[keeper]["at"])
+                  c_gap = abs(meta[sha]["ct"] - meta[keeper]["ct"])
+                  if a_gap >= WEEK or c_gap >= WEEK:
+                      skip[sha] = f"later duplicate patch of {keeper}"
+
+          mapping = {}
+          created = 0
+          skipped = 0
+
+          for sha in commits:
+              info = meta[sha]
+              mapped_parents = []
+              for parent in info["parents"]:
+                  mapped = mapping.get(parent)
+                  if mapped and mapped not in mapped_parents:
+                      mapped_parents.append(mapped)
+
+              if sha in skip:
+                  if mapped_parents:
+                      mapping[sha] = mapped_parents[0]
+                  else:
+                      # Never discard the root commit.
+                      skip.pop(sha, None)
+                  if sha in skip:
+                      skipped += 1
+                      continue
+
+              cmd = ["git", "-c", "commit.gpgsign=false", "commit-tree", info["tree"]]
+              for parent in mapped_parents:
+                  cmd.extend(["-p", parent])
+
+              env = os.environ.copy()
+              env.update({
+                  "GIT_AUTHOR_NAME": info["an"],
+                  "GIT_AUTHOR_EMAIL": info["ae"],
+                  "GIT_AUTHOR_DATE": info["aI"],
+                  "GIT_COMMITTER_NAME": info["cn"],
+                  "GIT_COMMITTER_EMAIL": info["ce"],
+                  "GIT_COMMITTER_DATE": info["cI"],
+              })
+              message_bytes = (info["message"] + "\n").encode("utf-8", "surrogateescape")
+              new_sha = out(cmd, input_bytes=message_bytes, env=env).decode().strip()
+              mapping[sha] = new_sha
+              created += 1
+
+          source_tip = commits[-1]
+          new_tip = mapping[source_tip]
+          source_tree = out(["git", "show", "-s", "--format=%T", source_tip]).decode().strip()
+          new_tree = out(["git", "show", "-s", "--format=%T", new_tip]).decode().strip()
+          if source_tree != new_tree:
+              raise SystemExit(f"Tree mismatch: source {source_tree}, rebuilt {new_tree}")
+
+          kept = len(commits) - skipped
+          print(f"Original reachable commits: {len(commits)}")
+          print(f"Removed duplicate commits: {skipped}")
+          print(f"Kept/rebuilt commits: {kept}")
+          print(f"Source tip: {source_tip}")
+          print(f"Clean tip: {new_tip}")
+          print(f"Final tree verified identical: {new_tree}")
+
+          # Print a concise audit sample for the workflow log.
+          for sha in list(skip)[:80]:
+              print(f"DROP {sha} :: {skip[sha]} :: {meta[sha]['message_key'][:100]}")
+
+          subprocess.check_call(["git", "push", "origin", f"{new_tip}:refs/heads/{TARGET}", "--force"])
+          PY
