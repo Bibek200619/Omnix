@@ -1,320 +1,409 @@
+<div align="center">
+
 # Omnix
 
-Omnix is an AI-native collaborative operating system built around workspace hierarchy, authenticated team access, document-aware chat, and operational continuity.
+### AI-native workspace for teams, knowledge, collaboration, and operational continuity
 
-The current codebase is a full-stack app:
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)](https://react.dev/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.138-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-Postgres-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-- Frontend: Next.js 15, React 19, TypeScript, Supabase Auth, Tailwind, Framer Motion
-- Backend: FastAPI, Supabase/Postgres, pgvector, Redis-ready background jobs, streaming chat
-- AI/RAG: workspace-scoped retrieval, local or OpenAI embeddings, Ollama/OpenAI-compatible runtime configuration
-- Collaboration: workspaces, subspaces, members, invites, roles, presence, activity, tasks, initiatives, and continuity surfaces
+**Web:** [omni-x.co.in](https://omni-x.co.in)  
+**Project board:** [Omnix Development Board](https://github.com/users/Bibek200619/projects/9)  
+**CLI:** [Bibek200619/Omnix-CLI](https://github.com/Bibek200619/Omnix-CLI)
 
-This README reflects the current repository state. It intentionally avoids fake metrics, fake collaboration states, and admin-panel positioning.
+</div>
 
-## Current Status
+---
 
-Omnix is in active product development. The core workspace operating surface is implemented, with frontend routes and backend APIs for authenticated workspaces, chat, files, retrieval, collaboration, and continuity.
+## Overview
 
-Live in the repo:
+Omnix is an AI-native collaborative operating system designed around a **workspace-first model**. It combines authenticated team collaboration, document-aware AI chat, workspace knowledge, tasks, initiatives, operational memory, and continuity tooling in one product surface.
 
-- Authenticated landing, login, register, callback, and invite flows
-- Dashboard shell with workspace-aware navigation
-- Workspace hierarchy with root workspaces and subspaces
-- Workspace switching and persisted active workspace context
+The repository contains the main Omnix web platform:
+
+- **Frontend:** Next.js 15, React 19, TypeScript, Supabase Auth, Tailwind CSS, Framer Motion
+- **Backend:** FastAPI, Supabase/Postgres, pgvector, Redis-ready workers, streaming APIs
+- **AI & retrieval:** workspace-scoped RAG, hybrid retrieval, local/OpenAI embeddings, Ollama/OpenAI-compatible model runtimes
+- **Collaboration:** workspaces, subspaces, members, roles, invites, presence, activity, conversations, tasks, and initiatives
+- **Continuity:** workspace timelines, memory, context assembly, intelligence settings, operational surfaces, and recovery-aware chat
+
+Omnix is in **active development**. The README reflects the current repository rather than a future mockup or demo-only architecture.
+
+## Core Product Capabilities
+
+### Workspace-first collaboration
+
+- Authenticated workspaces and subspaces
+- Workspace switching with persisted active context
 - Workspace onboarding gate
-- Workspace member management, role assignment, invitations, and pending invite handling
-- Workspace presence and activity feeds backed by real workspace data
-- Workspace chat with streaming assistant responses and recovery-oriented client handling
-- Conversation history and message persistence
-- File upload and workspace-scoped document context
-- RAG pipeline with chunking, embeddings, hybrid retrieval, pgvector migrations, and document context building
-- Tasks, initiatives, operational timelines, and continuity memory surfaces
-- Workspace intelligence settings and cognitive focus controls
-- Automations, artifacts, insights, Google Drive integration routes, and runtime health endpoints
-- Backend bootstrap for Redis, observability, vector store initialization, workers, and graceful shutdown
+- Member management and role assignment
+- Workspace invitations and pending invite handling
+- Presence and activity feeds backed by real workspace data
+- Workspace channels and collaboration surfaces
 
-Still limited or environment-dependent:
+### AI chat and knowledge
 
-- External connectors are not all fully active; some frontend source flows capture setup intent until backend ingestion is enabled.
-- Email invitations require `RESEND_API_KEY` and sender configuration.
-- Google Drive import requires provider credentials and the related migration/configuration.
-- AI quality depends on the configured provider, model, embeddings provider, and available document corpus.
-- Local development requires a configured Supabase project and applied migrations.
-- Redis-backed workers are wired through bootstrap/compose, but production job behavior depends on deployment configuration.
+- Streaming AI chat
+- Persisted conversations and messages
+- Workspace-scoped document context
+- File upload and ingestion
+- Chunking and embedding pipelines
+- pgvector-backed semantic retrieval
+- Keyword + hybrid retrieval
+- Context assembly with token budgets and citation support
+- Local or hosted AI provider configuration
 
-## Repository Docs
+### Work and continuity
 
-Keep root markdown limited to active, useful documents:
+- Tasks and initiatives
+- Operational timelines
+- Workspace intelligence settings
+- Cognitive focus controls
+- Continuity and memory surfaces
+- Artifacts, automations, and insights
+- Runtime health and observability endpoints
 
-- `README.md` for current product, architecture, setup, and operations.
-- `AGENTS.md` for non-negotiable assistant and architecture rules.
-- `OMNIX_CODEBASE_MAP.md` for detailed code navigation.
-- `SECURITY.md` for security policy and reporting.
+### Integrations
 
-Put narrow technical notes under `docs/`, and update an existing canonical doc instead of adding another root `.md` file.
+- Supabase authentication and database
+- Google Drive connection/import routes
+- Resend-powered workspace invitation email flow
+- Redis-ready workers and background jobs
+- Omnix CLI integration path
 
-## Architecture Rules
+## Omnix CLI Integration
 
-Omnix has a few non-negotiable product and architecture constraints:
+Omnix and [Omnix CLI](https://github.com/Bibek200619/Omnix-CLI) are separate repositories that are evolving toward a shared product experience.
 
-- Workspace hierarchy is the spine.
-- Do not break the onboarding gate.
-- Do not break streaming chat recovery.
-- Preserve workspace switching.
-- Preserve auth session persistence.
-- Avoid admin-panel UI.
-- Preserve the cinematic premium design language.
-- Use truthful analytics only.
-- Never fake collaboration states.
-
-Critical areas:
-
-- `frontend/lib/workspace-context.tsx`
-- `frontend/lib/workspace-collaboration-context.tsx`
-- `frontend/lib/workspace-continuity-context.tsx`
-- `frontend/components/workspace/`
-- `frontend/components/chat/ChatInterface.tsx`
-- `backend/app/routers/workspaces.py`
-- `backend/app/routers/messages.py`
-- `backend/app/services/workspace_*`
-- `backend/app/context/`
-- `backend/app/rag/`
-- `backend/app/retrieval/`
-
-## System Shape
+The backend currently includes Omnix CLI as a pinned Git dependency, creating a technical integration path between the web platform and CLI. The long-term direction is to share authentication, workspace context, AI capabilities, and developer workflows without forcing both projects into the same repository prematurely.
 
 ```text
-Next.js app
-  -> Supabase Auth session
-  -> FastAPI API client with workspace header
-  -> Workspace, chat, files, tasks, initiatives, continuity APIs
-  -> Retrieval/context engine
-  -> Supabase/Postgres + pgvector
-  -> AI runtime provider
-  -> Streaming response back to chat UI
+Omnix Web
+   │
+   ├── Workspace / Auth / Collaboration
+   ├── Knowledge / RAG / AI Runtime
+   │
+   └──── shared product capabilities ──── Omnix CLI
 ```
 
-The frontend stores the active workspace locally and sends it to the backend as `X-Omnix-Workspace`. Backend routes still validate access through authenticated user context and workspace permissions.
+The integration is still evolving, so CLI behavior should not be treated as a fully unified production surface yet.
 
-## Frontend
+## Architecture
+
+```text
+                         ┌─────────────────────┐
+                         │     Omnix Web      │
+                         │ Next.js + React 19 │
+                         └──────────┬──────────┘
+                                    │
+                         Supabase Auth session
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │    FastAPI API      │
+                         │ Workspace-aware    │
+                         └──────────┬──────────┘
+                                    │
+                  ┌─────────────────┼──────────────────┐
+                  │                 │                  │
+                  ▼                 ▼                  ▼
+            Workspace APIs    Chat / Context      Files / Jobs
+                  │                 │                  │
+                  └─────────────────┼──────────────────┘
+                                    │
+                                    ▼
+                        Retrieval + Context Engine
+                                    │
+                     ┌──────────────┼──────────────┐
+                     │              │              │
+                     ▼              ▼              ▼
+                 pgvector       Keyword       Embeddings
+                     │              │              │
+                     └──────────────┼──────────────┘
+                                    │
+                                    ▼
+                       Supabase / PostgreSQL
+                                    │
+                                    ▼
+                         Configured AI Runtime
+                                    │
+                                    ▼
+                         Streaming response
+```
+
+The frontend sends the active workspace to the backend through `X-Omnix-Workspace`. Backend routes still validate the authenticated user and workspace permissions before serving workspace-scoped data.
+
+## Repository Structure
+
+```text
+Omnix/
+├── frontend/                 # Next.js application
+├── backend/
+│   ├── app/
+│   │   ├── bootstrap/        # App startup, middleware, Redis, workers
+│   │   ├── context/          # Context engine, prompts, memory, ranking
+│   │   ├── core/             # Auth, config, RBAC
+│   │   ├── db/               # Supabase access
+│   │   ├── jobs/             # Background jobs and workers
+│   │   ├── observability/    # Metrics, tracing, diagnostics
+│   │   ├── rag/              # Ingestion, chunking, embeddings, vector store
+│   │   ├── retrieval/        # Semantic, keyword and hybrid retrieval
+│   │   ├── routers/          # FastAPI routes
+│   │   └── services/         # Product/domain services
+│   └── migrations/           # Database migrations
+├── docs/                     # Focused technical documentation
+├── supabase/                 # Supabase configuration
+├── docker-compose.yml
+├── nginx.conf
+├── AGENTS.md
+├── OMNIX_CODEBASE_MAP.md
+├── SECURITY.md
+└── README.md
+```
+
+## Important Frontend Areas
 
 The frontend lives in `frontend/`.
 
-Important routes:
+Key routes include:
 
-- `/` landing experience
-- `/login`, `/register`, `/auth/callback`
-- `/dashboard`
-- `/chat`
-- `/workspace`
-- `/conversations`
-- `/files`
-- `/sources`
-- `/team`
-- `/tasks`
-- `/initiatives`
-- `/analytics`
-- `/history`
-- `/settings`
-- `/invite`
+- `/` — landing experience
+- `/login`, `/register`, `/auth/callback` — authentication
+- `/dashboard` — workspace dashboard
+- `/chat` — AI chat
+- `/workspace` — workspace management
+- `/conversations` — conversation history
+- `/files` and `/sources` — knowledge sources
+- `/team` — collaboration and members
+- `/tasks` — tasks
+- `/initiatives` — initiatives
+- `/analytics` — analytics surfaces
+- `/history` — operational history
+- `/settings` — account/workspace settings
+- `/invite` — invite flow
 
-Important frontend modules:
+Important modules:
 
-- `frontend/lib/api.ts` handles authenticated API requests and streaming calls.
-- `frontend/lib/auth-context.tsx` keeps Supabase auth state available to the app.
-- `frontend/lib/workspace-context.tsx` owns workspace loading, switching, invite flows, and active workspace persistence.
-- `frontend/lib/workspace-collaboration-context.tsx` owns activity and presence state.
-- `frontend/components/workspace/WorkspaceOnboardingGate.tsx` protects the workspace-first experience.
-- `frontend/components/chat/ChatInterface.tsx` handles chat state, streaming reads, aborts, timeouts, and conversation recovery.
+- `frontend/lib/api.ts`
+- `frontend/lib/auth-context.tsx`
+- `frontend/lib/workspace-context.tsx`
+- `frontend/lib/workspace-collaboration-context.tsx`
+- `frontend/lib/workspace-continuity-context.tsx`
+- `frontend/components/workspace/WorkspaceOnboardingGate.tsx`
+- `frontend/components/chat/ChatInterface.tsx`
 
-## Backend
+## Important Backend Areas
 
-The backend lives in `backend/` and starts from `backend/app/main.py`.
+The backend starts from `backend/app/main.py`.
 
-Major backend areas:
+Major areas:
 
-- `backend/app/bootstrap/` app creation, middleware, Redis, observability, workers, vector store, shutdown
-- `backend/app/core/` auth, config, RBAC
-- `backend/app/db/` Supabase client access
-- `backend/app/routers/` HTTP API routes
-- `backend/app/services/` product services for chat, workspaces, collaboration, tasks, intelligence, email, and retrieval context
-- `backend/app/context/` context engine, prompt building, memory, ranking, citations, token budgets
-- `backend/app/rag/` ingestion, chunking, embeddings, pgvector store, startup contracts
-- `backend/app/retrieval/` semantic, keyword, hybrid search, reranking, scoring
-- `backend/app/observability/` metrics, traces, runtime diagnostics, streaming traces
-- `backend/app/jobs/` ingestion, automation, re-embedding, queues, workers
-- `backend/migrations/` SQL migrations through workspace, collaboration, pgvector, intelligence, and continuity features
+- `backend/app/bootstrap/` — startup, middleware, Redis, vector store, workers, shutdown
+- `backend/app/core/` — authentication, configuration, RBAC
+- `backend/app/routers/` — HTTP API routes
+- `backend/app/services/` — product/domain services
+- `backend/app/context/` — context engine and prompt assembly
+- `backend/app/rag/` — ingestion, chunking, embeddings, vector retrieval
+- `backend/app/retrieval/` — semantic, keyword and hybrid search
+- `backend/app/observability/` — metrics, traces and runtime diagnostics
+- `backend/app/jobs/` — ingestion, automation, re-embedding and queues
+- `backend/migrations/` — SQL migrations
 
 Selected API surfaces:
 
-- `GET /health/live`
-- `GET /health/ready`
-- `GET /health/runtime`
-- `POST /chat`
-- `POST /chat/stream`
-- `GET /conversations`
-- `POST /conversations`
-- `GET /conversations/{conversation_id}`
-- `GET /conversations/{conversation_id}/messages`
-- `POST /files`
-- `GET /files`
-- `POST /upload`
-- `GET /workspaces`
-- `POST /workspaces`
-- `GET /workspaces/hierarchy`
-- `GET /workspaces/status`
-- `GET /workspaces/{workspace_id}/presence`
-- `POST /workspaces/{workspace_id}/presence/heartbeat`
-- `GET /workspaces/{workspace_id}/activity`
-- `GET /workspaces/{workspace_id}/members`
-- `POST /workspaces/{workspace_id}/invites`
-- `GET /workspaces/{workspace_id}/channels`
-- `POST /workspaces/{workspace_id}/channels/{channel_id}/messages`
-- `GET /workspaces/{workspace_id}/tasks`
-- `POST /workspaces/{workspace_id}/tasks`
-- `GET /workspaces/{workspace_id}/initiatives`
-- `GET /workspaces/{workspace_id}/timeline`
-- `POST /workspaces/{workspace_id}/insights/generate`
-- `GET /integrations/google_drive/connect`
-- `POST /integrations/google_drive/import`
-
-## Data And Retrieval
-
-Supabase is the source of truth for auth, profile data, workspaces, messages, files, tasks, invites, activity, and document chunks.
-
-Retrieval currently supports:
-
-- Document chunking and ingestion
-- Local embedding provider and OpenAI embedding provider modules
-- pgvector-backed vector search migrations
-- Keyword search
-- Hybrid retrieval
-- Workspace-aware document filtering
-- Context assembly with token budgeting and citations support
-
-The older README described FAISS as the active vector store. The current repo has moved toward pgvector-backed retrieval and migration-managed embedding contracts.
-
-## Environment
-
-Use local `.env` files for secrets. Do not commit service role keys or real provider credentials.
-
-Common backend variables:
-
-```bash
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-SUPABASE_JWKS_URL=
-ENV=dev
-DEV_MODE=true
-REDIS_URL=redis://localhost:6379/0
-MODEL_URL=http://localhost:11434/v1/chat/completions
-AI_MODEL=phi3:latest
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_DEFAULT_MODEL=phi3:latest
-WEB_SEARCH_ENABLED=false
-TAVILY_API_KEY=
-RESEND_API_KEY=
-RESEND_FROM_EMAIL=
-OMNIX_APP_URL=http://localhost:3000
+```text
+GET  /health/live
+GET  /health/ready
+GET  /health/runtime
+POST /chat
+POST /chat/stream
+GET  /conversations
+POST /conversations
+GET  /files
+POST /files
+GET  /workspaces
+POST /workspaces
+GET  /workspaces/hierarchy
+GET  /workspaces/status
+GET  /workspaces/{workspace_id}/members
+GET  /workspaces/{workspace_id}/presence
+GET  /workspaces/{workspace_id}/activity
+POST /workspaces/{workspace_id}/invites
+GET  /workspaces/{workspace_id}/tasks
+GET  /workspaces/{workspace_id}/initiatives
+GET  /workspaces/{workspace_id}/timeline
+POST /workspaces/{workspace_id}/insights/generate
+GET  /integrations/google_drive/connect
+POST /integrations/google_drive/import
 ```
-
-Common frontend variables:
-
-```bash
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-```
-
-The repository includes example env files, but local values should be reviewed before use.
 
 ## Local Development
 
-Install root tooling:
+### Prerequisites
+
+You will need:
+
+- Node.js and npm
+- Python with virtual environment support
+- A Supabase project
+- PostgreSQL/pgvector through Supabase
+- Redis for worker-backed features
+- Ollama or another configured AI provider if running AI locally
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Bibek200619/Omnix.git
+cd Omnix
+```
+
+### 2. Install root tooling
 
 ```bash
 npm install
 ```
 
-Install frontend dependencies:
+### 3. Install frontend dependencies
 
 ```bash
 npm --prefix frontend install
 ```
 
-Install backend dependencies:
+### 4. Install backend dependencies
 
 ```bash
 cd backend
 python -m venv .venv
-. .venv/bin/activate
+source .venv/bin/activate   # macOS / Linux
+# .venv\Scripts\activate    # Windows PowerShell
 pip install -r requirements.txt
+cd ..
 ```
 
-Run both apps from the repo root:
+> The backend requirements currently include the Omnix CLI repository as a pinned Git dependency, so Git access is required during installation.
+
+### 5. Configure environment variables
+
+Use the example files as the canonical starting point.
+
+Backend:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Common backend values:
+
+```env
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_JWKS_URL=
+DEV_MODE=true
+
+MODEL_URL=http://localhost:11434/api/chat
+AI_MODEL=phi3:mini
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_DEFAULT_MODEL=phi3:mini
+
+WEB_SEARCH_ENABLED=false
+TAVILY_API_KEY=
+
+REDIS_URL=redis://localhost:6379/0
+
+RESEND_API_KEY=
+EMAIL_FROM=Omnix <noreply@omni-x.co.in>
+OMNIX_APP_URL=http://localhost:3000
+```
+
+Frontend:
+
+```bash
+cp frontend/.env.example frontend/.env.local
+```
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_API_BASE_URL=/api
+OMNIX_API_PROXY_TARGET=http://localhost:8000
+```
+
+Never commit real service-role keys, provider credentials, or production secrets.
+
+### 6. Run Omnix
+
+Run the frontend and backend together from the repository root:
 
 ```bash
 npm run dev
 ```
 
-Or run them separately:
+Or separately:
 
 ```bash
 npm run backend
 npm run frontend
 ```
 
-Default local URLs:
+Default development URLs:
 
-- Frontend: `http://localhost:3000`
-- Backend: `http://localhost:8000`
-- API docs: `http://localhost:8000/docs`
+| Service | URL |
+| --- | --- |
+| Frontend | `http://localhost:3000` |
+| Backend | `http://localhost:8000` |
+| FastAPI docs | `http://localhost:8000/docs` |
+| Health | `http://localhost:8000/health/live` |
 
 ## Docker
 
-`docker-compose.yml` includes backend, Redis, and worker services. It does not run the Next.js frontend.
+The root `docker-compose.yml` provides backend/worker infrastructure including Redis-oriented services. The Next.js frontend is developed separately.
 
 ```bash
 docker compose up --build
 ```
 
-The compose setup expects Supabase variables in the environment.
+The compose environment still requires valid Supabase and provider configuration.
 
-## Migrations
+## Database and Migrations
 
-SQL migrations live in `backend/migrations/`.
-
-They include:
+SQL migrations live in `backend/migrations/` and cover areas such as:
 
 - Base schema alignment
-- pgvector setup
+- pgvector and embedding contracts
 - Workspaces and collaboration
+- Invites and roles
+- Profiles
 - Artifacts and automations
 - Google Drive tokens
 - Jobs
-- Local embedding contract
 - Hybrid retrieval
-- Workspace invites and roles
-- Profiles
 - Message metadata and payloads
 - Workspace intelligence and memory
-- Realtime enablement
-- Operational continuity, conversations, tasks, and initiatives
+- Realtime configuration
+- Operational continuity
+- Conversations, tasks, and initiatives
 
-Apply migrations to the configured Supabase/Postgres project before relying on workspace, retrieval, or collaboration features.
+Apply the required migrations to the configured Supabase/Postgres project before relying on workspace, collaboration, or retrieval features.
 
 ## Verification
 
-Useful checks:
+### Frontend
 
 ```bash
 npm --prefix frontend run lint
+npm --prefix frontend run typecheck
 npm --prefix frontend run build
 npm --prefix frontend run test:e2e
+npm --prefix frontend run test:ui-audit
 ```
 
-The deterministic Playwright suite uses mocked API responses for repeatable UI, race, mobile, and accessibility coverage. A separate live lane verifies the deployed frontend, persisted Supabase session, API proxy, authenticated backend, and workspace database reads without intercepting requests:
+The deterministic Playwright suite uses controlled responses for repeatable UI, race, mobile, and accessibility testing.
+
+A separate live E2E lane can validate the deployed application against authenticated backend and Supabase state:
 
 ```bash
 OMNIX_E2E_BASE_URL=https://your-deployment.example \
@@ -322,20 +411,125 @@ OMNIX_E2E_STORAGE_STATE=/absolute/path/to/playwright-storage-state.json \
 npm --prefix frontend run test:e2e:live
 ```
 
-`OMNIX_E2E_STORAGE_STATE` must be a Playwright storage-state file captured for the deployment origin and contain the `omnix.supabase.auth` local-storage session for a least-privilege test user with an existing workspace. Keep that file outside the repository and secret storage; traces, screenshots, and videos are retained only on failure under `frontend/test-results-live/`. The live test does not invoke product write controls, although loading the authenticated app can emit its normal presence heartbeat. Missing or invalid live configuration fails the command instead of skipping the check.
+Keep Playwright storage-state files outside the repository and treat them as secrets.
 
-Backend verification depends on the local Python environment and configured services. At minimum, start the API and check:
+### Backend
+
+At minimum, verify the API starts and its health endpoints respond:
 
 ```bash
 curl http://localhost:8000/health/live
 curl http://localhost:8000/health/ready
 ```
 
-## Security Notes
+## Deployment Shape
+
+The repository contains deployment-oriented configuration for:
+
+- Next.js frontend
+- FastAPI backend
+- `api.omni-x.co.in`
+- Nginx reverse proxying
+- Production CORS for `omni-x.co.in` and `www.omni-x.co.in`
+- Redis/worker bootstrap
+- Supabase-backed authentication and persistence
+
+Production behavior still depends on the configured environment, credentials, migrations, model provider, Redis availability, and external integrations.
+
+## Architecture Rules
+
+These are core Omnix product constraints and should remain true as the codebase evolves:
+
+1. **Workspace hierarchy is the spine.**
+2. **Do not break the onboarding gate.**
+3. **Do not break streaming chat recovery.**
+4. **Preserve workspace switching and active context.**
+5. **Preserve authentication session persistence.**
+6. **Enforce real workspace authorization server-side.**
+7. **Use truthful analytics and collaboration state.**
+8. **Do not fake activity, presence, members, or operational data.**
+9. **Preserve the premium/cinematic Omnix design language.**
+10. **Avoid turning Omnix into a generic admin dashboard.**
+
+## Development Workflow
+
+For normal development:
+
+```text
+current main
+   │
+   └── feature/fix branch
+            │
+            └── Pull Request
+                    │
+                    └── review + tests
+                            │
+                            └── main
+```
+
+Recommended rules:
+
+- Create new work from the **current `main`**.
+- Keep each branch focused on one feature, fix, or milestone.
+- Link PRs to their relevant issues.
+- Run verification before merging.
+- Prefer squash merging when a branch contains noisy intermediate commits.
+- Never merge repository recovery/archive branches into `main`.
+- Rebase or recreate stale branches that were created from obsolete history before opening a new PR.
+
+## Documentation
+
+Root documentation is intentionally limited:
+
+- `README.md` — product overview, architecture, setup, and development workflow
+- `AGENTS.md` — assistant and architecture rules
+- `OMNIX_CODEBASE_MAP.md` — codebase navigation
+- `SECURITY.md` — security policy and reporting
+
+Focused technical notes belong under `docs/` rather than adding more root-level markdown files.
+
+## Current Limitations
+
+Some capabilities remain environment-dependent or under active development:
+
+- External connectors are not all fully active end-to-end.
+- Google Drive import requires provider credentials and supporting configuration.
+- Email invitations require Resend configuration.
+- AI quality depends on the configured model, embedding provider, retrieval corpus, and runtime resources.
+- Local development requires a configured Supabase project and applied migrations.
+- Redis-backed jobs depend on deployment/runtime configuration.
+- Omnix CLI and Omnix Web are not yet one fully unified product surface.
+
+## Security
 
 - Keep `SUPABASE_SERVICE_ROLE_KEY` server-side only.
-- Frontend code should only use the Supabase anon key.
-- Backend routes must continue to validate JWTs and workspace access.
-- Presence, activity, analytics, and collaboration UI must reflect real backend state.
-- Do not bypass workspace permission checks for convenience.
-- Be careful when editing env examples; rotate any credential that was exposed outside local development.
+- The frontend should use only the Supabase anon key.
+- Validate JWTs and workspace permissions on backend routes.
+- Never trust workspace IDs supplied by the client without authorization checks.
+- Do not expose Playwright storage-state files or provider secrets.
+- Rotate credentials immediately if they are accidentally committed or shared.
+- See [`SECURITY.md`](SECURITY.md) for the repository security policy.
+
+## Roadmap Direction
+
+Omnix is moving toward a unified workspace platform where the web experience and CLI share the same organizational context and intelligence layer.
+
+Near-term direction includes:
+
+- Deeper Omnix CLI integration
+- Stronger workspace-aware developer workflows
+- More reliable knowledge ingestion and retrieval
+- Expanded connectors
+- Richer operational continuity and memory
+- Production hardening and observability
+- Improved collaboration and automation surfaces
+
+Track active work through the [Omnix Development Board](https://github.com/users/Bibek200619/projects/9) and repository issues.
+
+---
+
+<div align="center">
+
+**Omnix — context, collaboration, and intelligence in one workspace.**
+
+</div>
