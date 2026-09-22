@@ -32,7 +32,6 @@ mdurl==0.1.2
 multidict==6.7.1
 mypy==1.20.2
 mypy_extensions==1.1.0
--e git+https://github.com/Bibek200619/Omnix-CLI.git@ffad032ea5f70423f89045c9531e19fc1c7ed6f0#egg=omnix_cli&subdirectory=ai-cli
 opencode-ai==0.1.0a36
 packaging==26.2
 pathspec==1.1.1
