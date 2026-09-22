@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: omnix-backend
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --timeout-graceful-shutdown 30
+    healthCheckPath: /health/live
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: ENV
+        value: production
+      - key: DEV_MODE
+        value: "false"
+      - key: OMNIX_ROLE
+        value: api
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWKS_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: OMNIX_APP_URL
+        sync: false
+      - key: OMNIX_FRONTEND_URL
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: Omnix <noreply@omni-x.co.in>
+      - key: WEB_SEARCH_ENABLED
+        value: "false"
+      - key: TAVILY_API_KEY
+        sync: false
