@@ -547,7 +547,7 @@ class TestWorkerLoopConcurrency:
                 await asyncio.sleep(0)
                 return None
 
-        async def fake_process_job(job_id: str):
+        async def fake_process_job(job_id: str, *, claim_state=None):
             nonlocal active, max_active
             active += 1
             max_active = max(max_active, active)
@@ -601,7 +601,7 @@ class TestWorkerLoopConcurrency:
                 await asyncio.sleep(0)
                 return None
 
-        async def fake_process_job(job_id: str):
+        async def fake_process_job(job_id: str, *, claim_state=None):
             nonlocal active, max_active
             active += 1
             max_active = max(max_active, active)
@@ -636,14 +636,14 @@ class TestWorkerLoopConcurrency:
         assert max_active == 2
 
     @pytest.mark.asyncio
-    async def test_process_job_timeout_requeues_job(self):
+    async def test_process_job_timeout_without_claim_does_not_requeue_job(self):
         import app.jobs.worker as w
 
         cancelled = asyncio.Event()
         update_calls: list[dict[str, object]] = []
         retries: list[str] = []
 
-        async def slow_process_job(job_id: str):
+        async def slow_process_job(job_id: str, *, claim_state=None):
             try:
                 await asyncio.sleep(10)
             except asyncio.CancelledError:
@@ -669,25 +669,10 @@ class TestWorkerLoopConcurrency:
             await w._process_job_with_timeout("job-slow", timeout_seconds=0.01)
 
         assert cancelled.is_set()
-        assert update_calls == [
-            {
-                "table": "jobs",
-                "filters": {"id": "job-slow"},
-                "payload": {
-                    "status": "queued",
-                    "progress": 0,
-                    "error": "Job exceeded timeout of 0.01s",
-                    "result": {
-                        "status": "failed",
-                        "error": "Job exceeded timeout of 0.01s",
-                        "retryable": True,
-                        "attempt": 1,
-                        "max_attempts": 3,
-                    },
-                },
-            }
-        ]
-        assert retries == ["job-slow"]
+        # This callback never claimed a row; the wrapper must not recover it.
+        # Actual claimed timeout recovery is covered by test_worker_interruption.
+        assert update_calls == []
+        assert retries == []
 
     @pytest.mark.asyncio
     async def test_worker_loop_recovers_missing_jobs_when_idle(self, monkeypatch: pytest.MonkeyPatch):
@@ -720,7 +705,7 @@ class TestWorkerLoopConcurrency:
                 "failed_requeue_jobs": 0,
             }
 
-        async def fake_process_job(job_id: str):
+        async def fake_process_job(job_id: str, *, claim_state=None):
             processed.append(job_id)
             shutdown_event.set()
 
