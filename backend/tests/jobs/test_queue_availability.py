@@ -171,7 +171,7 @@ async def test_worker_processes_database_fallback_after_redis_poll_failure(
         assert limit == 1
         return ["durable-job"]
 
-    async def fake_process(job_id: str) -> None:
+    async def fake_process(job_id: str, *, claim_state=None) -> None:
         processed.append(job_id)
         shutdown_event.set()
 

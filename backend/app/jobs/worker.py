@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Any
 
 from .queue import (
@@ -41,6 +42,12 @@ _DEFAULT_DATABASE_QUEUE_FALLBACK_INTERVAL_SECONDS = 5.0
 _DEFAULT_OCR_WORKER_CONCURRENCY = 1
 _DEFAULT_OCR_JOB_TIMEOUT_SECONDS = 30 * 60
 _FILE_LIFECYCLE_JOB_TYPES = ("cleanup_file_storage", "expire_file")
+
+
+@dataclass
+class _JobClaim:
+    row: dict[str, Any] | None = None
+    attempt_number: int = 0
 
 
 def _env_int(name: str, default: int, *, minimum: int = 1) -> int:
@@ -163,8 +170,12 @@ async def _retry_or_dead_letter_job(
     attempt_number: int,
     result: dict[str, Any],
     error: str,
+    require_owned_claim: bool = False,
 ) -> str:
     max_attempts = _max_job_attempts()
+    filters: dict[str, Any] = {"id": job_id}
+    if require_owned_claim:
+        filters.update(status="processing", attempts=attempt_number)
     if attempt_number < max_attempts:
         retry_payload = {
             "status": "queued",
@@ -177,7 +188,12 @@ async def _retry_or_dead_letter_job(
                 "max_attempts": max_attempts,
             },
         }
-        await update_one_trusted("jobs", {"id": job_id}, retry_payload)
+        updated_row = await update_one_trusted("jobs", filters, retry_payload)
+        if require_owned_claim and updated_row is None:
+            logger.warning(
+                "Interrupted job %s no longer matches its owned claim.", job_id
+            )
+            return "claim_lost"
         try:
             await _push_retry_job(job_id, queue_name=queue_name_for_payload(job_row.get("payload")))
         except Exception:
@@ -204,12 +220,15 @@ async def _retry_or_dead_letter_job(
             "max_attempts": max_attempts,
         },
     }
-    await update_one_trusted("jobs", {"id": job_id}, dead_letter_payload)
+    updated_row = await update_one_trusted("jobs", filters, dead_letter_payload)
+    if require_owned_claim and updated_row is None:
+        logger.warning("Interrupted job %s no longer matches its owned claim.", job_id)
+        return "claim_lost"
     logger.error("Job %s moved to dead_lettered after %d attempt(s): %s", job_id, attempt_number, error)
     return "dead_lettered"
 
 
-async def _process_job(job_id: str):
+async def _process_job(job_id: str, *, claim_state: _JobClaim | None = None):
     """Claim a queued job, run its handler once, and persist its result."""
     runtime = RuntimeManager.get()
     success = False
@@ -237,6 +256,9 @@ async def _process_job(job_id: str):
             return
 
         job_row = {**job_row, **claimed_row}
+        if claim_state is not None:
+            claim_state.row = job_row
+            claim_state.attempt_number = attempt_number
         runtime.record_job_started(_worker_id())
         runtime_recorded = True
 
@@ -301,22 +323,38 @@ async def _process_job(job_id: str):
 
 
 async def _process_job_with_timeout(job_id: str, *, timeout_seconds: float) -> None:
+    claim = _JobClaim()
+
+    async def recover_claim(error: str) -> None:
+        if claim.row is None:
+            return
+        try:
+            await _retry_or_dead_letter_job(
+                job_id,
+                claim.row,
+                attempt_number=claim.attempt_number,
+                result={"status": "failed", "error": error},
+                error=error,
+                require_owned_claim=True,
+            )
+        except Exception:
+            logger.error(
+                "Failed to recover interrupted job %s; claim remains unresolved.",
+                job_id,
+            )
+
     try:
-        await asyncio.wait_for(_process_job(job_id), timeout=timeout_seconds)
+        await asyncio.wait_for(
+            _process_job(job_id, claim_state=claim), timeout=timeout_seconds
+        )
     except asyncio.TimeoutError:
         error = f"Job exceeded timeout of {timeout_seconds:g}s"
         logger.error("Processing job %s timed out: %s", job_id, error)
-        try:
-            job_row = await select_one_trusted("jobs", "*", {"id": job_id}) or {"attempts": 0}
-            await _retry_or_dead_letter_job(
-                job_id,
-                job_row,
-                attempt_number=int(job_row.get("attempts") or 0),
-                result={"status": "failed", "error": error},
-                error=error,
-            )
-        except Exception:
-            logger.exception("Failed to update timed-out job row for job %s", job_id)
+        await recover_claim(error)
+    except asyncio.CancelledError:
+        # wait_for has awaited handler cancellation before releasing its claim.
+        await recover_claim("Job interrupted during worker shutdown")
+        raise
 
 
 async def _run_limited_job(job_id: str, semaphore: asyncio.Semaphore, *, timeout_seconds: float) -> None:
