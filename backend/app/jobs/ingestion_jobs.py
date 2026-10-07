@@ -26,6 +26,7 @@ _PARTIAL_INDEXING_ERROR = (
     "Text extraction succeeded, but vector indexing is temporarily unavailable. "
     "The source is only partially searchable and will be retried."
 )
+_PROCESSING_STATE_ERROR = "Unable to save file processing state. Please retry."
 
 
 def _unsearchable_processing_status(diagnostics: ExtractionDiagnostics) -> str:
@@ -88,11 +89,15 @@ async def _update_file_processing_state(
     }
     filters = _file_scope_filters(file_id, user_id, workspace_id)
     try:
-        return await update_one_trusted("files", filters, payload) or {**file_row, **payload}
+        updated = await update_one_trusted("files", filters, payload)
     except Exception:
-        logger.warning("Unable to persist file processing columns; retrying processing state as metadata only.")
-        await update_one_trusted("files", filters, {"metadata": metadata})
-        return {**file_row, "metadata": metadata}
+        # A metadata-only fallback would leave the canonical processing state stale.
+        # Suppress database exception details before the job handler logs the failure.
+        raise RuntimeError(_PROCESSING_STATE_ERROR) from None
+    if not updated:
+        # The scoped file may have disappeared; never fabricate persistence success.
+        raise RuntimeError(_PROCESSING_STATE_ERROR)
+    return updated
 
 
 async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
@@ -152,12 +157,40 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
         normalized = extraction_result.text
         diagnostics = extraction_result.diagnostics
         metadata = dict(file_row.get("metadata") or {})
-        metadata.update({"extracted_text_preview": normalized[:2000], **diagnostics.to_metadata()})
+        metadata.update(
+            {"extracted_text_preview": normalized[:2000], **diagnostics.to_metadata()}
+        )
         if diagnostics.extraction_failure_reason:
             metadata["extraction_error"] = diagnostics.extraction_failure_reason
 
-        if diagnostics.extraction_status != "searchable" or not normalized:
-            processing_error = diagnostics.extraction_failure_reason or "No searchable text was extracted from this file."
+        if diagnostics.extraction_status != "searchable" or not normalized.strip():
+            # Extraction no longer validates the previous searchable content.
+            # Clear both text and embedded rows before persisting a terminal state.
+            try:
+                await store_extracted_text_chunks(
+                    file_id=file_id,
+                    user_id=user_id,
+                    workspace_id=workspace_id,
+                    text="",
+                    replace_existing=True,
+                )
+            except Exception:
+                raise RuntimeError(
+                    "Unable to complete stale document cleanup. Please retry."
+                ) from None
+            metadata.update(
+                {
+                    "text_chunk_count": 0,
+                    "text_chunks_truncated": False,
+                    "embedded_chunk_count": 0,
+                    "embedded_chunk_ids": [],
+                    "vector_index_status": "unavailable",
+                }
+            )
+            processing_error = (
+                diagnostics.extraction_failure_reason
+                or "No searchable text was extracted from this file."
+            )
             processing_status = _unsearchable_processing_status(diagnostics)
             await _update_file_processing_state(
                 file_id,

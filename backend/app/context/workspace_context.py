@@ -56,7 +56,9 @@ class WorkspaceContextManager:
                 )
 
         except Exception:
-            logger.exception("Failed to build workspace intelligence profile for context.")
+            raise RuntimeError(
+                "Workspace intelligence context is unavailable."
+            ) from None
                 
         # 3. Top contextual artifacts
         try:
@@ -86,6 +88,6 @@ class WorkspaceContextManager:
                         )
                     )
         except Exception:
-            logger.exception("Failed to fetch artifacts for workspace context.")
+            raise RuntimeError("Workspace artifact context is unavailable.") from None
 
         return citations

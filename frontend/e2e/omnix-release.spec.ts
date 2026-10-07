@@ -1342,7 +1342,7 @@ test.describe("authenticated Omnix shell", () => {
     );
     await expect(channelError).toBeVisible();
 
-    const composer = page.getByPlaceholder("Write an operational update...");
+    const composer = page.getByPlaceholder(/Write an operational update/);
     await composer.fill("Failure ordering update");
     await page.getByRole("button", { name: "Send" }).click();
     const deliveryError = page.getByText("Unable to deliver message. Check your connection and try again.", { exact: true });
@@ -1384,7 +1384,7 @@ test.describe("authenticated Omnix shell", () => {
     );
 
     await page.goto("/conversations");
-    const composer = page.getByPlaceholder("Write an operational update...");
+    const composer = page.getByPlaceholder(/Write an operational update/);
     await expect(page.getByRole("button", { name: /^General/ })).toBeVisible();
     await page.getByRole("button", { name: /^General/ }).click();
     await expect(composer).toBeVisible();
@@ -1449,7 +1449,7 @@ test.describe("authenticated Omnix shell", () => {
 
     await page.goto("/conversations");
     if (isMobile) await page.getByRole("button", { name: /^General/ }).click();
-    const composer = page.getByPlaceholder("Write an operational update...");
+    const composer = page.getByPlaceholder(/Write an operational update/);
     await expect(composer).toBeVisible();
     await composer.fill("Snapshot-reconciled update");
     await page.getByRole("button", { name: "Send" }).click();
@@ -1520,7 +1520,7 @@ test.describe("authenticated Omnix shell", () => {
       hasText: "Coordinate the response-loss follow-through",
     });
     await rootRow.getByRole("button", { name: "Open thread" }).click();
-    const composer = page.getByPlaceholder("Add focused follow-through...");
+    const composer = page.getByPlaceholder(/Add focused follow-through/);
     await composer.fill("Canonical response-loss reply");
     await page.getByRole("button", { name: "Reply in thread" }).click();
 
@@ -1907,7 +1907,7 @@ test.describe("authenticated Omnix shell", () => {
     );
 
     await page.goto("/conversations");
-    const firstComposer = page.getByPlaceholder("Write an operational update...");
+    const firstComposer = page.getByPlaceholder(/Write an operational update/);
     await firstComposer.fill("Old channel mutation");
     await page.getByRole("button", { name: "Send" }).click();
     await started;
@@ -1915,13 +1915,13 @@ test.describe("authenticated Omnix shell", () => {
     await page.getByRole("button", { name: /Switch workspace\. Current workspace: Acme Operations/ }).click();
     await page.getByRole("button", { name: "Switch to Platform Lab" }).click();
     await expect(page.getByRole("heading", { name: "Platform coordination" })).toBeVisible();
-    const currentComposer = page.getByPlaceholder("Write an operational update...");
+    const currentComposer = page.getByPlaceholder(/Write an operational update/);
     await currentComposer.fill("Current channel draft");
 
     await page.getByRole("button", { name: /Switch workspace\. Current workspace: Platform Lab/ }).click();
     await page.getByRole("button", { name: "Switch to Acme Operations" }).click();
     await expect(page.getByRole("heading", { name: "general" })).toBeVisible();
-    const returnedComposer = page.getByPlaceholder("Write an operational update...");
+    const returnedComposer = page.getByPlaceholder(/Write an operational update/);
     await returnedComposer.fill("Returned channel mutation");
     const returnedChannelResponse = page.waitForResponse(
       (response) =>
@@ -3105,7 +3105,7 @@ test.describe("authenticated Omnix shell", () => {
     await page.keyboard.press("Enter");
     await expect(page.locator('[role="status"]').filter({ hasText: "Response stopped." })).toHaveCount(1);
     await expect(page.getByText("Unable to send message. Check your connection and try again.")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
     releaseStream();
   });
 
@@ -3194,28 +3194,39 @@ test.describe("authenticated Omnix shell", () => {
     expect(viewportMeta).toContain("interactive-widget=resizes-content");
 
     const composer = page.getByRole("textbox", { name: "Message composer" });
-    await composer.focus();
-    await page.setViewportSize({ width: 390, height: 500 });
-    await expect(composer).toBeFocused();
+    const sendButton = page.getByRole("button", { name: "Send message", exact: true });
+    const draft = "Keyboard-safe draft";
+    await composer.fill(draft);
 
-    const metrics = await page.evaluate(() => {
-      const sendButton = document.querySelector('button[aria-label="Send message"]');
-      const dock = document.querySelector('nav[aria-label="Primary mobile navigation"]');
-      const sendRect = sendButton?.getBoundingClientRect();
-      const dockRect = dock?.getBoundingClientRect();
-      return {
-        dockBottom: dockRect?.bottom ?? Number.POSITIVE_INFINITY,
-        dockTop: dockRect?.top ?? 0,
-        documentWidth: document.scrollingElement?.scrollWidth ?? 0,
-        sendBottom: sendRect?.bottom ?? Number.POSITIVE_INFINITY,
-        viewportHeight: window.innerHeight,
-        viewportWidth: window.innerWidth,
-      };
-    });
+    for (const width of [375, 390]) {
+      for (const height of [500, 480, 844]) {
+        await page.setViewportSize({ width, height });
+        await expect(composer).toBeFocused();
+        await expect(composer).toHaveValue(draft);
+        await expect(sendButton).toBeEnabled();
 
-    expect(metrics.sendBottom).toBeLessThanOrEqual(metrics.dockTop + 1);
-    expect(metrics.dockBottom).toBeLessThanOrEqual(metrics.viewportHeight + 1);
-    expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+        const metrics = await page.evaluate(() => {
+          const send = document.querySelector('button[aria-label="Send message"]');
+          const dock = document.querySelector('nav[aria-label="Primary mobile navigation"]');
+          const sendRect = send?.getBoundingClientRect();
+          const dockRect = dock?.getBoundingClientRect();
+          return {
+            dockBottom: dockRect?.bottom ?? Number.POSITIVE_INFINITY,
+            dockTop: dockRect?.top ?? 0,
+            documentWidth: document.scrollingElement?.scrollWidth ?? 0,
+            sendTop: sendRect?.top ?? -1,
+            sendBottom: sendRect?.bottom ?? Number.POSITIVE_INFINITY,
+            viewportHeight: window.innerHeight,
+            viewportWidth: window.innerWidth,
+          };
+        });
+
+        expect(metrics.sendTop).toBeGreaterThanOrEqual(0);
+        expect(metrics.sendBottom).toBeLessThanOrEqual(metrics.dockTop + 1);
+        expect(metrics.dockBottom).toBeLessThanOrEqual(metrics.viewportHeight + 1);
+        expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+      }
+    }
   });
 
   test("long task titles stay contained from narrow phones through touch tablets", async ({ page, isMobile }) => {

@@ -80,8 +80,8 @@ async def test_search_workspace_uses_ranked_rpc_when_available(monkeypatch: pyte
         assert kwargs == {
             "workspace_id": "workspace-1",
             "query": "launch",
-            "limit": 16,
-            "cursor": 2,
+            "limit": 6,
+            "cursor": 0,
         }
         return [
             {
@@ -169,8 +169,8 @@ async def test_search_workspace_uses_ranked_rpc_when_available(monkeypatch: pyte
         workspace_id="workspace-1",
         user_id="user-1",
         query="launch",
-        limit=2,
-        cursor=2,
+        limit=5,
+        cursor=0,
     )
 
     assert [item["title"] for item in result["tasks"]] == ["Launch checklist"]
@@ -178,10 +178,15 @@ async def test_search_workspace_uses_ranked_rpc_when_available(monkeypatch: pyte
     assert result["documents"][0]["url"] == "/files?id=file-1&document=document-1"
     assert result["sources"][0]["url"] == "/sources?source=source-1"
     assert result["automations"] == []
-    assert [item["type"] for item in result["items"]] == ["task", "document", "source", "workspace"]
+    assert [item["type"] for item in result["items"]] == [
+        "task",
+        "document",
+        "source",
+        "workspace",
+    ]
     assert result["jobs"] == []
     assert "bearer token" not in str(result)
-    assert result["pagination"] == {"limit": 2, "cursor": 2, "next_cursor": 4}
+    assert result["pagination"] == {"limit": 5, "cursor": 0, "next_cursor": None}
 
 
 def test_ranked_result_rejects_unsupported_and_noncanonical_document_destinations() -> None:

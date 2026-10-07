@@ -129,20 +129,22 @@ export function MessageList({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.24, ease: "easeOut" }}
-        className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 py-6 text-center sm:p-8"
+        className="omnix-scrollbar min-h-0 flex-1 overflow-y-auto"
       >
-        <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-md)]">
-          <span className="absolute inset-0 rounded-xl bg-cyan-300/10 blur-xl" />
-          <span className="absolute -inset-4 rounded-full bg-[radial-gradient(circle,var(--omnix-rgba-0-255-255-0-2),transparent_70%)] opacity-70 [animation:auth-drift_12s_ease-in-out_infinite]" />
-          <MessageSquare className="h-5 w-5" />
+        <div className="flex min-h-full flex-col items-center justify-center px-5 py-6 text-center sm:p-8">
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 shadow-[var(--omnix-glow-md)]">
+            <span className="absolute inset-0 rounded-xl bg-cyan-300/10 blur-xl" />
+            <span className="absolute -inset-4 rounded-full bg-[radial-gradient(circle,var(--omnix-rgba-0-255-255-0-2),transparent_70%)] opacity-70 [animation:auth-drift_12s_ease-in-out_infinite]" />
+            <MessageSquare className="h-5 w-5" />
+          </div>
+          <h2 className="omnix-display mt-5 text-lg font-semibold text-white sm:text-xl">
+            Ask Omnix anything your workspace should know
+          </h2>
+          <p className="mt-2 max-w-md text-sm leading-6 text-[var(--omnix-text-2)]">
+            Start from a document, a customer question, or a knowledge gap. Omnix
+            will save the thread and return a backend response.
+          </p>
         </div>
-        <h2 className="omnix-display mt-5 text-lg font-semibold text-white sm:text-xl">
-          Ask Omnix anything your workspace should know
-        </h2>
-        <p className="mt-2 max-w-md text-sm leading-6 text-[var(--omnix-text-2)]">
-          Start from a document, a customer question, or a knowledge gap. Omnix
-          will save the thread and return a backend response.
-        </p>
       </motion.div>
     );
   }

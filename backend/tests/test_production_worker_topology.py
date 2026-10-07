@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_PATH = REPO_ROOT / "docker-compose.prod.yml"
 WORKER_SCRIPT_PATH = REPO_ROOT / "scripts" / "start_workers.sh"
 SYSTEMD_UNIT_PATH = REPO_ROOT / "scripts" / "omnix-ingestion-worker.service"
+HISTORICAL_EC2_WORKFLOW_PATH = REPO_ROOT / "docs/history/ec2-deploy-workflow.yml"
 
 
 def _environment(service: dict[str, Any]) -> dict[str, str]:
@@ -63,10 +64,8 @@ def test_production_systemd_unit_uses_the_compose_ingestion_worker_role() -> Non
 
 @pytest.fixture
 def ec2_deployment(tmp_path: Path):
-    """Execute the real workflow shell with no network or host mutations."""
-    workflow = yaml.safe_load(
-        (REPO_ROOT / ".github/workflows/deploy.yml").read_text(encoding="utf-8")
-    )
+    """Check the archived EC2 script using doubles; this is not Render verification."""
+    workflow = yaml.safe_load(HISTORICAL_EC2_WORKFLOW_PATH.read_text(encoding="utf-8"))
     script = workflow["jobs"]["deploy"]["steps"][0]["with"]["script"]
     checkout = tmp_path / "Omnix"
     venv = checkout / "backend/venv/bin"
@@ -107,6 +106,11 @@ def ec2_deployment(tmp_path: Path):
         return result, calls_path.read_text(encoding="utf-8").splitlines()
 
     return run
+
+
+def test_historical_ec2_workflow_is_preserved_outside_active_actions() -> None:
+    assert HISTORICAL_EC2_WORKFLOW_PATH.is_file()
+    assert not (REPO_ROOT / ".github/workflows/deploy.yml").exists()
 
 
 OCR_INSTALL = (

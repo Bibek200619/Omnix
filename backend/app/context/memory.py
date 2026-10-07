@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from .schemas import ContextPayload, Citation, ContextSourceType
 from ..services import supabase_service
+from ..services.workspace_access_service import require_workspace_access
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +16,14 @@ class MemoryManager:
     Implements the Organizational Memory Engine for Omnix.
     """
 
-    async def fetch_memory(self, payload: ContextPayload, limit: int = 6) -> List[Citation]:
+    async def fetch_memory(
+        self, payload: ContextPayload, limit: int = 6
+    ) -> List[Citation]:
         """Fetch memory context for the given payload."""
+        if payload.workspace_id:
+            await require_workspace_access(payload.workspace_id, payload.user_id)
         citations = []
-        
+
         # 1. Synthesized Workspace Memory (High Priority)
         if payload.workspace_id:
             synth_cites = await self._fetch_synthesized_memory(payload.workspace_id)
@@ -65,15 +70,33 @@ class MemoryManager:
                 )
             return citations
         except Exception:
-            logger.exception("Failed to fetch synthesized workspace memory.")
-            return []
+            raise RuntimeError("Synthesized workspace memory is unavailable.") from None
 
     async def _fetch_conversation_memory(
-        self, conversation_id: str, user_id: str, workspace_id: Optional[str], limit: int
+        self,
+        conversation_id: str,
+        user_id: str,
+        workspace_id: Optional[str],
+        limit: int,
     ) -> List[Citation]:
         try:
+            conversation_filters = {"id": conversation_id}
+            if workspace_id:
+                conversation_filters["workspace_id"] = workspace_id
+            else:
+                conversation_filters.update(
+                    {"user_id": user_id, "workspace_id": {"is": None}}
+                )
+            conversation = await supabase_service.select_one_trusted(
+                "conversations", "id", filters=conversation_filters
+            )
+            if conversation is None:
+                raise RuntimeError("Conversation is outside the memory scope.")
+
             filters = {"conversation_id": conversation_id}
-            
+            if not workspace_id:
+                filters["user_id"] = user_id
+
             messages = await supabase_service.select_all_trusted(
                 "messages",
                 "id,role,content,created_at",
@@ -92,21 +115,27 @@ class MemoryManager:
                         source_id=str(msg.get("id")),
                         source_type=ContextSourceType.MEMORY,
                         content=f"{str(msg.get('role', 'unknown')).upper()}: {msg.get('content')}",
-                        metadata={"role": msg.get("role"), "created_at": msg.get("created_at")},
-                        score=0.9 # Direct history is very relevant
+                        metadata={
+                            "role": msg.get("role"),
+                            "created_at": msg.get("created_at"),
+                        },
+                        score=0.9,  # Direct history is very relevant
                     )
                 )
             return citations
         except Exception:
-            logger.exception("Failed to fetch conversation memory.")
-            return []
-            
+            raise RuntimeError("Conversation memory is unavailable.") from None
+
     async def _fetch_recent_conversations(
         self, user_id: str, workspace_id: Optional[str], limit: int
     ) -> List[Citation]:
         try:
-            filters = {"workspace_id": workspace_id} if workspace_id else {"user_id": user_id}
-            
+            filters = (
+                {"workspace_id": workspace_id}
+                if workspace_id
+                else {"user_id": user_id, "workspace_id": {"is": None}}
+            )
+
             convs = await supabase_service.select_all_trusted(
                 "conversations",
                 "id,title,last_message_at",
@@ -123,10 +152,9 @@ class MemoryManager:
                         source_id=str(c.get("id")),
                         source_type=ContextSourceType.MEMORY,
                         content=f"Recent Conversation Summary: {c.get('title') or 'Omnix'}",
-                        score=0.6
+                        score=0.6,
                     )
                 )
             return citations
         except Exception:
-            logger.exception("Failed to fetch recent conversations memory.")
-            return []
+            raise RuntimeError("Recent conversation memory is unavailable.") from None

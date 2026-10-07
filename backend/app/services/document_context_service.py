@@ -96,6 +96,16 @@ async def store_extracted_text_chunks(
     Embeddings are intentionally not generated here. The async ingestion worker can replace these
     rows later with embedded rows, while keyword and fallback retrieval work right away.
     """
+    if replace_existing:
+        # An empty replacement invalidates previous text and vectors too.
+        filters: dict[str, Any] = {"file_id": file_id}
+        if workspace_id:
+            filters["workspace_id"] = workspace_id
+        else:
+            filters["user_id"] = user_id
+            filters["workspace_id"] = {"is": None}
+        await delete_many_trusted("documents", filters)
+
     normalized_text = (text or "").strip()
     if not normalized_text:
         return StoredDocumentChunks(chunk_count=0, chunk_ids=[])
@@ -106,15 +116,6 @@ async def store_extracted_text_chunks(
 
     truncated = len(chunks) > MAX_IMMEDIATE_CHUNKS
     chunks = chunks[:MAX_IMMEDIATE_CHUNKS]
-
-    if replace_existing:
-        filters: dict[str, Any] = {"file_id": file_id}
-        if workspace_id:
-            filters["workspace_id"] = workspace_id
-        else:
-            filters["user_id"] = user_id
-            filters["workspace_id"] = {"is": None}
-        await delete_many_trusted("documents", filters)
 
     timestamp = utc_now_iso()
     payloads: list[dict[str, Any]] = []
