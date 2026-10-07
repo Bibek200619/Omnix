@@ -1520,7 +1520,7 @@ test.describe("authenticated Omnix shell", () => {
       hasText: "Coordinate the response-loss follow-through",
     });
     await rootRow.getByRole("button", { name: "Open thread" }).click();
-    const composer = page.getByPlaceholder("Add focused follow-through...");
+    const composer = page.getByPlaceholder(/Add focused follow-through/);
     await composer.fill("Canonical response-loss reply");
     await page.getByRole("button", { name: "Reply in thread" }).click();
 
