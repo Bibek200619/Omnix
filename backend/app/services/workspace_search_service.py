@@ -470,16 +470,29 @@ def _group_for_result_type(result_type: str) -> str | None:
     }.get(result_type)
 
 
-def _flatten_response(response: Mapping[str, Any], *, limit: int, cursor: int, ranked_count: int | None = None) -> list[dict[str, Any]]:
-    items: list[dict[str, Any]] = []
-    for group in SEARCH_GROUPS:
+def _flatten_response(
+    response: Mapping[str, Any],
+    *,
+    limit: int,
+    cursor: int,
+    ranked_count: int | None = None,
+) -> list[dict[str, Any]]:
+    # Ranked items retain RPC relevance order; first-page supplements follow them.
+    items: list[dict[str, Any]] = list(response.get("items") or [])
+    for group in ("conversations", "members", "mentions", "workspaces"):
         group_items = response.get(group)
         if isinstance(group_items, list):
             items.extend(group_items)
-    next_cursor = cursor + limit if ranked_count is not None and ranked_count >= limit else None
+    next_cursor = (
+        cursor + limit if ranked_count is not None and ranked_count > limit else None
+    )
     if isinstance(response, dict):
         response["items"] = items
-        response["pagination"] = {"limit": limit, "cursor": cursor, "next_cursor": next_cursor}
+        response["pagination"] = {
+            "limit": limit,
+            "cursor": cursor,
+            "next_cursor": next_cursor,
+        }
     return items
 
 
@@ -576,8 +589,9 @@ def _ranked_result_url(
     )
 
 
-def _group_ranked_results(rows: list[dict[str, Any]], *, query: str, limit: int) -> dict[str, Any]:
+def _group_ranked_results(rows: list[dict[str, Any]]) -> dict[str, Any]:
     grouped = _empty_response()
+    seen: set[tuple[str, str]] = set()
     for row in rows:
         result = _ranked_result(row)
         if result is None:
@@ -585,10 +599,12 @@ def _group_ranked_results(rows: list[dict[str, Any]], *, query: str, limit: int)
         group = _group_for_result_type(str(result["type"]))
         if group is None:
             continue
+        key = (group, str(result["id"]))
+        if key in seen:
+            continue
+        seen.add(key)
         grouped[group].append(result)
-
-    for group in SEARCH_GROUPS:
-        grouped[group] = _dedupe_results(grouped[group], query=query, limit=limit)
+        grouped["items"].append(result)
     return grouped
 
 
@@ -647,7 +663,11 @@ async def search_workspace(
     empty = _empty_response()
     bounded_limit = max(1, min(int(limit), 25))
     bounded_cursor = max(0, int(cursor))
-    empty["pagination"] = {"limit": bounded_limit, "cursor": bounded_cursor, "next_cursor": None}
+    empty["pagination"] = {
+        "limit": bounded_limit,
+        "cursor": bounded_cursor,
+        "next_cursor": None,
+    }
     if not normalized_query:
         return empty
 
@@ -655,30 +675,35 @@ async def search_workspace(
     ranked_rows = await _search_ranked_workspace(
         workspace_id=workspace_id,
         query=normalized_query,
-        limit=max(bounded_limit * 8, bounded_limit),
+        limit=bounded_limit + 1,
         cursor=bounded_cursor,
     )
     if ranked_rows is None:
         raise _ranked_search_unavailable()
 
-    try:
-        conversations_task = _search_conversations(workspace_id, user_id, pattern, normalized_query)
-        members_task = _search_members(access.workspace, normalized_query)
-        mentions_task = _search_mentions(workspace_id, user_id, normalized_query)
-        conversation_rows, member_rows, mention_rows = await asyncio.gather(
-            conversations_task,
-            members_task,
-            mentions_task,
-        )
-    except SupabaseServiceError as exc:
-        logger.exception("Workspace search failed | workspace_id=%s", workspace_id)
-        raise _database_error() from exc
+    # The cursor addresses the ranked SQL stream. Only consumed rows advance it;
+    # the extra row is a sentinel and will be returned on the next page.
+    ranked_response = _group_ranked_results(ranked_rows[:bounded_limit])
+    if bounded_cursor == 0:
+        try:
+            conversation_rows, member_rows, mention_rows = await asyncio.gather(
+                _search_conversations(workspace_id, user_id, pattern, normalized_query),
+                _search_members(access.workspace, normalized_query),
+                _search_mentions(workspace_id, user_id, normalized_query),
+            )
+        except SupabaseServiceError as exc:
+            logger.exception("Workspace search failed | workspace_id=%s", workspace_id)
+            raise _database_error() from exc
 
-    ranked_response = _group_ranked_results(ranked_rows, query=normalized_query, limit=bounded_limit)
-    workspace_result = _workspace_result(access.workspace, normalized_query)
-    ranked_response["conversations"] = conversation_rows
-    ranked_response["members"] = member_rows
-    ranked_response["mentions"] = mention_rows
-    ranked_response["workspaces"] = [workspace_result] if workspace_result else []
-    _flatten_response(ranked_response, limit=bounded_limit, cursor=bounded_cursor, ranked_count=len(ranked_rows))
+        workspace_result = _workspace_result(access.workspace, normalized_query)
+        ranked_response["conversations"] = conversation_rows
+        ranked_response["members"] = member_rows
+        ranked_response["mentions"] = mention_rows
+        ranked_response["workspaces"] = [workspace_result] if workspace_result else []
+    _flatten_response(
+        ranked_response,
+        limit=bounded_limit,
+        cursor=bounded_cursor,
+        ranked_count=len(ranked_rows),
+    )
     return ranked_response
