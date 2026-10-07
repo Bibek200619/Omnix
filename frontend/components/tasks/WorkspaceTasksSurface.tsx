@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { SurfaceStateCard } from "@/components/ui/SurfaceStateCard";
 import { mentionPayload } from "@/components/mentions/MentionTextarea";
-import { apiClient } from "@/lib/api";
+import { apiClient, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
 import {
@@ -64,6 +64,7 @@ function WorkspaceTasksSurfaceContent() {
   const [momentum, setMomentum] = useState<WorkspaceTaskMomentum | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadErrorStatus, setLoadErrorStatus] = useState<number | undefined>();
   const [filter, setFilter] = useState<WorkspaceTaskStatus | "open">("open");
   const [createOpen, setCreateOpen] = useState(false);
   const createDraftKey = useCallback((field: string) => (
@@ -144,6 +145,8 @@ function WorkspaceTasksSurfaceContent() {
       setMomentum(null);
       setMembers([]);
       setInitiatives([]);
+      setLoadError(null);
+      setLoadErrorStatus(undefined);
       setLoading(false);
       return;
     }
@@ -185,10 +188,17 @@ function WorkspaceTasksSurfaceContent() {
         setFocusedTaskId(null);
       }
       setLoadError(null);
+      setLoadErrorStatus(undefined);
     } catch (err) {
       if (requestId === requestRef.current && workspaceRef.current === activeWorkspaceId) {
         logClientError("Failed to load tasks", err, { endpoint: `/workspaces/${activeWorkspaceId}/tasks` });
-        setLoadError("Unable to load tasks. Check your connection and try again.");
+        const accessDenied = err instanceof ApiError && err.status === 403;
+        setLoadErrorStatus(err instanceof ApiError ? err.status : undefined);
+        setLoadError(
+          accessDenied
+            ? "You don't have access to this workspace's tasks. Choose an accessible workspace or retry after your access changes."
+            : "Unable to load tasks. Check your connection and try again.",
+        );
       }
     } finally {
       if (requestId === requestRef.current && workspaceRef.current === activeWorkspaceId) {
@@ -609,7 +619,7 @@ function WorkspaceTasksSurfaceContent() {
         <OmnixErrorState
           compact
           className="mb-4"
-          title={mutationError ? "Task action needs attention" : "Tasks are unavailable"}
+          title={mutationError ? "Task action needs attention" : loadErrorStatus === 403 ? "Workspace access required" : "Tasks are unavailable"}
           message={mutationError ?? loadError ?? ""}
           onRetry={!mutationError && loadError ? () => void loadExecution(true) : undefined}
           isRetrying={loading}
@@ -634,7 +644,17 @@ function WorkspaceTasksSurfaceContent() {
         ))}
       </div>
 
-      <div className="omnix-task-workbench shrink-0">
+      {loadError ? (
+        <SurfaceStateCard
+          tone={loadErrorStatus === 403 ? "inaccessible" : "empty"}
+          icon={ShieldAlert}
+          title={loadErrorStatus === 403 ? "Tasks are inaccessible" : "Tasks are unavailable"}
+          description={loadError}
+          action={{ label: "Retry", onClick: () => void loadExecution(true) }}
+          className="flex-1"
+        />
+      ) : (
+        <div className="omnix-task-workbench shrink-0">
         <main className="omnix-panel flex min-w-0 flex-col rounded-xl p-3 sm:p-4 xl:min-h-[28rem]">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--omnix-border)] pb-3">
             <div className="flex items-center gap-2">
@@ -679,6 +699,7 @@ function WorkspaceTasksSurfaceContent() {
           <TaskList
             listRef={taskListRef}
             loading={loading}
+            error={loadError}
             tasks={displayedTasks}
             virtualItems={taskVirtualizer.getVirtualItems()}
             totalSize={taskVirtualizer.getTotalSize()}
@@ -711,7 +732,8 @@ function WorkspaceTasksSurfaceContent() {
           assisting={assisting}
           onRequestAssistance={(mode) => void requestAssistance(mode)}
         />
-      </div>
+        </div>
+      )}
     </section>
   );
 }

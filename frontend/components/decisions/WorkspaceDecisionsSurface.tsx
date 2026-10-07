@@ -8,7 +8,7 @@ import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { SurfaceStateCard } from "@/components/ui/SurfaceStateCard";
-import { apiClient } from "@/lib/api";
+import { apiClient, ApiError } from "@/lib/api";
 import { logClientError } from "@/lib/errors";
 import { useWorkspaceTree } from "@/lib/workspace-context";
 import { cn } from "@/lib/utils";
@@ -50,6 +50,7 @@ function WorkspaceDecisionsSurfaceContent() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorStatus, setErrorStatus] = useState<number | undefined>();
   const [statusFilter, setStatusFilter] = useState<WorkspaceDecisionStatus | "all">("all");
   const [createOpen, setCreateOpen] = useState(false);
   const requestRef = useRef(0);
@@ -102,6 +103,8 @@ function WorkspaceDecisionsSurfaceContent() {
     if (!activeWorkspaceId) {
       setDecisions([]);
       setSelectedId(null);
+      setError(null);
+      setErrorStatus(undefined);
       setLoading(false);
       return;
     }
@@ -112,10 +115,17 @@ function WorkspaceDecisionsSurfaceContent() {
       if (requestId !== requestRef.current) return;
       setDecisions(incoming);
       setError(null);
+      setErrorStatus(undefined);
     } catch (err) {
       if (requestId === requestRef.current) {
         logClientError("Failed to load decisions", err, { endpoint: `/workspaces/${activeWorkspaceId}/decisions` });
-        setError("Unable to load decisions. Check your connection and try again.");
+        const accessDenied = err instanceof ApiError && err.status === 403;
+        setErrorStatus(err instanceof ApiError ? err.status : undefined);
+        setError(
+          accessDenied
+            ? "You don't have access to this workspace's decisions. Choose an accessible workspace or retry after your access changes."
+            : "Unable to load decisions. Check your connection and try again.",
+        );
       }
     } finally {
       if (requestId === requestRef.current) setLoading(false);
@@ -162,7 +172,7 @@ function WorkspaceDecisionsSurfaceContent() {
           </p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
-          <Button
+          {!error ? <Button
             type="button"
             size="sm"
             onClick={() => setCreateOpen(true)}
@@ -170,7 +180,7 @@ function WorkspaceDecisionsSurfaceContent() {
             className="h-9 flex-1 px-4 shadow-[0_0_15px_var(--omnix-rgba-34-211-238-0-1)] sm:flex-none"
           >
             New Decision
-          </Button>
+          </Button> : null}
           <Button
             type="button"
             size="sm"
@@ -217,14 +227,23 @@ function WorkspaceDecisionsSurfaceContent() {
         <OmnixErrorState
           compact
           className="mb-4"
-          title="Decisions are unavailable"
+          title={errorStatus === 403 ? "Workspace access required" : "Decisions are unavailable"}
           message={error}
           onRetry={() => void loadDecisions()}
           isRetrying={loading}
         />
       ) : null}
 
-      {!loading && decisions.length === 0 ? (
+      {error ? (
+        <SurfaceStateCard
+          tone={errorStatus === 403 ? "inaccessible" : "empty"}
+          icon={ShieldAlert}
+          title={errorStatus === 403 ? "Decisions are inaccessible" : "Decisions are unavailable"}
+          description={error}
+          action={{ label: "Retry", onClick: () => void loadDecisions() }}
+          className="flex-1"
+        />
+      ) : !loading && decisions.length === 0 ? (
         <SurfaceStateCard
           tone="empty"
           icon={BadgeCheck}

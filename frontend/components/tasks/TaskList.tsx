@@ -19,6 +19,7 @@ type TaskPhase = {
 type TaskListProps = {
   listRef: RefObject<HTMLDivElement | null>;
   loading: boolean;
+  error?: string | null;
   tasks: WorkspaceTask[];
   virtualItems: VirtualItem[];
   totalSize: number;
@@ -40,6 +41,7 @@ type TaskListProps = {
 export function TaskList({
   listRef,
   loading,
+  error,
   tasks,
   virtualItems,
   totalSize,
@@ -82,7 +84,7 @@ export function TaskList({
         </div>
       ) : null}
 
-      {!loading && tasks.length === 0 ? (
+      {!loading && !error && tasks.length === 0 ? (
         <SurfaceStateCard
           tone="empty"
           icon={ClipboardCheck}

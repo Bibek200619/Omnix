@@ -7,7 +7,7 @@ import { SurfaceErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { Button } from "@/components/ui/Button";
 import { OmnixErrorState } from "@/components/ui/OmnixErrorState";
 import { SurfaceStateCard } from "@/components/ui/SurfaceStateCard";
-import { apiClient } from "@/lib/api";
+import { apiClient, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { logClientError } from "@/lib/errors";
 import {
@@ -66,6 +66,7 @@ function WorkspaceInitiativesSurfaceContent() {
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadErrorStatus, setLoadErrorStatus] = useState<number | undefined>();
   const [createOpen, setCreateOpen] = useState(false);
   const createDraftKey = useCallback((field: string) => (
     recoverableDraftKey([
@@ -162,6 +163,8 @@ function WorkspaceInitiativesSurfaceContent() {
       setTasks([]);
       setChannels([]);
       setMembers([]);
+      setLoadError(null);
+      setLoadErrorStatus(undefined);
       setLoading(false);
       return;
     }
@@ -184,13 +187,20 @@ function WorkspaceInitiativesSurfaceContent() {
       if (channelOptions) setChannels(channelOptions);
       if (memberOptions) setMembers(memberOptions);
       setLoadError(null);
+      setLoadErrorStatus(undefined);
     } catch (err) {
       if (
         requestId === requestRef.current &&
         workspaceRef.current === activeWorkspaceId
       ) {
         logClientError("Failed to load initiatives", err, { endpoint: `/workspaces/${activeWorkspaceId}/initiatives` });
-        setLoadError("Unable to load initiatives. Check your connection and try again.");
+        const accessDenied = err instanceof ApiError && err.status === 403;
+        setLoadErrorStatus(err instanceof ApiError ? err.status : undefined);
+        setLoadError(
+          accessDenied
+            ? "You don't have access to this workspace's initiatives. Choose an accessible workspace or retry after your access changes."
+            : "Unable to load initiatives. Check your connection and try again.",
+        );
       }
     } finally {
       if (
@@ -767,7 +777,7 @@ function WorkspaceInitiativesSurfaceContent() {
         <OmnixErrorState
           compact
           className="mb-4"
-          title={mutationError ? "Initiative action needs attention" : "Initiatives are unavailable"}
+          title={mutationError ? "Initiative action needs attention" : loadErrorStatus === 403 ? "Workspace access required" : "Initiatives are unavailable"}
           message={mutationError ?? loadError ?? ""}
           onRetry={!mutationError && loadError ? () => void loadInitiatives(true) : undefined}
           isRetrying={loading}
@@ -775,7 +785,17 @@ function WorkspaceInitiativesSurfaceContent() {
         />
       ) : null}
 
-      <div className="omnix-initiative-workbench shrink-0">
+      {loadError ? (
+        <SurfaceStateCard
+          tone={loadErrorStatus === 403 ? "inaccessible" : "empty"}
+          icon={ShieldAlert}
+          title={loadErrorStatus === 403 ? "Initiatives are inaccessible" : "Initiatives are unavailable"}
+          description={loadError}
+          action={{ label: "Retry", onClick: () => void loadInitiatives(true) }}
+          className="flex-1"
+        />
+      ) : (
+        <div className="omnix-initiative-workbench shrink-0">
         <aside className={cn(
           "omnix-panel order-1 flex shrink-0 flex-col rounded-xl p-3 lg:order-none lg:min-h-[16rem]",
           selectedId && "hidden xl:flex"
@@ -811,7 +831,7 @@ function WorkspaceInitiativesSurfaceContent() {
                 className="min-w-[min(17rem,78vw)] py-8 lg:min-w-0"
               />
             ) : null}
-            {!loading && initiatives.length === 0 ? (
+            {!loading && !loadError && initiatives.length === 0 ? (
               <SurfaceStateCard
                 tone="empty"
                 icon={Compass}
@@ -878,7 +898,8 @@ function WorkspaceInitiativesSurfaceContent() {
           selected={selected}
           selectedId={selectedId}
         />
-      </div>
+        </div>
+      )}
     </section>
   );
 }
