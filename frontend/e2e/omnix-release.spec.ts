@@ -3194,28 +3194,39 @@ test.describe("authenticated Omnix shell", () => {
     expect(viewportMeta).toContain("interactive-widget=resizes-content");
 
     const composer = page.getByRole("textbox", { name: "Message composer" });
-    await composer.focus();
-    await page.setViewportSize({ width: 390, height: 500 });
-    await expect(composer).toBeFocused();
+    const sendButton = page.getByRole("button", { name: "Send message", exact: true });
+    const draft = "Keyboard-safe draft";
+    await composer.fill(draft);
 
-    const metrics = await page.evaluate(() => {
-      const sendButton = document.querySelector('button[aria-label="Send message"]');
-      const dock = document.querySelector('nav[aria-label="Primary mobile navigation"]');
-      const sendRect = sendButton?.getBoundingClientRect();
-      const dockRect = dock?.getBoundingClientRect();
-      return {
-        dockBottom: dockRect?.bottom ?? Number.POSITIVE_INFINITY,
-        dockTop: dockRect?.top ?? 0,
-        documentWidth: document.scrollingElement?.scrollWidth ?? 0,
-        sendBottom: sendRect?.bottom ?? Number.POSITIVE_INFINITY,
-        viewportHeight: window.innerHeight,
-        viewportWidth: window.innerWidth,
-      };
-    });
+    for (const width of [375, 390]) {
+      for (const height of [500, 480, 844]) {
+        await page.setViewportSize({ width, height });
+        await expect(composer).toBeFocused();
+        await expect(composer).toHaveValue(draft);
+        await expect(sendButton).toBeEnabled();
 
-    expect(metrics.sendBottom).toBeLessThanOrEqual(metrics.dockTop + 1);
-    expect(metrics.dockBottom).toBeLessThanOrEqual(metrics.viewportHeight + 1);
-    expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+        const metrics = await page.evaluate(() => {
+          const send = document.querySelector('button[aria-label="Send message"]');
+          const dock = document.querySelector('nav[aria-label="Primary mobile navigation"]');
+          const sendRect = send?.getBoundingClientRect();
+          const dockRect = dock?.getBoundingClientRect();
+          return {
+            dockBottom: dockRect?.bottom ?? Number.POSITIVE_INFINITY,
+            dockTop: dockRect?.top ?? 0,
+            documentWidth: document.scrollingElement?.scrollWidth ?? 0,
+            sendTop: sendRect?.top ?? -1,
+            sendBottom: sendRect?.bottom ?? Number.POSITIVE_INFINITY,
+            viewportHeight: window.innerHeight,
+            viewportWidth: window.innerWidth,
+          };
+        });
+
+        expect(metrics.sendTop).toBeGreaterThanOrEqual(0);
+        expect(metrics.sendBottom).toBeLessThanOrEqual(metrics.dockTop + 1);
+        expect(metrics.dockBottom).toBeLessThanOrEqual(metrics.viewportHeight + 1);
+        expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+      }
+    }
   });
 
   test("long task titles stay contained from narrow phones through touch tablets", async ({ page, isMobile }) => {

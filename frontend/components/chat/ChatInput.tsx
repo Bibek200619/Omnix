@@ -416,8 +416,8 @@ export function ChatInput({
           disabled={loading}
           className="block max-h-40 !min-h-[54px] resize-none !rounded-none !border-transparent !bg-transparent px-[15px] py-[13px] text-sm leading-[1.6] text-white !shadow-none outline-none transition placeholder:text-[var(--omnix-text-3)] hover:!border-transparent focus:!border-transparent focus:!bg-transparent focus:!ring-0 disabled:cursor-not-allowed disabled:opacity-70 sm:text-base"
         />
-        <div className="flex flex-col gap-2 border-t border-[var(--omnix-border)] bg-[var(--omnix-rgba-0-0-0-0-2)] px-2.5 py-2.5 transition focus-within:bg-[var(--omnix-surface)] min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between sm:px-3">
-          <div className="omnix-scrollbar flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 min-[420px]:flex-wrap min-[420px]:overflow-visible min-[420px]:pb-0">
+        <div className="flex items-center justify-between gap-2 border-t border-[var(--omnix-border)] bg-[var(--omnix-rgba-0-0-0-0-2)] px-2.5 py-2.5 transition focus-within:bg-[var(--omnix-surface)] sm:px-3">
+          <div className="omnix-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 min-[420px]:flex-wrap min-[420px]:overflow-visible min-[420px]:pb-0">
             <Button
               type="button"
               variant={uploadOpen ? "secondary" : "ghost"}
