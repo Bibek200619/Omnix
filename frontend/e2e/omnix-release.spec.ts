@@ -1342,7 +1342,7 @@ test.describe("authenticated Omnix shell", () => {
     );
     await expect(channelError).toBeVisible();
 
-    const composer = page.getByPlaceholder("Write an operational update...");
+    const composer = page.getByPlaceholder(/Write an operational update/);
     await composer.fill("Failure ordering update");
     await page.getByRole("button", { name: "Send" }).click();
     const deliveryError = page.getByText("Unable to deliver message. Check your connection and try again.", { exact: true });
@@ -1384,7 +1384,7 @@ test.describe("authenticated Omnix shell", () => {
     );
 
     await page.goto("/conversations");
-    const composer = page.getByPlaceholder("Write an operational update...");
+    const composer = page.getByPlaceholder(/Write an operational update/);
     await expect(page.getByRole("button", { name: /^General/ })).toBeVisible();
     await page.getByRole("button", { name: /^General/ }).click();
     await expect(composer).toBeVisible();
@@ -1449,7 +1449,7 @@ test.describe("authenticated Omnix shell", () => {
 
     await page.goto("/conversations");
     if (isMobile) await page.getByRole("button", { name: /^General/ }).click();
-    const composer = page.getByPlaceholder("Write an operational update...");
+    const composer = page.getByPlaceholder(/Write an operational update/);
     await expect(composer).toBeVisible();
     await composer.fill("Snapshot-reconciled update");
     await page.getByRole("button", { name: "Send" }).click();
@@ -1907,7 +1907,7 @@ test.describe("authenticated Omnix shell", () => {
     );
 
     await page.goto("/conversations");
-    const firstComposer = page.getByPlaceholder("Write an operational update...");
+    const firstComposer = page.getByPlaceholder(/Write an operational update/);
     await firstComposer.fill("Old channel mutation");
     await page.getByRole("button", { name: "Send" }).click();
     await started;
@@ -1915,13 +1915,13 @@ test.describe("authenticated Omnix shell", () => {
     await page.getByRole("button", { name: /Switch workspace\. Current workspace: Acme Operations/ }).click();
     await page.getByRole("button", { name: "Switch to Platform Lab" }).click();
     await expect(page.getByRole("heading", { name: "Platform coordination" })).toBeVisible();
-    const currentComposer = page.getByPlaceholder("Write an operational update...");
+    const currentComposer = page.getByPlaceholder(/Write an operational update/);
     await currentComposer.fill("Current channel draft");
 
     await page.getByRole("button", { name: /Switch workspace\. Current workspace: Platform Lab/ }).click();
     await page.getByRole("button", { name: "Switch to Acme Operations" }).click();
     await expect(page.getByRole("heading", { name: "general" })).toBeVisible();
-    const returnedComposer = page.getByPlaceholder("Write an operational update...");
+    const returnedComposer = page.getByPlaceholder(/Write an operational update/);
     await returnedComposer.fill("Returned channel mutation");
     const returnedChannelResponse = page.waitForResponse(
       (response) =>
