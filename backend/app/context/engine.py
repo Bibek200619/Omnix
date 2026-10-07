@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class ContextRetrievalUnavailableError(RuntimeError):
-    """Raised before an action or insight can generate a source-backed report."""
+    """Prevent a report when retrieval or another context source is unavailable."""
 
     def __init__(self) -> None:
         super().__init__("Workspace source retrieval is temporarily unavailable.")
@@ -72,7 +72,7 @@ class ContextEngine:
             raw_citations.extend(action_cites)
             source_statuses["actions"] = "ok"
         except Exception:
-            logger.exception("ContextEngine failed while gathering action context.")
+            logger.warning("ContextEngine failed while gathering action context.")
             source_statuses["actions"] = "failed"
 
         try:
@@ -82,7 +82,7 @@ class ContextEngine:
             raw_citations.extend(auto_cites)
             source_statuses["automations"] = "ok"
         except Exception:
-            logger.exception("ContextEngine failed while gathering automation context.")
+            logger.warning("ContextEngine failed while gathering automation context.")
             source_statuses["automations"] = "failed"
 
         try:
@@ -92,7 +92,7 @@ class ContextEngine:
             raw_citations.extend(ws_cites)
             source_statuses["workspace"] = "ok"
         except Exception:
-            logger.exception("ContextEngine failed while gathering workspace context.")
+            logger.warning("ContextEngine failed while gathering workspace context.")
             source_statuses["workspace"] = "failed"
 
         try:
@@ -106,7 +106,7 @@ class ContextEngine:
                         ws.get("workspace_focus") or ws.get("ai_specialization")
                     )
         except Exception:
-            logger.exception("ContextEngine failed while loading workspace focus.")
+            logger.warning("ContextEngine failed while loading workspace focus.")
             source_statuses["workspace_focus"] = "failed"
 
         try:
@@ -116,7 +116,7 @@ class ContextEngine:
             raw_citations.extend(mem_cites)
             source_statuses["memory"] = "ok"
         except Exception:
-            logger.exception("ContextEngine failed while gathering memory.")
+            logger.warning("ContextEngine failed while gathering memory.")
             source_statuses["memory"] = "failed"
 
         try:
@@ -125,7 +125,7 @@ class ContextEngine:
             raw_citations.extend(retrieval_outcome.citations)
             source_statuses["retrieval"] = retrieval_outcome.outcome
         except Exception:
-            logger.exception("ContextEngine failed during retrieval.")
+            logger.warning("ContextEngine failed during retrieval.")
             retrieval_outcome = RetrievalOutcome(
                 outcome="failed",
                 diagnostics={"outcome": "failed", "reason": "context_retrieval_unavailable", "failed_channels": ["context"]},
@@ -145,16 +145,23 @@ class ContextEngine:
         budgeted_citations = self.budget_engine.enforce_budget(compressed_citations)
 
         # 6. Prompt Assembly (with Operational Persona)
+        prompt_retrieval_outcome = retrieval_outcome.outcome
+        if (
+            prompt_retrieval_outcome != "failed"
+            and "failed" in source_statuses.values()
+        ):
+            # A working vector/keyword search does not establish complete context.
+            prompt_retrieval_outcome = "partial"
         assembled_context = self.prompt_builder.build_prompt(
-            payload.query, 
-            budgeted_citations, 
+            payload.query,
+            budgeted_citations,
             system_instructions,
             specialization=workspace_focus,
-            retrieval_outcome=retrieval_outcome.outcome,
+            retrieval_outcome=prompt_retrieval_outcome,
         )
 
         latency_ms = (time.perf_counter() - started_at) * 1000
-        
+
         # 7. Add Diagnostics
         assembled_context.diagnostics.update({
             "latency_ms": round(latency_ms, 2),
@@ -173,16 +180,19 @@ class ContextEngine:
         Backward compatibility adapter for the old ContextEngine.assemble() API.
         """
         payload = ContextPayload(
-            query=query,
-            user_id=user_id,
-            workspace_id=workspace_id
+            query=query, user_id=user_id, workspace_id=workspace_id
         )
         assembled = await self.build_context(payload)
         retrieval = assembled.diagnostics.get("retrieval")
-        retrieval_state = retrieval if isinstance(retrieval, dict) else {"outcome": "failed"}
-        if retrieval_state.get("outcome") == "failed":
+        retrieval_state = (
+            retrieval if isinstance(retrieval, dict) else {"outcome": "failed"}
+        )
+        if (
+            retrieval_state.get("outcome") == "failed"
+            or "failed" in assembled.diagnostics.get("context_sources", {}).values()
+        ):
             raise ContextRetrievalUnavailableError()
-        
+
         return {
             "prompt": assembled.prompt,
             "sources": [c.to_dict() for c in assembled.citations],

@@ -65,8 +65,7 @@ class MemoryManager:
                 )
             return citations
         except Exception:
-            logger.exception("Failed to fetch synthesized workspace memory.")
-            return []
+            raise RuntimeError("Synthesized workspace memory is unavailable.") from None
 
     async def _fetch_conversation_memory(
         self, conversation_id: str, user_id: str, workspace_id: Optional[str], limit: int
@@ -92,14 +91,16 @@ class MemoryManager:
                         source_id=str(msg.get("id")),
                         source_type=ContextSourceType.MEMORY,
                         content=f"{str(msg.get('role', 'unknown')).upper()}: {msg.get('content')}",
-                        metadata={"role": msg.get("role"), "created_at": msg.get("created_at")},
-                        score=0.9 # Direct history is very relevant
+                        metadata={
+                            "role": msg.get("role"),
+                            "created_at": msg.get("created_at"),
+                        },
+                        score=0.9,  # Direct history is very relevant
                     )
                 )
             return citations
         except Exception:
-            logger.exception("Failed to fetch conversation memory.")
-            return []
+            raise RuntimeError("Conversation memory is unavailable.") from None
             
     async def _fetch_recent_conversations(
         self, user_id: str, workspace_id: Optional[str], limit: int
@@ -123,10 +124,9 @@ class MemoryManager:
                         source_id=str(c.get("id")),
                         source_type=ContextSourceType.MEMORY,
                         content=f"Recent Conversation Summary: {c.get('title') or 'Omnix'}",
-                        score=0.6
+                        score=0.6,
                     )
                 )
             return citations
         except Exception:
-            logger.exception("Failed to fetch recent conversations memory.")
-            return []
+            raise RuntimeError("Recent conversation memory is unavailable.") from None
