@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from app.context import engine as engine_module
 from app.context.engine import ContextEngine, ContextRetrievalUnavailableError
 from app.context.memory import MemoryManager
+from app.context import memory as memory_module
 from app.context.retrieval import RetrievalOutcome
 from app.context.schemas import Citation, ContextPayload, ContextSourceType
 from app.context.workspace_context import WorkspaceContextManager
@@ -39,6 +40,11 @@ def source_failure_engine(monkeypatch: pytest.MonkeyPatch):
             return []
 
         monkeypatch.setattr("app.services.supabase_service.select_all_trusted", select)
+        monkeypatch.setattr(memory_module, "require_workspace_access", AsyncMock())
+        monkeypatch.setattr(
+            "app.services.supabase_service.select_one_trusted",
+            AsyncMock(return_value={"id": "conversation-1"}),
+        )
         profile = AsyncMock(return_value={})
         if failed_source == "profile":
             profile.side_effect = RuntimeError("private-source-content-and-db-secret")
@@ -191,6 +197,7 @@ async def test_healthy_empty_context_is_not_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     engine = ContextEngine()
+    monkeypatch.setattr(memory_module, "require_workspace_access", AsyncMock())
     monkeypatch.setattr(
         "app.services.supabase_service.select_all_trusted", AsyncMock(return_value=[])
     )
