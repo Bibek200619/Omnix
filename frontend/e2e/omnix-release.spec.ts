@@ -3105,7 +3105,7 @@ test.describe("authenticated Omnix shell", () => {
     await page.keyboard.press("Enter");
     await expect(page.locator('[role="status"]').filter({ hasText: "Response stopped." })).toHaveCount(1);
     await expect(page.getByText("Unable to send message. Check your connection and try again.")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
     releaseStream();
   });
 
