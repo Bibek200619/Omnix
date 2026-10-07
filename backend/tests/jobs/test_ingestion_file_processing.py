@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -148,9 +149,18 @@ async def test_ingest_file_marks_failed_when_extraction_fails(monkeypatch: pytes
     monkeypatch.setattr(ingestion_jobs, "read_bytes_from_storage", fake_read_bytes_from_storage)
     monkeypatch.setattr(ingestion_jobs, "document_likely_requires_ocr", lambda *args: False)
     monkeypatch.setattr(ingestion_jobs, "extract_document_with_diagnostics", fake_extract)
+    cleanup = AsyncMock(return_value=StoredDocumentChunks(chunk_count=0, chunk_ids=[]))
+    monkeypatch.setattr(ingestion_jobs, "store_extracted_text_chunks", cleanup)
 
     result = await ingestion_jobs.handle_ingest_file(_job_row())
 
+    cleanup.assert_awaited_once_with(
+        file_id="file-1",
+        user_id="user-1",
+        workspace_id="workspace-1",
+        text="",
+        replace_existing=True,
+    )
     assert result["status"] == "failed"
     assert result["processing_status"] == "failed"
     assert "No readable text" in result["error"]
@@ -199,9 +209,18 @@ async def test_ingest_file_marks_ocr_required_without_retrying(monkeypatch: pyte
     monkeypatch.setattr(ingestion_jobs, "read_bytes_from_storage", fake_read_bytes_from_storage)
     monkeypatch.setattr(ingestion_jobs, "document_likely_requires_ocr", lambda *args: False)
     monkeypatch.setattr(ingestion_jobs, "extract_document_with_diagnostics", fake_extract)
+    cleanup = AsyncMock(return_value=StoredDocumentChunks(chunk_count=0, chunk_ids=[]))
+    monkeypatch.setattr(ingestion_jobs, "store_extracted_text_chunks", cleanup)
 
     result = await ingestion_jobs.handle_ingest_file(_job_row())
 
+    cleanup.assert_awaited_once_with(
+        file_id="file-1",
+        user_id="user-1",
+        workspace_id="workspace-1",
+        text="",
+        replace_existing=True,
+    )
     assert result["status"] == "completed"
     assert result["processing_status"] == "ocr_required"
     assert statuses == ["extracting", "ocr_required"]

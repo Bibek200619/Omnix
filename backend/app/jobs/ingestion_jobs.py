@@ -157,12 +157,40 @@ async def handle_ingest_file(job_row: dict[str, Any]) -> dict[str, Any]:
         normalized = extraction_result.text
         diagnostics = extraction_result.diagnostics
         metadata = dict(file_row.get("metadata") or {})
-        metadata.update({"extracted_text_preview": normalized[:2000], **diagnostics.to_metadata()})
+        metadata.update(
+            {"extracted_text_preview": normalized[:2000], **diagnostics.to_metadata()}
+        )
         if diagnostics.extraction_failure_reason:
             metadata["extraction_error"] = diagnostics.extraction_failure_reason
 
-        if diagnostics.extraction_status != "searchable" or not normalized:
-            processing_error = diagnostics.extraction_failure_reason or "No searchable text was extracted from this file."
+        if diagnostics.extraction_status != "searchable" or not normalized.strip():
+            # Extraction no longer validates the previous searchable content.
+            # Clear both text and embedded rows before persisting a terminal state.
+            try:
+                await store_extracted_text_chunks(
+                    file_id=file_id,
+                    user_id=user_id,
+                    workspace_id=workspace_id,
+                    text="",
+                    replace_existing=True,
+                )
+            except Exception:
+                raise RuntimeError(
+                    "Unable to complete stale document cleanup. Please retry."
+                ) from None
+            metadata.update(
+                {
+                    "text_chunk_count": 0,
+                    "text_chunks_truncated": False,
+                    "embedded_chunk_count": 0,
+                    "embedded_chunk_ids": [],
+                    "vector_index_status": "unavailable",
+                }
+            )
+            processing_error = (
+                diagnostics.extraction_failure_reason
+                or "No searchable text was extracted from this file."
+            )
             processing_status = _unsearchable_processing_status(diagnostics)
             await _update_file_processing_state(
                 file_id,
