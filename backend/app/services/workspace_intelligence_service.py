@@ -166,7 +166,7 @@ async def workspace_retrieval_scope_ids(
     return list(dict.fromkeys(ids))
 
 
-async def _optional_select_all(
+async def _required_select_all(
     table: str,
     columns: str,
     *,
@@ -185,8 +185,11 @@ async def _optional_select_all(
             limit=limit,
         )
     except SupabaseServiceError:
-        logger.warning("Workspace intelligence optional read failed | table=%s", table, exc_info=True)
-        return []
+        logger.warning("Workspace intelligence source read failed | table=%s", table)
+        raise HTTPException(
+            status_code=503,
+            detail="Workspace intelligence is temporarily unavailable.",
+        ) from None
 
 
 async def build_workspace_intelligence_profile(
@@ -203,7 +206,7 @@ async def build_workspace_intelligence_profile(
     workspace = normalize_workspace_record(access.workspace)
     scope_ids = await workspace_retrieval_scope_ids(workspace, user_id)
 
-    files = await _optional_select_all(
+    files = await _required_select_all(
         "files",
         FILE_COLUMNS,
         filters={"workspace_id": scope_ids},
@@ -215,7 +218,7 @@ async def build_workspace_intelligence_profile(
         row for row in files if str(row.get("workspace_id") or "") in set(scope_ids)
     ]
 
-    conversations = await _optional_select_all(
+    conversations = await _required_select_all(
         "conversations",
         CONVERSATION_COLUMNS,
         filters={"workspace_id": scope_ids},
@@ -232,11 +235,14 @@ async def build_workspace_intelligence_profile(
     except HTTPException as exc:
         if exc.status_code < 500:
             raise
-        logger.warning("Workspace intelligence member hydration failed | workspace_id=%s", workspace_id, exc_info=True)
-        members = []
+        logger.warning("Workspace intelligence member hydration failed.")
+        raise HTTPException(
+            status_code=503,
+            detail="Workspace intelligence is temporarily unavailable.",
+        ) from None
 
     # Initiative direction is injected as recorded context only; health is derived at the initiative surface.
-    initiatives = await _optional_select_all(
+    initiatives = await _required_select_all(
         "workspace_initiatives",
         "*",
         filters={"workspace_id": scope_ids, "status": ["active", "focused", "at_risk"]},
@@ -245,7 +251,7 @@ async def build_workspace_intelligence_profile(
         limit=5,
     )
 
-    unresolved_continuity = await _optional_select_all(
+    unresolved_continuity = await _required_select_all(
         "workspace_intelligence_memory",
         "*",
         filters={

@@ -5,6 +5,8 @@ import logging
 import re
 from typing import Any
 
+from fastapi import HTTPException
+
 from .supabase_service import select_all, select_all_trusted
 from .workspace_intelligence_service import build_workspace_intelligence_profile
 
@@ -62,9 +64,20 @@ async def load_workspace_intelligence_for_chat(
         return None
     try:
         return await build_workspace_intelligence_profile_fn(workspace_id, user_id)
+    except HTTPException as exc:
+        if exc.status_code < 500:
+            raise
+        logger.warning("Workspace intelligence profile is unavailable for chat.")
+        raise HTTPException(
+            status_code=503,
+            detail="Workspace intelligence is temporarily unavailable.",
+        ) from None
     except Exception:
-        logger.exception("Failed to load workspace intelligence profile for chat; continuing with generic AI context.")
-        return None
+        logger.warning("Workspace intelligence profile is unavailable for chat.")
+        raise HTTPException(
+            status_code=503,
+            detail="Workspace intelligence is temporarily unavailable.",
+        ) from None
 
 
 async def has_retrievable_documents(
