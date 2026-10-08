@@ -4,7 +4,8 @@
   "scripts": {
     "frontend": "npm --prefix frontend run dev",
     "backend": "cd backend && uvicorn app.main:app --reload",
-    "dev": "concurrently \"npm run backend\" \"npm run frontend\""
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "test:dependency-security": "node --test scripts/dependency-security.test.cjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.4",
@@ -14,5 +15,10 @@
     "framer-motion": "^12.38.0",
     "react-markdown": "^10.1.0",
     "react-syntax-highlighter": "^16.1.1"
+  },
+  "overrides": {
+    "concurrently": {
+      "shell-quote": "1.11.0"
+    }
   }
 }
