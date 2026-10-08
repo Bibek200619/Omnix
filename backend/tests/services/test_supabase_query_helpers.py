@@ -200,7 +200,7 @@ def test_repository_has_no_implicit_unscoped_trusted_reads() -> None:
 
     assert implicit_reads == []
     assert explicit_system_reads == {
-        ("automation/scheduler.py", "automation_scheduler_startup"),
+        ("automation/scheduler.py", "automation_scheduler_reconciliation"),
         ("jobs/preflight.py", "startup_embedding_contract_sample"),
         ("jobs/reembed_jobs.py", "reembedding_batch_scan"),
     }
