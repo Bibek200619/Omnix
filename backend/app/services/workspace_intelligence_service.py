@@ -4,6 +4,8 @@ import logging
 import re
 import time
 from collections.abc import Mapping
+from copy import deepcopy
+from dataclasses import dataclass
 from typing import Any
 
 from fastapi import HTTPException
@@ -22,9 +24,17 @@ CONVERSATION_COLUMNS = "id,title,workspace_id,last_message_at,updated_at,created
 DOMAIN_RE = re.compile(r"[A-Za-z][A-Za-z0-9+#-]{2,}")
 logger = logging.getLogger(__name__)
 
-# Cache for intelligence profiles to reduce massive read amplification
-# Structure: {(workspace_id, user_id): (timestamp, profile_dict)}
-_intelligence_profile_cache: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
+
+@dataclass(frozen=True)
+class _CachedIntelligenceProfile:
+    created_at: float
+    workspace: dict[str, Any]
+    scope_ids: tuple[str, ...]
+    profile: dict[str, Any]
+
+
+# Cache source hydration, never authorization or the authorized retrieval scope.
+_intelligence_profile_cache: dict[tuple[str, str], _CachedIntelligenceProfile] = {}
 INTELLIGENCE_CACHE_TTL = 15.0  # Seconds
 
 
@@ -196,15 +206,20 @@ async def build_workspace_intelligence_profile(
     workspace_id: str,
     user_id: str,
 ) -> dict[str, Any]:
-    now_ts = time.perf_counter()
-    cache_key = (workspace_id, user_id)
-    cached = _intelligence_profile_cache.get(cache_key)
-    if cached and (now_ts - cached[0] < INTELLIGENCE_CACHE_TTL):
-        return cached[1]
-
     access = await require_workspace_access(workspace_id, user_id)
     workspace = normalize_workspace_record(access.workspace)
     scope_ids = await workspace_retrieval_scope_ids(workspace, user_id)
+
+    now_ts = time.perf_counter()
+    cache_key = (workspace_id, user_id)
+    cached = _intelligence_profile_cache.get(cache_key)
+    if (
+        cached
+        and now_ts - cached.created_at < INTELLIGENCE_CACHE_TTL
+        and cached.workspace == workspace
+        and cached.scope_ids == tuple(scope_ids)
+    ):
+        return deepcopy(cached.profile)
 
     files = await _required_select_all(
         "files",
@@ -308,7 +323,12 @@ async def build_workspace_intelligence_profile(
         domains=domains,
     )
 
-    _intelligence_profile_cache[cache_key] = (now_ts, profile)
+    _intelligence_profile_cache[cache_key] = _CachedIntelligenceProfile(
+        created_at=now_ts,
+        workspace=deepcopy(workspace),
+        scope_ids=tuple(scope_ids),
+        profile=deepcopy(profile),
+    )
     return profile
 
 
