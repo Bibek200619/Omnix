@@ -8,6 +8,7 @@ import os
 import logging
 import time
 from typing import Any
+from urllib.parse import urlencode
 
 from cryptography.fernet import Fernet, InvalidToken
 import httpx
@@ -181,7 +182,7 @@ def build_oauth_authorize_url(redirect_uri: str, state: str | None = None) -> st
     }
     if state:
         params["state"] = state
-    query = "&".join([f"{k}={httpx.utils.quote(str(v))}" for k, v in params.items()])
+    query = urlencode(params)
     return f"{GOOGLE_OAUTH_AUTHORIZE}?{query}"
 
 
