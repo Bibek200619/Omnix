@@ -307,9 +307,16 @@ async def store_token_for_user(user_id: str, workspace_id: str | None, token_res
     return row
 
 
-async def get_token_for_user(user_id: str, workspace_id: str | None = None) -> dict[str, Any] | None:
-    filters = {"user_id": user_id}
-    if workspace_id:
-        filters["workspace_id"] = workspace_id
-    rows = await select_one_trusted("google_drive_tokens", "id,user_id,workspace_id,access_token,refresh_token,expires_at,scope", filters)
+async def get_token_for_user(
+    user_id: str, workspace_id: str | None = None
+) -> dict[str, Any] | None:
+    filters = {
+        "user_id": user_id,
+        "workspace_id": workspace_id if workspace_id else {"is": None},
+    }
+    rows = await select_one_trusted(
+        "google_drive_tokens",
+        "id,user_id,workspace_id,access_token,refresh_token,expires_at,scope",
+        filters,
+    )
     return _decrypt_token_row(rows)
