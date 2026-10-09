@@ -4,6 +4,8 @@ import logging
 import re
 import time
 from collections.abc import Mapping
+from copy import deepcopy
+from dataclasses import dataclass
 from typing import Any
 
 from fastapi import HTTPException
@@ -22,9 +24,17 @@ CONVERSATION_COLUMNS = "id,title,workspace_id,last_message_at,updated_at,created
 DOMAIN_RE = re.compile(r"[A-Za-z][A-Za-z0-9+#-]{2,}")
 logger = logging.getLogger(__name__)
 
-# Cache for intelligence profiles to reduce massive read amplification
-# Structure: {(workspace_id, user_id): (timestamp, profile_dict)}
-_intelligence_profile_cache: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
+
+@dataclass(frozen=True)
+class _CachedIntelligenceProfile:
+    created_at: float
+    workspace: dict[str, Any]
+    scope_ids: tuple[str, ...]
+    profile: dict[str, Any]
+
+
+# Cache source hydration, never authorization or the authorized retrieval scope.
+_intelligence_profile_cache: dict[tuple[str, str], _CachedIntelligenceProfile] = {}
 INTELLIGENCE_CACHE_TTL = 15.0  # Seconds
 
 
@@ -166,7 +176,7 @@ async def workspace_retrieval_scope_ids(
     return list(dict.fromkeys(ids))
 
 
-async def _optional_select_all(
+async def _required_select_all(
     table: str,
     columns: str,
     *,
@@ -185,25 +195,33 @@ async def _optional_select_all(
             limit=limit,
         )
     except SupabaseServiceError:
-        logger.warning("Workspace intelligence optional read failed | table=%s", table, exc_info=True)
-        return []
+        logger.warning("Workspace intelligence source read failed | table=%s", table)
+        raise HTTPException(
+            status_code=503,
+            detail="Workspace intelligence is temporarily unavailable.",
+        ) from None
 
 
 async def build_workspace_intelligence_profile(
     workspace_id: str,
     user_id: str,
 ) -> dict[str, Any]:
-    now_ts = time.perf_counter()
-    cache_key = (workspace_id, user_id)
-    cached = _intelligence_profile_cache.get(cache_key)
-    if cached and (now_ts - cached[0] < INTELLIGENCE_CACHE_TTL):
-        return cached[1]
-
     access = await require_workspace_access(workspace_id, user_id)
     workspace = normalize_workspace_record(access.workspace)
     scope_ids = await workspace_retrieval_scope_ids(workspace, user_id)
 
-    files = await _optional_select_all(
+    now_ts = time.perf_counter()
+    cache_key = (workspace_id, user_id)
+    cached = _intelligence_profile_cache.get(cache_key)
+    if (
+        cached
+        and now_ts - cached.created_at < INTELLIGENCE_CACHE_TTL
+        and cached.workspace == workspace
+        and cached.scope_ids == tuple(scope_ids)
+    ):
+        return deepcopy(cached.profile)
+
+    files = await _required_select_all(
         "files",
         FILE_COLUMNS,
         filters={"workspace_id": scope_ids},
@@ -215,7 +233,7 @@ async def build_workspace_intelligence_profile(
         row for row in files if str(row.get("workspace_id") or "") in set(scope_ids)
     ]
 
-    conversations = await _optional_select_all(
+    conversations = await _required_select_all(
         "conversations",
         CONVERSATION_COLUMNS,
         filters={"workspace_id": scope_ids},
@@ -232,11 +250,14 @@ async def build_workspace_intelligence_profile(
     except HTTPException as exc:
         if exc.status_code < 500:
             raise
-        logger.warning("Workspace intelligence member hydration failed | workspace_id=%s", workspace_id, exc_info=True)
-        members = []
+        logger.warning("Workspace intelligence member hydration failed.")
+        raise HTTPException(
+            status_code=503,
+            detail="Workspace intelligence is temporarily unavailable.",
+        ) from None
 
     # Initiative direction is injected as recorded context only; health is derived at the initiative surface.
-    initiatives = await _optional_select_all(
+    initiatives = await _required_select_all(
         "workspace_initiatives",
         "*",
         filters={"workspace_id": scope_ids, "status": ["active", "focused", "at_risk"]},
@@ -245,7 +266,7 @@ async def build_workspace_intelligence_profile(
         limit=5,
     )
 
-    unresolved_continuity = await _optional_select_all(
+    unresolved_continuity = await _required_select_all(
         "workspace_intelligence_memory",
         "*",
         filters={
@@ -302,7 +323,12 @@ async def build_workspace_intelligence_profile(
         domains=domains,
     )
 
-    _intelligence_profile_cache[cache_key] = (now_ts, profile)
+    _intelligence_profile_cache[cache_key] = _CachedIntelligenceProfile(
+        created_at=now_ts,
+        workspace=deepcopy(workspace),
+        scope_ids=tuple(scope_ids),
+        profile=deepcopy(profile),
+    )
     return profile
 
 
