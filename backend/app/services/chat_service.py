@@ -771,12 +771,17 @@ class ProviderManager:
     ) -> AsyncGenerator[str, None]:
         candidates = self._candidate_providers()
         if not candidates:
-            raise ModelServiceError("No AI providers are configured.", status.HTTP_503_SERVICE_UNAVAILABLE)
+            raise ModelServiceError(
+                "No AI providers are configured.", status.HTTP_503_SERVICE_UNAVAILABLE
+            )
 
         last_error: BaseException | None = None
         for attempt_index, (provider_name, provider) in enumerate(candidates):
-            timeout_seconds = self._timeout_for_attempt(provider_name, attempt_index, len(candidates))
+            timeout_seconds = self._timeout_for_attempt(
+                provider_name, attempt_index, len(candidates)
+            )
             emitted_token = False
+            stream_iterator = None
             try:
                 stream = provider.stream(
                     prompt,
@@ -787,18 +792,32 @@ class ProviderManager:
                     max_tokens=max_tokens,
                 )
                 stream_iterator = stream.__aiter__()
-                first_token = await asyncio.wait_for(anext(stream_iterator), timeout=timeout_seconds)
+                # Empty chunks are not an answer and cannot reset the deadline.
+                deadline = asyncio.get_running_loop().time() + timeout_seconds
+                first_token = ""
+                while not first_token:
+                    remaining = max(0.0, deadline - asyncio.get_running_loop().time())
+                    first_token = await asyncio.wait_for(
+                        anext(stream_iterator), timeout=remaining
+                    )
                 emitted_token = True
                 yield first_token
                 async for token in stream_iterator:
-                    yield token
+                    if token:
+                        yield token
                 return
-            except StopAsyncIteration:
-                return
+            except StopAsyncIteration as exc:
+                last_error = exc
+                logger.warning(
+                    "AI stream provider %s ended without content; trying next provider if available.",
+                    provider_name,
+                )
             except asyncio.TimeoutError as exc:
                 last_error = exc
                 if emitted_token:
-                    raise ModelServiceError("Model stream timed out.", status.HTTP_504_GATEWAY_TIMEOUT) from exc
+                    raise ModelServiceError(
+                        "Model stream timed out.", status.HTTP_504_GATEWAY_TIMEOUT
+                    ) from exc
                 logger.warning(
                     "AI stream provider %s exceeded timeout %.2fs before first token; trying next provider if available.",
                     provider_name,
@@ -813,8 +832,20 @@ class ProviderManager:
                     provider_name,
                     exc.status_code,
                 )
+            finally:
+                close = getattr(stream_iterator, "aclose", None)
+                if close is not None:
+                    try:
+                        await asyncio.wait_for(close(), timeout=self.request_timeout)
+                    except Exception as exc:
+                        logger.warning(
+                            "AI stream cleanup failed (%s).", type(exc).__name__
+                        )
 
-        raise ModelServiceError("All configured AI stream providers are unavailable.", status.HTTP_503_SERVICE_UNAVAILABLE) from last_error
+        raise ModelServiceError(
+            "All configured AI stream providers are unavailable.",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+        ) from last_error
 
 
 def get_chat_service() -> ProviderManager:
