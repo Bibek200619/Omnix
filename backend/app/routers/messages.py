@@ -594,10 +594,11 @@ async def chat(
                 workspace_id = workspace_access.workspace_id
 
             await _check_rate_limit(user_id, workspace_id=workspace_id, endpoint=CHAT_RATE_LIMIT_ENDPOINT)
+            recent_messages = []
+        intelligence_profile = await _load_workspace_intelligence_for_chat(workspace_id, user_id)
+        if not payload.conversation_id:
             conversation = await insert_one("conversations", conversation_payload)
             conversation_id = str(conversation["id"])
-            recent_messages = []
-
         messages_to_insert = [
             {
                 "conversation_id": conversation_id,
@@ -630,7 +631,6 @@ async def chat(
         workspace_id=workspace_id,
     )
 
-    intelligence_profile = await _load_workspace_intelligence_for_chat(workspace_id, user_id)
     workspace_system_prompt = workspace_intelligence_system_prompt(intelligence_profile)
     prompt_message, sources, retrieval_debug = await _retrieve_prompt_context(
         message_text,
@@ -796,10 +796,11 @@ async def chat_stream(
                 workspace_id = active_workspace_access.workspace_id
 
             await _check_rate_limit(user_id, workspace_id=workspace_id, endpoint=CHAT_STREAM_RATE_LIMIT_ENDPOINT)
+            recent_messages = []
+        intelligence_profile = await _load_workspace_intelligence_for_chat(workspace_id, user_id)
+        if not payload.conversation_id:
             conversation = await insert_one("conversations", conversation_payload)
             conversation_id = str(conversation["id"])
-            recent_messages = []
-
         messages_to_insert = [
             {
                 "conversation_id": conversation_id,
@@ -832,7 +833,6 @@ async def chat_stream(
         workspace_id=workspace_id,
     )
 
-    intelligence_profile = await _load_workspace_intelligence_for_chat(workspace_id, user_id)
     workspace_system_prompt = workspace_intelligence_system_prompt(intelligence_profile)
 
     async def event_generator() -> AsyncIterator[str]:
