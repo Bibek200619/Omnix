@@ -149,7 +149,7 @@ async def build_uploaded_document_context(
     top_k: int = 3,
     supplemental_contexts: list[ContextSupplement | dict[str, Any]] | None = None,
 ) -> BuiltContext | None:
-    """Build prompt context from uploaded document chunks when vector retrieval has no hit."""
+    """Build uploaded context; failed reads must remain distinct from empty results."""
     files = await _load_candidate_files(
         user_id=user_id,
         conversation_id=conversation_id,
@@ -354,8 +354,8 @@ async def _select_files(
         )
         return [row for row in rows if str(row.get("user_id") or "") == user_id and not row.get("workspace_id")]
     except SupabaseServiceError:
-        logger.exception("Failed to load candidate uploaded files.")
-        return []
+        logger.warning("Uploaded file lookup unavailable.")
+        raise SupabaseServiceError("Uploaded file lookup unavailable.") from None
 
 
 async def _load_document_chunks(
@@ -401,8 +401,8 @@ async def _load_document_chunks(
         )
         return [row for row in rows if str(row.get("user_id") or "") == user_id and not row.get("workspace_id")]
     except SupabaseServiceError:
-        logger.exception("Failed to load uploaded document chunks.")
-        return []
+        logger.warning("Uploaded document chunks unavailable.")
+        raise SupabaseServiceError("Uploaded document chunks unavailable.") from None
 
 
 def _assign_chunk_indexes(results: list[RetrievalResult]) -> None:
