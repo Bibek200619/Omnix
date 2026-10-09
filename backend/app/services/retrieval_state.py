@@ -80,6 +80,8 @@ def public_retrieval_payload(
 def should_bypass_model_for_retrieval(debug: dict[str, Any] | None) -> bool:
     if not isinstance(debug, dict):
         return False
+    if debug.get("outcome") == "failed":
+        return True
     return debug.get("strategy") in {
         "document_unavailable",
         "retrieval_failed",
