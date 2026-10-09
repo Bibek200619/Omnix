@@ -71,11 +71,10 @@ def _execute_with_retry(
             _mark_pressure()
             delay = (base_delay * (2**attempt)) + (random.random() * 0.1)
             logger.warning(
-                "Supabase transient transport error during %s (attempt %s/%s): %s | retrying in %.2fs",
+                "Supabase transient transport error during %s (attempt %s/%s) | retrying in %.2fs",
                 operation,
                 attempt + 1,
                 retries,
-                exc,
                 delay,
             )
 
@@ -115,11 +114,10 @@ async def _execute_with_retry_async(
             _mark_pressure()
             delay = (base_delay * (2**attempt)) + (random.random() * 0.1)
             logger.warning(
-                "Supabase transient async error during %s (attempt %s/%s): %s | retrying in %.2fs",
+                "Supabase transient async transport error during %s (attempt %s/%s) | retrying in %.2fs",
                 operation,
                 attempt + 1,
                 retries,
-                exc,
                 delay,
             )
 
@@ -142,7 +140,13 @@ async def _async_client() -> Any:
 
 
 def execute_query_sync(query: Any, *, operation: str = "execute") -> Any:
-    return _execute_with_retry(query, operation=operation)
+    try:
+        return _execute_with_retry(query, operation=operation)
+    except SupabaseServiceError:
+        raise
+    except Exception as exc:
+        _raise_supabase_error(operation, "query", exc)
+
 
 class SupabaseServiceError(RuntimeError):
     pass
@@ -192,35 +196,35 @@ def _is_supabase_network_error(exc: Exception) -> bool:
 def _raise_supabase_error(operation: str, table: str, exc: Exception) -> NoReturn:
     if _is_supabase_auth_error(exc):
         logger.error(
-            "%s on '%s' failed: %s | raw_error=%r",
+            "%s on '%s' failed: %s",
             operation,
             table,
             SUPABASE_AUTH_ERROR,
-            exc,
         )
-        raise SupabaseServiceError(SUPABASE_AUTH_ERROR) from exc
+        raise SupabaseServiceError(INTERNAL_DB_ERROR) from None
 
     if _is_supabase_network_error(exc):
         logger.warning(
-            "%s on '%s' failed: %s | raw_error=%r",
+            "%s on '%s' failed: %s",
             operation,
             table,
             SUPABASE_NETWORK_ERROR,
-            exc,
         )
-        raise SupabaseServiceError(SUPABASE_NETWORK_ERROR) from exc
+        raise SupabaseServiceError(INTERNAL_DB_ERROR) from None
 
-    logger.exception(
-        "Supabase operation failed | operation=%s | table=%s | raw_error=%r",
+    # Provider errors can contain failing rows, query URLs and credentials. Keep
+    # diagnostics categorical and suppress causes before callers log failures.
+    logger.error(
+        "Supabase operation failed | operation=%s | table=%s",
         operation,
         table,
-        exc,
     )
 
-    raise SupabaseServiceError(INTERNAL_DB_ERROR) from exc
+    raise SupabaseServiceError(INTERNAL_DB_ERROR) from None
+
 
 def _insert_one_sync(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
-    # WARNING: get_supabase() uses the SERVICE ROLE KEY. 
+    # WARNING: get_supabase() uses the SERVICE ROLE KEY.
     # This bypasses RLS completely. Enforcing user_id mapping prevents privilege escalation.
     if "user_id" not in payload:
         logger.error("Rejected insert into '%s' without explicit user_id.", table)

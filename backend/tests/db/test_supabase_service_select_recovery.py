@@ -71,7 +71,8 @@ async def test_select_all_surfaces_schema_cache_miss_without_retry(
         )
 
     assert str(exc_info.value) == "Internal server error"
-    assert isinstance(exc_info.value.__cause__, RuntimeError)
+    assert exc_info.value.__cause__ is None
+    assert exc_info.value.__suppress_context__ is True
     assert attempts == ["id,user_id,name,workspace_focus,ai_specialization"]
 
 
