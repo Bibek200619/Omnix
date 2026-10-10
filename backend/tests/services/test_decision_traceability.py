@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, patch
+from fastapi import HTTPException
 from app.services import workspace_decision_service as service
 from app.services import workspace_initiative_service as init_service
 from app.services import workspace_task_service as task_service
@@ -288,19 +289,39 @@ async def test_initiative_hydration_uses_workspace_scoped_decision_filter(mock_u
 
 
 @pytest.mark.asyncio
-async def test_initiative_hydration_survives_missing_decision_previews(mock_user_id, mock_workspace_id):
+async def test_initiative_hydration_rejects_missing_decision_previews(
+    mock_user_id, mock_workspace_id
+):
     async def failing_select_all(*args, **kwargs):
         raise SupabaseServiceError("missing preview table")
 
-    with patch("app.services.workspace_initiative_service._base_records", AsyncMock(return_value=([], [], []))), \
-         patch("app.services.workspace_initiative_service.select_all_trusted", failing_select_all), \
-         patch("app.services.workspace_initiative_service.get_profiles", AsyncMock(return_value={})):
+    with (
+        patch(
+            "app.services.workspace_initiative_service._base_records",
+            AsyncMock(return_value=([], [], [])),
+        ),
+        patch(
+            "app.services.workspace_initiative_service.select_all_trusted",
+            failing_select_all,
+        ),
+        patch(
+            "app.services.workspace_initiative_service.get_profiles",
+            AsyncMock(return_value={}),
+        ),
+    ):
+        with pytest.raises(HTTPException) as caught:
+            await init_service._hydrate_initiatives(
+                [
+                    {
+                        "id": "init-1",
+                        "workspace_id": mock_workspace_id,
+                        "created_by": mock_user_id,
+                        "status": "active",
+                    }
+                ],
+                workspace_id=mock_workspace_id,
+                user_id=mock_user_id,
+            )
 
-        result = await init_service._hydrate_initiatives(
-            [{"id": "init-1", "workspace_id": mock_workspace_id, "created_by": mock_user_id, "status": "active"}],
-            workspace_id=mock_workspace_id,
-            user_id=mock_user_id,
-        )
-
-    assert result[0]["linked_decisions"] == []
-    assert result[0]["momentum"]["health"] == "quiet"
+    assert caught.value.status_code == 503
+    assert caught.value.__cause__ is None
