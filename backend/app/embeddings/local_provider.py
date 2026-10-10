@@ -51,24 +51,24 @@ class LocalEmbeddingProvider(EmbeddingProvider):
 
             try:
                 from sentence_transformers import SentenceTransformer
-            except Exception as exc:
-                logger.exception("sentence-transformers import failed: %s", exc)
+            except Exception:
+                logger.error("sentence-transformers import failed.")
                 raise RuntimeError(
                     "Local embeddings require sentence-transformers and torch. "
                     "Install backend dependencies with: pip install -r backend/requirements.txt"
-                ) from exc
+                ) from None
 
             started_at = time.perf_counter()
             logger.info("Loading local embedding model '%s' with sentence-transformers.", self.model_name)
             try:
                 model = SentenceTransformer(self.model_name, local_files_only=self.local_files_only)
-            except Exception as exc:
-                logger.exception("Failed to load local embedding model '%s': %s", self.model_name, exc)
+            except Exception:
+                logger.error("Failed to load local embedding model.")
                 raise RuntimeError(
-                    f"Failed to load local embedding model '{self.model_name}'. "
+                    "Failed to load local embedding model. "
                     "If this is a fresh offline deployment, download/cache the model before "
                     "starting the worker or set LOCAL_EMBEDDING_MODEL to an available local path."
-                ) from exc
+                ) from None
 
             try:
                 get_dimension = getattr(model, "get_embedding_dimension", None) or getattr(
@@ -76,21 +76,20 @@ class LocalEmbeddingProvider(EmbeddingProvider):
                     "get_sentence_embedding_dimension",
                 )
                 dim = int(get_dimension())
-            except Exception as exc:
+            except Exception:
                 raise RuntimeError(
-                    f"Local embedding model '{self.model_name}' did not report an embedding dimension."
-                ) from exc
+                    "Local embedding model did not report an embedding dimension."
+                ) from None
 
             elapsed_ms = (time.perf_counter() - started_at) * 1000
             if dim != self.expected_dim:
                 logger.error(
-                    "Local embedding model '%s' dimension mismatch: model_dim=%d expected_dim=%d.",
-                    self.model_name,
+                    "Local embedding model dimension mismatch: model_dim=%d expected_dim=%d.",
                     dim,
                     self.expected_dim,
                 )
                 raise RuntimeError(
-                    f"Local embedding model '{self.model_name}' outputs {dim} dimensions, "
+                    f"Local embedding model outputs {dim} dimensions, "
                     f"but the active DB/vector contract expects {self.expected_dim}. "
                     "Use all-MiniLM-L6-v2, set EMBEDDING_DIMENSION for a custom model, "
                     "and migrate pgvector before ingesting."
@@ -149,6 +148,6 @@ class LocalEmbeddingProvider(EmbeddingProvider):
                 self.expected_dim,
             )
             return out
-        except Exception as exc:
-            logger.exception("Local embedding generation failed: %s", exc)
-            raise
+        except Exception:
+            logger.error("Local embedding generation failed.")
+            raise RuntimeError("Local embedding generation failed.") from None

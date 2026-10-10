@@ -26,19 +26,21 @@ async def get_embeddings_async(texts: List[str]) -> List[List[float]]:
     if not texts:
         return []
 
-    provider = _get_provider()
+    provider_name = "uninitialized"
     try:
+        provider = _get_provider()
+        provider_name = provider.__class__.__name__
         embed_texts = provider.embed_texts
         if inspect.iscoroutinefunction(embed_texts):
             embeddings = await embed_texts(texts)
         else:
             result = await asyncio.to_thread(embed_texts, texts)
             embeddings = await result if inspect.isawaitable(result) else result
-    except Exception as exc:
-        logger.exception("Embedding provider %s failed to embed %d texts.", provider.__class__.__name__, len(texts))
-        raise RuntimeError(
-            f"Embedding generation failed using provider {provider.__class__.__name__}: {exc}"
-        ) from exc
+    except Exception:
+        logger.error(
+            "Embedding provider %s failed to embed %d texts.", provider_name, len(texts)
+        )
+        raise RuntimeError("Embedding generation is temporarily unavailable.") from None
 
     try:
         validate_embeddings_dimension(embeddings, expected_dim=get_expected_embedding_dimension())
