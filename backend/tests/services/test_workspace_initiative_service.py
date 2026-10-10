@@ -152,8 +152,25 @@ async def test_hydration_aggregates_only_matching_task_and_visible_channel(monke
     monkeypatch.setattr(initiatives, "_base_records", fake_base_records)
     monkeypatch.setattr(initiatives, "get_profiles", fake_profiles)
 
+    async def fake_decisions(table: str, columns: str, filters: dict[str, object]):
+        assert table == "workspace_decisions"
+        assert filters == {
+            "initiative_id": "initiative-1",
+            "workspace_id": "workspace-1",
+        }
+        return []
+
+    monkeypatch.setattr(initiatives, "select_all_trusted", fake_decisions)
+
     hydrated = await initiatives._hydrate_initiatives(
-        [{"id": "initiative-1", "status": "active", "linked_resources": [], "activity_metadata": {}}],
+        [
+            {
+                "id": "initiative-1",
+                "status": "active",
+                "linked_resources": [],
+                "activity_metadata": {},
+            }
+        ],
         workspace_id="workspace-1",
         user_id="user-1",
     )

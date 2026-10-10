@@ -36,6 +36,13 @@ def _database_error() -> HTTPException:
     return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
+def _hydration_error() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Initiative evidence is temporarily unavailable. Please try again.",
+    )
+
+
 def _not_found() -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Initiative not found.")
 
@@ -329,16 +336,18 @@ async def _base_records(workspace_id: str, user_id: str) -> tuple[list[dict[str,
     except HTTPException as exc:
         if exc.status_code < 500:
             raise
-        logger.warning("Initiative task hydration failed | workspace_id=%s", workspace_id, exc_info=True)
-        tasks = []
+        logger.error("Initiative task hydration failed | workspace_id=%s", workspace_id)
+        raise _hydration_error() from None
 
     try:
         channels = await list_channels(workspace_id=workspace_id, user_id=user_id)
     except HTTPException as exc:
         if exc.status_code < 500:
             raise
-        logger.warning("Initiative channel hydration failed | workspace_id=%s", workspace_id, exc_info=True)
-        channels = []
+        logger.error(
+            "Initiative channel hydration failed | workspace_id=%s", workspace_id
+        )
+        raise _hydration_error() from None
 
     try:
         links = await select_all_trusted(
@@ -346,9 +355,11 @@ async def _base_records(workspace_id: str, user_id: str) -> tuple[list[dict[str,
             CHANNEL_LINK_COLUMNS,
             filters={"workspace_id": workspace_id},
         )
-    except SupabaseServiceError as exc:
-        logger.warning("Initiative channel link hydration failed | workspace_id=%s", workspace_id, exc_info=True)
-        links = []
+    except SupabaseServiceError:
+        logger.error(
+            "Initiative channel link hydration failed | workspace_id=%s", workspace_id
+        )
+        raise _hydration_error() from None
     return tasks, channels, links
 
 
@@ -393,7 +404,11 @@ async def _hydrate_initiatives(
             )
             linked_decisions = decisions
         except SupabaseServiceError:
-            logger.warning("Initiative linked decision hydration failed | initiative_id=%s", initiative_id, exc_info=True)
+            logger.error(
+                "Initiative linked decision hydration failed | initiative_id=%s",
+                initiative_id,
+            )
+            raise _hydration_error() from None
 
         hydrated.append(
             {
