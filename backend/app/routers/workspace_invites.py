@@ -227,8 +227,8 @@ async def _accept_workspace_invite_rpc(
                 "p_email": user_email,
             },
         ).execute()
-    except Exception as exc:
-        raise SupabaseServiceError("Internal server error") from exc
+    except Exception:
+        raise SupabaseServiceError("Internal server error") from None
 
     data = getattr(response, "data", None)
     if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
@@ -258,11 +258,11 @@ async def _accept_workspace_invite(invite_id: str, current_user: Any) -> dict[st
             user_id,
             normalize_email(user_email),
         )
-    except SupabaseServiceError as exc:
-        logger.exception(
+    except SupabaseServiceError:
+        logger.error(
             "Atomic workspace invite acceptance failed | invite_id=%s", invite_id
         )
-        raise _database_error() from exc
+        raise _database_error() from None
 
     outcome = str(result.get("outcome") or "")
     if outcome == "not_found":
@@ -283,9 +283,8 @@ async def _accept_workspace_invite(invite_id: str, current_user: Any) -> dict[st
     workspace_id = str(result.get("accepted_workspace_id") or "")
     if outcome != "accepted" or not workspace_id:
         logger.error(
-            "Atomic workspace invite acceptance returned an invalid outcome | invite_id=%s | outcome=%s",
+            "Atomic workspace invite acceptance returned an invalid outcome | invite_id=%s",
             invite_id,
-            outcome or "missing",
         )
         raise _database_error()
 
