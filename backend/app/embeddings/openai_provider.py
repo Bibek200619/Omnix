@@ -9,7 +9,6 @@ from typing import List
 from .dimensions import get_expected_embedding_dimension, validate_embeddings_dimension
 from .provider import EmbeddingProvider
 from .utils import batch_list
-from ..observability.safe_logging import safe_text_preview
 
 logger = logging.getLogger(__name__)
 
@@ -47,19 +46,21 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
                 embeddings = [item["embedding"] for item in data.get("data", [])]
                 validate_embeddings_dimension(embeddings, expected_dim=self.embedding_dim, label="OpenAI embeddings")
                 return embeddings
-            except httpx.RequestError as exc:
-                logger.exception("Request error calling OpenAI embeddings: %s", exc)
+            except httpx.RequestError:
+                logger.error("Request error calling OpenAI embeddings.")
                 await asyncio.sleep(backoff)
                 backoff *= 2
             except httpx.HTTPStatusError as exc:
-                logger.exception(
-                    "HTTP error from OpenAI embeddings: status=%s body=%s",
+                logger.error(
+                    "HTTP error from OpenAI embeddings: status=%s",
                     exc.response.status_code,
-                    safe_text_preview(exc.response.text, max_chars=500),
                 )
                 # If client error, do not retry
-                if 400 <= exc.response.status_code < 500 and exc.response.status_code != 429:
-                    raise
+                if (
+                    400 <= exc.response.status_code < 500
+                    and exc.response.status_code != 429
+                ):
+                    raise RuntimeError("OpenAI embedding request failed.") from None
                 await asyncio.sleep(backoff)
                 backoff *= 2
         raise RuntimeError("Failed to call OpenAI embeddings after retries")
