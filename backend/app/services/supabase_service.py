@@ -9,12 +9,14 @@ import time
 from typing import Any, NoReturn
 
 import httpx
+from postgrest.exceptions import APIError
 
 from ..db.supabase_client import get_async_supabase, get_supabase
 from .supabase_query_helpers import apply_filters as _apply_filters
 
 logger = logging.getLogger(__name__)
 INTERNAL_DB_ERROR = "Internal server error"
+OPTIONAL_DOCUMENT_COLUMNS = ("metadata", "source_type", "updated_at")
 SUPABASE_AUTH_ERROR = (
     "Supabase rejected the backend API key. Verify backend/.env "
     "SUPABASE_SERVICE_ROLE_KEY belongs to the configured SUPABASE_URL project."
@@ -149,7 +151,38 @@ def execute_query_sync(query: Any, *, operation: str = "execute") -> Any:
 
 
 class SupabaseServiceError(RuntimeError):
-    pass
+    def __init__(
+        self, message: str, *, missing_document_column: str | None = None
+    ) -> None:
+        super().__init__(message)
+        self.missing_document_column = (
+            missing_document_column
+            if missing_document_column in OPTIONAL_DOCUMENT_COLUMNS
+            else None
+        )
+
+
+def _missing_optional_document_column(
+    operation: str, table: str, exc: Exception
+) -> str | None:
+    # Classify before redaction, but retain only server-defined column names.
+    # Never infer schema drift from arbitrary provider details or error substrings.
+    if (
+        operation != "Batch insert"
+        or table != "documents"
+        or not isinstance(exc, APIError)
+    ):
+        return None
+    for column in OPTIONAL_DOCUMENT_COLUMNS:
+        if exc.code == "PGRST204" and exc.message == (
+            f"Could not find the '{column}' column of 'documents' in the schema cache"
+        ):
+            return column
+        if exc.code == "42703" and exc.message == (
+            f'column "{column}" of relation "documents" does not exist'
+        ):
+            return column
+    return None
 
 
 def _require_trusted_filters(
@@ -220,7 +253,12 @@ def _raise_supabase_error(operation: str, table: str, exc: Exception) -> NoRetur
         table,
     )
 
-    raise SupabaseServiceError(INTERNAL_DB_ERROR) from None
+    raise SupabaseServiceError(
+        INTERNAL_DB_ERROR,
+        missing_document_column=_missing_optional_document_column(
+            operation, table, exc
+        ),
+    ) from None
 
 
 def _insert_one_sync(table: str, payload: Mapping[str, Any]) -> dict[str, Any]:
