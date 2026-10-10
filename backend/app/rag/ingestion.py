@@ -6,15 +6,23 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from ..embeddings.dimensions import get_expected_embedding_dimension, validate_embeddings_dimension
-from ..services.supabase_service import SupabaseServiceError, delete_many_trusted, insert_many, select_all_trusted
+from ..embeddings.dimensions import (
+    get_expected_embedding_dimension,
+    validate_embeddings_dimension,
+)
+from ..services.supabase_service import (
+    OPTIONAL_DOCUMENT_COLUMNS,
+    SupabaseServiceError,
+    delete_many_trusted,
+    insert_many,
+    select_all_trusted,
+)
 from .chunking import chunk_text
 from .embedding import get_embeddings_async
 from .models import DocumentChunk, IngestionResult, ParsedDocument, ParsedSection
 from .vector_store_base import VectorStore
 
 logger = logging.getLogger(__name__)
-OPTIONAL_DOCUMENT_COLUMNS = ("metadata", "source_type", "updated_at")
 DEFAULT_EMBEDDING_BATCH_SIZE = 64
 MAX_INGESTION_CHUNKS = int(os.environ.get("OMNIX_MAX_INGESTION_CHUNKS", "5000"))
 MAX_METADATA_ITEMS = 50
@@ -229,18 +237,14 @@ class RAGIngestionPipeline:
                 await insert_many("documents", candidate_payloads)
                 return
             except SupabaseServiceError as exc:
-                message = str(exc.__cause__ or exc).lower()
-                missing_optional_columns = [
-                    column
-                    for column in OPTIONAL_DOCUMENT_COLUMNS
-                    if column not in stripped_columns
-                    and column in message
-                    and ("does not exist" in message or "schema cache" in message or "could not find" in message)
-                ]
-                if not missing_optional_columns:
+                column = exc.missing_document_column
+                if (
+                    column not in OPTIONAL_DOCUMENT_COLUMNS
+                    or column in stripped_columns
+                ):
                     raise
 
-                stripped_columns.update(missing_optional_columns)
+                stripped_columns.add(column)
                 logger.warning(
                     "Retrying document insert without optional columns unavailable in this Supabase schema: %s.",
                     ", ".join(sorted(stripped_columns)),
